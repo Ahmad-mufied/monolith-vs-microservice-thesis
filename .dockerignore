@@ -1,0 +1,121 @@
+# =========================
+# Git / VCS
+# =========================
+.git
+.gitignore
+.gitattributes
+
+# =========================
+# Docs and Thesis Notes
+# =========================
+docs/
+*.md
+!README.md
+
+# =========================
+# Editor / OS
+# =========================
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+*.local
+*.secret
+*.secrets
+secrets/
+.secret/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_rsa.pub
+
+# =========================
+# Build / Runtime Artifacts
+# =========================
+bin/
+build/
+dist/
+tmp/
+**/tmp/
+*.test
+*.out
+coverage.out
+coverage.html
+*.coverprofile
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# Terraform / Infrastructure
+# =========================
+infra/
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+.terraform.lock.hcl
+
+# =========================
+# Kubernetes / Helm
+# =========================
+deployments/
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+*.kubeconfig.yaml
+.kube/
+
+# =========================
+# k6 / Benchmark Results
+# =========================
+k6/results/
+k6/output/
+results/
+experiments/
+exports/
+snapshots/
+cluster-snapshots/
+*.json.gz
+*.csv.gz
+
+# =========================
+# Seed Generated Data
+# =========================
+seed/datasets/*.csv
+seed/datasets/*.json
+seed/datasets/*.ndjson
+seed/datasets/*.gz
+
+# =========================
+# Database Dumps
+# =========================
+*.sql.gz
+*.dump
+*.backup
+*.bak
+
+# =========================
+# Node / Misc
+# =========================
+node_modules/
+.cache/
+coverage/

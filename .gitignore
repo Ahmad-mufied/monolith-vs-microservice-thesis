@@ -1,0 +1,177 @@
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.iml
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+*.env
+*.local
+*.secret
+*.secrets
+secrets/
+.secret/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_rsa.pub
+
+# =========================
+# Go
+# =========================
+bin/
+build/
+dist/
+tmp/
+**/tmp/
+*.test
+*.out
+coverage.out
+coverage.html
+*.coverprofile
+
+# Go workspace local checksum file.
+# Keep ignored if each module commits go.sum separately.
+go.work.sum
+
+# =========================
+# Go Generated / Tooling
+# =========================
+*.pb.go
+*_grpc.pb.go
+
+# Keep generated proto output ignored by default.
+# Remove this rule if generated code will be committed.
+proto/gen/
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+*.trace
+
+# =========================
+# Docker
+# =========================
+.docker/
+docker-compose.override.yml
+
+# =========================
+# Kubernetes / Helm
+# =========================
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+*.kubeconfig.yaml
+.kube/
+helmfile*.lock
+charts/
+*.tgz
+
+# =========================
+# Terraform
+# =========================
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# Keep examples, ignore real variable files.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# =========================
+# AWS / Cloud Credentials
+# =========================
+.aws/
+aws-credentials
+credentials
+config.aws
+
+# =========================
+# Datadog / Observability
+# =========================
+datadog-values.yaml
+datadog-values.*.yaml
+dd-agent-values.yaml
+
+# =========================
+# k6 Results
+# =========================
+k6/results/
+k6/output/
+k6/*.json
+k6/*.log
+k6/*.gz
+!k6/package.json
+!k6/package-lock.json
+
+# =========================
+# Benchmark Results / Exports
+# =========================
+results/
+experiments/
+exports/
+snapshots/
+cluster-snapshots/
+*.csv.gz
+*.json.gz
+summary.json
+metadata.json
+stdout.log
+hpa-state.yaml
+hpa-describe.txt
+pods-state.txt
+top-pods.txt
+top-nodes.txt
+events.txt
+
+# =========================
+# Seed Generated Data
+# =========================
+seed/datasets/*.csv
+seed/datasets/*.json
+seed/datasets/*.ndjson
+seed/datasets/*.gz
+!seed/datasets/.gitkeep
+!seed/datasets/README.md
+
+# =========================
+# Database Dumps
+# =========================
+*.sql.gz
+*.dump
+*.backup
+*.bak
+
+# =========================
+# Misc
+# =========================
+.cache/
+coverage/
+
+.idea/*
+.qodo/*
