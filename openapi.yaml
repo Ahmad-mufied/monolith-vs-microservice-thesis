@@ -356,8 +356,8 @@ paths:
         - Usually implemented using direct SQL JOINs in a single database.
 
         Microservices implementation:
-        - API Gateway requests transaction data.
-        - API Gateway enriches transaction data by calling Auth Service and Item Service through gRPC.
+        - API Gateway forwards the REST request to Transaction Service through gRPC.
+        - Transaction Service enriches transaction data by calling Auth Service and Item Service through gRPC.
         - This creates a controlled distributed aggregation workload.
 
         This endpoint is used to observe latency, throughput, error rate,

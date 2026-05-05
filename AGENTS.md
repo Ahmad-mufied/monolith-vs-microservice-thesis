@@ -37,6 +37,8 @@ Use these domain terms:
 - transaction
 - transaction_items
 
+External REST API naming follows openapi.yaml. In the current API contract, item availability is exposed as Item.amount. Database and migration docs may still use available_amount for the internal storage column.
+
 Avoid these terms unless explicitly requested:
 
 - product
@@ -392,7 +394,11 @@ Error:
 
 {
   "status": "error",
-  "message": "error message"
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Invalid request payload",
+    "details": null
+  }
 }
 
 Main benchmark endpoints:
