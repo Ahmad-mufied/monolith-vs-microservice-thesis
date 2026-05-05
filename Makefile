@@ -39,7 +39,7 @@ TRANSACTION_SERVICE_ENV := env/transaction-service.env
 # =========================
 
 GOLANGCI_LINT ?= golangci-lint
-GOLANGCI_LINT_INSTALL ?= go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+GOLANGCI_LINT_INSTALL ?= go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 GOSEC ?= gosec
 GOSEC_INSTALL ?= go install github.com/securego/gosec/v2/cmd/gosec@latest
 
@@ -107,11 +107,11 @@ fmt:
 
 .PHONY: test
 test:
-	cd $(MONOLITH_DIR) && go test ./...
-	cd $(API_GATEWAY_DIR) && go test ./...
-	cd $(AUTH_SERVICE_DIR) && go test ./...
-	cd $(ITEM_SERVICE_DIR) && go test ./...
-	cd $(TRANSACTION_SERVICE_DIR) && go test ./...
+	cd $(MONOLITH_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go test ./...; else echo "skip test ($(MONOLITH_DIR)): no go packages"; fi
+	cd $(API_GATEWAY_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go test ./...; else echo "skip test ($(API_GATEWAY_DIR)): no go packages"; fi
+	cd $(AUTH_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go test ./...; else echo "skip test ($(AUTH_SERVICE_DIR)): no go packages"; fi
+	cd $(ITEM_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go test ./...; else echo "skip test ($(ITEM_SERVICE_DIR)): no go packages"; fi
+	cd $(TRANSACTION_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go test ./...; else echo "skip test ($(TRANSACTION_SERVICE_DIR)): no go packages"; fi
 
 .PHONY: lint-install
 lint-install:
@@ -120,11 +120,11 @@ lint-install:
 .PHONY: lint golint
 lint:
 	@command -v $(GOLANGCI_LINT) >/dev/null || (echo "golangci-lint not found. Install with: make lint-install"; exit 1)
-	cd $(MONOLITH_DIR) && $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...
-	cd $(API_GATEWAY_DIR) && $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...
-	cd $(AUTH_SERVICE_DIR) && $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...
-	cd $(ITEM_SERVICE_DIR) && $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...
-	cd $(TRANSACTION_SERVICE_DIR) && $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...
+	cd $(MONOLITH_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...; else echo "skip lint ($(MONOLITH_DIR)): no go packages"; fi
+	cd $(API_GATEWAY_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...; else echo "skip lint ($(API_GATEWAY_DIR)): no go packages"; fi
+	cd $(AUTH_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...; else echo "skip lint ($(AUTH_SERVICE_DIR)): no go packages"; fi
+	cd $(ITEM_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...; else echo "skip lint ($(ITEM_SERVICE_DIR)): no go packages"; fi
+	cd $(TRANSACTION_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...; else echo "skip lint ($(TRANSACTION_SERVICE_DIR)): no go packages"; fi
 
 golint: lint
 
@@ -135,21 +135,21 @@ gosec-install:
 .PHONY: gosec security
 gosec:
 	@command -v $(GOSEC) >/dev/null || (echo "gosec not found. Install with: make gosec-install"; exit 1)
-	cd $(MONOLITH_DIR) && $(GOSEC) ./...
-	cd $(API_GATEWAY_DIR) && $(GOSEC) ./...
-	cd $(AUTH_SERVICE_DIR) && $(GOSEC) ./...
-	cd $(ITEM_SERVICE_DIR) && $(GOSEC) ./...
-	cd $(TRANSACTION_SERVICE_DIR) && $(GOSEC) ./...
+	cd $(MONOLITH_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then $(GOSEC) ./...; else echo "skip gosec ($(MONOLITH_DIR)): no go packages"; fi
+	cd $(API_GATEWAY_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then $(GOSEC) ./...; else echo "skip gosec ($(API_GATEWAY_DIR)): no go packages"; fi
+	cd $(AUTH_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then $(GOSEC) ./...; else echo "skip gosec ($(AUTH_SERVICE_DIR)): no go packages"; fi
+	cd $(ITEM_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then $(GOSEC) ./...; else echo "skip gosec ($(ITEM_SERVICE_DIR)): no go packages"; fi
+	cd $(TRANSACTION_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then $(GOSEC) ./...; else echo "skip gosec ($(TRANSACTION_SERVICE_DIR)): no go packages"; fi
 
 security: gosec
 
 .PHONY: gofix go-fix fix
 gofix:
-	cd $(MONOLITH_DIR) && go fix ./...
-	cd $(API_GATEWAY_DIR) && go fix ./...
-	cd $(AUTH_SERVICE_DIR) && go fix ./...
-	cd $(ITEM_SERVICE_DIR) && go fix ./...
-	cd $(TRANSACTION_SERVICE_DIR) && go fix ./...
+	cd $(MONOLITH_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./...; else echo "skip fix ($(MONOLITH_DIR)): no go packages"; fi
+	cd $(API_GATEWAY_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./...; else echo "skip fix ($(API_GATEWAY_DIR)): no go packages"; fi
+	cd $(AUTH_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./...; else echo "skip fix ($(AUTH_SERVICE_DIR)): no go packages"; fi
+	cd $(ITEM_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./...; else echo "skip fix ($(ITEM_SERVICE_DIR)): no go packages"; fi
+	cd $(TRANSACTION_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./...; else echo "skip fix ($(TRANSACTION_SERVICE_DIR)): no go packages"; fi
 
 go-fix: gofix
 fix: gofix
