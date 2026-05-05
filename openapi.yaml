@@ -352,6 +352,12 @@ paths:
       description: |
         Read-heavy aggregation benchmark endpoint.
 
+        This endpoint is JWT-protected for the current benchmark scope.
+        The `admin` path segment identifies the administrative aggregation view,
+        not role-based access control. RBAC/admin-role authorization is outside
+        the current API contract and would require a separate schema, seed,
+        JWT claims, monolith, and microservices parity change.
+
         Monolith implementation:
         - Usually implemented using direct SQL JOINs in a single database.
 
