@@ -30,11 +30,12 @@ The API uses these generic domain terms:
 - user,
 - item,
 - transaction,
-- amount.
+- amount,
+- available_amount.
 
 The term `item` represents a generic allocatable entity. It can represent a ticket category, booking unit, quota unit, inventory-like resource, or another resource that can be allocated during a transaction.
 
-The external REST API uses `amount` for both item availability and transaction allocation amounts. The database may use more specific internal column names, such as `items.available_amount`, but API clients must follow `openapi.yaml`.
+The external REST API currently uses `available_amount` for item availability and `amount` for transaction allocation. The database may use internal column names such as `items.available_amount`, and API clients must follow `openapi.yaml`.
 
 Avoid these terms unless explicitly required later:
 
@@ -397,7 +398,7 @@ Expected response:
     {
       "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
       "name": "Item 1",
-      "amount": 1000000,
+      "available_amount": 1000000,
       "created_at": "2026-05-03T10:15:30Z",
       "updated_at": "2026-05-03T10:15:30Z"
     }
@@ -435,14 +436,14 @@ Expected request body:
 ```json
 {
   "name": "Item 1",
-  "amount": 1000000
+  "available_amount": 1000000
 }
 ```
 
 Notes:
 
-- API `amount` must be greater than or equal to 0,
-- API `amount` maps to the internal database column `items.available_amount`,
+- API `available_amount` must be greater than or equal to 0,
+- API `available_amount` maps to the internal database column `items.available_amount`,
 - the database generates `id` using UUIDv7.
 
 ---
@@ -492,14 +493,14 @@ Expected request body:
 ```json
 {
   "name": "Updated Item",
-  "amount": 500000
+  "available_amount": 500000
 }
 ```
 
 Notes:
 
-- updating API `amount` directly is allowed for CRUD/demo purposes,
-- API `amount` maps to the internal database column `items.available_amount`,
+- updating API `available_amount` directly is allowed for CRUD/demo purposes,
+- API `available_amount` maps to the internal database column `items.available_amount`,
 - benchmark transaction allocation must use the transaction flow, not this endpoint.
 
 ---
@@ -731,7 +732,7 @@ Expected response:
           "item": {
             "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
             "name": "Item 1",
-            "amount": 999998,
+            "available_amount": 999998,
             "created_at": "2026-05-03T10:15:30Z",
             "updated_at": "2026-05-03T10:15:30Z"
           },
@@ -810,7 +811,7 @@ Item:
       format: uuid
     name:
       type: string
-    amount:
+    available_amount:
       type: integer
       minimum: 0
     created_at:
@@ -824,7 +825,7 @@ Item:
 Use:
 
 ```text
-amount
+available_amount
 ```
 
 Do not use:
@@ -838,7 +839,7 @@ stock
 Implementation note:
 
 ```text
-API Item.amount maps to the database column items.available_amount.
+API Item.available_amount maps to the database column items.available_amount.
 ```
 
 ---
@@ -1043,7 +1044,7 @@ When updating `openapi.yaml`, ensure:
 - all ID fields use `format: uuid`,
 - examples use UUID strings,
 - `availability`, `quantity`, and `stock` are not used,
-- item availability in REST responses uses `Item.amount`,
+- item availability in REST responses uses `Item.available_amount`,
 - `item_ids` is replaced by `items: [{ item_id, amount }]`,
 - transaction responses include `amount`,
 - transaction responses follow the current `Transaction` and `TransactionItem` schemas,
@@ -1064,7 +1065,7 @@ Final API rules:
 Source of truth    : openapi.yaml
 ID format          : string, format uuid
 Domain term        : item
-Item field         : amount
+Item field         : available_amount
 Allocation field   : amount
 Response envelope  : status + data
 Error envelope     : status + error
