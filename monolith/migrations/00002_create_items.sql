@@ -1,0 +1,11 @@
+-- +goose Up
+CREATE TABLE items (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  name TEXT NOT NULL,
+  available_amount INT NOT NULL CHECK (available_amount >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- +goose Down
+DROP TABLE items;

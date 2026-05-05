@@ -1,0 +1,17 @@
+-- +goose Up
+CREATE TABLE transactions (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  status TEXT NOT NULL DEFAULT 'SUCCESS',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_transactions_user_id_created_at
+ON transactions(user_id, created_at DESC);
+
+CREATE INDEX idx_transactions_created_at
+ON transactions(created_at DESC);
+
+-- +goose Down
+DROP TABLE transactions;
