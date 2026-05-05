@@ -35,6 +35,15 @@ ITEM_SERVICE_ENV := env/item-service.env
 TRANSACTION_SERVICE_ENV := env/transaction-service.env
 
 # =========================
+# Tooling
+# =========================
+
+GOLANGCI_LINT ?= golangci-lint
+GOLANGCI_LINT_INSTALL ?= go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+GOSEC ?= gosec
+GOSEC_INSTALL ?= go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+# =========================
 # Help
 # =========================
 
@@ -45,6 +54,12 @@ help:
 	@echo "Development:"
 	@echo "  make fmt"
 	@echo "  make test"
+	@echo "  make lint"
+	@echo "  make lint-install"
+	@echo "  make golint"
+	@echo "  make gosec"
+	@echo "  make fix"
+	@echo "  make gofix"
 	@echo "  make tidy"
 	@echo "  make proto"
 	@echo ""
@@ -97,6 +112,47 @@ test:
 	cd $(AUTH_SERVICE_DIR) && go test ./...
 	cd $(ITEM_SERVICE_DIR) && go test ./...
 	cd $(TRANSACTION_SERVICE_DIR) && go test ./...
+
+.PHONY: lint-install
+lint-install:
+	$(GOLANGCI_LINT_INSTALL)
+
+.PHONY: lint golint
+lint:
+	@command -v $(GOLANGCI_LINT) >/dev/null || (echo "golangci-lint not found. Install with: make lint-install"; exit 1)
+	cd $(MONOLITH_DIR) && $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...
+	cd $(API_GATEWAY_DIR) && $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...
+	cd $(AUTH_SERVICE_DIR) && $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...
+	cd $(ITEM_SERVICE_DIR) && $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...
+	cd $(TRANSACTION_SERVICE_DIR) && $(GOLANGCI_LINT) run --config="$(CURDIR)/.golangci.yml" ./...
+
+golint: lint
+
+.PHONY: gosec-install
+gosec-install:
+	$(GOSEC_INSTALL)
+
+.PHONY: gosec security
+gosec:
+	@command -v $(GOSEC) >/dev/null || (echo "gosec not found. Install with: make gosec-install"; exit 1)
+	cd $(MONOLITH_DIR) && $(GOSEC) ./...
+	cd $(API_GATEWAY_DIR) && $(GOSEC) ./...
+	cd $(AUTH_SERVICE_DIR) && $(GOSEC) ./...
+	cd $(ITEM_SERVICE_DIR) && $(GOSEC) ./...
+	cd $(TRANSACTION_SERVICE_DIR) && $(GOSEC) ./...
+
+security: gosec
+
+.PHONY: gofix go-fix fix
+gofix:
+	cd $(MONOLITH_DIR) && go fix ./...
+	cd $(API_GATEWAY_DIR) && go fix ./...
+	cd $(AUTH_SERVICE_DIR) && go fix ./...
+	cd $(ITEM_SERVICE_DIR) && go fix ./...
+	cd $(TRANSACTION_SERVICE_DIR) && go fix ./...
+
+go-fix: gofix
+fix: gofix
 
 .PHONY: tidy
 tidy:
