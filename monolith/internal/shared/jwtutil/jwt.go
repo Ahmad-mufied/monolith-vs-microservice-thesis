@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type Manager struct {
@@ -13,7 +13,7 @@ type Manager struct {
 }
 
 type Claims struct {
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 func NewManager(secret string, ttl time.Duration) *Manager {
@@ -23,10 +23,10 @@ func NewManager(secret string, ttl time.Duration) *Manager {
 func (m *Manager) Sign(userID string) (string, error) {
 	now := time.Now().UTC()
 	claims := Claims{
-		StandardClaims: jwt.StandardClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
-			IssuedAt:  now.Unix(),
-			ExpiresAt: now.Add(m.ttl).Unix(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(m.ttl)),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -39,7 +39,8 @@ func (m *Manager) Sign(userID string) (string, error) {
 
 func (m *Manager) Verify(tokenString string) (string, error) {
 	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
+	parser := jwt.NewParser(jwt.WithExpirationRequired())
+	_, err := parser.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
@@ -47,9 +48,6 @@ func (m *Manager) Verify(tokenString string) (string, error) {
 	})
 	if err != nil {
 		return "", fmt.Errorf("parsing jwt: %w", err)
-	}
-	if !token.Valid {
-		return "", fmt.Errorf("invalid jwt")
 	}
 	if claims.Subject == "" {
 		return "", fmt.Errorf("jwt subject is required")

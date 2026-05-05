@@ -1,6 +1,8 @@
 package jwtutil
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"testing"
 	"time"
 )
@@ -19,7 +21,7 @@ func TestManagerSignVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := NewManager("secret", tt.ttl)
+			manager := NewManager(testJWTSecret(t), tt.ttl)
 			token := tt.token
 			if token == "" {
 				var err error
@@ -44,4 +46,14 @@ func TestManagerSignVerify(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testJWTSecret(t *testing.T) string {
+	t.Helper()
+
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		t.Fatalf("rand.Read() error: %v", err)
+	}
+	return hex.EncodeToString(secret)
 }
