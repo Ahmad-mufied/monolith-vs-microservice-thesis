@@ -5,11 +5,14 @@ import "net/http"
 type Code string
 
 const (
-	CodeBadRequest   Code = "BAD_REQUEST"
-	CodeUnauthorized Code = "UNAUTHORIZED"
-	CodeNotFound     Code = "NOT_FOUND"
-	CodeConflict     Code = "CONFLICT"
-	CodeInternal     Code = "INTERNAL_SERVER_ERROR"
+	CodeBadRequest           Code = "BAD_REQUEST"
+	CodeUnauthorized         Code = "UNAUTHORIZED"
+	CodeForbidden            Code = "FORBIDDEN"
+	CodeNotFound             Code = "NOT_FOUND"
+	CodeMethodNotAllowed     Code = "METHOD_NOT_ALLOWED"
+	CodeUnsupportedMediaType Code = "UNSUPPORTED_MEDIA_TYPE"
+	CodeConflict             Code = "CONFLICT"
+	CodeInternal             Code = "INTERNAL_SERVER_ERROR"
 )
 
 type Error struct {
@@ -42,6 +45,10 @@ func Unauthorized(message string) *Error {
 	return &Error{Code: CodeUnauthorized, Message: message, Status: http.StatusUnauthorized}
 }
 
+func Forbidden(message string) *Error {
+	return &Error{Code: CodeForbidden, Message: message, Status: http.StatusForbidden}
+}
+
 func NotFound(message string) *Error {
 	return &Error{Code: CodeNotFound, Message: message, Status: http.StatusNotFound}
 }
@@ -52,4 +59,31 @@ func Conflict(message string) *Error {
 
 func Internal(message string, err error) *Error {
 	return &Error{Code: CodeInternal, Message: message, Status: http.StatusInternalServerError, Err: err}
+}
+
+func FromHTTPStatus(status int, message string) *Error {
+	if message == "" {
+		message = http.StatusText(status)
+	}
+	switch status {
+	case http.StatusBadRequest:
+		return BadRequest(message, nil)
+	case http.StatusUnauthorized:
+		return Unauthorized(message)
+	case http.StatusForbidden:
+		return Forbidden(message)
+	case http.StatusNotFound:
+		return NotFound(message)
+	case http.StatusMethodNotAllowed:
+		return &Error{Code: CodeMethodNotAllowed, Message: message, Status: status}
+	case http.StatusUnsupportedMediaType:
+		return &Error{Code: CodeUnsupportedMediaType, Message: message, Status: status}
+	case http.StatusConflict:
+		return Conflict(message)
+	default:
+		if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
+			return &Error{Code: CodeBadRequest, Message: message, Status: status}
+		}
+		return Internal(message, nil)
+	}
 }
