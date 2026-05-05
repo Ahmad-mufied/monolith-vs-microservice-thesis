@@ -29,7 +29,7 @@ func (r *PostgresRepository) List(ctx context.Context, limit, offset int) ([]Ite
 	const query = `
 SELECT id::text, name, available_amount, created_at, updated_at
 FROM items
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2`
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
