@@ -1,0 +1,52 @@
+name: Code Quality Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-quality-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-security:
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+
+      - name: Run go fix
+        run: make fix
+
+      - name: Verify go fix changes are committed
+        run: |
+          if ! git diff --quiet; then
+            echo "go fix produced changes. Please run 'make fix' locally and commit the result."
+            git --no-pager diff
+            exit 1
+          fi
+
+      - name: Install golangci-lint
+        run: make lint-install
+
+      - name: Lint
+        run: make lint
+
+      - name: Run tests
+        run: make test
+
+      - name: Install gosec
+        run: make gosec-install
+
+      - name: Security scan
+        run: make gosec
