@@ -69,10 +69,16 @@ func TestList(t *testing.T) {
 			if err := List(c, http.StatusOK, []string{}, tt.limit, tt.offset, tt.totalReturned); err != nil {
 				t.Fatalf("List() returned error: %v", err)
 			}
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+			}
 
 			var got ListResponse
 			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 				t.Fatalf("unmarshal response: %v", err)
+			}
+			if got.Status != "success" {
+				t.Fatalf("status body = %q, want success", got.Status)
 			}
 			if got.Meta.Limit != tt.limit || got.Meta.Offset != tt.offset || got.Meta.TotalReturned != tt.totalReturned {
 				t.Fatalf("meta = %+v, want limit=%d offset=%d total=%d", got.Meta, tt.limit, tt.offset, tt.totalReturned)
