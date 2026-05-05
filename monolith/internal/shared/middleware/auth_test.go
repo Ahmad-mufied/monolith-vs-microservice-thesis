@@ -18,7 +18,7 @@ func TestUserIDFromBearer(t *testing.T) {
 	tests := []struct {
 		name      string
 		header    string
-		verifier  fakeVerifier
+		verifier  TokenVerifier
 		want      string
 		wantError bool
 	}{
@@ -27,6 +27,7 @@ func TestUserIDFromBearer(t *testing.T) {
 		{name: "invalid scheme", header: "Basic token", wantError: true},
 		{name: "verifier error", header: "Bearer token", verifier: fakeVerifier{err: errors.New("bad token")}, wantError: true},
 		{name: "invalid subject", header: "Bearer token", verifier: fakeVerifier{userID: "not-a-uuid"}, wantError: true},
+		{name: "nil verifier", header: "Bearer token", verifier: nil, wantError: true},
 	}
 
 	for _, tt := range tests {

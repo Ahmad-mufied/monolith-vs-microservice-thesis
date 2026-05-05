@@ -37,6 +37,9 @@ func UserID(c echo.Context) (string, error) {
 }
 
 func UserIDFromBearer(header string, verifier TokenVerifier) (string, error) {
+	if verifier == nil {
+		return "", apperror.Internal("authentication verifier is not configured", nil)
+	}
 	if header == "" {
 		return "", apperror.Unauthorized("missing authorization header")
 	}
