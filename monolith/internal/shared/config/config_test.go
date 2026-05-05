@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"testing"
 	"time"
 )
@@ -14,21 +16,21 @@ func TestLoad(t *testing.T) {
 		{
 			name: "loads required config with defaults",
 			env: map[string]string{
-				"DATABASE_URL": "postgres://user:pass@localhost:5432/mono_db",
-				"JWT_SECRET":   "secret",
+				"DATABASE_URL": "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":   testJWTSecret(t),
 			},
 		},
 		{
 			name: "missing database url",
 			env: map[string]string{
-				"JWT_SECRET": "secret",
+				"JWT_SECRET": testJWTSecret(t),
 			},
 			wantError: true,
 		},
 		{
 			name: "missing jwt secret",
 			env: map[string]string{
-				"DATABASE_URL": "postgres://user:pass@localhost:5432/mono_db",
+				"DATABASE_URL": "postgres://localhost:5432/mono_db?sslmode=disable",
 			},
 			wantError: true,
 		},
@@ -61,4 +63,14 @@ func TestLoad(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testJWTSecret(t *testing.T) string {
+	t.Helper()
+
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		t.Fatalf("rand.Read() error: %v", err)
+	}
+	return hex.EncodeToString(secret)
 }
