@@ -1,0 +1,889 @@
+openapi: 3.0.3
+
+info:
+  title: Skripsi Experimental API (Monolith & Microservices)
+  version: 1.3.0
+  description: |
+    Final OpenAPI specification for the undergraduate thesis benchmark project.
+
+    This API contract is shared by both architecture implementations:
+
+    1. Monolithic Architecture
+       - Exposes this REST API directly.
+
+    2. Microservices Architecture
+       - API Gateway exposes this REST API.
+       - Internal service-to-service communication uses gRPC.
+
+    The API is intentionally generic and designed for controlled benchmarking,
+    not for a production e-commerce system.
+
+    Main benchmark scenarios:
+    - Login user: CPU-bound authentication workload.
+    - Create transaction: write-heavy database workload.
+    - Get enriched transactions: read-heavy aggregation workload.
+
+servers:
+  - url: http://localhost:8080
+    description: Local monolith server or local API Gateway
+  - url: http://api.skripsi.local
+    description: Local Minikube ingress for API Gateway
+  - url: http://monolith.skripsi.local
+    description: Local Minikube ingress for monolith
+  - url: https://api.skripsi.example
+    description: EKS ingress placeholder
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Auth
+    description: Authentication and user registration
+  - name: Items
+    description: Generic item management
+  - name: Transactions
+    description: Transaction workload endpoints
+  - name: Admin
+    description: Administrative benchmark aggregation endpoints
+
+security:
+  - bearerAuth: []
+
+paths:
+  /healthz:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Used by Docker Compose, Kubernetes probes, and smoke tests.
+      security: []
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user
+      description: Creates a new user account for benchmark preparation or functional testing.
+      security: []
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: "[BENCHMARK 1] Login user"
+      description: |
+        CPU-bound benchmark endpoint.
+
+        This endpoint validates credentials and generates a JWT token.
+        It is used to simulate authentication workload and cryptographic processing.
+      security: []
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/items:
+    get:
+      tags:
+        - Items
+      summary: Get item list
+      description: Returns paginated generic items.
+      operationId: getItems
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/OffsetQuery"
+      responses:
+        "200":
+          description: Item list retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags:
+        - Items
+      summary: Create item
+      description: Creates a generic item with an amount value.
+      operationId: createItem
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateItemRequest"
+      responses:
+        "201":
+          description: Item created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/items/{item_id}:
+    get:
+      tags:
+        - Items
+      summary: Get item detail
+      operationId: getItemById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ItemIdPath"
+      responses:
+        "200":
+          description: Item retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      tags:
+        - Items
+      summary: Update item
+      description: Updates item name or amount.
+      operationId: updateItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ItemIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateItemRequest"
+      responses:
+        "200":
+          description: Item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      tags:
+        - Items
+      summary: Delete item
+      operationId: deleteItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ItemIdPath"
+      responses:
+        "200":
+          description: Item deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/transactions:
+    post:
+      tags:
+        - Transactions
+      summary: "[BENCHMARK 2] Create transaction"
+      description: |
+        I/O-bound benchmark endpoint.
+
+        Creates a transaction with one or more item entries.
+        Each transaction item contains an `item_id` and an `amount`.
+
+        The term `amount` is intentionally generic. It avoids making the benchmark
+        too specific to e-commerce inventory semantics while still providing a
+        numeric workload field for transaction processing.
+      operationId: createTransaction
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransactionRequest"
+      responses:
+        "201":
+          description: Transaction created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    get:
+      tags:
+        - Transactions
+      summary: Get own transactions
+      description: Returns transactions owned by the authenticated user.
+      operationId: getOwnTransactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/OffsetQuery"
+      responses:
+        "200":
+          description: Own transaction list retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/transactions/{transaction_id}:
+    get:
+      tags:
+        - Transactions
+      summary: Get transaction detail
+      operationId: getTransactionById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TransactionIdPath"
+      responses:
+        "200":
+          description: Transaction detail retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/admin/transactions:
+    get:
+      tags:
+        - Admin
+      summary: "[BENCHMARK 3] Get enriched transactions"
+      description: |
+        Read-heavy aggregation benchmark endpoint.
+
+        Monolith implementation:
+        - Usually implemented using direct SQL JOINs in a single database.
+
+        Microservices implementation:
+        - API Gateway requests transaction data.
+        - API Gateway enriches transaction data by calling Auth Service and Item Service through gRPC.
+        - This creates a controlled distributed aggregation workload.
+
+        This endpoint is used to observe latency, throughput, error rate,
+        and service-to-service communication overhead.
+      operationId: getEnrichedTransactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/OffsetQuery"
+      responses:
+        "200":
+          description: Enriched transaction list retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrichedTransactionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of records returned.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+
+    OffsetQuery:
+      name: offset
+      in: query
+      required: false
+      description: Number of records skipped.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+    ItemIdPath:
+      name: item_id
+      in: path
+      required: true
+      description: Item UUID.
+      schema:
+        type: string
+        format: uuid
+        example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001"
+
+    TransactionIdPath:
+      name: transaction_id
+      in: path
+      required: true
+      description: Transaction UUID.
+      schema:
+        type: string
+        format: uuid
+        example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f1001"
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: "ok"
+        service:
+          type: string
+          example: "api-gateway"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-05-05T12:00:00Z"
+
+    SuccessResponse:
+      type: object
+      required:
+        - status
+        - message
+      properties:
+        status:
+          type: string
+          example: "success"
+        message:
+          type: string
+          example: "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      required:
+        - status
+        - error
+      properties:
+        status:
+          type: string
+          example: "error"
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: "BAD_REQUEST"
+            message:
+              type: string
+              example: "Invalid request payload"
+            details:
+              type: object
+              additionalProperties: true
+              nullable: true
+
+    PaginationMeta:
+      type: object
+      required:
+        - limit
+        - offset
+        - total_returned
+      properties:
+        limit:
+          type: integer
+          example: 50
+        offset:
+          type: integer
+          example: 0
+        total_returned:
+          type: integer
+          example: 50
+
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: "Ahmad Mufied"
+        email:
+          type: string
+          format: email
+          example: "mufied@example.com"
+        password:
+          type: string
+          minLength: 8
+          example: "secret123"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "mufied@example.com"
+        password:
+          type: string
+          minLength: 8
+          example: "secret123"
+
+    LoginResponse:
+      type: object
+      required:
+        - status
+        - data
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: object
+          required:
+            - token
+            - user
+          properties:
+            token:
+              type: string
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            user:
+              $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Database-generated UUIDv7.
+          example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001"
+        name:
+          type: string
+          example: "Ahmad Mufied"
+        email:
+          type: string
+          format: email
+          example: "mufied@example.com"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-05-05T12:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-05-05T12:00:00Z"
+
+    UserResponse:
+      type: object
+      required:
+        - status
+        - data
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: "#/components/schemas/User"
+
+    CreateItemRequest:
+      type: object
+      required:
+        - name
+        - amount
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+          example: "Benchmark Item A"
+        amount:
+          type: integer
+          minimum: 0
+          description: Generic amount value used for benchmark transaction workload.
+          example: 1000
+
+    UpdateItemRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+          example: "Benchmark Item A Updated"
+        amount:
+          type: integer
+          minimum: 0
+          description: Generic amount value used for benchmark transaction workload.
+          example: 1500
+
+    Item:
+      type: object
+      required:
+        - id
+        - name
+        - amount
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Database-generated UUIDv7.
+          example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001"
+        name:
+          type: string
+          example: "Benchmark Item A"
+        amount:
+          type: integer
+          minimum: 0
+          description: Generic amount value. This is intentionally not named quantity or stock.
+          example: 1000
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-05-05T12:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-05-05T12:00:00Z"
+
+    ItemResponse:
+      type: object
+      required:
+        - status
+        - data
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: "#/components/schemas/Item"
+
+    ItemListResponse:
+      type: object
+      required:
+        - status
+        - data
+        - meta
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    CreateTransactionRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/CreateTransactionItemRequest"
+
+    CreateTransactionItemRequest:
+      type: object
+      required:
+        - item_id
+        - amount
+      properties:
+        item_id:
+          type: string
+          format: uuid
+          example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001"
+        amount:
+          type: integer
+          minimum: 1
+          description: Generic transaction amount for the selected item.
+          example: 2
+
+    Transaction:
+      type: object
+      required:
+        - id
+        - user_id
+        - items
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Database-generated UUIDv7.
+          example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001"
+        user_id:
+          type: string
+          format: uuid
+          example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionItem"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-05-05T12:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-05-05T12:00:00Z"
+
+    TransactionItem:
+      type: object
+      required:
+        - item_id
+        - amount
+      properties:
+        item_id:
+          type: string
+          format: uuid
+          example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001"
+        amount:
+          type: integer
+          minimum: 1
+          example: 2
+
+    TransactionResponse:
+      type: object
+      required:
+        - status
+        - data
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: "#/components/schemas/Transaction"
+
+    TransactionListResponse:
+      type: object
+      required:
+        - status
+        - data
+        - meta
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    EnrichedTransaction:
+      type: object
+      required:
+        - id
+        - user
+        - items
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001"
+        user:
+          $ref: "#/components/schemas/User"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnrichedTransactionItem"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-05-05T12:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-05-05T12:00:00Z"
+
+    EnrichedTransactionItem:
+      type: object
+      required:
+        - item
+        - amount
+      properties:
+        item:
+          $ref: "#/components/schemas/Item"
+        amount:
+          type: integer
+          minimum: 1
+          example: 2
+
+    EnrichedTransactionListResponse:
+      type: object
+      required:
+        - status
+        - data
+        - meta
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnrichedTransaction"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
