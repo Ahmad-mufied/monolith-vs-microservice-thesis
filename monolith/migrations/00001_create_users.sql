@@ -1,4 +1,5 @@
 -- +goose Up
+-- Requires PostgreSQL 18+ because DEFAULT uuidv7() is used below.
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   name TEXT NOT NULL,
