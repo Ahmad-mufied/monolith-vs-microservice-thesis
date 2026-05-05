@@ -46,7 +46,7 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 		if err := insertTransactionItem(ctx, tx, transaction.ID, item, availableAfter[item.ItemID]); err != nil {
 			return Transaction{}, err
 		}
-		transaction.Items = append(transaction.Items, Item{ItemID: item.ItemID, Amount: item.Amount})
+		transaction.Items = append(transaction.Items, Item(item))
 	}
 
 	if err := tx.Commit(ctx); err != nil {

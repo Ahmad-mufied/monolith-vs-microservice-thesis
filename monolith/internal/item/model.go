@@ -19,13 +19,7 @@ type Response struct {
 }
 
 func toResponse(item Item) Response {
-	return Response{
-		ID:              item.ID,
-		Name:            item.Name,
-		AvailableAmount: item.AvailableAmount,
-		CreatedAt:       item.CreatedAt,
-		UpdatedAt:       item.UpdatedAt,
-	}
+	return Response(item)
 }
 
 func toResponses(items []Item) []Response {

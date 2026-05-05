@@ -89,7 +89,7 @@ type ItemDetailResponse struct {
 func toResponse(tx Transaction) Response {
 	items := make([]ItemResponse, 0, len(tx.Items))
 	for _, item := range tx.Items {
-		items = append(items, ItemResponse{ItemID: item.ItemID, Amount: item.Amount})
+		items = append(items, ItemResponse(item))
 	}
 	return Response{ID: tx.ID, UserID: tx.UserID, Items: items, CreatedAt: tx.CreatedAt, UpdatedAt: tx.UpdatedAt}
 }
