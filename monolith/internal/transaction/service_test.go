@@ -60,6 +60,7 @@ func TestServiceCreate(t *testing.T) {
 		wantCode  apperror.Code
 	}{
 		{name: "success", userID: userID, req: CreateRequest{Items: []CreateItemRequest{{ItemID: strings.ToUpper(itemID), Amount: 2}}}, repo: &fakeRepo{tx: Transaction{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001", UserID: userID, Items: []Item{{ItemID: itemID, Amount: 2}}}}},
+		{name: "too many items", userID: userID, req: CreateRequest{Items: repeatCreateItems(itemID, 21)}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "invalid user id", userID: "bad", req: CreateRequest{Items: []CreateItemRequest{{ItemID: itemID, Amount: 2}}}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "empty items", userID: userID, req: CreateRequest{}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "invalid item id", userID: userID, req: CreateRequest{Items: []CreateItemRequest{{ItemID: "bad", Amount: 2}}}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
@@ -95,16 +96,34 @@ func TestServiceReadMethods(t *testing.T) {
 		wantCode  apperror.Code
 	}{
 		{name: "list own success", repo: &fakeRepo{txs: []Transaction{{ID: txID, UserID: userID}}}, run: func(s *Service) error {
-			_, err := s.ListOwn(context.Background(), userID, pagination.Page{Limit: 50})
-			return err
+			got, err := s.ListOwn(context.Background(), userID, pagination.Page{Limit: 50})
+			if err != nil {
+				return err
+			}
+			if len(got) != 1 || got[0].ID != txID || got[0].UserID != userID {
+				t.Fatalf("ListOwn() = %+v", got)
+			}
+			return nil
 		}},
 		{name: "detail success", repo: &fakeRepo{tx: Transaction{ID: txID, UserID: userID}}, run: func(s *Service) error {
-			_, err := s.GetOwnByID(context.Background(), userID, txID)
-			return err
+			got, err := s.GetOwnByID(context.Background(), userID, txID)
+			if err != nil {
+				return err
+			}
+			if got.ID != txID || got.UserID != userID {
+				t.Fatalf("GetOwnByID() = %+v", got)
+			}
+			return nil
 		}},
 		{name: "enriched success", repo: &fakeRepo{enriched: []EnrichedTransaction{{ID: txID, CreatedAt: now}}}, run: func(s *Service) error {
-			_, err := s.ListEnriched(context.Background(), pagination.Page{Limit: 50})
-			return err
+			got, err := s.ListEnriched(context.Background(), pagination.Page{Limit: 50})
+			if err != nil {
+				return err
+			}
+			if len(got) != 1 || got[0].ID != txID || !got[0].CreatedAt.Equal(now) {
+				t.Fatalf("ListEnriched() = %+v", got)
+			}
+			return nil
 		}},
 		{name: "invalid detail id", repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest, run: func(s *Service) error {
 			_, err := s.GetOwnByID(context.Background(), userID, "bad")
@@ -122,6 +141,14 @@ func TestServiceReadMethods(t *testing.T) {
 			assertAppError(t, err, tt.wantError, tt.wantCode)
 		})
 	}
+}
+
+func repeatCreateItems(itemID string, count int) []CreateItemRequest {
+	items := make([]CreateItemRequest, count)
+	for i := range items {
+		items[i] = CreateItemRequest{ItemID: itemID, Amount: 1}
+	}
+	return items
 }
 
 func assertAppError(t *testing.T, err error, wantError bool, wantCode apperror.Code) {

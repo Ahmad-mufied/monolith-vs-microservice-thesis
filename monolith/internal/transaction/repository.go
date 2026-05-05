@@ -70,7 +70,7 @@ func (r *PostgresRepository) ListOwn(ctx context.Context, userID string, limit, 
 SELECT id::text, user_id::text, created_at, updated_at
 FROM transactions
 WHERE user_id = $1::uuid
-ORDER BY created_at DESC
+ORDER BY created_at DESC, id DESC
 LIMIT $2 OFFSET $3`
 	rows, err := r.db.Query(ctx, query, userID, limit, offset)
 	if err != nil {
@@ -138,15 +138,15 @@ SELECT
   i.updated_at,
   ti.amount
 FROM (
-  SELECT id, user_id, created_at, updated_at
-  FROM transactions
-  ORDER BY created_at DESC
-  LIMIT $1 OFFSET $2
-) t
+	  SELECT id, user_id, created_at, updated_at
+	  FROM transactions
+	  ORDER BY created_at DESC, id DESC
+	  LIMIT $1 OFFSET $2
+	) t
 JOIN users u ON u.id = t.user_id
 JOIN transaction_items ti ON ti.transaction_id = t.id
 JOIN items i ON i.id = ti.item_id
-ORDER BY t.created_at DESC, t.id, i.id`
+ORDER BY t.created_at DESC, t.id DESC, i.id`
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, apperror.Internal("internal server error", fmt.Errorf("listing enriched transactions: %w", err))
