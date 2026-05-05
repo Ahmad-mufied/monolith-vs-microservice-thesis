@@ -1,0 +1,9 @@
+go 1.26.2
+
+use (
+	./microservices/api-gateway
+	./microservices/auth-service
+	./microservices/item-service
+	./microservices/transaction-service
+	./monolith
+)
