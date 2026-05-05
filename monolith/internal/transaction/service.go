@@ -27,10 +27,11 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 	if err := validateUUID(userID, "user_id"); err != nil {
 		return Response{}, err
 	}
-	if err := validateCreateItems(req.Items); err != nil {
+	items, err := validateAndNormalizeCreateItems(req.Items)
+	if err != nil {
 		return Response{}, err
 	}
-	tx, err := s.repo.Create(ctx, userID, req.Items)
+	tx, err := s.repo.Create(ctx, userID, items)
 	if err != nil {
 		return Response{}, err
 	}
@@ -70,27 +71,34 @@ func (s *Service) ListEnriched(ctx context.Context, page pagination.Page) ([]Enr
 	return toEnrichedResponses(transactions), nil
 }
 
-func validateCreateItems(items []CreateItemRequest) error {
+func validateAndNormalizeCreateItems(items []CreateItemRequest) ([]CreateItemRequest, error) {
 	if len(items) == 0 {
-		return apperror.BadRequest("invalid request payload", map[string]any{"items": "must contain at least one item"})
+		return nil, apperror.BadRequest("invalid request payload", map[string]any{"items": "must contain at least one item"})
 	}
 	if len(items) > 20 {
-		return apperror.BadRequest("invalid request payload", map[string]any{"items": "must contain at most 20 items"})
+		return nil, apperror.BadRequest("invalid request payload", map[string]any{"items": "must contain at most 20 items"})
 	}
 	seen := make(map[string]struct{}, len(items))
+	normalized := make([]CreateItemRequest, 0, len(items))
 	for _, item := range items {
-		if err := validateUUID(item.ItemID, "item_id"); err != nil {
-			return err
+		itemUUID, err := uuid.Parse(item.ItemID)
+		if err != nil {
+			return nil, apperror.BadRequest("invalid request payload", map[string]any{"item_id": "must be a valid UUID"})
 		}
 		if item.Amount < 1 {
-			return apperror.BadRequest("invalid request payload", map[string]any{"amount": "must be greater than 0"})
+			return nil, apperror.BadRequest("invalid request payload", map[string]any{"amount": "must be greater than 0"})
 		}
-		if _, ok := seen[item.ItemID]; ok {
-			return apperror.BadRequest("invalid request payload", map[string]any{"item_id": "duplicate item in transaction"})
+		normalizedID := itemUUID.String()
+		if _, ok := seen[normalizedID]; ok {
+			return nil, apperror.BadRequest("invalid request payload", map[string]any{"item_id": "duplicate item in transaction"})
 		}
-		seen[item.ItemID] = struct{}{}
+		seen[normalizedID] = struct{}{}
+		normalized = append(normalized, CreateItemRequest{
+			ItemID: normalizedID,
+			Amount: item.Amount,
+		})
 	}
-	return nil
+	return normalized, nil
 }
 
 func validateUUID(value, field string) error {

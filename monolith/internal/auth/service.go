@@ -2,8 +2,10 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/mail"
+	"reflect"
 	"strings"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
@@ -30,6 +32,9 @@ type Service struct {
 }
 
 func NewService(repo Repository, hasher PasswordHasher, signer TokenSigner) *Service {
+	mustNotBeNil("repo", repo)
+	mustNotBeNil("hasher", hasher)
+	mustNotBeNil("signer", signer)
 	return &Service{repo: repo, hasher: hasher, signer: signer}
 }
 
@@ -73,7 +78,10 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 		return LoginResponse{}, err
 	}
 	if err := s.hasher.Compare(user.PasswordHash, req.Password); err != nil {
-		return LoginResponse{}, apperror.Unauthorized("invalid email or password")
+		if errors.Is(err, ErrPasswordMismatch) {
+			return LoginResponse{}, apperror.Unauthorized("invalid email or password")
+		}
+		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("comparing password: %w", err))
 	}
 
 	token, err := s.signer.Sign(user.ID)
@@ -90,4 +98,17 @@ func isEmail(value string) bool {
 	}
 	addr, err := mail.ParseAddress(value)
 	return err == nil && addr.Address == value && addr.Name == ""
+}
+
+func mustNotBeNil(name string, value any) {
+	if value == nil {
+		panic(fmt.Sprintf("auth service dependency %q is required", name))
+	}
+	v := reflect.ValueOf(value)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		if v.IsNil() {
+			panic(fmt.Sprintf("auth service dependency %q is required", name))
+		}
+	}
 }

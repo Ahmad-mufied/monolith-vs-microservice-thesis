@@ -119,7 +119,8 @@ func TestServiceLogin(t *testing.T) {
 		{name: "invalid email", req: LoginRequest{Email: "bad", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, signer: fakeSigner{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "display name email rejected", req: LoginRequest{Email: "Ahmad <mufied@example.com>", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, signer: fakeSigner{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "missing user", req: LoginRequest{Email: "mufied@example.com", Password: "secret123"}, repo: &fakeRepo{findErr: apperror.Unauthorized("invalid email or password")}, hasher: fakeHasher{}, signer: fakeSigner{}, wantError: true, wantCode: apperror.CodeUnauthorized},
-		{name: "bad password", req: LoginRequest{Email: "mufied@example.com", Password: "wrongpass"}, repo: &fakeRepo{findUser: user}, hasher: fakeHasher{compareErr: errors.New("bad password")}, signer: fakeSigner{}, wantError: true, wantCode: apperror.CodeUnauthorized},
+		{name: "bad password", req: LoginRequest{Email: "mufied@example.com", Password: "wrongpass"}, repo: &fakeRepo{findUser: user}, hasher: fakeHasher{compareErr: ErrPasswordMismatch}, signer: fakeSigner{}, wantError: true, wantCode: apperror.CodeUnauthorized},
+		{name: "hasher internal error", req: LoginRequest{Email: "mufied@example.com", Password: "secret123"}, repo: &fakeRepo{findUser: user}, hasher: fakeHasher{compareErr: errors.New("hash parsing failed")}, signer: fakeSigner{}, wantError: true, wantCode: apperror.CodeInternal},
 		{name: "sign error", req: LoginRequest{Email: "mufied@example.com", Password: "secret123"}, repo: &fakeRepo{findUser: user}, hasher: fakeHasher{}, signer: fakeSigner{err: errors.New("sign failed")}, wantError: true, wantCode: apperror.CodeInternal},
 	}
 
@@ -134,6 +135,50 @@ func TestServiceLogin(t *testing.T) {
 			if got.Token != "token" || got.User.ID != user.ID || tt.repo.findEmailReceived != "mufied@example.com" {
 				t.Fatalf("login response = %+v findEmail=%q", got, tt.repo.findEmailReceived)
 			}
+		})
+	}
+}
+
+func TestNewServiceDependencyValidation(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		_ = NewService(&fakeRepo{}, fakeHasher{}, fakeSigner{})
+	})
+
+	tests := []struct {
+		name string
+		run  func()
+	}{
+		{
+			name: "nil repo",
+			run: func() {
+				var repo *fakeRepo
+				_ = NewService(repo, fakeHasher{}, fakeSigner{})
+			},
+		},
+		{
+			name: "nil hasher",
+			run: func() {
+				var hasher *fakeHasher
+				_ = NewService(&fakeRepo{}, hasher, fakeSigner{})
+			},
+		},
+		{
+			name: "nil signer",
+			run: func() {
+				var signer *fakeSigner
+				_ = NewService(&fakeRepo{}, fakeHasher{}, signer)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("expected panic, got nil")
+				}
+			}()
+			tt.run()
 		})
 	}
 }

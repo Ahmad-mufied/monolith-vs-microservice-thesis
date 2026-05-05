@@ -3,6 +3,7 @@ package transaction
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
@@ -28,7 +29,7 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 	}()
 
 	availableAfter := make(map[string]int, len(items))
-	for _, item := range items {
+	for _, item := range orderedItemsForAllocation(items) {
 		after, err := allocateItem(ctx, tx, item)
 		if err != nil {
 			return Transaction{}, err
@@ -53,6 +54,15 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 		return Transaction{}, apperror.Internal("internal server error", fmt.Errorf("committing transaction: %w", err))
 	}
 	return transaction, nil
+}
+
+func orderedItemsForAllocation(items []CreateItemRequest) []CreateItemRequest {
+	ordered := make([]CreateItemRequest, len(items))
+	copy(ordered, items)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return ordered[i].ItemID < ordered[j].ItemID
+	})
+	return ordered
 }
 
 func (r *PostgresRepository) ListOwn(ctx context.Context, userID string, limit, offset int) ([]Transaction, error) {

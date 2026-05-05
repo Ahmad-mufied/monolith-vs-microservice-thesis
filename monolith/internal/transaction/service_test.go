@@ -3,6 +3,7 @@ package transaction
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,12 +59,13 @@ func TestServiceCreate(t *testing.T) {
 		wantError bool
 		wantCode  apperror.Code
 	}{
-		{name: "success", userID: userID, req: CreateRequest{Items: []CreateItemRequest{{ItemID: itemID, Amount: 2}}}, repo: &fakeRepo{tx: Transaction{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001", UserID: userID, Items: []Item{{ItemID: itemID, Amount: 2}}}}},
+		{name: "success", userID: userID, req: CreateRequest{Items: []CreateItemRequest{{ItemID: strings.ToUpper(itemID), Amount: 2}}}, repo: &fakeRepo{tx: Transaction{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001", UserID: userID, Items: []Item{{ItemID: itemID, Amount: 2}}}}},
 		{name: "invalid user id", userID: "bad", req: CreateRequest{Items: []CreateItemRequest{{ItemID: itemID, Amount: 2}}}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "empty items", userID: userID, req: CreateRequest{}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "invalid item id", userID: userID, req: CreateRequest{Items: []CreateItemRequest{{ItemID: "bad", Amount: 2}}}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "invalid amount", userID: userID, req: CreateRequest{Items: []CreateItemRequest{{ItemID: itemID, Amount: 0}}}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "duplicate item", userID: userID, req: CreateRequest{Items: []CreateItemRequest{{ItemID: itemID, Amount: 1}, {ItemID: itemID, Amount: 1}}}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
+		{name: "duplicate item with different case", userID: userID, req: CreateRequest{Items: []CreateItemRequest{{ItemID: itemID, Amount: 1}, {ItemID: strings.ToUpper(itemID), Amount: 1}}}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "repo conflict", userID: userID, req: CreateRequest{Items: []CreateItemRequest{{ItemID: itemID, Amount: 2}}}, repo: &fakeRepo{err: apperror.Conflict("insufficient available amount")}, wantError: true, wantCode: apperror.CodeConflict},
 	}
 
@@ -73,6 +75,9 @@ func TestServiceCreate(t *testing.T) {
 			assertAppError(t, err, tt.wantError, tt.wantCode)
 			if !tt.wantError && got.ID == "" {
 				t.Fatal("expected transaction ID")
+			}
+			if !tt.wantError && len(tt.repo.createItems) == 1 && tt.repo.createItems[0].ItemID != itemID {
+				t.Fatalf("normalized item_id = %q, want %q", tt.repo.createItems[0].ItemID, itemID)
 			}
 		})
 	}
