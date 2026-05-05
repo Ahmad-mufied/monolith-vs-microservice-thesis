@@ -90,12 +90,12 @@ func TestServiceReadMethods(t *testing.T) {
 	now := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name      string
-		run       func(*Service) error
+		run       func(*testing.T, *Service) error
 		repo      *fakeRepo
 		wantError bool
 		wantCode  apperror.Code
 	}{
-		{name: "list own success", repo: &fakeRepo{txs: []Transaction{{ID: txID, UserID: userID}}}, run: func(s *Service) error {
+		{name: "list own success", repo: &fakeRepo{txs: []Transaction{{ID: txID, UserID: userID}}}, run: func(t *testing.T, s *Service) error {
 			got, err := s.ListOwn(context.Background(), userID, pagination.Page{Limit: 50})
 			if err != nil {
 				return err
@@ -105,7 +105,7 @@ func TestServiceReadMethods(t *testing.T) {
 			}
 			return nil
 		}},
-		{name: "detail success", repo: &fakeRepo{tx: Transaction{ID: txID, UserID: userID}}, run: func(s *Service) error {
+		{name: "detail success", repo: &fakeRepo{tx: Transaction{ID: txID, UserID: userID}}, run: func(t *testing.T, s *Service) error {
 			got, err := s.GetOwnByID(context.Background(), userID, txID)
 			if err != nil {
 				return err
@@ -115,7 +115,7 @@ func TestServiceReadMethods(t *testing.T) {
 			}
 			return nil
 		}},
-		{name: "enriched success", repo: &fakeRepo{enriched: []EnrichedTransaction{{ID: txID, CreatedAt: now}}}, run: func(s *Service) error {
+		{name: "enriched success", repo: &fakeRepo{enriched: []EnrichedTransaction{{ID: txID, CreatedAt: now}}}, run: func(t *testing.T, s *Service) error {
 			got, err := s.ListEnriched(context.Background(), pagination.Page{Limit: 50})
 			if err != nil {
 				return err
@@ -125,11 +125,11 @@ func TestServiceReadMethods(t *testing.T) {
 			}
 			return nil
 		}},
-		{name: "invalid detail id", repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest, run: func(s *Service) error {
+		{name: "invalid detail id", repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest, run: func(_ *testing.T, s *Service) error {
 			_, err := s.GetOwnByID(context.Background(), userID, "bad")
 			return err
 		}},
-		{name: "repo not found", repo: &fakeRepo{err: apperror.NotFound("transaction not found")}, wantError: true, wantCode: apperror.CodeNotFound, run: func(s *Service) error {
+		{name: "repo not found", repo: &fakeRepo{err: apperror.NotFound("transaction not found")}, wantError: true, wantCode: apperror.CodeNotFound, run: func(_ *testing.T, s *Service) error {
 			_, err := s.GetOwnByID(context.Background(), userID, txID)
 			return err
 		}},
@@ -137,7 +137,7 @@ func TestServiceReadMethods(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.run(NewService(tt.repo))
+			err := tt.run(t, NewService(tt.repo))
 			assertAppError(t, err, tt.wantError, tt.wantCode)
 		})
 	}
