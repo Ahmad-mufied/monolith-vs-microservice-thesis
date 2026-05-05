@@ -3,6 +3,8 @@ name: Code Quality Check
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "**/*.go"
 
 permissions:
   contents: read
