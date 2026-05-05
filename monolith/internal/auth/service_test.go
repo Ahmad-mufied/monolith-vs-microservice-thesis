@@ -83,6 +83,7 @@ func TestServiceRegister(t *testing.T) {
 		},
 		{name: "missing name", req: RegisterRequest{Email: "mufied@example.com", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "invalid email", req: RegisterRequest{Name: "Ahmad", Email: "bad", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, wantError: true, wantCode: apperror.CodeBadRequest},
+		{name: "display name email rejected", req: RegisterRequest{Name: "Ahmad", Email: "Ahmad <mufied@example.com>", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "short password", req: RegisterRequest{Name: "Ahmad", Email: "mufied@example.com", Password: "short"}, repo: &fakeRepo{}, hasher: fakeHasher{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "duplicate email", req: RegisterRequest{Name: "Ahmad", Email: "mufied@example.com", Password: "secret123"}, repo: &fakeRepo{createErr: apperror.Conflict("email already exists")}, hasher: fakeHasher{hash: "hashed"}, wantError: true, wantCode: apperror.CodeConflict},
 	}
@@ -116,6 +117,7 @@ func TestServiceLogin(t *testing.T) {
 	}{
 		{name: "success", req: LoginRequest{Email: "MUFIED@example.com", Password: "secret123"}, repo: &fakeRepo{findUser: user}, hasher: fakeHasher{}, signer: fakeSigner{token: "token"}},
 		{name: "invalid email", req: LoginRequest{Email: "bad", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, signer: fakeSigner{}, wantError: true, wantCode: apperror.CodeBadRequest},
+		{name: "display name email rejected", req: LoginRequest{Email: "Ahmad <mufied@example.com>", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, signer: fakeSigner{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "missing user", req: LoginRequest{Email: "mufied@example.com", Password: "secret123"}, repo: &fakeRepo{findErr: apperror.Unauthorized("invalid email or password")}, hasher: fakeHasher{}, signer: fakeSigner{}, wantError: true, wantCode: apperror.CodeUnauthorized},
 		{name: "bad password", req: LoginRequest{Email: "mufied@example.com", Password: "wrongpass"}, repo: &fakeRepo{findUser: user}, hasher: fakeHasher{compareErr: errors.New("bad password")}, signer: fakeSigner{}, wantError: true, wantCode: apperror.CodeUnauthorized},
 		{name: "sign error", req: LoginRequest{Email: "mufied@example.com", Password: "secret123"}, repo: &fakeRepo{findUser: user}, hasher: fakeHasher{}, signer: fakeSigner{err: errors.New("sign failed")}, wantError: true, wantCode: apperror.CodeInternal},

@@ -88,6 +88,6 @@ func isEmail(value string) bool {
 	if value == "" {
 		return false
 	}
-	_, err := mail.ParseAddress(value)
-	return err == nil
+	addr, err := mail.ParseAddress(value)
+	return err == nil && addr.Address == value && addr.Name == ""
 }
