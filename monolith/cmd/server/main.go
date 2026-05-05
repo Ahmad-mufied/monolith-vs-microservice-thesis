@@ -53,8 +53,12 @@ func main() {
 		if c.Response().Committed {
 			return
 		}
-		if httpErr, ok := err.(*echo.HTTPError); ok && httpErr.Code == http.StatusNotFound {
-			_ = httputil.Error(c, apperror.NotFound("resource not found"))
+		if httpErr, ok := errors.AsType[*echo.HTTPError](err); ok {
+			if httpErr.Code == http.StatusNotFound {
+				_ = httputil.Error(c, apperror.NotFound("resource not found"))
+				return
+			}
+			_ = httputil.Error(c, apperror.FromHTTPStatus(httpErr.Code, httpErrorMessage(httpErr)))
 			return
 		}
 		_ = httputil.Error(c, apperror.Internal("internal server error", err))
@@ -83,7 +87,7 @@ func main() {
 		logger.Info("starting monolith", slog.String("addr", addr), slog.String("env", cfg.AppEnv))
 		if err := e.Start(addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("http server error", slog.String("error", err.Error()))
-			stop()
+			os.Exit(1)
 		}
 	}()
 
@@ -93,4 +97,11 @@ func main() {
 	if err := e.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown http server", slog.String("error", err.Error()))
 	}
+}
+
+func httpErrorMessage(err *echo.HTTPError) string {
+	if message, ok := err.Message.(string); ok {
+		return message
+	}
+	return http.StatusText(err.Code)
 }
