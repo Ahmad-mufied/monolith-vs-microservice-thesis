@@ -9,9 +9,6 @@ CREATE TABLE transaction_items (
   PRIMARY KEY (transaction_id, item_id)
 );
 
-CREATE INDEX idx_transaction_items_transaction_id
-ON transaction_items(transaction_id);
-
 CREATE INDEX idx_transaction_items_item_id
 ON transaction_items(item_id);
 
