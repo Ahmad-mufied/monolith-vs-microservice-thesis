@@ -31,6 +31,11 @@ type Service struct {
 	signer TokenSigner
 }
 
+const (
+	minPasswordLength = 8
+	maxPasswordBytes  = 72
+)
+
 func NewService(repo Repository, hasher PasswordHasher, signer TokenSigner) *Service {
 	mustNotBeNil("repo", repo)
 	mustNotBeNil("hasher", hasher)
@@ -47,8 +52,8 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (UserRespon
 	if !isEmail(email) {
 		return UserResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"email": "must be a valid email"})
 	}
-	if len(req.Password) < 8 {
-		return UserResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at least 8 characters"})
+	if err := validatePassword(req.Password); err != nil {
+		return UserResponse{}, err
 	}
 
 	passwordHash, err := s.hasher.Hash(req.Password)
@@ -69,8 +74,8 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 	if !isEmail(email) {
 		return LoginResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"email": "must be a valid email"})
 	}
-	if len(req.Password) < 8 {
-		return LoginResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at least 8 characters"})
+	if err := validatePassword(req.Password); err != nil {
+		return LoginResponse{}, err
 	}
 
 	user, err := s.repo.FindUserByEmail(ctx, email)
@@ -105,6 +110,16 @@ func isEmail(value string) bool {
 	}
 	addr, err := mail.ParseAddress(value)
 	return err == nil && addr.Address == value && addr.Name == ""
+}
+
+func validatePassword(password string) error {
+	if len(password) < minPasswordLength {
+		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at least 8 characters"})
+	}
+	if len(password) > maxPasswordBytes {
+		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at most 72 bytes"})
+	}
+	return nil
 }
 
 func mustNotBeNil(name string, value any) {
