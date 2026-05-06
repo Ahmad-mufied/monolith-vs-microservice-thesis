@@ -7,6 +7,7 @@ import (
 	"net/mail"
 	"reflect"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 )
@@ -33,6 +34,7 @@ type Service struct {
 
 const (
 	minPasswordLength = 8
+	maxPasswordLength = 72
 	maxPasswordBytes  = 72
 )
 
@@ -113,13 +115,18 @@ func isEmail(value string) bool {
 }
 
 func validatePassword(password string) error {
-	if len(password) < minPasswordLength {
+	passwordLength := utf8.RuneCountInString(password)
+	if passwordLength < minPasswordLength {
 		// #nosec G101 -- "password" is the public request field name in the validation payload, not a hardcoded credential.
 		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at least 8 characters"})
 	}
+	if passwordLength > maxPasswordLength {
+		// #nosec G101 -- "password" is the public request field name in the validation payload, not a hardcoded credential.
+		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at most 72 characters"})
+	}
 	if len(password) > maxPasswordBytes {
 		// #nosec G101 -- "password" is the public request field name in the validation payload, not a hardcoded credential.
-		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at most 72 bytes"})
+		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at most 72 bytes for bcrypt compatibility"})
 	}
 	return nil
 }

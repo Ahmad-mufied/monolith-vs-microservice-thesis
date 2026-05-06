@@ -570,6 +570,7 @@ components:
           example: "mufied@example.com"
         password:
           type: string
+          description: "8-72 characters; for bcrypt compatibility, encoded UTF-8 input must not exceed 72 bytes."
           minLength: 8
           maxLength: 72
           example: "secret123"
@@ -586,6 +587,7 @@ components:
           example: "mufied@example.com"
         password:
           type: string
+          description: "8-72 characters; for bcrypt compatibility, encoded UTF-8 input must not exceed 72 bytes."
           minLength: 8
           maxLength: 72
           example: "secret123"
