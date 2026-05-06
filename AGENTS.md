@@ -37,7 +37,7 @@ Use these domain terms:
 - transaction
 - transaction_items
 
-External REST API naming follows openapi.yaml. In the current API contract, item availability is exposed as Item.amount. Database and migration docs may still use available_amount for the internal storage column.
+External REST API naming follows openapi.yaml. In the current API contract, item availability is exposed as Item.available_amount. The database schema and migration docs also use available_amount for the internal storage column.
 
 Avoid these terms unless explicitly requested:
 
