@@ -898,7 +898,7 @@ TransactionEnriched:
       type: string
       format: date-time
     user:
-      $ref: '#/components/schemas/User'
+      $ref: '#/components/schemas/UserSummary'
     items:
       type: array
       items:
