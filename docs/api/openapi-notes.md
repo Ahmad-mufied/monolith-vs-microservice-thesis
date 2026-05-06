@@ -700,7 +700,7 @@ aggregation + network-bound
 
 Purpose:
 
-Return transaction data enriched with user and item details.
+Return transaction data enriched with user summary and item summary details.
 
 Query parameters:
 
@@ -731,10 +731,7 @@ Expected response:
         {
           "item": {
             "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
-            "name": "Item 1",
-            "available_amount": 999998,
-            "created_at": "2026-05-03T10:15:30Z",
-            "updated_at": "2026-05-03T10:15:30Z"
+            "name": "Item 1"
           },
           "amount": 2
         }
@@ -764,6 +761,11 @@ Transaction Service
 -> Item Service GetItemsByIds
 -> in-memory enrichment
 ```
+
+Notes:
+
+- This endpoint returns `UserSummary` and `ItemSummary`, not the full `User` and `Item` schemas.
+- `available_amount` is intentionally omitted from enriched item payloads because this endpoint represents transaction enrichment, not current inventory state.
 
 ---
 

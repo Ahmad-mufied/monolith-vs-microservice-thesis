@@ -3,6 +3,7 @@ package transaction
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -146,7 +147,10 @@ func TestServiceReadMethods(t *testing.T) {
 func repeatCreateItems(itemID string, count int) []CreateItemRequest {
 	items := make([]CreateItemRequest, count)
 	for i := range items {
-		items[i] = CreateItemRequest{ItemID: itemID, Amount: 1}
+		items[i] = CreateItemRequest{
+			ItemID: fmt.Sprintf("018f5f60-7c35-7ccf-9c3c-%012x", i+1),
+			Amount: 1,
+		}
 	}
 	return items
 }

@@ -131,14 +131,14 @@ SELECT
   u.id::text,
   u.name,
   u.email,
-  u.created_at,
-  u.updated_at,
-  i.id::text,
-  i.name,
-  i.available_amount,
-  i.created_at,
-  i.updated_at,
-  ti.amount
+	u.created_at,
+	u.updated_at,
+	i.id::text,
+	i.name,
+	ti.available_amount_after,
+	i.created_at,
+	i.updated_at,
+	ti.amount
 FROM (
 	  SELECT id, user_id, created_at, updated_at
 	  FROM transactions

@@ -3,6 +3,7 @@ package transaction
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -105,7 +106,7 @@ func TestHandlerListEnriched(t *testing.T) {
 		service    *fakeTransactionService
 		wantStatus int
 	}{
-		{name: "success", target: "/api/v1/admin/transactions", service: &fakeTransactionService{enriched: []EnrichedResponse{{ID: "tx"}}}, wantStatus: http.StatusOK},
+		{name: "success", target: "/api/v1/admin/transactions", service: &fakeTransactionService{enriched: []EnrichedResponse{{ID: "tx", User: UserSummaryResponse{ID: "user-1", Name: "Ahmad", Email: "ahmad@example.com"}, Items: []EnrichedItemResponse{{Item: ItemSummaryResponse{ID: "item-1", Name: "Item A"}, Amount: 2}}}}}, wantStatus: http.StatusOK},
 		{name: "invalid pagination", target: "/api/v1/admin/transactions?offset=-1", service: &fakeTransactionService{}, wantStatus: http.StatusBadRequest},
 		{name: "service error", target: "/api/v1/admin/transactions", service: &fakeTransactionService{err: apperror.Internal("internal server error", nil)}, wantStatus: http.StatusInternalServerError},
 	}
@@ -114,6 +115,38 @@ func TestHandlerListEnriched(t *testing.T) {
 			rec := executeTransactionHandler(http.MethodGet, tt.target, "", "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", nil, NewHandler(tt.service).ListEnriched)
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if tt.wantStatus == http.StatusOK {
+				var got map[string]any
+				if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+					t.Fatalf("unmarshal response: %v", err)
+				}
+				data, ok := got["data"].([]any)
+				if !ok || len(data) == 0 {
+					t.Fatalf("data payload = %+v", got["data"])
+				}
+				first, ok := data[0].(map[string]any)
+				if !ok {
+					t.Fatalf("transaction payload = %+v", data[0])
+				}
+				items, ok := first["items"].([]any)
+				if !ok || len(items) == 0 {
+					t.Fatalf("items payload = %+v", first["items"])
+				}
+				itemEntry, ok := items[0].(map[string]any)
+				if !ok {
+					t.Fatalf("item entry = %+v", items[0])
+				}
+				itemSummary, ok := itemEntry["item"].(map[string]any)
+				if !ok {
+					t.Fatalf("item summary = %+v", itemEntry["item"])
+				}
+				if _, exists := itemSummary["available_amount"]; exists {
+					t.Fatalf("enriched item unexpectedly exposes available_amount: %+v", itemSummary)
+				}
+				if _, exists := itemSummary["created_at"]; exists {
+					t.Fatalf("enriched item unexpectedly exposes created_at: %+v", itemSummary)
+				}
 			}
 		})
 	}

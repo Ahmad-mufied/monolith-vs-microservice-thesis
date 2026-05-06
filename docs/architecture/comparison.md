@@ -595,7 +595,10 @@ Aggregation + network-bound
 
 Main operation:
 
-Return transaction data enriched with user and item details.
+Return transaction data enriched with user summary and item summary details.
+
+The enriched transaction response intentionally omits `item.available_amount`.
+The benchmark compares aggregation strategy, not current inventory reporting.
 
 ---
 

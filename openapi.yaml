@@ -366,6 +366,10 @@ paths:
         - Transaction Service enriches transaction data by calling Auth Service and Item Service through gRPC.
         - This creates a controlled distributed aggregation workload.
 
+        The enriched item payload in this endpoint returns item summary fields only.
+        `available_amount` is intentionally not returned here because this endpoint
+        represents transaction enrichment rather than current inventory state.
+
         This endpoint is used to observe latency, throughput, error rate,
         and service-to-service communication overhead.
       operationId: getEnrichedTransactions
@@ -643,6 +647,41 @@ components:
         data:
           $ref: "#/components/schemas/User"
 
+    UserSummary:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Database-generated UUIDv7.
+          example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001"
+        name:
+          type: string
+          example: "Ahmad Mufied"
+        email:
+          type: string
+          format: email
+          example: "mufied@example.com"
+
+    ItemSummary:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Database-generated UUIDv7.
+          example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001"
+        name:
+          type: string
+          example: "Benchmark Item A"
+
     CreateItemRequest:
       type: object
       required:
@@ -850,7 +889,7 @@ components:
           format: uuid
           example: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001"
         user:
-          $ref: "#/components/schemas/User"
+          $ref: "#/components/schemas/UserSummary"
         items:
           type: array
           items:
@@ -871,7 +910,7 @@ components:
         - amount
       properties:
         item:
-          $ref: "#/components/schemas/Item"
+          $ref: "#/components/schemas/ItemSummary"
         amount:
           type: integer
           minimum: 1

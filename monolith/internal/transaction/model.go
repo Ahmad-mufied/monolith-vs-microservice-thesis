@@ -59,7 +59,7 @@ type ItemResponse struct {
 
 type EnrichedResponse struct {
 	ID        string                 `json:"id"`
-	User      UserResponse           `json:"user"`
+	User      UserSummaryResponse    `json:"user"`
 	Items     []EnrichedItemResponse `json:"items"`
 	CreatedAt time.Time              `json:"created_at"`
 	UpdatedAt time.Time              `json:"updated_at"`
@@ -73,9 +73,15 @@ type UserResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type UserSummaryResponse struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
 type EnrichedItemResponse struct {
-	Item   ItemDetailResponse `json:"item"`
-	Amount int                `json:"amount"`
+	Item   ItemSummaryResponse `json:"item"`
+	Amount int                 `json:"amount"`
 }
 
 type ItemDetailResponse struct {
@@ -84,6 +90,11 @@ type ItemDetailResponse struct {
 	AvailableAmount int       `json:"available_amount"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type ItemSummaryResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 func toResponse(tx Transaction) Response {
@@ -106,24 +117,19 @@ func toEnrichedResponse(tx EnrichedTransaction) EnrichedResponse {
 	items := make([]EnrichedItemResponse, 0, len(tx.Items))
 	for _, item := range tx.Items {
 		items = append(items, EnrichedItemResponse{
-			Item: ItemDetailResponse{
-				ID:              item.Item.ID,
-				Name:            item.Item.Name,
-				AvailableAmount: item.Item.AvailableAmount,
-				CreatedAt:       item.Item.CreatedAt,
-				UpdatedAt:       item.Item.UpdatedAt,
+			Item: ItemSummaryResponse{
+				ID:   item.Item.ID,
+				Name: item.Item.Name,
 			},
 			Amount: item.Amount,
 		})
 	}
 	return EnrichedResponse{
 		ID: tx.ID,
-		User: UserResponse{
-			ID:        tx.User.ID,
-			Name:      tx.User.Name,
-			Email:     tx.User.Email,
-			CreatedAt: tx.User.CreatedAt,
-			UpdatedAt: tx.User.UpdatedAt,
+		User: UserSummaryResponse{
+			ID:    tx.User.ID,
+			Name:  tx.User.Name,
+			Email: tx.User.Email,
 		},
 		Items:     items,
 		CreatedAt: tx.CreatedAt,
