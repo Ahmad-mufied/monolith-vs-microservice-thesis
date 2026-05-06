@@ -30,7 +30,7 @@ write_if_missing() {
 jwt_secret="$(random_hex 32)"
 
 if [[ -f env/postgres.env ]]; then
-  postgres_password="$(grep -E '^POSTGRES_PASSWORD=' env/postgres.env | cut -d= -f2-)"
+  postgres_password="$(grep -E '^POSTGRES_PASSWORD=' env/postgres.env | cut -d= -f2- || true)"
   if [[ -z "$postgres_password" ]]; then
     echo "env/postgres.env exists but POSTGRES_PASSWORD is empty" >&2
     exit 1
