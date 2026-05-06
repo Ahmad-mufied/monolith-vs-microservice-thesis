@@ -57,7 +57,7 @@ func TestHandlerCreate(t *testing.T) {
 		{name: "success", body: `{"items":[{"item_id":"018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001","amount":2}]}`, userID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", service: &fakeTransactionService{resp: Response{ID: "tx"}}, wantStatus: http.StatusCreated},
 		{name: "missing user", body: `{}`, service: &fakeTransactionService{}, wantStatus: http.StatusUnauthorized},
 		{name: "invalid json", body: `{`, userID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", service: &fakeTransactionService{}, wantStatus: http.StatusBadRequest},
-		{name: "service conflict", body: `{}`, userID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", service: &fakeTransactionService{err: apperror.Conflict("insufficient available amount")}, wantStatus: http.StatusConflict},
+		{name: "service conflict", body: `{"items":[{"item_id":"018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001","amount":2}]}`, userID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", service: &fakeTransactionService{err: apperror.Conflict("insufficient available amount")}, wantStatus: http.StatusConflict},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

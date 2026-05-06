@@ -106,6 +106,7 @@ func TestHandlerGetUpdateDelete(t *testing.T) {
 		{name: "update success", method: http.MethodPut, body: `{"name":"Updated"}`, handler: func(h *Handler) echo.HandlerFunc { return h.Update }, service: &fakeItemService{resp: Response{ID: "item"}}, wantStatus: http.StatusOK},
 		{name: "update invalid json", method: http.MethodPut, body: `{`, handler: func(h *Handler) echo.HandlerFunc { return h.Update }, service: &fakeItemService{}, wantStatus: http.StatusBadRequest},
 		{name: "delete success", method: http.MethodDelete, handler: func(h *Handler) echo.HandlerFunc { return h.Delete }, service: &fakeItemService{}, wantStatus: http.StatusOK},
+		{name: "delete conflict", method: http.MethodDelete, handler: func(h *Handler) echo.HandlerFunc { return h.Delete }, service: &fakeItemService{err: apperror.Conflict("item is referenced by transaction")}, wantStatus: http.StatusConflict},
 		{name: "delete not found", method: http.MethodDelete, handler: func(h *Handler) echo.HandlerFunc { return h.Delete }, service: &fakeItemService{err: apperror.NotFound("item not found")}, wantStatus: http.StatusNotFound},
 	}
 	for _, tt := range tests {
