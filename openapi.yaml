@@ -571,6 +571,7 @@ components:
         password:
           type: string
           minLength: 8
+          maxLength: 72
           example: "secret123"
 
     LoginRequest:
@@ -586,10 +587,11 @@ components:
         password:
           type: string
           minLength: 8
+          maxLength: 72
           example: "secret123"
 
     LoginResponse:
-      type: object
+
       required:
         - status
         - data
