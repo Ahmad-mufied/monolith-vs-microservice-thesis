@@ -30,10 +30,13 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Response, erro
 	if name == "" {
 		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "is required"})
 	}
-	if req.AvailableAmount < 0 {
+	if req.AvailableAmount == nil {
+		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"available_amount": "is required"})
+	}
+	if *req.AvailableAmount < 0 {
 		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"available_amount": "must be greater than or equal to 0"})
 	}
-	item, err := s.repo.Create(ctx, name, req.AvailableAmount)
+	item, err := s.repo.Create(ctx, name, *req.AvailableAmount)
 	if err != nil {
 		return Response{}, err
 	}
