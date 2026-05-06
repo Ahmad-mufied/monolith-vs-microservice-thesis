@@ -56,6 +56,8 @@ func (f *fakeRepo) Delete(_ context.Context, id string) error {
 
 func TestServiceCreate(t *testing.T) {
 	now := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
+	amount10 := 10
+	negativeOne := -1
 	tests := []struct {
 		name      string
 		req       CreateRequest
@@ -63,11 +65,11 @@ func TestServiceCreate(t *testing.T) {
 		wantError bool
 		wantCode  apperror.Code
 	}{
-		{name: "success", req: CreateRequest{Name: " Item A ", AvailableAmount: intPtr(10)}, repo: &fakeRepo{item: Item{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", Name: "Item A", AvailableAmount: 10, CreatedAt: now, UpdatedAt: now}}},
-		{name: "missing name", req: CreateRequest{AvailableAmount: intPtr(10)}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
+		{name: "success", req: CreateRequest{Name: " Item A ", AvailableAmount: &amount10}, repo: &fakeRepo{item: Item{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", Name: "Item A", AvailableAmount: 10, CreatedAt: now, UpdatedAt: now}}},
+		{name: "missing name", req: CreateRequest{AvailableAmount: &amount10}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "missing available amount", req: CreateRequest{Name: "Item A"}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
-		{name: "negative amount", req: CreateRequest{Name: "Item A", AvailableAmount: intPtr(-1)}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
-		{name: "repo error", req: CreateRequest{Name: "Item A", AvailableAmount: intPtr(10)}, repo: &fakeRepo{err: apperror.Internal("internal server error", errors.New("db"))}, wantError: true, wantCode: apperror.CodeInternal},
+		{name: "negative amount", req: CreateRequest{Name: "Item A", AvailableAmount: &negativeOne}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
+		{name: "repo error", req: CreateRequest{Name: "Item A", AvailableAmount: &amount10}, repo: &fakeRepo{err: apperror.Internal("internal server error", errors.New("db"))}, wantError: true, wantCode: apperror.CodeInternal},
 	}
 
 	for _, tt := range tests {
@@ -168,8 +170,4 @@ func assertAppError(t *testing.T, err error, wantError bool, wantCode apperror.C
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-}
-
-func intPtr(v int) *int {
-	return &v
 }
