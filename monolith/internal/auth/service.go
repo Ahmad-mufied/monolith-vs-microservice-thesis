@@ -75,7 +75,14 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 
 	user, err := s.repo.FindUserByEmail(ctx, email)
 	if err != nil {
-		return LoginResponse{}, err
+		var appErr *apperror.Error
+		if errors.As(err, &appErr) {
+			if appErr.Code == apperror.CodeInternal {
+				return LoginResponse{}, err
+			}
+			return LoginResponse{}, apperror.Unauthorized("invalid email or password")
+		}
+		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("finding user by email: %w", err))
 	}
 	if err := s.hasher.Compare(user.PasswordHash, req.Password); err != nil {
 		if errors.Is(err, ErrPasswordMismatch) {
