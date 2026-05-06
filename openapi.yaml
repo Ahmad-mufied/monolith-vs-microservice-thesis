@@ -194,6 +194,8 @@ paths:
                 $ref: "#/components/schemas/ItemResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
