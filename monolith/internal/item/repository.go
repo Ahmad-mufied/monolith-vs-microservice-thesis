@@ -106,7 +106,7 @@ type scanner interface {
 func scanOne(row scanner, contextMessage string) (Item, error) {
 	var item Item
 	if err := row.Scan(&item.ID, &item.Name, &item.AvailableAmount, &item.CreatedAt, &item.UpdatedAt); err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return Item{}, apperror.NotFound("item not found")
 		}
 		return Item{}, apperror.Internal("internal server error", fmt.Errorf("%s: %w", contextMessage, err))
