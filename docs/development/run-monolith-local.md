@@ -26,7 +26,7 @@ Optional for Kubernetes validation:
 Install Goose when needed:
 
 ```bash
-go install github.com/pressly/goose/v3/cmd/goose@latest
+go install github.com/pressly/goose/v3/cmd/goose@v3.27.1
 ```
 
 ## Repository Layout
