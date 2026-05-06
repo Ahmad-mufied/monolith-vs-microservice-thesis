@@ -67,12 +67,13 @@ func TestError(t *testing.T) {
 func TestList(t *testing.T) {
 	tests := []struct {
 		name          string
+		data          []string
 		limit         int
 		offset        int
 		totalReturned int
 	}{
-		{name: "empty list meta", limit: 50, offset: 0, totalReturned: 0},
-		{name: "non empty list meta", limit: 10, offset: 20, totalReturned: 3},
+		{name: "empty list meta", data: []string{}, limit: 50, offset: 0, totalReturned: 0},
+		{name: "non empty list meta", data: []string{"item-1", "item-2", "item-3"}, limit: 10, offset: 20, totalReturned: 3},
 	}
 
 	for _, tt := range tests {
@@ -81,7 +82,7 @@ func TestList(t *testing.T) {
 			rec := httptest.NewRecorder()
 			c := e.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), rec)
 
-			if err := List(c, http.StatusOK, []string{}, tt.limit, tt.offset, tt.totalReturned); err != nil {
+			if err := List(c, http.StatusOK, tt.data, tt.limit, tt.offset, tt.totalReturned); err != nil {
 				t.Fatalf("List() returned error: %v", err)
 			}
 			if rec.Code != http.StatusOK {
@@ -97,6 +98,13 @@ func TestList(t *testing.T) {
 			}
 			if got.Meta.Limit != tt.limit || got.Meta.Offset != tt.offset || got.Meta.TotalReturned != tt.totalReturned {
 				t.Fatalf("meta = %+v, want limit=%d offset=%d total=%d", got.Meta, tt.limit, tt.offset, tt.totalReturned)
+			}
+			gotData, ok := got.Data.([]any)
+			if !ok {
+				t.Fatalf("data type = %T, want []any", got.Data)
+			}
+			if len(gotData) != len(tt.data) {
+				t.Fatalf("data len = %d, want %d", len(gotData), len(tt.data))
 			}
 		})
 	}
