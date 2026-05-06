@@ -60,6 +60,44 @@ scripts/
 └── create-local-secrets.sh
 ```
 
+## Kubernetes Local Security Hardening Baseline
+
+The local Kubernetes manifests now include an explicit security baseline to
+avoid permissive runtime defaults and reduce accidental privilege exposure
+during local validation.
+
+### Security objectives
+
+1. Ensure workloads run as non-root by default.
+2. Block Linux privilege escalation where not required.
+3. Drop default Linux capabilities.
+4. Use the runtime default seccomp profile explicitly.
+5. Keep behavior compatible with local development flow (bootstrap, migration,
+   and monolith startup).
+
+### Baseline controls used
+
+- `runAsNonRoot: true` (pod/container level where applicable)
+- `allowPrivilegeEscalation: false`
+- `capabilities.drop: ["ALL"]`
+- `seccompProfile.type: RuntimeDefault`
+
+### Applied manifests and intent
+
+| Manifest | Hardened scope | Notes |
+|---|---|---|
+| `deployments/k8s/local/db-bootstrap-job.yaml` | Pod + container securityContext | One-shot job; uses read-only root filesystem. |
+| `deployments/k8s/monolith/migration-job.yaml` | Pod + container securityContext | One-shot migration execution; uses read-only root filesystem. |
+| `deployments/k8s/monolith/monolith.yaml` | Pod + container securityContext | Long-running app workload; hardened runtime defaults. |
+| `deployments/k8s/local/postgres.yaml` | Pod + container securityContext | Uses explicit UID/GID/fsGroup and seccomp; `readOnlyRootFilesystem` remains `false` due to PostgreSQL runtime write needs. |
+
+### Why this matters for local runs
+
+- Keeps local manifests closer to production hardening expectations.
+- Reduces noisy scanner findings from default security contexts.
+- Documents intentional exceptions (for example, PostgreSQL writable runtime
+  paths) instead of relying on implicit defaults.
+
 The OpenAPI source of truth is:
 
 ```text

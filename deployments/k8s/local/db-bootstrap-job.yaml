@@ -7,11 +7,21 @@ spec:
   backoffLimit: 3
   template:
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       restartPolicy: OnFailure
       containers:
         - name: db-bootstrap
           image: postgres:18
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           envFrom:
             - secretRef:
                 name: db-bootstrap-env
@@ -32,4 +42,3 @@ spec:
               SELECT 'CREATE DATABASE transaction_db'
               WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'transaction_db')\gexec
               SQL
-

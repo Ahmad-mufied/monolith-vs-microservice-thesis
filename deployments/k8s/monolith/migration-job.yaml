@@ -7,11 +7,22 @@ spec:
   backoffLimit: 3
   template:
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       restartPolicy: OnFailure
       containers:
         - name: migration
           image: skripsi/monolith:local
           imagePullPolicy: Never
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           envFrom:
             - secretRef:
                 name: monolith-env
@@ -19,4 +30,3 @@ spec:
             - /bin/sh
             - -ec
             - goose -dir /app/migrations postgres "$DATABASE_URL" up
-

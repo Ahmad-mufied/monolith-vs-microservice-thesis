@@ -13,10 +13,21 @@ spec:
       labels:
         app: monolith
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: monolith
           image: skripsi/monolith:local
           imagePullPolicy: Never
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           envFrom:
             - secretRef:
                 name: monolith-env
@@ -75,4 +86,3 @@ spec:
         target:
           type: Utilization
           averageUtilization: 70
-
