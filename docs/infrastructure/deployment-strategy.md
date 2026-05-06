@@ -342,7 +342,7 @@ Kubernetes validation only
 Recommended local cluster:
 
 ```bash
-minikube start --driver=docker --cpus=4 --memory=6144 --disk-size=20g
+minikube start --driver=docker --cpus=2 --memory=3072 --disk-size=20g
 ```
 
 For heavier validation:
@@ -431,8 +431,21 @@ Build local Docker images and load them into Minikube.
 Example:
 
 ```bash
-docker build -t skripsi/monolith:local ./monolith
+docker build -t skripsi/monolith:local -f monolith/Dockerfile .
 minikube image load skripsi/monolith:local
+```
+
+After the monolith deployment is ready, use a foreground port-forward session
+for direct access from the host:
+
+```bash
+make minikube-port-forward-monolith
+```
+
+If local port `8080` is already occupied:
+
+```bash
+make minikube-port-forward-monolith MONOLITH_PORT=18080
 ```
 
 For microservices:

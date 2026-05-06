@@ -1,0 +1,28 @@
+name: skripsi-db
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: skripsi-postgres
+    restart: unless-stopped
+    env_file:
+      - ../../env/postgres.env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bootstrap"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - skripsi-local
+
+volumes:
+  postgres-data:
+
+networks:
+  skripsi-local:
+    name: skripsi-local

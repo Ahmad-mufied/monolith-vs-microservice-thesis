@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: monolith-migration-job
+  namespace: mono
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migration
+          image: skripsi/monolith:local
+          imagePullPolicy: Never
+          envFrom:
+            - secretRef:
+                name: monolith-env
+          command:
+            - /bin/sh
+            - -ec
+            - goose -dir /app/migrations postgres "$DATABASE_URL" up
+
