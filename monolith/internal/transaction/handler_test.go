@@ -161,9 +161,15 @@ func executeTransactionHandler(method, target, body, userID string, params map[s
 	if userID != "" {
 		c.Set(middleware.UserIDKey, userID)
 	}
-	for name, value := range params {
-		c.SetParamNames(name)
-		c.SetParamValues(value)
+	if len(params) > 0 {
+		names := make([]string, 0, len(params))
+		values := make([]string, 0, len(params))
+		for name, value := range params {
+			names = append(names, name)
+			values = append(values, value)
+		}
+		c.SetParamNames(names...)
+		c.SetParamValues(values...)
 	}
 	_ = handler(c)
 	return rec
