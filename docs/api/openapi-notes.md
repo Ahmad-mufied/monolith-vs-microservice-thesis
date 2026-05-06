@@ -912,7 +912,7 @@ TransactionEnrichedItem:
   type: object
   properties:
     item:
-      $ref: '#/components/schemas/Item'
+      $ref: '#/components/schemas/ItemSummary'
     amount:
       type: integer
       minimum: 1
