@@ -55,11 +55,9 @@ spec:
           readinessProbe:
             exec:
               command:
-                - pg_isready
-                - -U
-                - postgres
-                - -d
-                - bootstrap
+                - /bin/sh
+                - -ec
+                - pg_isready -U "$POSTGRES_USER" -d "${POSTGRES_DB:-bootstrap}"
             initialDelaySeconds: 5
             periodSeconds: 5
           volumeMounts:
