@@ -84,7 +84,7 @@ transaction
 transaction_items
 ```
 
-External REST API naming follows `openapi.yaml`. In that contract, an item's externally visible availability field is named `amount`. Repository and DTO layers map that API field to the database column `items.available_amount`.
+External REST API naming follows `openapi.yaml`. In that contract, an item's externally visible availability field is named `available_amount`, which maps directly to the database column `items.available_amount`.
 
 Avoid:
 
@@ -294,7 +294,7 @@ Notes:
 
 - `available_amount` represents available allocatable amount,
 - `available_amount` is updated during transaction allocation,
-- REST API `Item.amount` maps to this column,
+- REST API `Item.available_amount` maps to this column,
 - do not use `stock`, `quantity`, or `availability`.
 
 Owned by:
