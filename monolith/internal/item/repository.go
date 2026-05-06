@@ -2,10 +2,12 @@ package item
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -86,6 +88,9 @@ RETURNING id::text, name, available_amount, created_at, updated_at`
 func (r *PostgresRepository) Delete(ctx context.Context, id string) error {
 	commandTag, err := r.db.Exec(ctx, `DELETE FROM items WHERE id = $1::uuid`, id)
 	if err != nil {
+		if isReferencedItemDeleteError(err) {
+			return apperror.Conflict("item is referenced by transaction")
+		}
 		return apperror.Internal("internal server error", fmt.Errorf("deleting item: %w", err))
 	}
 	if commandTag.RowsAffected() == 0 {
@@ -107,4 +112,12 @@ func scanOne(row scanner, contextMessage string) (Item, error) {
 		return Item{}, apperror.Internal("internal server error", fmt.Errorf("%s: %w", contextMessage, err))
 	}
 	return item, nil
+}
+
+func isReferencedItemDeleteError(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	return pgErr.Code == "23503" && pgErr.TableName == "transaction_items" && pgErr.ConstraintName == "transaction_items_item_id_fkey"
 }

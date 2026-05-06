@@ -2,12 +2,14 @@ package transaction
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -266,14 +268,25 @@ RETURNING available_amount`, item.ItemID, item.Amount).Scan(&availableAfter); er
 
 func insertTransaction(ctx context.Context, tx pgx.Tx, userID string) (Transaction, error) {
 	const query = `
-INSERT INTO transactions (user_id)
-VALUES ($1::uuid)
-RETURNING id::text, user_id::text, created_at, updated_at`
+	INSERT INTO transactions (user_id)
+	VALUES ($1::uuid)
+	RETURNING id::text, user_id::text, created_at, updated_at`
 	var transaction Transaction
 	if err := tx.QueryRow(ctx, query, userID).Scan(&transaction.ID, &transaction.UserID, &transaction.CreatedAt, &transaction.UpdatedAt); err != nil {
+		if isMissingTransactionUserError(err) {
+			return Transaction{}, apperror.Unauthorized("invalid authentication context")
+		}
 		return Transaction{}, apperror.Internal("internal server error", fmt.Errorf("inserting transaction: %w", err))
 	}
 	return transaction, nil
+}
+
+func isMissingTransactionUserError(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	return pgErr.Code == "23503" && pgErr.TableName == "transactions" && pgErr.ConstraintName == "transactions_user_id_fkey"
 }
 
 func insertTransactionItem(ctx context.Context, tx pgx.Tx, transactionID string, item CreateItemRequest, availableAfter int) error {

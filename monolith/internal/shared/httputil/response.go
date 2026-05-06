@@ -38,7 +38,7 @@ type ErrorResponse struct {
 type ErrorPayload struct {
 	Code    string         `json:"code"`
 	Message string         `json:"message"`
-	Details map[string]any `json:"details,omitempty"`
+	Details map[string]any `json:"details"`
 }
 
 func Success(c echo.Context, status int, data any) error {

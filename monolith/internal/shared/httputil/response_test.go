@@ -45,6 +45,21 @@ func TestError(t *testing.T) {
 			if got.Error.Code != tt.wantCode {
 				t.Fatalf("code = %q, want %q", got.Error.Code, tt.wantCode)
 			}
+
+			var raw map[string]any
+			if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+				t.Fatalf("unmarshal raw response: %v", err)
+			}
+			errorBody, ok := raw["error"].(map[string]any)
+			if !ok {
+				t.Fatalf("error payload missing: %+v", raw)
+			}
+			if _, exists := errorBody["details"]; !exists {
+				t.Fatalf("details field missing: %+v", errorBody)
+			}
+			if got.Error.Details == nil && errorBody["details"] != nil {
+				t.Fatalf("details = %+v, want null", errorBody["details"])
+			}
 		})
 	}
 }

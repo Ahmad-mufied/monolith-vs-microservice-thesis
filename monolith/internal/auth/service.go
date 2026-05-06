@@ -69,8 +69,8 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 	if !isEmail(email) {
 		return LoginResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"email": "must be a valid email"})
 	}
-	if req.Password == "" {
-		return LoginResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"password": "is required"})
+	if len(req.Password) < 8 {
+		return LoginResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at least 8 characters"})
 	}
 
 	user, err := s.repo.FindUserByEmail(ctx, email)
