@@ -1,5 +1,7 @@
 FROM golang:1.26-alpine AS builder
 
+ARG GOOSE_VERSION=v3.27.1
+
 RUN apk add --no-cache ca-certificates git
 
 WORKDIR /src
@@ -8,7 +10,7 @@ COPY monolith/go.mod monolith/go.sum ./monolith/
 
 WORKDIR /src/monolith
 RUN go mod download
-RUN go install github.com/pressly/goose/v3/cmd/goose@latest
+RUN go install github.com/pressly/goose/v3/cmd/goose@${GOOSE_VERSION}
 
 WORKDIR /src
 COPY monolith ./monolith
@@ -33,4 +35,3 @@ USER app
 EXPOSE 8080
 
 ENTRYPOINT ["/usr/local/bin/monolith"]
-
