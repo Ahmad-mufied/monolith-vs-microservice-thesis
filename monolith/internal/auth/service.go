@@ -114,9 +114,11 @@ func isEmail(value string) bool {
 
 func validatePassword(password string) error {
 	if len(password) < minPasswordLength {
+		// #nosec G101 -- "password" is the public request field name in the validation payload, not a hardcoded credential.
 		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at least 8 characters"})
 	}
 	if len(password) > maxPasswordBytes {
+		// #nosec G101 -- "password" is the public request field name in the validation payload, not a hardcoded credential.
 		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at most 72 bytes"})
 	}
 	return nil
