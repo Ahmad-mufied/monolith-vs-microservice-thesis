@@ -31,27 +31,30 @@ write_if_missing() {
 jwt_secret="$(random_hex 32)"
 
 if [[ -f env/postgres.env ]]; then
+  postgres_user="$(grep -E '^POSTGRES_USER=' env/postgres.env | cut -d= -f2- || true)"
+  postgres_user="${postgres_user:-postgres}"
   postgres_password="$(grep -E '^POSTGRES_PASSWORD=' env/postgres.env | cut -d= -f2- || true)"
   if [[ -z "$postgres_password" ]]; then
     echo "env/postgres.env exists but POSTGRES_PASSWORD is empty" >&2
     exit 1
   fi
 else
+  postgres_user="postgres"
   postgres_password="$(random_hex 16)"
 fi
 
-write_if_missing "env/postgres.env" "POSTGRES_USER=postgres
+write_if_missing "env/postgres.env" "POSTGRES_USER=${postgres_user}
 POSTGRES_PASSWORD=${postgres_password}
 POSTGRES_DB=bootstrap"
 
 write_if_missing "env/monolith.env" "APP_ENV=local
 APP_PORT=8080
 SERVICE_NAME=monolith
-DATABASE_URL=postgres://postgres:${postgres_password}@postgres:5432/mono_db?sslmode=disable
-MONO_DATABASE_URL=postgres://postgres:${postgres_password}@localhost:5432/mono_db?sslmode=disable
+DATABASE_URL=postgres://${postgres_user}:${postgres_password}@postgres:5432/mono_db?sslmode=disable
+MONO_DATABASE_URL=postgres://${postgres_user}:${postgres_password}@localhost:5432/mono_db?sslmode=disable
 JWT_SECRET=${jwt_secret}
 DATADOG_ENABLED=false"
 
-write_if_missing "env/db-bootstrap.env" "BOOTSTRAP_DATABASE_URL=postgres://postgres:${postgres_password}@postgres.benchmark.svc.cluster.local:5432/bootstrap?sslmode=disable"
+write_if_missing "env/db-bootstrap.env" "BOOTSTRAP_DATABASE_URL=postgres://${postgres_user}:${postgres_password}@postgres.benchmark.svc.cluster.local:5432/bootstrap?sslmode=disable"
 
 echo "local env initialization complete"
