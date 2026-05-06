@@ -38,9 +38,11 @@ func (f *fakeRepo) FindUserByEmail(_ context.Context, email string) (User, error
 }
 
 type fakeHasher struct {
-	hash       string
-	hashErr    error
-	compareErr error
+	hash            string
+	hashErr         error
+	compareErr      error
+	compareHash     *string
+	comparePassword *string
 }
 
 func (f fakeHasher) Hash(string) (string, error) {
@@ -50,16 +52,26 @@ func (f fakeHasher) Hash(string) (string, error) {
 	return f.hash, nil
 }
 
-func (f fakeHasher) Compare(string, string) error {
+func (f fakeHasher) Compare(hash, password string) error {
+	if f.compareHash != nil {
+		*f.compareHash = hash
+	}
+	if f.comparePassword != nil {
+		*f.comparePassword = password
+	}
 	return f.compareErr
 }
 
 type fakeSigner struct {
-	token string
-	err   error
+	token        string
+	err          error
+	signedUserID *string
 }
 
-func (f fakeSigner) Sign(string) (string, error) {
+func (f fakeSigner) Sign(userID string) (string, error) {
+	if f.signedUserID != nil {
+		*f.signedUserID = userID
+	}
 	if f.err != nil {
 		return "", f.err
 	}
@@ -137,14 +149,31 @@ func TestServiceLogin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var comparedHash, comparedPassword, signedUserID string
+			tt.hasher.compareHash = &comparedHash
+			tt.hasher.comparePassword = &comparedPassword
+			tt.signer.signedUserID = &signedUserID
+
 			service := NewService(tt.repo, tt.hasher, tt.signer)
 			got, err := service.Login(context.Background(), tt.req)
 			assertAppError(t, err, tt.wantError, tt.wantCode)
 			if tt.wantError {
 				return
 			}
-			if got.Token != "token" || got.User.ID != user.ID || tt.repo.findEmailReceived != "mufied@example.com" {
-				t.Fatalf("login response = %+v findEmail=%q", got, tt.repo.findEmailReceived)
+			if got.Token != "token" ||
+				got.User.ID != user.ID ||
+				tt.repo.findEmailReceived != "mufied@example.com" ||
+				comparedHash != user.PasswordHash ||
+				comparedPassword != tt.req.Password ||
+				signedUserID != user.ID {
+				t.Fatalf(
+					"login response = %+v findEmail=%q compareHash=%q comparePassword=%q signedUserID=%q",
+					got,
+					tt.repo.findEmailReceived,
+					comparedHash,
+					comparedPassword,
+					signedUserID,
+				)
 			}
 		})
 	}
