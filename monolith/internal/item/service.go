@@ -80,6 +80,9 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateRequest) (Res
 		if name == "" {
 			return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "must not be empty"})
 		}
+		if utf8.RuneCountInString(name) > maxItemNameLength {
+			return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "must be at most 160 characters"})
+		}
 		req.Name = &name
 	}
 	if req.AvailableAmount != nil && *req.AvailableAmount < 0 {

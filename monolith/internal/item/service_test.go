@@ -110,6 +110,7 @@ func TestServiceList(t *testing.T) {
 func TestServiceUpdate(t *testing.T) {
 	name := "Updated"
 	blank := " "
+	tooLong := strings.Repeat("a", 161)
 	amount := 0
 	negative := -1
 	tests := []struct {
@@ -124,6 +125,7 @@ func TestServiceUpdate(t *testing.T) {
 		{name: "invalid id", id: "bad", req: UpdateRequest{Name: &name}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "empty body", id: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", req: UpdateRequest{}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "blank name", id: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", req: UpdateRequest{Name: &blank}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
+		{name: "name too long", id: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", req: UpdateRequest{Name: &tooLong}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "negative amount", id: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", req: UpdateRequest{AvailableAmount: &negative}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 	}
 	for _, tt := range tests {
