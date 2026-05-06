@@ -3,6 +3,7 @@ package item
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -67,6 +68,7 @@ func TestServiceCreate(t *testing.T) {
 	}{
 		{name: "success", req: CreateRequest{Name: " Item A ", AvailableAmount: &amount10}, repo: &fakeRepo{item: Item{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", Name: "Item A", AvailableAmount: 10, CreatedAt: now, UpdatedAt: now}}},
 		{name: "missing name", req: CreateRequest{AvailableAmount: &amount10}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
+		{name: "name too long", req: CreateRequest{Name: strings.Repeat("a", 161), AvailableAmount: &amount10}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "missing available amount", req: CreateRequest{Name: "Item A"}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "negative amount", req: CreateRequest{Name: "Item A", AvailableAmount: &negativeOne}, repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "repo error", req: CreateRequest{Name: "Item A", AvailableAmount: &amount10}, repo: &fakeRepo{err: apperror.Internal("internal server error", errors.New("db"))}, wantError: true, wantCode: apperror.CodeInternal},

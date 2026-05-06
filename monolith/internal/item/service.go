@@ -3,11 +3,14 @@ package item
 import (
 	"context"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/pagination"
 	"github.com/google/uuid"
 )
+
+const maxItemNameLength = 160
 
 type Repository interface {
 	Create(ctx context.Context, name string, availableAmount int) (Item, error)
@@ -29,6 +32,9 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Response, erro
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "is required"})
+	}
+	if utf8.RuneCountInString(name) > maxItemNameLength {
+		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "must be at most 160 characters"})
 	}
 	if req.AvailableAmount == nil {
 		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"available_amount": "is required"})
