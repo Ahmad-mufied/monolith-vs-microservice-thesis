@@ -33,6 +33,7 @@ type Service struct {
 }
 
 const (
+	maxNameLength     = 120
 	minPasswordLength = 8
 	maxPasswordLength = 72
 	maxPasswordBytes  = 72
@@ -50,6 +51,9 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (UserRespon
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	if name == "" {
 		return UserResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "is required"})
+	}
+	if utf8.RuneCountInString(name) > maxNameLength {
+		return UserResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "must be at most 120 characters"})
 	}
 	if !isEmail(email) {
 		return UserResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"email": "must be a valid email"})

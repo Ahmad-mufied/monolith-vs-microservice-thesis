@@ -83,6 +83,7 @@ func TestServiceRegister(t *testing.T) {
 			hasher: fakeHasher{hash: "hashed"},
 		},
 		{name: "missing name", req: RegisterRequest{Email: "mufied@example.com", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, wantError: true, wantCode: apperror.CodeBadRequest},
+		{name: "name too long", req: RegisterRequest{Name: strings.Repeat("a", 121), Email: "mufied@example.com", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "invalid email", req: RegisterRequest{Name: "Ahmad", Email: "bad", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "display name email rejected", req: RegisterRequest{Name: "Ahmad", Email: "Ahmad <mufied@example.com>", Password: "secret123"}, repo: &fakeRepo{}, hasher: fakeHasher{}, wantError: true, wantCode: apperror.CodeBadRequest},
 		{name: "short password", req: RegisterRequest{Name: "Ahmad", Email: "mufied@example.com", Password: "short"}, repo: &fakeRepo{}, hasher: fakeHasher{}, wantError: true, wantCode: apperror.CodeBadRequest},
