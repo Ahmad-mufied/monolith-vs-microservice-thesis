@@ -108,6 +108,8 @@ func executeAuthHandler(body string, handler echo.HandlerFunc) *httptest.Respons
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	_ = handler(c)
+	if err := handler(c); err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
 	return rec
 }

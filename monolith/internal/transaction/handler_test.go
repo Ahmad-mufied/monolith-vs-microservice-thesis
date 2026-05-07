@@ -184,6 +184,8 @@ func executeTransactionHandler(method, target, body, userID string, params map[s
 		c.SetParamNames(names...)
 		c.SetParamValues(values...)
 	}
-	_ = handler(c)
+	if err := handler(c); err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
 	return rec
 }
