@@ -92,7 +92,7 @@ func TestServiceBulkSave(t *testing.T) {
 		},
 		{
 			name:      "invalid uuid",
-			req:       BulkSaveRequest{Items: []BulkSaveItemRequest{{ID: ptr("bad"), Name: "Item", AvailableAmount: &amount10}}},
+			req:       BulkSaveRequest{Items: []BulkSaveItemRequest{{ID: new("bad"), Name: "Item", AvailableAmount: &amount10}}},
 			repo:      &fakeRepo{},
 			wantError: true,
 			wantCode:  apperror.CodeBadRequest,
@@ -237,7 +237,7 @@ func TestServiceBulkSaveValidationDetails(t *testing.T) {
 	assertValidationDetail(t, err, "name", "must not be empty")
 
 	err = service.BulkSave(context.Background(), BulkSaveRequest{
-		Items: []BulkSaveItemRequest{{ID: ptr("bad"), Name: "Item", AvailableAmount: &amount}},
+		Items: []BulkSaveItemRequest{{ID: new("bad"), Name: "Item", AvailableAmount: &amount}},
 	})
 	assertValidationDetail(t, err, "id", "must be a valid UUID")
 
@@ -245,10 +245,6 @@ func TestServiceBulkSaveValidationDetails(t *testing.T) {
 		Items: []BulkSaveItemRequest{{Name: strings.Repeat("a", 161), AvailableAmount: &amount}},
 	})
 	assertValidationDetail(t, err, "name", "must be at most 160 characters")
-}
-
-func ptr(value string) *string {
-	return &value
 }
 
 func assertAppError(t *testing.T, err error, wantError bool, wantCode apperror.Code) {
