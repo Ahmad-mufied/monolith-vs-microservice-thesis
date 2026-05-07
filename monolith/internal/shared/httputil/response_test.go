@@ -41,9 +41,6 @@ func TestError(t *testing.T) {
 			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 				t.Fatalf("unmarshal response: %v", err)
 			}
-			if got.Status != "error" {
-				t.Fatalf("status body = %q, want error", got.Status)
-			}
 			if got.Error.Code != tt.wantCode {
 				t.Fatalf("code = %q, want %q", got.Error.Code, tt.wantCode)
 			}
@@ -100,9 +97,6 @@ func TestList(t *testing.T) {
 			var got ListResponse
 			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 				t.Fatalf("unmarshal response: %v", err)
-			}
-			if got.Status != "success" {
-				t.Fatalf("status body = %q, want success", got.Status)
 			}
 			if got.Meta.Limit != tt.limit || got.Meta.Offset != tt.offset || got.Meta.TotalReturned != tt.totalReturned {
 				t.Fatalf("meta = %+v, want limit=%d offset=%d total=%d", got.Meta, tt.limit, tt.offset, tt.totalReturned)

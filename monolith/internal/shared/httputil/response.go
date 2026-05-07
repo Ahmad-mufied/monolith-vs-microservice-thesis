@@ -2,26 +2,31 @@ package httputil
 
 import (
 	"errors"
-	"net/http"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/labstack/echo/v4"
 )
 
 type SuccessResponse struct {
-	Status string `json:"status"`
-	Data   any    `json:"data"`
+	Data any `json:"data"`
+}
+
+type MessageDataResponse struct {
+	Message string `json:"message"`
+	Data    any    `json:"data"`
+}
+
+type IDData struct {
+	ID string `json:"id"`
 }
 
 type MessageResponse struct {
-	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
 type ListResponse struct {
-	Status string         `json:"status"`
-	Data   any            `json:"data"`
-	Meta   PaginationMeta `json:"meta"`
+	Data any            `json:"data"`
+	Meta PaginationMeta `json:"meta"`
 }
 
 type PaginationMeta struct {
@@ -31,8 +36,7 @@ type PaginationMeta struct {
 }
 
 type ErrorResponse struct {
-	Status string       `json:"status"`
-	Error  ErrorPayload `json:"error"`
+	Error ErrorPayload `json:"error"`
 }
 
 type ErrorPayload struct {
@@ -42,17 +46,24 @@ type ErrorPayload struct {
 }
 
 func Success(c echo.Context, status int, data any) error {
-	return c.JSON(status, SuccessResponse{Status: "success", Data: data})
+	return c.JSON(status, SuccessResponse{Data: data})
 }
 
-func Message(c echo.Context, message string) error {
-	return c.JSON(http.StatusOK, MessageResponse{Status: "success", Message: message})
+func MessageData(c echo.Context, status int, message string, data any) error {
+	return c.JSON(status, MessageDataResponse{Message: message, Data: data})
+}
+
+func Message(c echo.Context, status int, message string) error {
+	return c.JSON(status, MessageResponse{Message: message})
+}
+
+func ID(c echo.Context, status int, message, id string) error {
+	return MessageData(c, status, message, IDData{ID: id})
 }
 
 func List(c echo.Context, status int, data any, limit, offset, totalReturned int) error {
 	return c.JSON(status, ListResponse{
-		Status: "success",
-		Data:   data,
+		Data: data,
 		Meta: PaginationMeta{
 			Limit:         limit,
 			Offset:        offset,
@@ -64,7 +75,6 @@ func List(c echo.Context, status int, data any, limit, offset, totalReturned int
 func Error(c echo.Context, err error) error {
 	appErr := toAppError(err)
 	return c.JSON(appErr.Status, ErrorResponse{
-		Status: "error",
 		Error: ErrorPayload{
 			Code:    string(appErr.Code),
 			Message: appErr.Message,
