@@ -597,3 +597,601 @@ Then:
 ```bash
 curl -i http://monolith.skripsi.local/healthz
 ```
+
+## Step Verification Checklist
+
+Use the following checks to confirm each local step actually succeeded.
+
+These commands use the original tools directly (`docker`, `minikube`,
+`kubectl`, `goose`, `psql`) so the intent stays visible even when you later use
+Makefile shortcuts.
+
+### Docker Compose Verification
+
+#### 1. Verify env initialization
+
+Purpose:
+
+```text
+Confirm local env files exist before starting any container or migration.
+```
+
+Commands:
+
+```bash
+ls -l env/postgres.env env/monolith.env env/db-bootstrap.env
+```
+
+Success indicators:
+
+- all three files exist,
+- no `No such file or directory` error appears.
+
+#### 2. Verify PostgreSQL container is running
+
+Purpose:
+
+```text
+Confirm local PostgreSQL is up and reachable before running migrations.
+```
+
+Commands:
+
+```bash
+docker compose -f deployments/compose/docker-compose.db.yml ps
+docker inspect --format='{{.State.Health.Status}}' skripsi-postgres
+docker logs --tail=50 skripsi-postgres
+```
+
+Success indicators:
+
+- service `postgres` is `running`,
+- container health status is `healthy`,
+- logs do not show repeated startup failure or authentication errors.
+
+Optional database verification:
+
+```bash
+set -a
+source env/postgres.env
+set +a
+
+export PGPASSWORD="$POSTGRES_PASSWORD"
+psql -h localhost -U "$POSTGRES_USER" -d "${POSTGRES_DB:-bootstrap}" -c '\l'
+```
+
+Expected result:
+
+- databases `bootstrap`, `mono_db`, `auth_db`, `item_db`, and
+  `transaction_db` exist.
+
+#### 3. Verify monolith migration completed
+
+Purpose:
+
+```text
+Confirm schema objects were created in mono_db.
+```
+
+Commands:
+
+```bash
+set -a
+source env/monolith.env
+set +a
+
+goose -dir monolith/migrations postgres "$MONO_DATABASE_URL" status
+```
+
+Success indicators:
+
+- each migration in `monolith/migrations/` is marked as applied,
+- there is no connection or SQL error.
+
+Optional table verification:
+
+```bash
+set -a
+source env/postgres.env
+set +a
+
+export PGPASSWORD="$POSTGRES_PASSWORD"
+psql -h localhost -U "$POSTGRES_USER" -d mono_db -c '\dt'
+```
+
+Expected result:
+
+- tables such as `users`, `items`, `transactions`, and `transaction_items`
+  exist.
+
+#### 4. Verify monolith container is serving traffic
+
+Purpose:
+
+```text
+Confirm the monolith process started correctly and passed health checks.
+```
+
+Commands:
+
+```bash
+docker compose -f deployments/compose/docker-compose.monolith.yml ps
+docker logs --tail=100 skripsi-monolith
+curl -i http://localhost:8080/healthz
+```
+
+Success indicators:
+
+- service `monolith` is `running`,
+- logs do not show startup panic or database connection failure,
+- `GET /healthz` returns `200 OK`.
+
+### Minikube Verification
+
+#### 1. Verify Minikube cluster is ready
+
+Purpose:
+
+```text
+Confirm the local Kubernetes control plane and node are ready.
+```
+
+Commands:
+
+```bash
+minikube status
+kubectl get nodes
+kubectl get pods -A
+```
+
+Success indicators:
+
+- `host`, `kubelet`, and `apiserver` are `Running`,
+- at least one node is `Ready`.
+
+#### 2. Verify monolith image exists inside Minikube Docker
+
+Purpose:
+
+```text
+Confirm the local image was built into Minikube's Docker daemon before deploy.
+```
+
+Commands:
+
+```bash
+eval $(minikube docker-env)
+docker image ls skripsi/monolith:local
+```
+
+Success indicators:
+
+- image `skripsi/monolith:local` is listed.
+
+#### 3. Verify local Kubernetes secrets were created
+
+Purpose:
+
+```text
+Confirm Minikube runtime configuration was generated from the local env files.
+```
+
+Commands:
+
+```bash
+kubectl get secret -n benchmark postgres-local-env db-bootstrap-env
+kubectl get secret -n mono monolith-env
+```
+
+Success indicators:
+
+- all three secrets exist,
+- no `NotFound` error appears.
+
+#### 4. Verify local PostgreSQL StatefulSet is ready
+
+Purpose:
+
+```text
+Confirm in-cluster PostgreSQL and its persistent storage are ready.
+```
+
+Commands:
+
+```bash
+kubectl get pods -n benchmark
+kubectl get svc -n benchmark postgres
+kubectl get pvc -n benchmark
+kubectl describe pod postgres-0 -n benchmark
+```
+
+Success indicators:
+
+- pod `postgres-0` is `Running`,
+- service `postgres` exists,
+- PVC for PostgreSQL is `Bound`.
+
+#### 5. Verify DB bootstrap job completed
+
+Purpose:
+
+```text
+Confirm the application databases were created inside the cluster PostgreSQL.
+```
+
+Commands:
+
+```bash
+kubectl get job db-bootstrap-job -n benchmark
+kubectl logs job/db-bootstrap-job -n benchmark
+kubectl exec -n benchmark postgres-0 -- sh -ec 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d "${POSTGRES_DB:-bootstrap}" -c "\l"'
+```
+
+Success indicators:
+
+- job completion count is `1/1`,
+- logs do not show SQL errors,
+- databases `mono_db`, `auth_db`, `item_db`, and `transaction_db` exist.
+
+#### 6. Verify monolith migration job completed
+
+Purpose:
+
+```text
+Confirm the monolith schema exists inside in-cluster mono_db.
+```
+
+Commands:
+
+```bash
+kubectl get job monolith-migration-job -n mono
+kubectl logs job/monolith-migration-job -n mono
+kubectl exec -n benchmark postgres-0 -- sh -ec 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d mono_db -c "\dt"'
+```
+
+Success indicators:
+
+- job completion count is `1/1`,
+- logs do not show Goose or SQL failure,
+- monolith tables exist in `mono_db`.
+
+#### 7. Verify monolith deployment is healthy
+
+Purpose:
+
+```text
+Confirm the app is running, routable, and eligible for HPA observation.
+```
+
+Commands:
+
+```bash
+kubectl rollout status deployment/monolith -n mono
+kubectl get pods -n mono
+kubectl get svc -n mono
+kubectl get hpa -n mono
+kubectl logs deploy/monolith -n mono --tail=100
+```
+
+Success indicators:
+
+- rollout completes successfully,
+- pod is `Running` and `Ready`,
+- service `monolith` exists,
+- HPA object exists,
+- logs do not show repeated crash loop or database connection failure.
+
+#### 8. Verify external access works
+
+Purpose:
+
+```text
+Confirm the monolith can be reached from the host after deployment.
+```
+
+Commands using port-forward:
+
+```bash
+kubectl port-forward svc/monolith -n mono 8080:8080
+curl -i http://localhost:8080/healthz
+```
+
+Commands using ingress:
+
+```bash
+minikube tunnel
+curl -i http://monolith.skripsi.local/healthz
+```
+
+Success indicators:
+
+- `GET /healthz` returns `200 OK`,
+- requests do not fail with connection refused or upstream timeout.
+
+## Stop, Clean, And Data Persistence
+
+The local Minikube and Docker Compose flows do not all behave the same when you
+stop them.
+
+Some commands only stop compute, while others also remove persistent data.
+
+### Quick Rule
+
+```text
+Stop:
+usually keep data
+
+Delete / down -v / delete PVC:
+remove data
+```
+
+### Command Effect Matrix
+
+| Command | Scope | Keeps migration result? | Keeps CRUD data? | Notes |
+|---|---|---|---|---|
+| `minikube stop` | stop local cluster VM/container | Yes | Yes | Cluster is stopped, not deleted. StatefulSet PVC remains. |
+| `minikube delete` | delete local cluster | No | No | Treat as full reset of local Kubernetes environment. |
+| `docker compose -f deployments/compose/docker-compose.db.yml down` | stop Compose PostgreSQL without removing volume | Yes | Yes | Safe stop if you want to keep local Compose DB data. |
+| `docker compose -f deployments/compose/docker-compose.db.yml down -v` | stop Compose PostgreSQL and remove named volume | No | No | Deletes Compose PostgreSQL persistent volume. |
+| `docker compose -f deployments/compose/docker-compose.monolith.yml down` | stop monolith app container only | Yes | Yes | App stops, DB data remains in PostgreSQL. |
+| `make compose-down` | stop all Compose stacks and remove volumes | No | No | Current target uses `down -v`, so local Compose DB data is deleted. |
+| `kubectl delete job db-bootstrap-job -n benchmark` | remove completed bootstrap job object | Yes | Yes | Deletes Job object only, not the created databases. |
+| `kubectl delete job monolith-migration-job -n mono` | remove completed migration job object | Yes | Yes | Deletes Job object only, not the migrated schema. |
+| `kubectl delete deployment monolith -n mono` | remove monolith pods | Yes | Yes | App stops, PostgreSQL data remains. |
+| `kubectl scale deployment monolith -n mono --replicas=0` | stop monolith pods without deleting object | Yes | Yes | Useful if you want a reversible app-only stop. |
+| `kubectl delete statefulset postgres -n benchmark` | remove PostgreSQL pod controller | Usually yes | Usually yes | Data remains only if PVC is not deleted. |
+| `kubectl delete pvc postgres-data-postgres-0 -n benchmark` | delete PostgreSQL persistent volume claim | No | No | This removes the Minikube PostgreSQL data volume. |
+
+### What Happens After Laptop Restart
+
+#### Minikube
+
+If the laptop restarts and you previously used:
+
+```bash
+minikube stop
+```
+
+or the machine shut down without deleting the Minikube profile:
+
+- the cluster usually comes back with the same PVC,
+- PostgreSQL data usually remains,
+- completed migrations remain applied,
+- CRUD data usually remains,
+- you normally do not need to repeat bootstrap and migration from zero.
+
+Recommended verification after restart:
+
+```bash
+minikube start --driver=docker --cpus=2 --memory=3072 --disk-size=20g
+kubectl get pods -A
+kubectl get pvc -n benchmark
+kubectl exec -n benchmark postgres-0 -- sh -ec 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d mono_db -c "\dt"'
+```
+
+#### Docker Compose
+
+If the laptop restarts while you are using Compose:
+
+- named volumes usually remain on disk,
+- Compose PostgreSQL data usually remains,
+- monolith migration state remains if the volume was not deleted.
+
+But if you later run:
+
+```bash
+make compose-down
+```
+
+the current Makefile uses `down -v`, which removes the Compose PostgreSQL
+volume and deletes the local Compose data set.
+
+## Recommended Stop And Cleanup Commands
+
+Choose the command based on whether you want to preserve data or fully reset the
+environment.
+
+### A. Stop host access only
+
+Purpose:
+
+```text
+Stop your local access tunnel, but keep the cluster and app running.
+```
+
+Commands:
+
+```bash
+# In the terminal running the command:
+Ctrl+C
+
+# Applies to:
+kubectl port-forward svc/monolith -n mono 8080:8080
+minikube tunnel
+```
+
+Effect:
+
+- only the access tunnel stops,
+- application and database keep running,
+- no data is removed.
+
+### B. Stop monolith app only, keep database and data
+
+Purpose:
+
+```text
+Pause the application workload without deleting PostgreSQL data.
+```
+
+Commands:
+
+```bash
+kubectl scale deployment monolith -n mono --replicas=0
+kubectl get pods -n mono
+```
+
+Restart command:
+
+```bash
+kubectl scale deployment monolith -n mono --replicas=1
+kubectl rollout status deployment/monolith -n mono
+```
+
+Effect:
+
+- monolith pod stops,
+- database remains,
+- migrations remain,
+- CRUD data remains.
+
+### C. Remove monolith workload objects, keep database and data
+
+Purpose:
+
+```text
+Clean the app-side Kubernetes objects but preserve PostgreSQL state.
+```
+
+Commands:
+
+```bash
+kubectl delete ingress monolith -n mono --ignore-not-found
+kubectl delete deployment monolith -n mono --ignore-not-found
+kubectl delete service monolith -n mono --ignore-not-found
+kubectl delete hpa monolith -n mono --ignore-not-found
+```
+
+Redeploy commands:
+
+```bash
+kubectl apply -f deployments/k8s/monolith/monolith.yaml
+kubectl apply -f deployments/k8s/monolith/ingress.yaml
+kubectl rollout status deployment/monolith -n mono
+```
+
+Effect:
+
+- app workload is removed,
+- PostgreSQL StatefulSet and PVC remain,
+- data remains.
+
+### D. Stop entire Minikube cluster, keep data
+
+Purpose:
+
+```text
+Shut down local Kubernetes runtime without deleting its persistent state.
+```
+
+Commands:
+
+```bash
+minikube stop
+minikube status
+```
+
+Restart commands:
+
+```bash
+minikube start --driver=docker --cpus=2 --memory=3072 --disk-size=20g
+kubectl get nodes
+kubectl get pvc -n benchmark
+```
+
+Effect:
+
+- cluster runtime stops,
+- PVC remains,
+- migrations remain,
+- CRUD data remains.
+
+### E. Full Minikube reset
+
+Purpose:
+
+```text
+Delete the entire local Kubernetes cluster and start over from zero.
+```
+
+Commands:
+
+```bash
+minikube delete
+```
+
+Effect:
+
+- cluster is removed,
+- local Kubernetes data is treated as lost,
+- you should rerun the full Minikube setup flow from the beginning.
+
+### F. Safe Compose stop, keep data
+
+Purpose:
+
+```text
+Stop local Compose containers without deleting the PostgreSQL volume.
+```
+
+Commands:
+
+```bash
+docker compose -f deployments/compose/docker-compose.monolith.yml down
+docker compose -f deployments/compose/docker-compose.db.yml down
+```
+
+Effect:
+
+- containers stop,
+- named volume remains,
+- migrations remain,
+- CRUD data remains.
+
+### G. Full Compose reset
+
+Purpose:
+
+```text
+Stop Compose containers and remove the local PostgreSQL volume.
+```
+
+Commands:
+
+```bash
+docker compose -f deployments/compose/docker-compose.monolith.yml down -v
+docker compose -f deployments/compose/docker-compose.db.yml down -v
+```
+
+Equivalent current shortcut:
+
+```bash
+make compose-down
+```
+
+Effect:
+
+- containers stop,
+- named volume is removed,
+- migrations are lost from the Compose database,
+- CRUD data is lost from the Compose database.
+
+## When You Must Repeat All Steps From The Beginning
+
+You should assume a full rerun is required when one of the following happens:
+
+- you ran `minikube delete`,
+- you deleted the PostgreSQL PVC in namespace `benchmark`,
+- you ran Compose teardown with `down -v`,
+- you manually removed the local Docker volume used by Compose PostgreSQL.
+
+In those cases, repeat:
+
+```text
+env-init
+start database
+bootstrap database if needed
+run migration
+deploy monolith
+verify health
+```

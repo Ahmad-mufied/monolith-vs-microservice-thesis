@@ -1071,7 +1071,46 @@ Do not store static AWS access keys in any Kubernetes Secret.
 
 ---
 
-## 25. What Counts as Final Result
+## 25. Local Persistence And Cleanup Rules
+
+For local validation, stopping compute is not always the same as deleting data.
+
+Quick rule:
+
+```text
+Stop:
+usually keep data
+
+Delete / down -v / delete PVC:
+remove data
+```
+
+Important local behaviors:
+
+- `minikube stop` stops the local cluster runtime but usually keeps PVC-backed
+  PostgreSQL data.
+- `minikube delete` should be treated as a full local cluster reset.
+- deleting a completed Kubernetes Job removes only the Job object, not the
+  database, schema, or CRUD data it already created.
+- deleting the monolith `Deployment` removes app pods only; PostgreSQL data
+  remains if the PostgreSQL PVC is still present.
+- `docker compose ... down` stops containers and keeps Compose volumes unless
+  `-v` is added.
+- `docker compose ... down -v` removes the Compose PostgreSQL volume and deletes
+  local Compose data.
+- the current `make compose-down` target is destructive for local Compose data
+  because it uses `down -v`.
+
+Operational detail:
+
+```text
+The local operational guide for step verification, stop options,
+and cleanup commands is docs/development/run-monolith-local.md.
+```
+
+---
+
+## 26. What Counts as Final Result
 
 Final result source:
 
@@ -1098,7 +1137,7 @@ Docker Compose and Minikube results may be used only for:
 
 ---
 
-## 26. Result Storage
+## 27. Result Storage
 
 Final benchmark results must be uploaded to S3 before destroying infrastructure.
 
@@ -1132,7 +1171,7 @@ Do not run `terraform destroy` before verifying result files in S3.
 
 ---
 
-## 27. Summary
+## 28. Summary
 
 Final deployment strategy:
 

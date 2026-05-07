@@ -92,10 +92,10 @@ Only `*.example.env` files should be committed.
 
 ## DB Bootstrap Secret
 
-Secret name:
+Current local / Minikube secret name:
 
 ```text
-db-bootstrap-secret
+db-bootstrap-env
 ```
 
 Namespace:
@@ -108,6 +108,12 @@ Required key:
 
 ```text
 BOOTSTRAP_DATABASE_URL
+```
+
+Current local generation path:
+
+```text
+scripts/create-local-secrets.sh
 ```
 
 Example:
@@ -125,16 +131,22 @@ item_db
 transaction_db
 ```
 
+In the current local Minikube flow, this secret is mounted by:
+
+```text
+deployments/k8s/local/db-bootstrap-job.yaml
+```
+
 ---
 
 ## Application Secrets
 
 ### Monolith
 
-Secret:
+Current local / Minikube secret:
 
 ```text
-monolith-secret
+monolith-env
 ```
 
 Namespace:
@@ -168,6 +180,13 @@ DATADOG_ENABLED
 The purpose of the DB pool and HTTP timeout variables is explained in
 `docs/development/run-monolith-local.md`, because the same keys are used for
 local Compose and local Kubernetes flows.
+
+In the current local Minikube flow, this secret is mounted by:
+
+```text
+deployments/k8s/monolith/migration-job.yaml
+deployments/k8s/monolith/monolith.yaml
+```
 
 ### API Gateway
 
@@ -283,12 +302,86 @@ The k6 runner should upload to S3 through EKS Pod Identity or IRSA.
 
 ## Creating Secrets from Env Files
 
+The repository currently uses two slightly different patterns:
+
+- Docker Compose reads ignored local env files directly with `env_file`.
+- Local Minikube generates Kubernetes Secrets from those env files, with some
+  values rewritten for in-cluster DNS.
+- AWS EKS should also use Kubernetes Secrets, but the exact creation flow may be
+  managed separately from the local helper script.
+
+### Current local Minikube secret generation
+
+These commands reflect the current local behavior implemented by
+`scripts/create-local-secrets.sh`.
+
+Namespaces:
+
+```bash
+kubectl apply -f deployments/k8s/namespaces/benchmark.yaml
+kubectl create namespace mono --dry-run=client -o yaml | kubectl apply -f -
+```
+
+PostgreSQL runtime secret for local cluster:
+
+```bash
+kubectl create secret generic postgres-local-env \
+  --from-env-file=env/postgres.env \
+  -n benchmark \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+Purpose:
+
+- used by `deployments/k8s/local/postgres.yaml`,
+- provides `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` to the local
+  PostgreSQL StatefulSet.
+
+DB bootstrap secret for local cluster:
+
+```bash
+bash scripts/create-local-secrets.sh
+```
+
+Important note:
+
+- the current helper script does not apply `env/db-bootstrap.env` verbatim,
+- it generates an in-cluster value for `BOOTSTRAP_DATABASE_URL`,
+- it rewrites the hostname to
+  `postgres.benchmark.svc.cluster.local`.
+
+Monolith secret for local cluster:
+
+```bash
+bash scripts/create-local-secrets.sh
+```
+
+Important note:
+
+- the current helper script does not apply `env/monolith.env` verbatim for
+  Minikube,
+- it rewrites `DATABASE_URL` from Compose host `postgres` to the in-cluster DNS
+  name `postgres.benchmark.svc.cluster.local`,
+- this allows the same base local env files to support both Compose and
+  Minikube.
+
+Reference:
+
+```text
+scripts/create-local-secrets.sh
+```
+
+### General Kubernetes secret creation pattern
+
+If you are creating secrets manually outside the local helper flow, use this
+general pattern and choose names that match the manifests being applied.
+
 DB bootstrap:
 
 ```bash
 kubectl create namespace benchmark --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl create secret generic db-bootstrap-secret \
+kubectl create secret generic db-bootstrap-env \
   --from-env-file=env/db-bootstrap.env \
   -n benchmark \
   --dry-run=client -o yaml | kubectl apply -f -
@@ -299,7 +392,7 @@ Monolith:
 ```bash
 kubectl create namespace mono --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl create secret generic monolith-secret \
+kubectl create secret generic monolith-env \
   --from-env-file=env/monolith.env \
   -n mono \
   --dry-run=client -o yaml | kubectl apply -f -
@@ -407,7 +500,8 @@ Before committing:
 Before benchmark:
 
 ```text
-- db-bootstrap-secret exists
+- db-bootstrap-env exists
+- monolith-env exists
 - app secrets exist
 - k6 runner has S3 IAM role access
 - RDS is private
