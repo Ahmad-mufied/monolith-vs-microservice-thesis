@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
@@ -26,8 +27,10 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 	if err != nil {
 		return Transaction{}, apperror.Internal("internal server error", fmt.Errorf("beginning transaction: %w", err))
 	}
+	finalizeCtx, finalizeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer finalizeCancel()
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(finalizeCtx)
 	}()
 
 	orderedItems := orderedItemsForAllocation(items)
@@ -53,7 +56,7 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 		transaction.Items = append(transaction.Items, Item(item))
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(finalizeCtx); err != nil {
 		return Transaction{}, apperror.Internal("internal server error", fmt.Errorf("committing transaction: %w", err))
 	}
 	return transaction, nil
@@ -92,13 +95,16 @@ LIMIT $2 OFFSET $3`
 	if err := rows.Err(); err != nil {
 		return nil, apperror.Internal("internal server error", fmt.Errorf("iterating transactions: %w", err))
 	}
+	if len(transactions) == 0 {
+		return transactions, nil
+	}
 
+	itemsByTransactionID, err := r.listItemsByTransactionIDs(ctx, transactionIDs(transactions))
+	if err != nil {
+		return nil, err
+	}
 	for i := range transactions {
-		items, err := r.listItems(ctx, transactions[i].ID)
-		if err != nil {
-			return nil, err
-		}
-		transactions[i].Items = items
+		transactions[i].Items = itemsByTransactionID[transactions[i].ID]
 	}
 	return transactions, nil
 }
@@ -242,6 +248,57 @@ ORDER BY item_id`
 		return nil, apperror.Internal("internal server error", fmt.Errorf("iterating transaction items: %w", err))
 	}
 	return items, nil
+}
+
+func (r *PostgresRepository) listItemsByTransactionIDs(ctx context.Context, transactionIDs []string) (map[string][]Item, error) {
+	query, args := buildListItemsByTransactionIDsQuery(transactionIDs)
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, apperror.Internal("internal server error", fmt.Errorf("listing transaction items: %w", err))
+	}
+	defer rows.Close()
+
+	itemsByTransactionID := make(map[string][]Item, len(transactionIDs))
+	for _, transactionID := range transactionIDs {
+		itemsByTransactionID[transactionID] = []Item{}
+	}
+
+	for rows.Next() {
+		var transactionID string
+		var item Item
+		if err := rows.Scan(&transactionID, &item.ItemID, &item.Amount); err != nil {
+			return nil, apperror.Internal("internal server error", fmt.Errorf("scanning transaction item: %w", err))
+		}
+		itemsByTransactionID[transactionID] = append(itemsByTransactionID[transactionID], item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, apperror.Internal("internal server error", fmt.Errorf("iterating transaction items: %w", err))
+	}
+	return itemsByTransactionID, nil
+}
+
+func buildListItemsByTransactionIDsQuery(transactionIDs []string) (string, []any) {
+	placeholders := make([]string, len(transactionIDs))
+	args := make([]any, 0, len(transactionIDs))
+	for i, transactionID := range transactionIDs {
+		placeholders[i] = fmt.Sprintf("$%d::uuid", i+1)
+		args = append(args, transactionID)
+	}
+
+	query := fmt.Sprintf(`
+SELECT transaction_id::text, item_id::text, amount
+FROM transaction_items
+WHERE transaction_id IN (%s)
+ORDER BY transaction_id, item_id`, strings.Join(placeholders, ", "))
+	return query, args
+}
+
+func transactionIDs(transactions []Transaction) []string {
+	ids := make([]string, 0, len(transactions))
+	for _, transaction := range transactions {
+		ids = append(ids, transaction.ID)
+	}
+	return ids
 }
 
 func allocateItem(ctx context.Context, tx pgx.Tx, item CreateItemRequest) (int, error) {
