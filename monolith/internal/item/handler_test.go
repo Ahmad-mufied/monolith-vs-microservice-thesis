@@ -14,14 +14,17 @@ import (
 )
 
 type fakeItemService struct {
-	resp Response
-	list []Response
-	err  error
-	page pagination.Page
-	id   string
+	resp       Response
+	list       []Response
+	err        error
+	page       pagination.Page
+	id         string
+	lastCreate CreateRequest
+	lastUpdate UpdateRequest
 }
 
-func (f *fakeItemService) Create(context.Context, CreateRequest) (Response, error) {
+func (f *fakeItemService) Create(_ context.Context, req CreateRequest) (Response, error) {
+	f.lastCreate = req
 	return f.resp, f.err
 }
 
@@ -35,8 +38,9 @@ func (f *fakeItemService) GetByID(_ context.Context, id string) (Response, error
 	return f.resp, f.err
 }
 
-func (f *fakeItemService) Update(_ context.Context, id string, _ UpdateRequest) (Response, error) {
+func (f *fakeItemService) Update(_ context.Context, id string, req UpdateRequest) (Response, error) {
 	f.id = id
+	f.lastUpdate = req
 	return f.resp, f.err
 }
 
@@ -62,6 +66,14 @@ func TestHandlerCreate(t *testing.T) {
 			rec := executeItemHandler(http.MethodPost, "/api/v1/items", tt.body, nil, NewHandler(tt.service).Create)
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if tt.name == "success" {
+				if tt.service.lastCreate.Name != "Item" {
+					t.Fatalf("create name = %q, want Item", tt.service.lastCreate.Name)
+				}
+				if tt.service.lastCreate.AvailableAmount == nil || *tt.service.lastCreate.AvailableAmount != 10 {
+					t.Fatalf("create available_amount = %+v, want 10", tt.service.lastCreate.AvailableAmount)
+				}
 			}
 		})
 	}
@@ -103,7 +115,7 @@ func TestHandlerGetUpdateDelete(t *testing.T) {
 	}{
 		{name: "get success", method: http.MethodGet, handler: func(h *Handler) echo.HandlerFunc { return h.GetByID }, service: &fakeItemService{resp: Response{ID: "item"}}, wantStatus: http.StatusOK},
 		{name: "get not found", method: http.MethodGet, handler: func(h *Handler) echo.HandlerFunc { return h.GetByID }, service: &fakeItemService{err: apperror.NotFound("item not found")}, wantStatus: http.StatusNotFound},
-		{name: "update success", method: http.MethodPut, body: `{"name":"Updated"}`, handler: func(h *Handler) echo.HandlerFunc { return h.Update }, service: &fakeItemService{resp: Response{ID: "item"}}, wantStatus: http.StatusOK},
+		{name: "update success", method: http.MethodPut, body: `{"name":"Updated","available_amount":15}`, handler: func(h *Handler) echo.HandlerFunc { return h.Update }, service: &fakeItemService{resp: Response{ID: "item"}}, wantStatus: http.StatusOK},
 		{name: "update invalid json", method: http.MethodPut, body: `{`, handler: func(h *Handler) echo.HandlerFunc { return h.Update }, service: &fakeItemService{}, wantStatus: http.StatusBadRequest},
 		{name: "delete success", method: http.MethodDelete, handler: func(h *Handler) echo.HandlerFunc { return h.Delete }, service: &fakeItemService{}, wantStatus: http.StatusOK},
 		{name: "delete conflict", method: http.MethodDelete, handler: func(h *Handler) echo.HandlerFunc { return h.Delete }, service: &fakeItemService{err: apperror.Conflict("item is referenced by transaction")}, wantStatus: http.StatusConflict},
@@ -118,6 +130,14 @@ func TestHandlerGetUpdateDelete(t *testing.T) {
 			}
 			if tt.wantStatus < 400 && tt.service.id != "item-1" && tt.method != http.MethodPost {
 				t.Fatalf("id = %q, want item-1", tt.service.id)
+			}
+			if tt.name == "update success" {
+				if tt.service.lastUpdate.Name == nil || *tt.service.lastUpdate.Name != "Updated" {
+					t.Fatalf("update name = %+v, want Updated", tt.service.lastUpdate.Name)
+				}
+				if tt.service.lastUpdate.AvailableAmount == nil || *tt.service.lastUpdate.AvailableAmount != 15 {
+					t.Fatalf("update available_amount = %+v, want 15", tt.service.lastUpdate.AvailableAmount)
+				}
 			}
 		})
 	}
