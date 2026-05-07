@@ -495,11 +495,11 @@ Current indexes used in migrations:
 CREATE UNIQUE INDEX idx_users_email_lower_unique
 ON users(lower(email));
 
-CREATE INDEX idx_transactions_user_id_created_at
-ON transactions(user_id, created_at DESC);
+CREATE INDEX idx_transactions_user_id_created_at_id
+ON transactions(user_id, created_at DESC, id DESC);
 
-CREATE INDEX idx_transactions_created_at
-ON transactions(created_at DESC);
+CREATE INDEX idx_transactions_created_at_id
+ON transactions(created_at DESC, id DESC);
 
 CREATE INDEX idx_transaction_items_item_id
 ON transaction_items(item_id);
@@ -510,8 +510,8 @@ Purpose:
 | Index | Purpose |
 |---|---|
 | `users(lower(email))` | case-insensitive email uniqueness |
-| `transactions(user_id, created_at DESC)` | get own transactions |
-| `transactions(created_at DESC)` | admin transaction listing |
+| `transactions(user_id, created_at DESC, id DESC)` | get own transactions |
+| `transactions(created_at DESC, id DESC)` | admin transaction listing |
 | `transaction_items(item_id)` | item reference lookup or analysis |
 
 Note:

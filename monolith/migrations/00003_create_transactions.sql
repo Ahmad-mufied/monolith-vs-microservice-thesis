@@ -8,11 +8,11 @@ CREATE TABLE transactions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_transactions_user_id_created_at
-ON transactions(user_id, created_at DESC);
+CREATE INDEX idx_transactions_user_id_created_at_id
+ON transactions(user_id, created_at DESC, id DESC);
 
-CREATE INDEX idx_transactions_created_at
-ON transactions(created_at DESC);
+CREATE INDEX idx_transactions_created_at_id
+ON transactions(created_at DESC, id DESC);
 
 -- +goose Down
 DROP TABLE transactions;
