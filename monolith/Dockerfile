@@ -22,7 +22,7 @@ FROM alpine:3.22
 
 RUN apk add --no-cache ca-certificates tzdata
 
-RUN addgroup -S app && adduser -S app -G app
+RUN addgroup -g 10001 -S app && adduser -S -D -H -u 10001 -G app app
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ COPY --from=builder /out/monolith /usr/local/bin/monolith
 COPY --from=builder /go/bin/goose /usr/local/bin/goose
 COPY monolith/migrations ./migrations
 
-USER app
+USER 10001:10001
 
 EXPOSE 8080
 

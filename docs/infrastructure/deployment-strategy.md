@@ -219,8 +219,7 @@ deployments/
 └── compose/
     ├── docker-compose.db.yml
     ├── docker-compose.monolith.yml
-    ├── docker-compose.microservices.yml
-    └── docker-compose.full.yml
+    └── initdb/
 ```
 
 File responsibilities:
@@ -228,9 +227,8 @@ File responsibilities:
 | File | Purpose |
 |---|---|
 | `docker-compose.db.yml` | local PostgreSQL only |
-| `docker-compose.monolith.yml` | PostgreSQL + monolith |
-| `docker-compose.microservices.yml` | PostgreSQL + microservices |
-| `docker-compose.full.yml` | optional all-in-one local stack |
+| `docker-compose.monolith.yml` | monolith app container only (connects to `skripsi-local` network) |
+| `initdb/*.sql` | initial database bootstrap SQL for local PostgreSQL container |
 
 ---
 
@@ -431,8 +429,8 @@ Build local Docker images and load them into Minikube.
 Example:
 
 ```bash
+eval $(minikube docker-env)
 docker build -t skripsi/monolith:local -f monolith/Dockerfile .
-minikube image load skripsi/monolith:local
 ```
 
 After the monolith deployment is ready, use a foreground port-forward session
@@ -451,21 +449,17 @@ make minikube-port-forward-monolith MONOLITH_PORT=18080
 For microservices:
 
 ```bash
+eval $(minikube docker-env)
 docker build -t skripsi/api-gateway:local ./microservices/api-gateway
 docker build -t skripsi/auth-service:local ./microservices/auth-service
 docker build -t skripsi/item-service:local ./microservices/item-service
 docker build -t skripsi/transaction-service:local ./microservices/transaction-service
-
-minikube image load skripsi/api-gateway:local
-minikube image load skripsi/auth-service:local
-minikube image load skripsi/item-service:local
-minikube image load skripsi/transaction-service:local
 ```
 
 Set local Kubernetes manifests to:
 
 ```yaml
-imagePullPolicy: IfNotPresent
+imagePullPolicy: Never
 ```
 
 ---
@@ -638,7 +632,7 @@ The Job should be executed once before all migration jobs.
 Secret used:
 
 ```text
-db-bootstrap-secret
+db-bootstrap-env
 ```
 
 Expected secret key:
@@ -814,7 +808,7 @@ Application pods should not run schema migration automatically.
 Create namespace mono
     |
     v
-Create monolith-secret
+Create monolith-env
     |
     v
 Run db-bootstrap-job if not already completed
@@ -848,7 +842,7 @@ Expanded sequence:
 
 ```text
 1. Create namespace mono.
-2. Create monolith-secret.
+2. Create monolith-env.
 3. Run db-bootstrap-job.
 4. Wait until db-bootstrap-job is complete.
 5. Run monolith-migration-job.
@@ -1048,11 +1042,11 @@ Recommended Kubernetes Secrets:
 
 ```text
 benchmark namespace:
-- db-bootstrap-secret
+- db-bootstrap-env
 - k6-runner-secret
 
 mono namespace:
-- monolith-secret
+- monolith-env
 
 msa namespace:
 - api-gateway-secret
@@ -1065,8 +1059,8 @@ Secret purposes:
 
 | Secret | Purpose |
 |---|---|
-| `db-bootstrap-secret` | contains `BOOTSTRAP_DATABASE_URL` |
-| `monolith-secret` | contains monolith app config and `DATABASE_URL` |
+| `db-bootstrap-env` | contains `BOOTSTRAP_DATABASE_URL` |
+| `monolith-env` | contains monolith app config and `DATABASE_URL` |
 | `api-gateway-secret` | contains gateway config and `JWT_SECRET` |
 | `auth-service-secret` | contains auth DB URL and `JWT_SECRET` |
 | `item-service-secret` | contains item DB URL |

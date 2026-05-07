@@ -9,7 +9,7 @@ fi
 # URL-encode function for DB credentials (reserved chars: : @ / ? # %)
 url_encode() {
   local string="$1"
-  printf '%s\n' "$string" | jq -sRr @uri
+  printf '%s' "$string" | jq -sRr @uri
 }
 
 set -a

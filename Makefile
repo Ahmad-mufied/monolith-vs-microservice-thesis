@@ -335,16 +335,16 @@ minikube-delete:
 	minikube delete
 
 .PHONY: minikube-load-images
-minikube-load-images: docker-build-all
-	minikube image load $(MONOLITH_IMAGE)
-	minikube image load $(API_GATEWAY_IMAGE)
-	minikube image load $(AUTH_SERVICE_IMAGE)
-	minikube image load $(ITEM_SERVICE_IMAGE)
-	minikube image load $(TRANSACTION_SERVICE_IMAGE)
+minikube-load-images:
+	eval $$(minikube docker-env) && docker build -t $(MONOLITH_IMAGE) -f $(MONOLITH_DIR)/Dockerfile .
+	eval $$(minikube docker-env) && docker build -t $(API_GATEWAY_IMAGE) ./$(API_GATEWAY_DIR)
+	eval $$(minikube docker-env) && docker build -t $(AUTH_SERVICE_IMAGE) ./$(AUTH_SERVICE_DIR)
+	eval $$(minikube docker-env) && docker build -t $(ITEM_SERVICE_IMAGE) ./$(ITEM_SERVICE_DIR)
+	eval $$(minikube docker-env) && docker build -t $(TRANSACTION_SERVICE_IMAGE) ./$(TRANSACTION_SERVICE_DIR)
 
 .PHONY: minikube-load-monolith
-minikube-load-monolith: docker-build-monolith
-	minikube image load $(MONOLITH_IMAGE)
+minikube-load-monolith:
+	eval $$(minikube docker-env) && docker build -t $(MONOLITH_IMAGE) -f $(MONOLITH_DIR)/Dockerfile .
 
 .PHONY: minikube-deploy-postgres
 minikube-deploy-postgres: create-local-secrets

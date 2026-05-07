@@ -397,8 +397,8 @@ make minikube-load-monolith
 Equivalent manual commands:
 
 ```bash
+eval $(minikube docker-env)
 docker build -t skripsi/monolith:local -f monolith/Dockerfile .
-minikube image load skripsi/monolith:local
 ```
 
 ### 3. Configure Minikube Secret Inputs
