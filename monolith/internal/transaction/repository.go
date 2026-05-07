@@ -56,7 +56,7 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 		transaction.Items = append(transaction.Items, Item(item))
 	}
 
-	if err := tx.Commit(finalizeCtx); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return Transaction{}, apperror.Internal("internal server error", fmt.Errorf("committing transaction: %w", err))
 	}
 	return transaction, nil
@@ -84,7 +84,7 @@ LIMIT $2 OFFSET $3`
 	}
 	defer rows.Close()
 
-	transactions := make([]Transaction, 0)
+	transactions := make([]Transaction, 0, limit)
 	for rows.Next() {
 		var tx Transaction
 		if err := rows.Scan(&tx.ID, &tx.UserID, &tx.CreatedAt, &tx.UpdatedAt); err != nil {
@@ -236,7 +236,7 @@ ORDER BY item_id`
 	}
 	defer rows.Close()
 
-	items := make([]Item, 0)
+	items := make([]Item, 0, 20)
 	for rows.Next() {
 		var item Item
 		if err := rows.Scan(&item.ItemID, &item.Amount); err != nil {

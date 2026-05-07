@@ -37,7 +37,7 @@ func (r *PostgresRepository) BulkSave(ctx context.Context, items []BulkSaveItem)
 		}
 	}
 
-	if err := tx.Commit(finalizeCtx); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return apperror.Internal("internal server error", fmt.Errorf("committing item bulk save transaction: %w", err))
 	}
 	return nil
@@ -55,7 +55,7 @@ LIMIT $1 OFFSET $2`
 	}
 	defer rows.Close()
 
-	items := make([]Item, 0)
+	items := make([]Item, 0, limit)
 	for rows.Next() {
 		var item Item
 		if err := rows.Scan(&item.ID, &item.Name, &item.AvailableAmount, &item.CreatedAt, &item.UpdatedAt); err != nil {
