@@ -36,7 +36,6 @@ In the monolith:
 
 ```json
 {
-  "status": "error",
   "error": {
     "code": "BAD_REQUEST",
     "message": "invalid request payload",
