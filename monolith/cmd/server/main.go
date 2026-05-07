@@ -82,20 +82,35 @@ func main() {
 	item.NewHandler(itemService).RegisterRoutes(api)
 	transaction.NewHandler(transactionService).RegisterRoutes(api)
 
+	addr := ":" + cfg.AppPort
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           e,
+		ReadHeaderTimeout: cfg.HTTPServer.ReadHeaderTimeout,
+		ReadTimeout:       cfg.HTTPServer.ReadTimeout,
+		WriteTimeout:      cfg.HTTPServer.WriteTimeout,
+		IdleTimeout:       cfg.HTTPServer.IdleTimeout,
+		MaxHeaderBytes:    cfg.HTTPServer.MaxHeaderBytes,
+	}
+
+	serverErrCh := make(chan error, 1)
 	go func() {
-		addr := ":" + cfg.AppPort
 		logger.Info("starting monolith", slog.String("addr", addr), slog.String("env", cfg.AppEnv))
-		if err := e.Start(addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("http server error", slog.String("error", err.Error()))
-			os.Exit(1)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErrCh <- err
 		}
 	}()
 
-	<-ctx.Done()
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
-	if err := e.Shutdown(shutdownCtx); err != nil {
-		logger.Error("shutdown http server", slog.String("error", err.Error()))
+	select {
+	case <-ctx.Done():
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.HTTPServer.ShutdownTimeout)
+		defer shutdownCancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logger.Error("shutdown http server", slog.String("error", err.Error()))
+		}
+	case err := <-serverErrCh:
+		logger.Error("http server error", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 }
 

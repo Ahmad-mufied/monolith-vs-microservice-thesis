@@ -13,6 +13,7 @@ spec:
       labels:
         app: monolith
     spec:
+      terminationGracePeriodSeconds: 20
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -34,18 +35,27 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
             initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 2
           livenessProbe:
             httpGet:
               path: /healthz
               port: http
             initialDelaySeconds: 15
             periodSeconds: 10
+            timeoutSeconds: 2
           resources:
             requests:
               cpu: 1000m

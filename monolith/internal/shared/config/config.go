@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -15,12 +16,22 @@ type DBPoolConfig struct {
 	PingTimeout     time.Duration
 }
 
+type HTTPServerConfig struct {
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+	ShutdownTimeout   time.Duration
+	MaxHeaderBytes    int
+}
+
 type Config struct {
 	AppEnv         string
 	AppPort        string
 	ServiceName    string
 	DatabaseURL    string
 	DBPool         DBPoolConfig
+	HTTPServer     HTTPServerConfig
 	JWTSecret      string
 	JWTTokenTTL    time.Duration
 	DatadogEnabled bool
@@ -31,6 +42,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	httpServer, err := loadHTTPServerConfig()
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
 		AppEnv:         getEnv("APP_ENV", "development"),
@@ -38,6 +53,7 @@ func Load() (Config, error) {
 		ServiceName:    getEnv("SERVICE_NAME", "monolith"),
 		DatabaseURL:    os.Getenv("DATABASE_URL"),
 		DBPool:         dbPool,
+		HTTPServer:     httpServer,
 		JWTSecret:      os.Getenv("JWT_SECRET"),
 		JWTTokenTTL:    24 * time.Hour,
 		DatadogEnabled: os.Getenv("DATADOG_ENABLED") == "true",
@@ -106,6 +122,65 @@ func loadDBPoolConfig() (DBPoolConfig, error) {
 	}, nil
 }
 
+func loadHTTPServerConfig() (HTTPServerConfig, error) {
+	readHeaderTimeout, err := getEnvDuration("HTTP_READ_HEADER_TIMEOUT", 5*time.Second)
+	if err != nil {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_READ_HEADER_TIMEOUT: %w", err)
+	}
+	if readHeaderTimeout <= 0 {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_READ_HEADER_TIMEOUT must be greater than 0")
+	}
+
+	readTimeout, err := getEnvDuration("HTTP_READ_TIMEOUT", 15*time.Second)
+	if err != nil {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_READ_TIMEOUT: %w", err)
+	}
+	if readTimeout <= 0 {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_READ_TIMEOUT must be greater than 0")
+	}
+
+	writeTimeout, err := getEnvDuration("HTTP_WRITE_TIMEOUT", 30*time.Second)
+	if err != nil {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_WRITE_TIMEOUT: %w", err)
+	}
+	if writeTimeout <= 0 {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_WRITE_TIMEOUT must be greater than 0")
+	}
+
+	idleTimeout, err := getEnvDuration("HTTP_IDLE_TIMEOUT", time.Minute)
+	if err != nil {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_IDLE_TIMEOUT: %w", err)
+	}
+	if idleTimeout <= 0 {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_IDLE_TIMEOUT must be greater than 0")
+	}
+
+	shutdownTimeout, err := getEnvDuration("HTTP_SHUTDOWN_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_SHUTDOWN_TIMEOUT: %w", err)
+	}
+	if shutdownTimeout <= 0 {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_SHUTDOWN_TIMEOUT must be greater than 0")
+	}
+
+	maxHeaderBytes, err := getEnvInt("HTTP_MAX_HEADER_BYTES", http.DefaultMaxHeaderBytes)
+	if err != nil {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_MAX_HEADER_BYTES: %w", err)
+	}
+	if maxHeaderBytes <= 0 {
+		return HTTPServerConfig{}, fmt.Errorf("HTTP_MAX_HEADER_BYTES must be greater than 0")
+	}
+
+	return HTTPServerConfig{
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+		ShutdownTimeout:   shutdownTimeout,
+		MaxHeaderBytes:    maxHeaderBytes,
+	}, nil
+}
+
 func getEnv(key, fallback string) string {
 	value := os.Getenv(key)
 	if value == "" {
@@ -125,6 +200,19 @@ func getEnvInt32(key string, fallback int32) (int32, error) {
 		return 0, fmt.Errorf("must be a valid integer: %w", err)
 	}
 	return int32(parsed), nil
+}
+
+func getEnvInt(key string, fallback int) (int, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("must be a valid integer: %w", err)
+	}
+	return parsed, nil
 }
 
 func getEnvDuration(key string, fallback time.Duration) (time.Duration, error) {

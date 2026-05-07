@@ -33,6 +33,19 @@ func TestLoad(t *testing.T) {
 			},
 		},
 		{
+			name: "loads http server overrides",
+			env: map[string]string{
+				"DATABASE_URL":             "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":               testJWTSecret(t),
+				"HTTP_READ_HEADER_TIMEOUT": "6s",
+				"HTTP_READ_TIMEOUT":        "20s",
+				"HTTP_WRITE_TIMEOUT":       "40s",
+				"HTTP_IDLE_TIMEOUT":        "75s",
+				"HTTP_SHUTDOWN_TIMEOUT":    "12s",
+				"HTTP_MAX_HEADER_BYTES":    "2097152",
+			},
+		},
+		{
 			name: "missing database url",
 			env: map[string]string{
 				"JWT_SECRET": testJWTSecret(t),
@@ -74,6 +87,33 @@ func TestLoad(t *testing.T) {
 			},
 			wantError: true,
 		},
+		{
+			name: "invalid http duration",
+			env: map[string]string{
+				"DATABASE_URL":      "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":        testJWTSecret(t),
+				"HTTP_READ_TIMEOUT": "later",
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid http max header bytes",
+			env: map[string]string{
+				"DATABASE_URL":          "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":            testJWTSecret(t),
+				"HTTP_MAX_HEADER_BYTES": "big",
+			},
+			wantError: true,
+		},
+		{
+			name: "http max header bytes must be positive",
+			env: map[string]string{
+				"DATABASE_URL":          "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":            testJWTSecret(t),
+				"HTTP_MAX_HEADER_BYTES": "0",
+			},
+			wantError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -89,6 +129,12 @@ func TestLoad(t *testing.T) {
 			t.Setenv("DB_POOL_MAX_CONN_LIFETIME", "")
 			t.Setenv("DB_POOL_MAX_CONN_IDLE_TIME", "")
 			t.Setenv("DB_PING_TIMEOUT", "")
+			t.Setenv("HTTP_READ_HEADER_TIMEOUT", "")
+			t.Setenv("HTTP_READ_TIMEOUT", "")
+			t.Setenv("HTTP_WRITE_TIMEOUT", "")
+			t.Setenv("HTTP_IDLE_TIMEOUT", "")
+			t.Setenv("HTTP_SHUTDOWN_TIMEOUT", "")
+			t.Setenv("HTTP_MAX_HEADER_BYTES", "")
 			for key, value := range tt.env {
 				t.Setenv(key, value)
 			}
@@ -114,6 +160,16 @@ func TestLoad(t *testing.T) {
 			if tt.name == "loads db pool overrides" {
 				if got.DBPool.MaxConns != 40 || got.DBPool.MinConns != 4 || got.DBPool.MaxConnLifetime != 10*time.Minute || got.DBPool.MaxConnIdleTime != 2*time.Minute || got.DBPool.PingTimeout != 7*time.Second {
 					t.Fatalf("db pool overrides = %+v", got.DBPool)
+				}
+			}
+			if tt.name == "loads required config with defaults" {
+				if got.HTTPServer.ReadHeaderTimeout != 5*time.Second || got.HTTPServer.ReadTimeout != 15*time.Second || got.HTTPServer.WriteTimeout != 30*time.Second || got.HTTPServer.IdleTimeout != time.Minute || got.HTTPServer.ShutdownTimeout != 10*time.Second || got.HTTPServer.MaxHeaderBytes != 1048576 {
+					t.Fatalf("http server defaults = %+v", got.HTTPServer)
+				}
+			}
+			if tt.name == "loads http server overrides" {
+				if got.HTTPServer.ReadHeaderTimeout != 6*time.Second || got.HTTPServer.ReadTimeout != 20*time.Second || got.HTTPServer.WriteTimeout != 40*time.Second || got.HTTPServer.IdleTimeout != 75*time.Second || got.HTTPServer.ShutdownTimeout != 12*time.Second || got.HTTPServer.MaxHeaderBytes != 2097152 {
+					t.Fatalf("http server overrides = %+v", got.HTTPServer)
 				}
 			}
 		})

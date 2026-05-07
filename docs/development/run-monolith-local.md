@@ -141,6 +141,12 @@ DB_POOL_MIN_CONNS=2
 DB_POOL_MAX_CONN_LIFETIME=5m
 DB_POOL_MAX_CONN_IDLE_TIME=1m
 DB_PING_TIMEOUT=5s
+HTTP_READ_HEADER_TIMEOUT=5s
+HTTP_READ_TIMEOUT=15s
+HTTP_WRITE_TIMEOUT=30s
+HTTP_IDLE_TIMEOUT=60s
+HTTP_SHUTDOWN_TIMEOUT=10s
+HTTP_MAX_HEADER_BYTES=1048576
 JWT_SECRET=<generated-local-secret>
 DATADOG_ENABLED=false
 ```
@@ -155,6 +161,40 @@ The DB pool values control `pgxpool` per monolith pod or process. With the
 current HPA cap of 4 monolith replicas, `DB_POOL_MAX_CONNS=25` means the
 application can open up to roughly 100 database connections in total during
 scale-out.
+
+The HTTP server values control request and connection timeouts for the monolith
+process. They keep slow or idle clients from holding resources too long and
+define how long graceful shutdown may wait for in-flight requests.
+
+Meaning of each HTTP setting:
+
+- `HTTP_READ_HEADER_TIMEOUT=5s`
+  Limits how long the server waits to receive the request headers. This helps
+  protect the process from very slow clients that open a connection but send
+  headers too slowly.
+
+- `HTTP_READ_TIMEOUT=15s`
+  Limits the total time allowed to read the full request, including the body.
+  This prevents a request from occupying a connection indefinitely while still
+  allowing normal API payloads to arrive comfortably.
+
+- `HTTP_WRITE_TIMEOUT=30s`
+  Limits how long the server may spend writing the response. This keeps a slow
+  downstream client from holding a response connection open for too long.
+
+- `HTTP_IDLE_TIMEOUT=60s`
+  Controls how long keep-alive connections may stay idle before the server
+  closes them. This helps reclaim resources from clients that are no longer
+  actively sending requests.
+
+- `HTTP_SHUTDOWN_TIMEOUT=10s`
+  Controls how long graceful shutdown waits for in-flight requests to finish
+  before the server stops. This is used during pod termination and local
+  process shutdown.
+
+- `HTTP_MAX_HEADER_BYTES=1048576`
+  Caps the total size of HTTP request headers at 1 MiB. This makes the default
+  limit explicit and avoids unusually large headers consuming excessive memory.
 
 ### 2. Start PostgreSQL
 

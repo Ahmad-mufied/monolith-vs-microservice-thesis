@@ -150,9 +150,24 @@ APP_ENV
 APP_PORT
 SERVICE_NAME
 DATABASE_URL
+DB_POOL_MAX_CONNS
+DB_POOL_MIN_CONNS
+DB_POOL_MAX_CONN_LIFETIME
+DB_POOL_MAX_CONN_IDLE_TIME
+DB_PING_TIMEOUT
+HTTP_READ_HEADER_TIMEOUT
+HTTP_READ_TIMEOUT
+HTTP_WRITE_TIMEOUT
+HTTP_IDLE_TIMEOUT
+HTTP_SHUTDOWN_TIMEOUT
+HTTP_MAX_HEADER_BYTES
 JWT_SECRET
 DATADOG_ENABLED
 ```
+
+The purpose of the DB pool and HTTP timeout variables is explained in
+`docs/development/run-monolith-local.md`, because the same keys are used for
+local Compose and local Kubernetes flows.
 
 ### API Gateway
 
