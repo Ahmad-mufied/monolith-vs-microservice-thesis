@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
@@ -17,9 +18,10 @@ func TestError(t *testing.T) {
 		err        error
 		wantStatus int
 		wantCode   string
+		wantMsg    string
 	}{
-		{name: "app error", err: apperror.NotFound("item not found"), wantStatus: http.StatusNotFound, wantCode: "NOT_FOUND"},
-		{name: "unknown error", err: errors.New("database failed"), wantStatus: http.StatusInternalServerError, wantCode: "INTERNAL_SERVER_ERROR"},
+		{name: "app error", err: apperror.NotFound("item not found"), wantStatus: http.StatusNotFound, wantCode: "NOT_FOUND", wantMsg: "item not found"},
+		{name: "unknown error", err: errors.New("database failed"), wantStatus: http.StatusInternalServerError, wantCode: "INTERNAL_SERVER_ERROR", wantMsg: "internal server error"},
 	}
 
 	for _, tt := range tests {
@@ -44,6 +46,12 @@ func TestError(t *testing.T) {
 			}
 			if got.Error.Code != tt.wantCode {
 				t.Fatalf("code = %q, want %q", got.Error.Code, tt.wantCode)
+			}
+			if got.Error.Message != tt.wantMsg {
+				t.Fatalf("message = %q, want %q", got.Error.Message, tt.wantMsg)
+			}
+			if tt.name == "unknown error" && strings.Contains(rec.Body.String(), "database failed") {
+				t.Fatalf("unexpected raw error leak in body: %s", rec.Body.String())
 			}
 
 			var raw map[string]any
