@@ -30,8 +30,9 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 		_ = tx.Rollback(ctx)
 	}()
 
-	availableAfter := make(map[string]int, len(items))
-	for _, item := range orderedItemsForAllocation(items) {
+	orderedItems := orderedItemsForAllocation(items)
+	availableAfter := make(map[string]int, len(orderedItems))
+	for _, item := range orderedItems {
 		after, err := allocateItem(ctx, tx, item)
 		if err != nil {
 			return Transaction{}, err
@@ -44,8 +45,8 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 		return Transaction{}, err
 	}
 
-	transaction.Items = make([]Item, 0, len(items))
-	for _, item := range items {
+	transaction.Items = make([]Item, 0, len(orderedItems))
+	for _, item := range orderedItems {
 		if err := insertTransactionItem(ctx, tx, transaction.ID, item, availableAfter[item.ItemID]); err != nil {
 			return Transaction{}, err
 		}

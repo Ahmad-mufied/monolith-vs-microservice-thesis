@@ -30,6 +30,24 @@ func TestOrderedItemsForAllocation(t *testing.T) {
 	}
 }
 
+func TestOrderedItemsForAllocationMatchesReadOrder(t *testing.T) {
+	input := []CreateItemRequest{
+		{ItemID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2002", Amount: 3},
+		{ItemID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", Amount: 1},
+	}
+
+	ordered := orderedItemsForAllocation(input)
+	responseItems := make([]Item, 0, len(ordered))
+	for _, item := range ordered {
+		responseItems = append(responseItems, Item(item))
+	}
+
+	if responseItems[0].ItemID != "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001" ||
+		responseItems[1].ItemID != "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2002" {
+		t.Fatalf("response items = %+v", responseItems)
+	}
+}
+
 func TestInsertTransactionErrorMapping(t *testing.T) {
 	t.Run("missing user foreign key becomes unauthorized", func(t *testing.T) {
 		tx := stubTx{
