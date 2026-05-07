@@ -22,7 +22,7 @@ func (h *Handler) Register(e *echo.Echo) {
 
 func (h *Handler) Check(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{
-		"status":    "ok",
+		"message":   "ok",
 		"service":   h.serviceName,
 		"timestamp": h.now().UTC().Format(time.RFC3339),
 	})

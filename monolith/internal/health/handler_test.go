@@ -38,7 +38,7 @@ func TestHandlerCheck(t *testing.T) {
 			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 				t.Fatalf("unmarshal response: %v", err)
 			}
-			if got["status"] != "ok" || got["service"] != tt.serviceName || got["timestamp"] != "2026-05-05T12:00:00Z" {
+			if got["message"] != "ok" || got["service"] != tt.serviceName || got["timestamp"] != "2026-05-05T12:00:00Z" {
 				t.Fatalf("response = %+v", got)
 			}
 		})
