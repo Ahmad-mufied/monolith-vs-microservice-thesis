@@ -25,7 +25,7 @@ func NewService(repo Repository) *Service {
 }
 
 func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) (string, error) {
-	if err := validateUUID(userID, "user_id"); err != nil {
+	if err := validation.ValidateUUIDField(userID, "user_id"); err != nil {
 		return "", err
 	}
 	if err := validation.Struct(req); err != nil {
@@ -43,7 +43,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 }
 
 func (s *Service) ListOwn(ctx context.Context, userID string, page pagination.Page) ([]Response, error) {
-	if err := validateUUID(userID, "user_id"); err != nil {
+	if err := validation.ValidateUUIDField(userID, "user_id"); err != nil {
 		return nil, err
 	}
 	transactions, err := s.repo.ListOwn(ctx, userID, page.Limit, page.Offset)
@@ -54,10 +54,10 @@ func (s *Service) ListOwn(ctx context.Context, userID string, page pagination.Pa
 }
 
 func (s *Service) GetOwnByID(ctx context.Context, userID, transactionID string) (Response, error) {
-	if err := validateUUID(userID, "user_id"); err != nil {
+	if err := validation.ValidateUUIDField(userID, "user_id"); err != nil {
 		return Response{}, err
 	}
-	if err := validateUUID(transactionID, "transaction_id"); err != nil {
+	if err := validation.ValidateUUIDField(transactionID, "transaction_id"); err != nil {
 		return Response{}, err
 	}
 	tx, err := s.repo.GetOwnByID(ctx, userID, transactionID)
@@ -94,11 +94,4 @@ func validateAndNormalizeCreateItems(items []CreateItemRequest) ([]CreateItemReq
 		})
 	}
 	return normalized, nil
-}
-
-func validateUUID(value, field string) error {
-	if _, err := uuid.Parse(value); err != nil {
-		return apperror.BadRequest("invalid request payload", map[string]any{field: "must be a valid UUID"})
-	}
-	return nil
 }

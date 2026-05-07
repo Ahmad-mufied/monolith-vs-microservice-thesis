@@ -24,6 +24,13 @@ func Struct(value any) error {
 	return nil
 }
 
+func ValidateUUIDField(value, field string) error {
+	if _, err := uuid.Parse(value); err != nil {
+		return apperror.BadRequest("invalid request payload", map[string]any{field: "must be a valid UUID"})
+	}
+	return nil
+}
+
 func newValidator() *validator.Validate {
 	v := validator.New()
 	v.RegisterTagNameFunc(func(field reflect.StructField) string {
