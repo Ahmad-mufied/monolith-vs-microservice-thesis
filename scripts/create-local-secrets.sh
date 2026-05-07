@@ -50,6 +50,7 @@ BOOTSTRAP_DATABASE_URL=postgres://${encoded_user}:${encoded_pass}@postgres.bench
 EOF
 
 kubectl apply -f deployments/k8s/namespaces/benchmark.yaml
+kubectl create namespace mono --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic postgres-local-env \
   --namespace benchmark \
