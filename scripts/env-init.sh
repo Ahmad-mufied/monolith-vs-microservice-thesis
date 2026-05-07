@@ -52,6 +52,11 @@ APP_PORT=8080
 SERVICE_NAME=monolith
 DATABASE_URL=postgres://${postgres_user}:${postgres_password}@postgres:5432/mono_db?sslmode=disable
 MONO_DATABASE_URL=postgres://${postgres_user}:${postgres_password}@localhost:5432/mono_db?sslmode=disable
+DB_POOL_MAX_CONNS=25
+DB_POOL_MIN_CONNS=2
+DB_POOL_MAX_CONN_LIFETIME=5m
+DB_POOL_MAX_CONN_IDLE_TIME=1m
+DB_PING_TIMEOUT=5s
 JWT_SECRET=${jwt_secret}
 DATADOG_ENABLED=false"
 

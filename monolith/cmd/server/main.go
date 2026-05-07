@@ -38,7 +38,7 @@ func main() {
 
 	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	pool, err := db.Connect(connectCtx, cfg.DatabaseURL)
+	pool, err := db.Connect(connectCtx, cfg.DatabaseURL, cfg.DBPool)
 	if err != nil {
 		logger.Error("connect database", slog.String("error", err.Error()))
 		os.Exit(1)

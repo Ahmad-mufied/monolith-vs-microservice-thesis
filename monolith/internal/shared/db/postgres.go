@@ -3,26 +3,26 @@ package db
 import (
 	"context"
 	"fmt"
-	"time"
 
+	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
+func Connect(ctx context.Context, databaseURL string, poolConfig config.DBPoolConfig) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing database url: %w", err)
 	}
-	cfg.MaxConns = 25
-	cfg.MinConns = 2
-	cfg.MaxConnLifetime = 5 * time.Minute
-	cfg.MaxConnIdleTime = time.Minute
+	cfg.MaxConns = poolConfig.MaxConns
+	cfg.MinConns = poolConfig.MinConns
+	cfg.MaxConnLifetime = poolConfig.MaxConnLifetime
+	cfg.MaxConnIdleTime = poolConfig.MaxConnIdleTime
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("opening database pool: %w", err)
 	}
-	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	pingCtx, cancel := context.WithTimeout(ctx, poolConfig.PingTimeout)
 	defer cancel()
 	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()

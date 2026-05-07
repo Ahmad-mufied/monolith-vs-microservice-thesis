@@ -21,6 +21,18 @@ func TestLoad(t *testing.T) {
 			},
 		},
 		{
+			name: "loads db pool overrides",
+			env: map[string]string{
+				"DATABASE_URL":               "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":                 testJWTSecret(t),
+				"DB_POOL_MAX_CONNS":          "40",
+				"DB_POOL_MIN_CONNS":          "4",
+				"DB_POOL_MAX_CONN_LIFETIME":  "10m",
+				"DB_POOL_MAX_CONN_IDLE_TIME": "2m",
+				"DB_PING_TIMEOUT":            "7s",
+			},
+		},
+		{
 			name: "missing database url",
 			env: map[string]string{
 				"JWT_SECRET": testJWTSecret(t),
@@ -34,6 +46,34 @@ func TestLoad(t *testing.T) {
 			},
 			wantError: true,
 		},
+		{
+			name: "invalid db pool max conns",
+			env: map[string]string{
+				"DATABASE_URL":      "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":        testJWTSecret(t),
+				"DB_POOL_MAX_CONNS": "abc",
+			},
+			wantError: true,
+		},
+		{
+			name: "db pool min conns cannot exceed max",
+			env: map[string]string{
+				"DATABASE_URL":      "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":        testJWTSecret(t),
+				"DB_POOL_MAX_CONNS": "2",
+				"DB_POOL_MIN_CONNS": "3",
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid db pool duration",
+			env: map[string]string{
+				"DATABASE_URL":              "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":                testJWTSecret(t),
+				"DB_POOL_MAX_CONN_LIFETIME": "soon",
+			},
+			wantError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -44,6 +84,11 @@ func TestLoad(t *testing.T) {
 			t.Setenv("DATABASE_URL", "")
 			t.Setenv("JWT_SECRET", "")
 			t.Setenv("DATADOG_ENABLED", "")
+			t.Setenv("DB_POOL_MAX_CONNS", "")
+			t.Setenv("DB_POOL_MIN_CONNS", "")
+			t.Setenv("DB_POOL_MAX_CONN_LIFETIME", "")
+			t.Setenv("DB_POOL_MAX_CONN_IDLE_TIME", "")
+			t.Setenv("DB_PING_TIMEOUT", "")
 			for key, value := range tt.env {
 				t.Setenv(key, value)
 			}
@@ -60,6 +105,16 @@ func TestLoad(t *testing.T) {
 			}
 			if got.AppPort != "8080" || got.ServiceName != "monolith" || got.JWTTokenTTL != 24*time.Hour {
 				t.Fatalf("config defaults = %+v", got)
+			}
+			if tt.name == "loads required config with defaults" {
+				if got.DBPool.MaxConns != 25 || got.DBPool.MinConns != 2 || got.DBPool.MaxConnLifetime != 5*time.Minute || got.DBPool.MaxConnIdleTime != time.Minute || got.DBPool.PingTimeout != 5*time.Second {
+					t.Fatalf("db pool defaults = %+v", got.DBPool)
+				}
+			}
+			if tt.name == "loads db pool overrides" {
+				if got.DBPool.MaxConns != 40 || got.DBPool.MinConns != 4 || got.DBPool.MaxConnLifetime != 10*time.Minute || got.DBPool.MaxConnIdleTime != 2*time.Minute || got.DBPool.PingTimeout != 7*time.Second {
+					t.Fatalf("db pool overrides = %+v", got.DBPool)
+				}
 			}
 		})
 	}

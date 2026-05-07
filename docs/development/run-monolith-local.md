@@ -136,6 +136,11 @@ APP_PORT=8080
 SERVICE_NAME=monolith
 DATABASE_URL=postgres://postgres:<generated-local-password>@postgres:5432/mono_db?sslmode=disable
 MONO_DATABASE_URL=postgres://postgres:<generated-local-password>@localhost:5432/mono_db?sslmode=disable
+DB_POOL_MAX_CONNS=25
+DB_POOL_MIN_CONNS=2
+DB_POOL_MAX_CONN_LIFETIME=5m
+DB_POOL_MAX_CONN_IDLE_TIME=1m
+DB_PING_TIMEOUT=5s
 JWT_SECRET=<generated-local-secret>
 DATADOG_ENABLED=false
 ```
@@ -145,6 +150,11 @@ Compose service name: `postgres`.
 
 `MONO_DATABASE_URL` is used by host-side migration commands. The hostname is
 `localhost`.
+
+The DB pool values control `pgxpool` per monolith pod or process. With the
+current HPA cap of 4 monolith replicas, `DB_POOL_MAX_CONNS=25` means the
+application can open up to roughly 100 database connections in total during
+scale-out.
 
 ### 2. Start PostgreSQL
 
