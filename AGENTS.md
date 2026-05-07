@@ -122,6 +122,10 @@ For database decisions:
 - docs/development/database-migration.md
 - docs/infrastructure/rds-postgres.md
 
+For request validation decisions:
+
+- docs/development/validation-strategy.md
+
 For benchmark decisions:
 
 - docs/experiment/research-design.md
@@ -895,6 +899,7 @@ Development:
 - docs/development/local-development.md
 - docs/development/database-schema.md
 - docs/development/database-migration.md
+- docs/development/validation-strategy.md
 
 Experiment:
 

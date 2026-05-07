@@ -136,6 +136,17 @@ func TestServiceUpdate(t *testing.T) {
 	}
 }
 
+func TestServiceUpdateValidationDetails(t *testing.T) {
+	service := NewService(&fakeRepo{})
+	blank := " "
+
+	_, err := service.Update(context.Background(), "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", UpdateRequest{})
+	assertValidationDetail(t, err, "body", "at least one field is required")
+
+	_, err = service.Update(context.Background(), "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", UpdateRequest{Name: &blank})
+	assertValidationDetail(t, err, "name", "must not be empty")
+}
+
 func TestServiceDelete(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -173,5 +184,21 @@ func assertAppError(t *testing.T, err error, wantError bool, wantCode apperror.C
 	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func assertValidationDetail(t *testing.T, err error, wantField, wantMessage string) {
+	t.Helper()
+	var appErr *apperror.Error
+	if !errors.As(err, &appErr) {
+		t.Fatalf("error type = %T, want *apperror.Error", err)
+	}
+
+	gotMessage, ok := appErr.Details[wantField]
+	if !ok {
+		t.Fatalf("details = %#v, want field %q", appErr.Details, wantField)
+	}
+	if gotMessage != wantMessage {
+		t.Fatalf("details[%q] = %v, want %q", wantField, gotMessage, wantMessage)
 	}
 }

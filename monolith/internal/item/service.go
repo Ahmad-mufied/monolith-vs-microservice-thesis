@@ -3,14 +3,12 @@ package item
 import (
 	"context"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/pagination"
+	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/validation"
 	"github.com/google/uuid"
 )
-
-const maxItemNameLength = 160
 
 type Repository interface {
 	Create(ctx context.Context, name string, availableAmount int) (Item, error)
@@ -30,17 +28,9 @@ func NewService(repo Repository) *Service {
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (Response, error) {
 	name := strings.TrimSpace(req.Name)
-	if name == "" {
-		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "is required"})
-	}
-	if utf8.RuneCountInString(name) > maxItemNameLength {
-		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "must be at most 160 characters"})
-	}
-	if req.AvailableAmount == nil {
-		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"available_amount": "is required"})
-	}
-	if *req.AvailableAmount < 0 {
-		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"available_amount": "must be greater than or equal to 0"})
+	normalizedReq := CreateRequest{Name: name, AvailableAmount: req.AvailableAmount}
+	if err := validation.Struct(normalizedReq); err != nil {
+		return Response{}, err
 	}
 	item, err := s.repo.Create(ctx, name, *req.AvailableAmount)
 	if err != nil {
@@ -80,13 +70,10 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateRequest) (Res
 		if name == "" {
 			return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "must not be empty"})
 		}
-		if utf8.RuneCountInString(name) > maxItemNameLength {
-			return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "must be at most 160 characters"})
-		}
 		req.Name = &name
 	}
-	if req.AvailableAmount != nil && *req.AvailableAmount < 0 {
-		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"available_amount": "must be greater than or equal to 0"})
+	if err := validation.Struct(req); err != nil {
+		return Response{}, err
 	}
 	item, err := s.repo.Update(ctx, id, req.Name, req.AvailableAmount)
 	if err != nil {

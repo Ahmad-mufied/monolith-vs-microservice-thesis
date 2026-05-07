@@ -179,6 +179,40 @@ func TestServiceLogin(t *testing.T) {
 	}
 }
 
+func TestServiceRegisterValidationDetails(t *testing.T) {
+	service := NewService(&fakeRepo{}, fakeHasher{}, fakeSigner{})
+
+	_, err := service.Register(context.Background(), RegisterRequest{
+		Name:     "Ahmad",
+		Email:    "Ahmad <mufied@example.com>",
+		Password: "secret123",
+	})
+	assertValidationDetail(t, err, "email", "must be a valid email")
+
+	_, err = service.Register(context.Background(), RegisterRequest{
+		Name:     "Ahmad",
+		Email:    "mufied@example.com",
+		Password: strings.Repeat("あ", 40),
+	})
+	assertValidationDetail(t, err, "password", "must be at most 72 bytes for bcrypt compatibility")
+}
+
+func TestServiceLoginValidationDetails(t *testing.T) {
+	service := NewService(&fakeRepo{}, fakeHasher{}, fakeSigner{})
+
+	_, err := service.Login(context.Background(), LoginRequest{
+		Email:    "Ahmad <mufied@example.com>",
+		Password: "secret123",
+	})
+	assertValidationDetail(t, err, "email", "must be a valid email")
+
+	_, err = service.Login(context.Background(), LoginRequest{
+		Email:    "mufied@example.com",
+		Password: strings.Repeat("あ", 40),
+	})
+	assertValidationDetail(t, err, "password", "must be at most 72 bytes for bcrypt compatibility")
+}
+
 func TestNewServiceDependencyValidation(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		_ = NewService(&fakeRepo{}, fakeHasher{}, fakeSigner{})
@@ -220,6 +254,22 @@ func TestNewServiceDependencyValidation(t *testing.T) {
 			}()
 			tt.run()
 		})
+	}
+}
+
+func assertValidationDetail(t *testing.T, err error, wantField, wantMessage string) {
+	t.Helper()
+	var appErr *apperror.Error
+	if !errors.As(err, &appErr) {
+		t.Fatalf("error type = %T, want *apperror.Error", err)
+	}
+
+	gotMessage, ok := appErr.Details[wantField]
+	if !ok {
+		t.Fatalf("details = %#v, want field %q", appErr.Details, wantField)
+	}
+	if gotMessage != wantMessage {
+		t.Fatalf("details[%q] = %v, want %q", wantField, gotMessage, wantMessage)
 	}
 }
 

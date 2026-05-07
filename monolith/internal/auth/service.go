@@ -7,9 +7,9 @@ import (
 	"net/mail"
 	"reflect"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
+	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/validation"
 )
 
 type Repository interface {
@@ -33,10 +33,7 @@ type Service struct {
 }
 
 const (
-	maxNameLength     = 120
-	minPasswordLength = 8
-	maxPasswordLength = 72
-	maxPasswordBytes  = 72
+	maxPasswordBytes = 72
 )
 
 func NewService(repo Repository, hasher PasswordHasher, signer TokenSigner) *Service {
@@ -49,16 +46,15 @@ func NewService(repo Repository, hasher PasswordHasher, signer TokenSigner) *Ser
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (UserResponse, error) {
 	name := strings.TrimSpace(req.Name)
 	email := strings.ToLower(strings.TrimSpace(req.Email))
-	if name == "" {
-		return UserResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "is required"})
-	}
-	if utf8.RuneCountInString(name) > maxNameLength {
-		return UserResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "must be at most 120 characters"})
+
+	normalizedReq := RegisterRequest{Name: name, Email: email, Password: req.Password}
+	if err := validation.Struct(normalizedReq); err != nil {
+		return UserResponse{}, err
 	}
 	if !isEmail(email) {
 		return UserResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"email": "must be a valid email"})
 	}
-	if err := validatePassword(req.Password); err != nil {
+	if err := validatePasswordBytes(req.Password); err != nil {
 		return UserResponse{}, err
 	}
 
@@ -77,10 +73,15 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (UserRespon
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, error) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
+
+	normalizedReq := LoginRequest{Email: email, Password: req.Password}
+	if err := validation.Struct(normalizedReq); err != nil {
+		return LoginResponse{}, err
+	}
 	if !isEmail(email) {
 		return LoginResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"email": "must be a valid email"})
 	}
-	if err := validatePassword(req.Password); err != nil {
+	if err := validatePasswordBytes(req.Password); err != nil {
 		return LoginResponse{}, err
 	}
 
@@ -118,16 +119,7 @@ func isEmail(value string) bool {
 	return err == nil && addr.Address == value && addr.Name == ""
 }
 
-func validatePassword(password string) error {
-	passwordLength := utf8.RuneCountInString(password)
-	if passwordLength < minPasswordLength {
-		// #nosec G101 -- "password" is the public request field name in the validation payload, not a hardcoded credential.
-		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at least 8 characters"})
-	}
-	if passwordLength > maxPasswordLength {
-		// #nosec G101 -- "password" is the public request field name in the validation payload, not a hardcoded credential.
-		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at most 72 characters"})
-	}
+func validatePasswordBytes(password string) error {
 	if len(password) > maxPasswordBytes {
 		// #nosec G101 -- "password" is the public request field name in the validation payload, not a hardcoded credential.
 		return apperror.BadRequest("invalid request payload", map[string]any{"password": "must be at most 72 bytes for bcrypt compatibility"})

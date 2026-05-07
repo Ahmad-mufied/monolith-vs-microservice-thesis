@@ -85,6 +85,15 @@ func TestServiceCreate(t *testing.T) {
 	}
 }
 
+func TestServiceCreateValidationDetails(t *testing.T) {
+	service := NewService(&fakeRepo{})
+	userID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001"
+	itemID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001"
+
+	_, err := service.Create(context.Background(), userID, CreateRequest{Items: []CreateItemRequest{{ItemID: itemID, Amount: 1}, {ItemID: strings.ToUpper(itemID), Amount: 1}}})
+	assertValidationDetail(t, err, "item_id", "duplicate item in transaction")
+}
+
 func TestServiceReadMethods(t *testing.T) {
 	userID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001"
 	txID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001"
@@ -172,5 +181,21 @@ func assertAppError(t *testing.T, err error, wantError bool, wantCode apperror.C
 	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func assertValidationDetail(t *testing.T, err error, wantField, wantMessage string) {
+	t.Helper()
+	var appErr *apperror.Error
+	if !errors.As(err, &appErr) {
+		t.Fatalf("error type = %T, want *apperror.Error", err)
+	}
+
+	gotMessage, ok := appErr.Details[wantField]
+	if !ok {
+		t.Fatalf("details = %#v, want field %q", appErr.Details, wantField)
+	}
+	if gotMessage != wantMessage {
+		t.Fatalf("details[%q] = %v, want %q", wantField, gotMessage, wantMessage)
 	}
 }

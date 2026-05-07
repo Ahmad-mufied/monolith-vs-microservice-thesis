@@ -5,6 +5,7 @@ import (
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/pagination"
+	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/validation"
 	"github.com/google/uuid"
 )
 
@@ -25,6 +26,9 @@ func NewService(repo Repository) *Service {
 
 func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) (Response, error) {
 	if err := validateUUID(userID, "user_id"); err != nil {
+		return Response{}, err
+	}
+	if err := validation.Struct(req); err != nil {
 		return Response{}, err
 	}
 	items, err := validateAndNormalizeCreateItems(req.Items)
@@ -72,21 +76,12 @@ func (s *Service) ListEnriched(ctx context.Context, page pagination.Page) ([]Enr
 }
 
 func validateAndNormalizeCreateItems(items []CreateItemRequest) ([]CreateItemRequest, error) {
-	if len(items) == 0 {
-		return nil, apperror.BadRequest("invalid request payload", map[string]any{"items": "must contain at least one item"})
-	}
-	if len(items) > 20 {
-		return nil, apperror.BadRequest("invalid request payload", map[string]any{"items": "must contain at most 20 items"})
-	}
 	seen := make(map[string]struct{}, len(items))
 	normalized := make([]CreateItemRequest, 0, len(items))
 	for _, item := range items {
 		itemUUID, err := uuid.Parse(item.ItemID)
 		if err != nil {
 			return nil, apperror.BadRequest("invalid request payload", map[string]any{"item_id": "must be a valid UUID"})
-		}
-		if item.Amount < 1 {
-			return nil, apperror.BadRequest("invalid request payload", map[string]any{"amount": "must be greater than 0"})
 		}
 		normalizedID := itemUUID.String()
 		if _, ok := seen[normalizedID]; ok {
