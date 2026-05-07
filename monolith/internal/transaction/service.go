@@ -24,22 +24,22 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) (Response, error) {
+func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) (string, error) {
 	if err := validateUUID(userID, "user_id"); err != nil {
-		return Response{}, err
+		return "", err
 	}
 	if err := validation.Struct(req); err != nil {
-		return Response{}, err
+		return "", err
 	}
 	items, err := validateAndNormalizeCreateItems(req.Items)
 	if err != nil {
-		return Response{}, err
+		return "", err
 	}
 	tx, err := s.repo.Create(ctx, userID, items)
 	if err != nil {
-		return Response{}, err
+		return "", err
 	}
-	return toResponse(tx), nil
+	return tx.ID, nil
 }
 
 func (s *Service) ListOwn(ctx context.Context, userID string, page pagination.Page) ([]Response, error) {

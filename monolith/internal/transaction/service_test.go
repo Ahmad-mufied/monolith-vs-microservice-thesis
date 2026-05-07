@@ -75,7 +75,7 @@ func TestServiceCreate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := NewService(tt.repo).Create(context.Background(), tt.userID, tt.req)
 			assertAppError(t, err, tt.wantError, tt.wantCode)
-			if !tt.wantError && got.ID == "" {
+			if !tt.wantError && got == "" {
 				t.Fatal("expected transaction ID")
 			}
 			if !tt.wantError && len(tt.repo.createItems) == 1 && tt.repo.createItems[0].ItemID != itemID {

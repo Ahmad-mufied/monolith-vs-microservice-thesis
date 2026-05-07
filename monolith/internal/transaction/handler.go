@@ -12,7 +12,7 @@ import (
 )
 
 type HandlerService interface {
-	Create(ctx context.Context, userID string, req CreateRequest) (Response, error)
+	Create(ctx context.Context, userID string, req CreateRequest) (string, error)
 	ListOwn(ctx context.Context, userID string, page pagination.Page) ([]Response, error)
 	GetOwnByID(ctx context.Context, userID, transactionID string) (Response, error)
 	ListEnriched(ctx context.Context, page pagination.Page) ([]EnrichedResponse, error)
@@ -42,11 +42,11 @@ func (h *Handler) Create(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return httputil.Error(c, apperror.BadRequest("invalid request payload", nil))
 	}
-	resp, err := h.service.Create(c.Request().Context(), userID, req)
+	transactionID, err := h.service.Create(c.Request().Context(), userID, req)
 	if err != nil {
 		return httputil.Error(c, err)
 	}
-	return httputil.Success(c, http.StatusCreated, resp)
+	return httputil.ID(c, http.StatusCreated, "Transaction created successfully", transactionID)
 }
 
 func (h *Handler) ListOwn(c echo.Context) error {

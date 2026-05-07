@@ -22,11 +22,12 @@ type fakeTransactionService struct {
 	userID      string
 	transaction string
 	page        pagination.Page
+	createdID   string
 }
 
-func (f *fakeTransactionService) Create(_ context.Context, userID string, _ CreateRequest) (Response, error) {
+func (f *fakeTransactionService) Create(_ context.Context, userID string, _ CreateRequest) (string, error) {
 	f.userID = userID
-	return f.resp, f.err
+	return f.createdID, f.err
 }
 
 func (f *fakeTransactionService) ListOwn(_ context.Context, userID string, page pagination.Page) ([]Response, error) {
@@ -54,7 +55,7 @@ func TestHandlerCreate(t *testing.T) {
 		service    *fakeTransactionService
 		wantStatus int
 	}{
-		{name: "success", body: `{"items":[{"item_id":"018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001","amount":2}]}`, userID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", service: &fakeTransactionService{resp: Response{ID: "tx"}}, wantStatus: http.StatusCreated},
+		{name: "success", body: `{"items":[{"item_id":"018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001","amount":2}]}`, userID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", service: &fakeTransactionService{createdID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001"}, wantStatus: http.StatusCreated},
 		{name: "missing user", body: `{}`, service: &fakeTransactionService{}, wantStatus: http.StatusUnauthorized},
 		{name: "invalid json", body: `{`, userID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", service: &fakeTransactionService{}, wantStatus: http.StatusBadRequest},
 		{name: "service conflict", body: `{"items":[{"item_id":"018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001","amount":2}]}`, userID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", service: &fakeTransactionService{err: apperror.Conflict("insufficient available amount")}, wantStatus: http.StatusConflict},
@@ -64,6 +65,15 @@ func TestHandlerCreate(t *testing.T) {
 			rec := executeTransactionHandler(http.MethodPost, "/api/v1/transactions", tt.body, tt.userID, nil, NewHandler(tt.service).Create)
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if tt.wantStatus == http.StatusCreated {
+				var got map[string]any
+				if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+					t.Fatalf("unmarshal response: %v", err)
+				}
+				if got["message"] != "Transaction created successfully" {
+					t.Fatalf("message = %v", got["message"])
+				}
 			}
 		})
 	}
@@ -94,6 +104,9 @@ func TestHandlerListAndDetail(t *testing.T) {
 			}
 			if tt.wantStatus < 400 && tt.service.userID != userID {
 				t.Fatalf("userID = %q, want %q", tt.service.userID, userID)
+			}
+			if tt.wantStatus == http.StatusOK && bytes.Contains(rec.Body.Bytes(), []byte(`"status"`)) {
+				t.Fatalf("response unexpectedly contains legacy status envelope: %s", rec.Body.String())
 			}
 		})
 	}
