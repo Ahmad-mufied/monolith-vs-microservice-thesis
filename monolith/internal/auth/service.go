@@ -43,32 +43,37 @@ func NewService(repo Repository, hasher PasswordHasher, signer TokenSigner) *Ser
 	return &Service{repo: repo, hasher: hasher, signer: signer}
 }
 
-func (s *Service) Register(ctx context.Context, req RegisterRequest) (UserResponse, error) {
+func (s *Service) Register(ctx context.Context, req RegisterRequest) (RegisterResponse, error) {
 	name := strings.TrimSpace(req.Name)
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 
 	normalizedReq := RegisterRequest{Name: name, Email: email, Password: req.Password}
 	if err := validation.Struct(normalizedReq); err != nil {
-		return UserResponse{}, err
+		return RegisterResponse{}, err
 	}
 	if !isEmail(email) {
-		return UserResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"email": "must be a valid email"})
+		return RegisterResponse{}, apperror.BadRequest("invalid request payload", map[string]any{"email": "must be a valid email"})
 	}
 	if err := validatePasswordBytes(req.Password); err != nil {
-		return UserResponse{}, err
+		return RegisterResponse{}, err
 	}
 
 	passwordHash, err := s.hasher.Hash(req.Password)
 	if err != nil {
-		return UserResponse{}, apperror.Internal("internal server error", fmt.Errorf("hashing password: %w", err))
+		return RegisterResponse{}, apperror.Internal("internal server error", fmt.Errorf("hashing password: %w", err))
 	}
 
 	user, err := s.repo.CreateUser(ctx, name, email, passwordHash)
 	if err != nil {
-		return UserResponse{}, err
+		return RegisterResponse{}, err
 	}
 
-	return toUserResponse(user), nil
+	return RegisterResponse{
+		Message: "User registered successfully",
+		Data: RegisterResponseData{
+			User: toUserSummary(user),
+		},
+	}, nil
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, error) {
@@ -108,7 +113,13 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("signing token: %w", err))
 	}
 
-	return LoginResponse{Token: token, User: toUserResponse(user)}, nil
+	return LoginResponse{
+		Message: "Login successful",
+		Data: LoginResponseData{
+			Token: token,
+			User:  toUserSummary(user),
+		},
+	}, nil
 }
 
 func isEmail(value string) bool {

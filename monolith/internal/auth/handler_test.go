@@ -7,21 +7,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
-	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/httputil"
 	"github.com/labstack/echo/v4"
 )
 
 type fakeAuthService struct {
-	registerResp UserResponse
+	registerResp RegisterResponse
 	registerErr  error
 	loginResp    LoginResponse
 	loginErr     error
 }
 
-func (f fakeAuthService) Register(context.Context, RegisterRequest) (UserResponse, error) {
+func (f fakeAuthService) Register(context.Context, RegisterRequest) (RegisterResponse, error) {
 	return f.registerResp, f.registerErr
 }
 
@@ -30,7 +28,6 @@ func (f fakeAuthService) Login(context.Context, LoginRequest) (LoginResponse, er
 }
 
 func TestHandlerRegister(t *testing.T) {
-	now := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name       string
 		body       string
@@ -40,7 +37,7 @@ func TestHandlerRegister(t *testing.T) {
 		{
 			name:       "success",
 			body:       `{"name":"Ahmad","email":"mufied@example.com","password":"secret123"}`,
-			service:    fakeAuthService{registerResp: UserResponse{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Name: "Ahmad", Email: "mufied@example.com", CreatedAt: now, UpdatedAt: now}},
+			service:    fakeAuthService{registerResp: RegisterResponse{Message: "User registered successfully", Data: RegisterResponseData{User: UserSummary{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Name: "Ahmad", Email: "mufied@example.com"}}}},
 			wantStatus: http.StatusCreated,
 		},
 		{name: "invalid json", body: `{`, service: fakeAuthService{}, wantStatus: http.StatusBadRequest},
@@ -54,12 +51,12 @@ func TestHandlerRegister(t *testing.T) {
 				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
 			}
 			if tt.wantStatus == http.StatusCreated {
-				var got httputil.SuccessResponse
+				var got RegisterResponse
 				if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 					t.Fatalf("unmarshal response: %v", err)
 				}
-				if got.Status != "success" {
-					t.Fatalf("status body = %q", got.Status)
+				if got.Message != "User registered successfully" {
+					t.Fatalf("message = %q", got.Message)
 				}
 				if bytes.Contains(rec.Body.Bytes(), []byte("password")) {
 					t.Fatalf("response exposes password fields: %s", rec.Body.String())
@@ -70,7 +67,6 @@ func TestHandlerRegister(t *testing.T) {
 }
 
 func TestHandlerLogin(t *testing.T) {
-	now := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name       string
 		body       string
@@ -80,7 +76,7 @@ func TestHandlerLogin(t *testing.T) {
 		{
 			name:       "success",
 			body:       `{"email":"mufied@example.com","password":"secret123"}`,
-			service:    fakeAuthService{loginResp: LoginResponse{Token: "token", User: UserResponse{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Name: "Ahmad", Email: "mufied@example.com", CreatedAt: now, UpdatedAt: now}}},
+			service:    fakeAuthService{loginResp: LoginResponse{Message: "Login successful", Data: LoginResponseData{Token: "token", User: UserSummary{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Name: "Ahmad", Email: "mufied@example.com"}}}},
 			wantStatus: http.StatusOK,
 		},
 		{name: "invalid json", body: `{`, service: fakeAuthService{}, wantStatus: http.StatusBadRequest},
@@ -93,8 +89,14 @@ func TestHandlerLogin(t *testing.T) {
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
 			}
-			if tt.wantStatus == http.StatusOK && !bytes.Contains(rec.Body.Bytes(), []byte(`"token":"token"`)) {
-				t.Fatalf("response missing token: %s", rec.Body.String())
+			if tt.wantStatus == http.StatusOK {
+				var got LoginResponse
+				if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+					t.Fatalf("unmarshal response: %v", err)
+				}
+				if got.Message != "Login successful" || got.Data.Token != "token" {
+					t.Fatalf("response = %+v", got)
+				}
 			}
 		})
 	}

@@ -113,7 +113,9 @@ func TestServiceRegister(t *testing.T) {
 			if tt.wantError {
 				return
 			}
-			if got.Email != "mufied@example.com" || tt.repo.createdPassword != "hashed" {
+			if got.Message != "User registered successfully" ||
+				got.Data.User.Email != "mufied@example.com" ||
+				tt.repo.createdPassword != "hashed" {
 				t.Fatalf("response = %+v createdPassword=%q", got, tt.repo.createdPassword)
 			}
 		})
@@ -160,8 +162,9 @@ func TestServiceLogin(t *testing.T) {
 			if tt.wantError {
 				return
 			}
-			if got.Token != "token" ||
-				got.User.ID != user.ID ||
+			if got.Message != "Login successful" ||
+				got.Data.Token != "token" ||
+				got.Data.User.ID != user.ID ||
 				tt.repo.findEmailReceived != "mufied@example.com" ||
 				comparedHash != user.PasswordHash ||
 				comparedPassword != tt.req.Password ||

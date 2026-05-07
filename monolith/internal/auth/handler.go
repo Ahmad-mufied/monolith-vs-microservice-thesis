@@ -10,7 +10,7 @@ import (
 )
 
 type HandlerService interface {
-	Register(ctx context.Context, req RegisterRequest) (UserResponse, error)
+	Register(ctx context.Context, req RegisterRequest) (RegisterResponse, error)
 	Login(ctx context.Context, req LoginRequest) (LoginResponse, error)
 }
 
@@ -33,11 +33,11 @@ func (h *Handler) Register(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return httputil.Error(c, apperror.BadRequest("invalid request payload", nil))
 	}
-	user, err := h.service.Register(c.Request().Context(), req)
+	resp, err := h.service.Register(c.Request().Context(), req)
 	if err != nil {
 		return httputil.Error(c, err)
 	}
-	return httputil.Success(c, http.StatusCreated, user)
+	return c.JSON(http.StatusCreated, resp)
 }
 
 func (h *Handler) Login(c echo.Context) error {
@@ -49,5 +49,5 @@ func (h *Handler) Login(c echo.Context) error {
 	if err != nil {
 		return httputil.Error(c, err)
 	}
-	return httputil.Success(c, http.StatusOK, resp)
+	return c.JSON(http.StatusOK, resp)
 }
