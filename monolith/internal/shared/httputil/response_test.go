@@ -1,0 +1,113 @@
+package httputil
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
+	"github.com/labstack/echo/v4"
+)
+
+func TestError(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantCode   string
+		wantMsg    string
+	}{
+		{name: "app error", err: apperror.NotFound("item not found"), wantStatus: http.StatusNotFound, wantCode: "NOT_FOUND", wantMsg: "item not found"},
+		{name: "unknown error", err: errors.New("database failed"), wantStatus: http.StatusInternalServerError, wantCode: "INTERNAL_SERVER_ERROR", wantMsg: "internal server error"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := echo.New()
+			rec := httptest.NewRecorder()
+			c := e.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), rec)
+
+			if err := Error(c, tt.err); err != nil {
+				t.Fatalf("Error() returned error: %v", err)
+			}
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
+			}
+
+			var got ErrorResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatalf("unmarshal response: %v", err)
+			}
+			if got.Error.Code != tt.wantCode {
+				t.Fatalf("code = %q, want %q", got.Error.Code, tt.wantCode)
+			}
+			if got.Error.Message != tt.wantMsg {
+				t.Fatalf("message = %q, want %q", got.Error.Message, tt.wantMsg)
+			}
+			if tt.name == "unknown error" && strings.Contains(rec.Body.String(), "database failed") {
+				t.Fatalf("unexpected raw error leak in body: %s", rec.Body.String())
+			}
+
+			var raw map[string]any
+			if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+				t.Fatalf("unmarshal raw response: %v", err)
+			}
+			errorBody, ok := raw["error"].(map[string]any)
+			if !ok {
+				t.Fatalf("error payload missing: %+v", raw)
+			}
+			if _, exists := errorBody["details"]; !exists {
+				t.Fatalf("details field missing: %+v", errorBody)
+			}
+			if got.Error.Details == nil && errorBody["details"] != nil {
+				t.Fatalf("details = %+v, want null", errorBody["details"])
+			}
+		})
+	}
+}
+
+func TestList(t *testing.T) {
+	tests := []struct {
+		name          string
+		data          []string
+		limit         int
+		offset        int
+		totalReturned int
+	}{
+		{name: "empty list meta", data: []string{}, limit: 50, offset: 0, totalReturned: 0},
+		{name: "non empty list meta", data: []string{"item-1", "item-2", "item-3"}, limit: 10, offset: 20, totalReturned: 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := echo.New()
+			rec := httptest.NewRecorder()
+			c := e.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), rec)
+
+			if err := List(c, http.StatusOK, tt.data, tt.limit, tt.offset, tt.totalReturned); err != nil {
+				t.Fatalf("List() returned error: %v", err)
+			}
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+			}
+
+			var got ListResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatalf("unmarshal response: %v", err)
+			}
+			if got.Meta.Limit != tt.limit || got.Meta.Offset != tt.offset || got.Meta.TotalReturned != tt.totalReturned {
+				t.Fatalf("meta = %+v, want limit=%d offset=%d total=%d", got.Meta, tt.limit, tt.offset, tt.totalReturned)
+			}
+			gotData, ok := got.Data.([]any)
+			if !ok {
+				t.Fatalf("data type = %T, want []any", got.Data)
+			}
+			if len(gotData) != len(tt.data) {
+				t.Fatalf("data len = %d, want %d", len(gotData), len(tt.data))
+			}
+		})
+	}
+}

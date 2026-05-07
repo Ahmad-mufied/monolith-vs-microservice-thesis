@@ -37,6 +37,8 @@ Use these domain terms:
 - transaction
 - transaction_items
 
+External REST API naming follows openapi.yaml. In the current API contract, item availability is exposed as Item.available_amount. The database schema and migration docs also use available_amount for the internal storage column.
+
 Avoid these terms unless explicitly requested:
 
 - product
@@ -119,6 +121,10 @@ For database decisions:
 - docs/development/database-schema.md
 - docs/development/database-migration.md
 - docs/infrastructure/rds-postgres.md
+
+For request validation decisions:
+
+- docs/development/validation-strategy.md
 
 For benchmark decisions:
 
@@ -392,7 +398,11 @@ Error:
 
 {
   "status": "error",
-  "message": "error message"
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Invalid request payload",
+    "details": null
+  }
 }
 
 Main benchmark endpoints:
@@ -889,6 +899,7 @@ Development:
 - docs/development/local-development.md
 - docs/development/database-schema.md
 - docs/development/database-migration.md
+- docs/development/validation-strategy.md
 
 Experiment:
 

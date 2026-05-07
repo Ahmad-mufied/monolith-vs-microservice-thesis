@@ -1,0 +1,5 @@
+CREATE DATABASE mono_db;
+CREATE DATABASE auth_db;
+CREATE DATABASE item_db;
+CREATE DATABASE transaction_db;
+

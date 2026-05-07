@@ -84,6 +84,8 @@ transaction
 transaction_items
 ```
 
+External REST API naming follows `openapi.yaml`. In that contract, an item's externally visible availability field is named `available_amount`, which maps directly to the database column `items.available_amount`.
+
 Avoid:
 
 ```text
@@ -292,6 +294,7 @@ Notes:
 
 - `available_amount` represents available allocatable amount,
 - `available_amount` is updated during transaction allocation,
+- REST API `Item.available_amount` maps to this column,
 - do not use `stock`, `quantity`, or `availability`.
 
 Owned by:
@@ -375,6 +378,8 @@ CREATE TABLE transaction_items (
   PRIMARY KEY (transaction_id, item_id)
 );
 ```
+
+`amount` stores the amount requested for an item in a transaction. `available_amount_after` stores the internal post-allocation value used for persistence and analysis. The current REST `TransactionItem` response in `openapi.yaml` exposes `item_id` and `amount`; it does not expose `available_amount_after`.
 
 Microservices schema:
 
@@ -490,11 +495,11 @@ Current indexes used in migrations:
 CREATE UNIQUE INDEX idx_users_email_lower_unique
 ON users(lower(email));
 
-CREATE INDEX idx_transactions_user_id_created_at
-ON transactions(user_id, created_at DESC);
+CREATE INDEX idx_transactions_user_id_created_at_id
+ON transactions(user_id, created_at DESC, id DESC);
 
-CREATE INDEX idx_transactions_created_at
-ON transactions(created_at DESC);
+CREATE INDEX idx_transactions_created_at_id
+ON transactions(created_at DESC, id DESC);
 
 CREATE INDEX idx_transaction_items_item_id
 ON transaction_items(item_id);
@@ -505,8 +510,8 @@ Purpose:
 | Index | Purpose |
 |---|---|
 | `users(lower(email))` | case-insensitive email uniqueness |
-| `transactions(user_id, created_at DESC)` | get own transactions |
-| `transactions(created_at DESC)` | admin transaction listing |
+| `transactions(user_id, created_at DESC, id DESC)` | get own transactions |
+| `transactions(created_at DESC, id DESC)` | admin transaction listing |
 | `transaction_items(item_id)` | item reference lookup or analysis |
 
 Note:

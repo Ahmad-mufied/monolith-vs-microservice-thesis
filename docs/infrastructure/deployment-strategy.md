@@ -219,8 +219,7 @@ deployments/
 └── compose/
     ├── docker-compose.db.yml
     ├── docker-compose.monolith.yml
-    ├── docker-compose.microservices.yml
-    └── docker-compose.full.yml
+    └── initdb/
 ```
 
 File responsibilities:
@@ -228,9 +227,8 @@ File responsibilities:
 | File | Purpose |
 |---|---|
 | `docker-compose.db.yml` | local PostgreSQL only |
-| `docker-compose.monolith.yml` | PostgreSQL + monolith |
-| `docker-compose.microservices.yml` | PostgreSQL + microservices |
-| `docker-compose.full.yml` | optional all-in-one local stack |
+| `docker-compose.monolith.yml` | monolith app container only (connects to `skripsi-local` network) |
+| `initdb/*.sql` | initial database bootstrap SQL for local PostgreSQL container |
 
 ---
 
@@ -342,7 +340,7 @@ Kubernetes validation only
 Recommended local cluster:
 
 ```bash
-minikube start --driver=docker --cpus=4 --memory=6144 --disk-size=20g
+minikube start --driver=docker --cpus=2 --memory=3072 --disk-size=20g
 ```
 
 For heavier validation:
@@ -431,28 +429,37 @@ Build local Docker images and load them into Minikube.
 Example:
 
 ```bash
-docker build -t skripsi/monolith:local ./monolith
-minikube image load skripsi/monolith:local
+eval $(minikube docker-env)
+docker build -t skripsi/monolith:local -f monolith/Dockerfile .
+```
+
+After the monolith deployment is ready, use a foreground port-forward session
+for direct access from the host:
+
+```bash
+make minikube-port-forward-monolith
+```
+
+If local port `8080` is already occupied:
+
+```bash
+make minikube-port-forward-monolith MONOLITH_PORT=18080
 ```
 
 For microservices:
 
 ```bash
+eval $(minikube docker-env)
 docker build -t skripsi/api-gateway:local ./microservices/api-gateway
 docker build -t skripsi/auth-service:local ./microservices/auth-service
 docker build -t skripsi/item-service:local ./microservices/item-service
 docker build -t skripsi/transaction-service:local ./microservices/transaction-service
-
-minikube image load skripsi/api-gateway:local
-minikube image load skripsi/auth-service:local
-minikube image load skripsi/item-service:local
-minikube image load skripsi/transaction-service:local
 ```
 
 Set local Kubernetes manifests to:
 
 ```yaml
-imagePullPolicy: IfNotPresent
+imagePullPolicy: Never
 ```
 
 ---
@@ -625,7 +632,7 @@ The Job should be executed once before all migration jobs.
 Secret used:
 
 ```text
-db-bootstrap-secret
+db-bootstrap-env
 ```
 
 Expected secret key:
@@ -801,7 +808,7 @@ Application pods should not run schema migration automatically.
 Create namespace mono
     |
     v
-Create monolith-secret
+Create monolith-env
     |
     v
 Run db-bootstrap-job if not already completed
@@ -835,7 +842,7 @@ Expanded sequence:
 
 ```text
 1. Create namespace mono.
-2. Create monolith-secret.
+2. Create monolith-env.
 3. Run db-bootstrap-job.
 4. Wait until db-bootstrap-job is complete.
 5. Run monolith-migration-job.
@@ -1035,11 +1042,11 @@ Recommended Kubernetes Secrets:
 
 ```text
 benchmark namespace:
-- db-bootstrap-secret
+- db-bootstrap-env
 - k6-runner-secret
 
 mono namespace:
-- monolith-secret
+- monolith-env
 
 msa namespace:
 - api-gateway-secret
@@ -1052,8 +1059,8 @@ Secret purposes:
 
 | Secret | Purpose |
 |---|---|
-| `db-bootstrap-secret` | contains `BOOTSTRAP_DATABASE_URL` |
-| `monolith-secret` | contains monolith app config and `DATABASE_URL` |
+| `db-bootstrap-env` | contains `BOOTSTRAP_DATABASE_URL` |
+| `monolith-env` | contains monolith app config and `DATABASE_URL` |
 | `api-gateway-secret` | contains gateway config and `JWT_SECRET` |
 | `auth-service-secret` | contains auth DB URL and `JWT_SECRET` |
 | `item-service-secret` | contains item DB URL |
@@ -1064,7 +1071,46 @@ Do not store static AWS access keys in any Kubernetes Secret.
 
 ---
 
-## 25. What Counts as Final Result
+## 25. Local Persistence And Cleanup Rules
+
+For local validation, stopping compute is not always the same as deleting data.
+
+Quick rule:
+
+```text
+Stop:
+usually keep data
+
+Delete / down -v / delete PVC:
+remove data
+```
+
+Important local behaviors:
+
+- `minikube stop` stops the local cluster runtime but usually keeps PVC-backed
+  PostgreSQL data.
+- `minikube delete` should be treated as a full local cluster reset.
+- deleting a completed Kubernetes Job removes only the Job object, not the
+  database, schema, or CRUD data it already created.
+- deleting the monolith `Deployment` removes app pods only; PostgreSQL data
+  remains if the PostgreSQL PVC is still present.
+- `docker compose ... down` stops containers and keeps Compose volumes unless
+  `-v` is added.
+- `docker compose ... down -v` removes the Compose PostgreSQL volume and deletes
+  local Compose data.
+- the current `make compose-down` target is destructive for local Compose data
+  because it uses `down -v`.
+
+Operational detail:
+
+```text
+The local operational guide for step verification, stop options,
+and cleanup commands is docs/development/run-monolith-local.md.
+```
+
+---
+
+## 26. What Counts as Final Result
 
 Final result source:
 
@@ -1091,7 +1137,7 @@ Docker Compose and Minikube results may be used only for:
 
 ---
 
-## 26. Result Storage
+## 27. Result Storage
 
 Final benchmark results must be uploaded to S3 before destroying infrastructure.
 
@@ -1125,7 +1171,7 @@ Do not run `terraform destroy` before verifying result files in S3.
 
 ---
 
-## 27. Summary
+## 28. Summary
 
 Final deployment strategy:
 
