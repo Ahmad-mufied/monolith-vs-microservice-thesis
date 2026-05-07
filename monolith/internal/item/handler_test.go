@@ -129,10 +129,18 @@ func executeItemHandler(method, target, body string, params map[string]string, h
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	for name, value := range params {
-		c.SetParamNames(name)
-		c.SetParamValues(value)
+	if len(params) > 0 {
+		names := make([]string, 0, len(params))
+		values := make([]string, 0, len(params))
+		for name, value := range params {
+			names = append(names, name)
+			values = append(values, value)
+		}
+		c.SetParamNames(names...)
+		c.SetParamValues(values...)
 	}
-	_ = handler(c)
+	if err := handler(c); err != nil {
+		e.HTTPErrorHandler(err, c)
+	}
 	return rec
 }
