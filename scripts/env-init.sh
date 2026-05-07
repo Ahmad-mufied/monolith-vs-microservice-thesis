@@ -15,6 +15,11 @@ random_hex() {
   od -An -N "$bytes" -tx1 /dev/urandom | tr -d ' \n'
 }
 
+url_encode() {
+  local string="$1"
+  printf '%s' "$string" | jq -sRr @uri
+}
+
 write_if_missing() {
   local file="$1"
   local content="$2"
@@ -43,6 +48,9 @@ else
   postgres_password="$(random_hex 16)"
 fi
 
+encoded_postgres_user="$(url_encode "$postgres_user")"
+encoded_postgres_password="$(url_encode "$postgres_password")"
+
 write_if_missing "env/postgres.env" "POSTGRES_USER=${postgres_user}
 POSTGRES_PASSWORD=${postgres_password}
 POSTGRES_DB=bootstrap"
@@ -50,8 +58,8 @@ POSTGRES_DB=bootstrap"
 write_if_missing "env/monolith.env" "APP_ENV=local
 APP_PORT=8080
 SERVICE_NAME=monolith
-DATABASE_URL=postgres://${postgres_user}:${postgres_password}@postgres:5432/mono_db?sslmode=disable
-MONO_DATABASE_URL=postgres://${postgres_user}:${postgres_password}@localhost:5432/mono_db?sslmode=disable
+DATABASE_URL=postgres://${encoded_postgres_user}:${encoded_postgres_password}@postgres:5432/mono_db?sslmode=disable
+MONO_DATABASE_URL=postgres://${encoded_postgres_user}:${encoded_postgres_password}@localhost:5432/mono_db?sslmode=disable
 DB_POOL_MAX_CONNS=25
 DB_POOL_MIN_CONNS=2
 DB_POOL_MAX_CONN_LIFETIME=5m
@@ -66,6 +74,6 @@ HTTP_MAX_HEADER_BYTES=1048576
 JWT_SECRET=${jwt_secret}
 DATADOG_ENABLED=false"
 
-write_if_missing "env/db-bootstrap.env" "BOOTSTRAP_DATABASE_URL=postgres://${postgres_user}:${postgres_password}@postgres.benchmark.svc.cluster.local:5432/bootstrap?sslmode=disable"
+write_if_missing "env/db-bootstrap.env" "BOOTSTRAP_DATABASE_URL=postgres://${encoded_postgres_user}:${encoded_postgres_password}@postgres.benchmark.svc.cluster.local:5432/bootstrap?sslmode=disable"
 
 echo "local env initialization complete"
