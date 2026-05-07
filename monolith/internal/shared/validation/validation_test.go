@@ -47,7 +47,7 @@ func TestStruct(t *testing.T) {
 		},
 		{
 			name:        "slice size error maps to items",
-			req:         request{Name: "abc", AvailableAmount: intPtr(0), Items: []nestedItem{{ItemID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", Amount: 1}, {ItemID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2002", Amount: 1}, {ItemID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2003", Amount: 1}}},
+			req:         request{Name: "abc", AvailableAmount: new(0), Items: []nestedItem{{ItemID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", Amount: 1}, {ItemID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2002", Amount: 1}, {ItemID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2003", Amount: 1}}},
 			wantField:   "items",
 			wantMessage: "must contain at most 2 items",
 		},
@@ -99,8 +99,4 @@ func assertValidationError(t *testing.T, err error, wantField, wantMessage strin
 	if len(appErr.Details) != 1 {
 		t.Fatalf("details = %#v, want exactly one violation", appErr.Details)
 	}
-}
-
-func intPtr(value int) *int {
-	return &value
 }
