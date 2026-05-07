@@ -446,7 +446,7 @@ Request concept:
 ```proto
 message CreateItemRequest {
   string name = 1;
-  int64 available_amount = 2;
+  int64 amount = 2;
 }
 ```
 
@@ -461,7 +461,8 @@ message CreateItemResponse {
 Behavior:
 
 - validate name,
-- validate `available_amount >= 0`,
+- validate `amount >= 0`,
+- map `amount` to the database column `items.available_amount`,
 - insert item into `item_db.items`,
 - database generates UUID using `uuidv7()`,
 - return created item.
@@ -586,7 +587,7 @@ Request concept:
 message UpdateItemRequest {
   string item_id = 1;
   string name = 2;
-  int64 available_amount = 3;
+  int64 amount = 3;
 }
 ```
 
@@ -601,6 +602,8 @@ message UpdateItemResponse {
 Notes:
 
 - this endpoint is for CRUD/demo behavior,
+- REST and gateway-facing item contracts use `amount`,
+- service persistence maps `amount` to `items.available_amount`,
 - benchmark transaction allocation should use `ValidateAndAllocate`, not direct item update.
 
 ---
@@ -696,7 +699,7 @@ Expected error cases:
 - invalid item ID,
 - item not found,
 - invalid amount,
-- insufficient available_amount,
+- insufficient item amount,
 - database error.
 
 Atomicity requirement:
@@ -717,7 +720,7 @@ Concept:
 message Item {
   string id = 1;
   string name = 2;
-  int64 available_amount = 3;
+  int64 amount = 3;
   string created_at = 4;
   string updated_at = 5;
 }
@@ -726,7 +729,7 @@ message Item {
 Use:
 
 ```text
-available_amount
+amount
 ```
 
 Do not use:
@@ -735,6 +738,12 @@ Do not use:
 availability
 stock
 quantity
+```
+
+Persistence note:
+
+```text
+Item.amount maps to the service-owned database column items.available_amount.
 ```
 
 ---
@@ -919,12 +928,14 @@ Concept:
 message Transaction {
   string id = 1;
   string user_id = 2;
-  string status = 3;
+  reserved 3; // status is persisted internally but not exposed by the current REST schema.
   repeated TransactionItem items = 4;
   string created_at = 5;
   string updated_at = 6;
 }
 ```
+
+The Transaction Service may persist a `status` column internally. The current REST `Transaction` schema in `openapi.yaml` does not expose `status`.
 
 ---
 
@@ -936,11 +947,13 @@ Concept:
 message TransactionItem {
   string item_id = 1;
   int64 amount = 2;
-  int64 available_amount_after = 3;
+  reserved 3; // available_amount_after is internal persistence data in the current REST schema.
   string created_at = 4;
   string updated_at = 5;
 }
 ```
+
+The Transaction Service may store `available_amount_after` internally in `transaction_items`, and `ValidateAndAllocate` may return it to the service during creation. The current REST `TransactionItem` response in `openapi.yaml` exposes only `item_id` and `amount`.
 
 ---
 
@@ -951,7 +964,7 @@ Concept:
 ```proto
 message TransactionEnriched {
   string id = 1;
-  string status = 2;
+  reserved 2; // status is persisted internally but not exposed by the current REST schema.
   UserSnapshot user = 3;
   repeated TransactionEnrichedItem items = 4;
   string created_at = 5;
@@ -970,11 +983,17 @@ message UserSnapshot {
   string email = 3;
 }
 
-message TransactionEnrichedItem {
+message ItemSnapshot {
   string id = 1;
   string name = 2;
   int64 amount = 3;
-  int64 available_amount_after = 4;
+  string created_at = 4;
+  string updated_at = 5;
+}
+
+message TransactionEnrichedItem {
+  ItemSnapshot item = 1;
+  int64 amount = 2;
 }
 ```
 
@@ -995,7 +1014,7 @@ gRPC errors should be mapped to HTTP errors by the API Gateway.
 | `PermissionDenied` | 403 | forbidden |
 | `NotFound` | 404 | resource not found |
 | `AlreadyExists` | 409 | duplicate resource |
-| `FailedPrecondition` | 409 | insufficient available_amount |
+| `FailedPrecondition` | 409 | insufficient item amount |
 | `Aborted` | 409 | allocation conflict |
 | `Unavailable` | 503 | upstream service unavailable |
 | `DeadlineExceeded` | 504 | upstream timeout |
@@ -1006,7 +1025,11 @@ API Gateway must convert internal errors into the standard REST error envelope:
 ```json
 {
   "status": "error",
-  "message": "error message"
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Invalid request payload",
+    "details": null
+  }
 }
 ```
 

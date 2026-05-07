@@ -35,6 +35,8 @@ The API uses these generic domain terms:
 
 The term `item` represents a generic allocatable entity. It can represent a ticket category, booking unit, quota unit, inventory-like resource, or another resource that can be allocated during a transaction.
 
+The external REST API currently uses `available_amount` for item availability and `amount` for transaction allocation. The database may use internal column names such as `items.available_amount`, and API clients must follow `openapi.yaml`.
+
 Avoid these terms unless explicitly required later:
 
 - product,
@@ -187,6 +189,8 @@ List responses may include metadata:
   "status": "success",
   "data": [],
   "meta": {
+    "limit": 50,
+    "offset": 0,
     "total_returned": 50
   }
 }
@@ -197,7 +201,11 @@ All error responses should follow:
 ```json
 {
   "status": "error",
-  "message": "error message"
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Invalid request payload",
+    "details": null
+  }
 }
 ```
 
@@ -371,6 +379,12 @@ Endpoint:
 GET /api/v1/items
 ```
 
+Authentication:
+
+```text
+Bearer JWT
+```
+
 Purpose:
 
 Return available items.
@@ -388,7 +402,12 @@ Expected response:
       "created_at": "2026-05-03T10:15:30Z",
       "updated_at": "2026-05-03T10:15:30Z"
     }
-  ]
+  ],
+  "meta": {
+    "limit": 50,
+    "offset": 0,
+    "total_returned": 1
+  }
 }
 ```
 
@@ -423,7 +442,8 @@ Expected request body:
 
 Notes:
 
-- `available_amount` must be greater than or equal to 0,
+- API `available_amount` must be greater than or equal to 0,
+- API `available_amount` maps to the internal database column `items.available_amount`,
 - the database generates `id` using UUIDv7.
 
 ---
@@ -433,13 +453,13 @@ Notes:
 Endpoint:
 
 ```text
-GET /api/v1/items/{id}
+GET /api/v1/items/{item_id}
 ```
 
 Path parameter:
 
 ```yaml
-id:
+item_id:
   type: string
   format: uuid
 ```
@@ -455,7 +475,7 @@ Return one item by ID.
 Endpoint:
 
 ```text
-PUT /api/v1/items/{id}
+PUT /api/v1/items/{item_id}
 ```
 
 Authentication:
@@ -479,7 +499,8 @@ Expected request body:
 
 Notes:
 
-- updating `available_amount` directly is allowed for CRUD/demo purposes,
+- updating API `available_amount` directly is allowed for CRUD/demo purposes,
+- API `available_amount` maps to the internal database column `items.available_amount`,
 - benchmark transaction allocation must use the transaction flow, not this endpoint.
 
 ---
@@ -489,7 +510,7 @@ Notes:
 Endpoint:
 
 ```text
-DELETE /api/v1/items/{id}
+DELETE /api/v1/items/{item_id}
 ```
 
 Authentication:
@@ -574,12 +595,11 @@ Expected response:
   "status": "success",
   "data": {
     "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a3",
-    "status": "SUCCESS",
+    "user_id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a1",
     "items": [
       {
         "item_id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
-        "amount": 2,
-        "available_amount_after": 999998
+        "amount": 2
       }
     ],
     "created_at": "2026-05-03T10:15:30Z",
@@ -593,7 +613,7 @@ Completion rule:
 The response must be returned only after:
 
 - item availability is validated,
-- `available_amount` is updated,
+- internal item availability is updated,
 - transaction row is inserted,
 - transaction_items rows are inserted.
 
@@ -631,18 +651,22 @@ Expected response:
   "data": [
     {
       "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a3",
-      "status": "SUCCESS",
+      "user_id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a1",
       "items": [
         {
           "item_id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
-          "amount": 2,
-          "available_amount_after": 999998
+          "amount": 2
         }
       ],
       "created_at": "2026-05-03T10:15:30Z",
       "updated_at": "2026-05-03T10:15:30Z"
     }
-  ]
+  ],
+  "meta": {
+    "limit": 50,
+    "offset": 0,
+    "total_returned": 1
+  }
 }
 ```
 
@@ -676,7 +700,7 @@ aggregation + network-bound
 
 Purpose:
 
-Return transaction data enriched with user and item details.
+Return transaction data enriched with user summary and item summary details.
 
 Query parameters:
 
@@ -685,7 +709,7 @@ limit:
   type: integer
   default: 50
   minimum: 1
-  maximum: 1000
+  maximum: 100
 ```
 
 Expected response:
@@ -696,7 +720,6 @@ Expected response:
   "data": [
     {
       "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a3",
-      "status": "SUCCESS",
       "created_at": "2026-05-03T10:15:30Z",
       "updated_at": "2026-05-03T10:15:30Z",
       "user": {
@@ -706,16 +729,19 @@ Expected response:
       },
       "items": [
         {
-          "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
-          "name": "Item 1",
-          "amount": 2,
-          "available_amount_after": 999998
+          "item": {
+            "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
+            "name": "Item 1"
+          },
+          "amount": 2
         }
       ]
     }
   ],
   "meta": {
-    "total_returned": 50
+    "limit": 50,
+    "offset": 0,
+    "total_returned": 1
   }
 }
 ```
@@ -735,6 +761,11 @@ Transaction Service
 -> Item Service GetItemsByIds
 -> in-memory enrichment
 ```
+
+Notes:
+
+- This endpoint returns `UserSummary` and `ItemSummary`, not the full `User` and `Item` schemas.
+- `available_amount` is intentionally omitted from enriched item payloads because this endpoint represents transaction enrichment, not current inventory state.
 
 ---
 
@@ -807,6 +838,12 @@ quantity
 stock
 ```
 
+Implementation note:
+
+```text
+API Item.available_amount maps to the database column items.available_amount.
+```
+
 ---
 
 ## 13.3 Transaction Item Request
@@ -839,10 +876,9 @@ TransactionItemResponse:
       format: uuid
     amount:
       type: integer
-    available_amount_after:
-      type: integer
-      minimum: 0
 ```
+
+The REST transaction item response does not expose `available_amount_after` in the current `openapi.yaml`, even though the database stores it for internal persistence and analysis.
 
 ---
 
@@ -855,9 +891,6 @@ TransactionEnriched:
     id:
       type: string
       format: uuid
-    status:
-      type: string
-      example: SUCCESS
     created_at:
       type: string
       format: date-time
@@ -865,11 +898,24 @@ TransactionEnriched:
       type: string
       format: date-time
     user:
-      $ref: '#/components/schemas/User'
+      $ref: '#/components/schemas/UserSummary'
     items:
       type: array
       items:
         $ref: '#/components/schemas/TransactionEnrichedItem'
+```
+
+Current enriched item shape:
+
+```yaml
+TransactionEnrichedItem:
+  type: object
+  properties:
+    item:
+      $ref: '#/components/schemas/ItemSummary'
+    amount:
+      type: integer
+      minimum: 1
 ```
 
 ---
@@ -883,9 +929,19 @@ ErrorResponse:
     status:
       type: string
       example: error
-    message:
-      type: string
-      example: Internal server error
+    error:
+      type: object
+      properties:
+        code:
+          type: string
+          example: BAD_REQUEST
+        message:
+          type: string
+          example: Invalid request payload
+        details:
+          type: object
+          additionalProperties: true
+          nullable: true
 ```
 
 ---
@@ -900,14 +956,14 @@ Common HTTP status codes:
 | 401 | missing or invalid token |
 | 403 | forbidden |
 | 404 | resource not found |
-| 409 | conflict, allocation conflict, or insufficient available_amount |
+| 409 | conflict, allocation conflict, or insufficient item amount |
 | 500 | internal server error |
 | 503 | upstream service unavailable |
 | 504 | upstream timeout |
 
 For create transaction:
 
-- insufficient `available_amount` should return `409`,
+- insufficient item amount should return `409`,
 - invalid UUID should return `400`,
 - invalid JWT should return `401`,
 - upstream service timeout in microservices should return `504`,
@@ -989,12 +1045,13 @@ When updating `openapi.yaml`, ensure:
 
 - all ID fields use `format: uuid`,
 - examples use UUID strings,
-- `availability` is renamed to `available_amount`,
+- `availability`, `quantity`, and `stock` are not used,
+- item availability in REST responses uses `Item.available_amount`,
 - `item_ids` is replaced by `items: [{ item_id, amount }]`,
 - transaction responses include `amount`,
-- transaction responses include `available_amount_after`,
+- transaction responses follow the current `Transaction` and `TransactionItem` schemas,
 - `created_at` and `updated_at` are included where relevant,
-- error response uses the standard envelope,
+- error response uses `status` plus nested `error`,
 - benchmark endpoint descriptions are updated,
 - security requirements are consistent.
 
@@ -1010,10 +1067,10 @@ Final API rules:
 Source of truth    : openapi.yaml
 ID format          : string, format uuid
 Domain term        : item
+Item field         : available_amount
 Allocation field   : amount
-Availability field : available_amount
 Response envelope  : status + data
-Error envelope     : status + message
+Error envelope     : status + error
 Auth               : Bearer JWT
 Benchmark endpoints:
   - POST /api/v1/auth/login

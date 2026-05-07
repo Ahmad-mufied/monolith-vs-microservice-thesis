@@ -13,6 +13,7 @@ ITEM_SERVICE_DIR := microservices/item-service
 TRANSACTION_SERVICE_DIR := microservices/transaction-service
 
 COMPOSE_DIR := deployments/compose
+K8S_DIR := deployments/k8s
 
 # =========================
 # Images
@@ -23,6 +24,11 @@ API_GATEWAY_IMAGE := skripsi/api-gateway:local
 AUTH_SERVICE_IMAGE := skripsi/auth-service:local
 ITEM_SERVICE_IMAGE := skripsi/item-service:local
 TRANSACTION_SERVICE_IMAGE := skripsi/transaction-service:local
+
+MINIKUBE_CPUS ?= 2
+MINIKUBE_MEMORY ?= 3072
+MINIKUBE_DISK_SIZE ?= 20g
+MONOLITH_PORT ?= 8080
 
 # =========================
 # Env Files
@@ -52,6 +58,7 @@ help:
 	@echo "Available commands:"
 	@echo ""
 	@echo "Development:"
+	@echo "  make env-init"
 	@echo "  make fmt"
 	@echo "  make test"
 	@echo "  make lint"
@@ -77,6 +84,7 @@ help:
 	@echo "  make compose-down"
 	@echo ""
 	@echo "Migration:"
+	@echo "  make migrate-monolith-local"
 	@echo "  make migrate-monolith"
 	@echo "  make migrate-microservices"
 	@echo ""
@@ -89,9 +97,23 @@ help:
 	@echo "Minikube:"
 	@echo "  make minikube-start"
 	@echo "  make minikube-stop"
+	@echo "  make minikube-load-monolith"
+	@echo "  make minikube-deploy-postgres"
+	@echo "  make minikube-db-bootstrap"
+	@echo "  make minikube-migrate-monolith"
+	@echo "  make minikube-deploy-monolith"
+	@echo "  make minikube-port-forward-monolith"
 	@echo "  make minikube-load-images"
 	@echo "  make create-local-secrets"
 	@echo ""
+
+# =========================
+# Local Env
+# =========================
+
+.PHONY: env-init
+env-init:
+	bash scripts/env-init.sh
 
 # =========================
 # Go Development
@@ -197,7 +219,7 @@ run-transaction-service:
 
 .PHONY: docker-build-monolith
 docker-build-monolith:
-	docker build -t $(MONOLITH_IMAGE) ./$(MONOLITH_DIR)
+	docker build -t $(MONOLITH_IMAGE) -f $(MONOLITH_DIR)/Dockerfile .
 
 .PHONY: docker-build-microservices
 docker-build-microservices:
@@ -238,6 +260,10 @@ compose-down:
 .PHONY: migrate-monolith
 migrate-monolith:
 	goose -dir $(MONOLITH_DIR)/migrations postgres "$$MONO_DATABASE_URL" up
+
+.PHONY: migrate-monolith-local
+migrate-monolith-local:
+	bash -c 'set -a; source $(MONOLITH_ENV); set +a; goose -dir $(MONOLITH_DIR)/migrations postgres "$$MONO_DATABASE_URL" up'
 
 .PHONY: migrate-auth
 migrate-auth:
@@ -296,7 +322,7 @@ create-local-secrets:
 
 .PHONY: minikube-start
 minikube-start:
-	minikube start --driver=docker --cpus=4 --memory=6144 --disk-size=20g
+	minikube start --driver=docker --cpus=$(MINIKUBE_CPUS) --memory=$(MINIKUBE_MEMORY) --disk-size=$(MINIKUBE_DISK_SIZE)
 	minikube addons enable ingress
 	minikube addons enable metrics-server
 
@@ -309,12 +335,44 @@ minikube-delete:
 	minikube delete
 
 .PHONY: minikube-load-images
-minikube-load-images: docker-build-all
-	minikube image load $(MONOLITH_IMAGE)
-	minikube image load $(API_GATEWAY_IMAGE)
-	minikube image load $(AUTH_SERVICE_IMAGE)
-	minikube image load $(ITEM_SERVICE_IMAGE)
-	minikube image load $(TRANSACTION_SERVICE_IMAGE)
+minikube-load-images:
+	eval $$(minikube docker-env) && docker build -t $(MONOLITH_IMAGE) -f $(MONOLITH_DIR)/Dockerfile .
+	eval $$(minikube docker-env) && docker build -t $(API_GATEWAY_IMAGE) ./$(API_GATEWAY_DIR)
+	eval $$(minikube docker-env) && docker build -t $(AUTH_SERVICE_IMAGE) ./$(AUTH_SERVICE_DIR)
+	eval $$(minikube docker-env) && docker build -t $(ITEM_SERVICE_IMAGE) ./$(ITEM_SERVICE_DIR)
+	eval $$(minikube docker-env) && docker build -t $(TRANSACTION_SERVICE_IMAGE) ./$(TRANSACTION_SERVICE_DIR)
+
+.PHONY: minikube-load-monolith
+minikube-load-monolith:
+	eval $$(minikube docker-env) && docker build -t $(MONOLITH_IMAGE) -f $(MONOLITH_DIR)/Dockerfile .
+
+.PHONY: minikube-deploy-postgres
+minikube-deploy-postgres: create-local-secrets
+	kubectl apply -f $(K8S_DIR)/namespaces/benchmark.yaml
+	kubectl apply -f $(K8S_DIR)/local/postgres.yaml
+	kubectl wait --for=condition=ready pod/postgres-0 -n benchmark --timeout=180s
+
+.PHONY: minikube-db-bootstrap
+minikube-db-bootstrap: create-local-secrets
+	kubectl delete job db-bootstrap-job -n benchmark --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/local/db-bootstrap-job.yaml
+	kubectl wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=180s
+
+.PHONY: minikube-migrate-monolith
+minikube-migrate-monolith: create-local-secrets
+	kubectl delete job monolith-migration-job -n mono --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/monolith/migration-job.yaml
+	kubectl wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
+
+.PHONY: minikube-deploy-monolith
+minikube-deploy-monolith: create-local-secrets
+	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
+	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
+	kubectl rollout status deployment/monolith -n mono --timeout=180s
+
+.PHONY: minikube-port-forward-monolith
+minikube-port-forward-monolith:
+	kubectl port-forward svc/monolith -n mono $(MONOLITH_PORT):8080
 
 .PHONY: minikube-status
 minikube-status:
