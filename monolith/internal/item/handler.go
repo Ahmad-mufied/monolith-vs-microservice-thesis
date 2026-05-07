@@ -11,10 +11,9 @@ import (
 )
 
 type HandlerService interface {
-	Create(ctx context.Context, req CreateRequest) (Response, error)
+	BulkSave(ctx context.Context, req BulkSaveRequest) error
 	List(ctx context.Context, page pagination.Page) ([]Response, error)
 	GetByID(ctx context.Context, id string) (Response, error)
-	Update(ctx context.Context, id string, req UpdateRequest) (Response, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -28,22 +27,20 @@ func NewHandler(service HandlerService) *Handler {
 
 func (h *Handler) RegisterRoutes(group *echo.Group) {
 	group.GET("/items", h.List)
-	group.POST("/items", h.Create)
+	group.PUT("/items", h.BulkSave)
 	group.GET("/items/:item_id", h.GetByID)
-	group.PUT("/items/:item_id", h.Update)
 	group.DELETE("/items/:item_id", h.Delete)
 }
 
-func (h *Handler) Create(c echo.Context) error {
-	var req CreateRequest
+func (h *Handler) BulkSave(c echo.Context) error {
+	var req BulkSaveRequest
 	if err := c.Bind(&req); err != nil {
 		return httputil.Error(c, apperror.BadRequest("invalid request payload", nil))
 	}
-	resp, err := h.service.Create(c.Request().Context(), req)
-	if err != nil {
+	if err := h.service.BulkSave(c.Request().Context(), req); err != nil {
 		return httputil.Error(c, err)
 	}
-	return httputil.Success(c, http.StatusCreated, resp)
+	return httputil.Message(c, http.StatusOK, "Items saved successfully")
 }
 
 func (h *Handler) List(c echo.Context) error {
@@ -66,21 +63,9 @@ func (h *Handler) GetByID(c echo.Context) error {
 	return httputil.Success(c, http.StatusOK, resp)
 }
 
-func (h *Handler) Update(c echo.Context) error {
-	var req UpdateRequest
-	if err := c.Bind(&req); err != nil {
-		return httputil.Error(c, apperror.BadRequest("invalid request payload", nil))
-	}
-	resp, err := h.service.Update(c.Request().Context(), c.Param("item_id"), req)
-	if err != nil {
-		return httputil.Error(c, err)
-	}
-	return httputil.Success(c, http.StatusOK, resp)
-}
-
 func (h *Handler) Delete(c echo.Context) error {
 	if err := h.service.Delete(c.Request().Context(), c.Param("item_id")); err != nil {
 		return httputil.Error(c, err)
 	}
-	return httputil.Message(c, "Operation completed successfully")
+	return httputil.Message(c, http.StatusOK, "Item deleted successfully")
 }

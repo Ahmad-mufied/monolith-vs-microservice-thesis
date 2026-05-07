@@ -10,6 +10,12 @@ type Item struct {
 	UpdatedAt       time.Time
 }
 
+type BulkSaveItem struct {
+	ID              *string
+	Name            string
+	AvailableAmount int
+}
+
 type Response struct {
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/jackc/pgx/v5"
@@ -19,12 +20,27 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
-func (r *PostgresRepository) Create(ctx context.Context, name string, availableAmount int) (Item, error) {
-	const query = `
-INSERT INTO items (name, available_amount)
-VALUES ($1, $2)
-RETURNING id::text, name, available_amount, created_at, updated_at`
-	return scanOne(r.db.QueryRow(ctx, query, name, availableAmount), "creating item")
+func (r *PostgresRepository) BulkSave(ctx context.Context, items []BulkSaveItem) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return apperror.Internal("internal server error", fmt.Errorf("beginning item bulk save transaction: %w", err))
+	}
+	finalizeCtx, finalizeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer finalizeCancel()
+	defer func() {
+		_ = tx.Rollback(finalizeCtx)
+	}()
+
+	for _, item := range items {
+		if err := bulkSaveItem(ctx, tx, item); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(finalizeCtx); err != nil {
+		return apperror.Internal("internal server error", fmt.Errorf("committing item bulk save transaction: %w", err))
+	}
+	return nil
 }
 
 func (r *PostgresRepository) List(ctx context.Context, limit, offset int) ([]Item, error) {
@@ -61,30 +77,6 @@ WHERE id = $1::uuid`
 	return scanOne(r.db.QueryRow(ctx, query, id), "getting item")
 }
 
-func (r *PostgresRepository) Update(ctx context.Context, id string, name *string, availableAmount *int) (Item, error) {
-	const query = `
-UPDATE items
-SET
-  name = CASE WHEN $2 THEN $3 ELSE name END,
-  available_amount = CASE WHEN $4 THEN $5 ELSE available_amount END,
-  updated_at = now()
-WHERE id = $1::uuid
-RETURNING id::text, name, available_amount, created_at, updated_at`
-
-	hasName := name != nil
-	nameValue := ""
-	if name != nil {
-		nameValue = *name
-	}
-	hasAmount := availableAmount != nil
-	amountValue := 0
-	if availableAmount != nil {
-		amountValue = *availableAmount
-	}
-
-	return scanOne(r.db.QueryRow(ctx, query, id, hasName, nameValue, hasAmount, amountValue), "updating item")
-}
-
 func (r *PostgresRepository) Delete(ctx context.Context, id string) error {
 	commandTag, err := r.db.Exec(ctx, `DELETE FROM items WHERE id = $1::uuid`, id)
 	if err != nil {
@@ -112,6 +104,45 @@ func scanOne(row scanner, contextMessage string) (Item, error) {
 		return Item{}, apperror.Internal("internal server error", fmt.Errorf("%s: %w", contextMessage, err))
 	}
 	return item, nil
+}
+
+func bulkSaveItem(ctx context.Context, tx pgx.Tx, item BulkSaveItem) error {
+	if item.ID == nil {
+		const insertQuery = `
+INSERT INTO items (name, available_amount)
+VALUES ($1, $2)
+RETURNING id::text, name, available_amount, created_at, updated_at`
+		if _, err := scanOne(tx.QueryRow(ctx, insertQuery, item.Name, item.AvailableAmount), "creating item during bulk save"); err != nil {
+			return mapItemConflictError(err)
+		}
+		return nil
+	}
+
+	const upsertQuery = `
+INSERT INTO items (id, name, available_amount)
+VALUES ($1::uuid, $2, $3)
+ON CONFLICT (id) DO UPDATE
+SET
+  name = EXCLUDED.name,
+  available_amount = EXCLUDED.available_amount,
+  updated_at = now()
+RETURNING id::text, name, available_amount, created_at, updated_at`
+	if _, err := scanOne(tx.QueryRow(ctx, upsertQuery, *item.ID, item.Name, item.AvailableAmount), "saving item during bulk save"); err != nil {
+		return mapItemConflictError(err)
+	}
+	return nil
+}
+
+func mapItemConflictError(err error) error {
+	if isUniqueViolation(err) {
+		return apperror.Conflict("item name already exists")
+	}
+	return err
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 func isReferencedItemDeleteError(err error) bool {

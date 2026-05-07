@@ -11,10 +11,9 @@ import (
 )
 
 type Repository interface {
-	Create(ctx context.Context, name string, availableAmount int) (Item, error)
+	BulkSave(ctx context.Context, items []BulkSaveItem) error
 	List(ctx context.Context, limit, offset int) ([]Item, error)
 	GetByID(ctx context.Context, id string) (Item, error)
-	Update(ctx context.Context, id string, name *string, availableAmount *int) (Item, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -26,17 +25,34 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) Create(ctx context.Context, req CreateRequest) (Response, error) {
-	name := strings.TrimSpace(req.Name)
-	normalizedReq := CreateRequest{Name: name, AvailableAmount: req.AvailableAmount}
-	if err := validation.Struct(normalizedReq); err != nil {
-		return Response{}, err
+func (s *Service) BulkSave(ctx context.Context, req BulkSaveRequest) error {
+	if err := validation.Struct(req); err != nil {
+		return err
 	}
-	item, err := s.repo.Create(ctx, name, *req.AvailableAmount)
-	if err != nil {
-		return Response{}, err
+
+	items := make([]BulkSaveItem, 0, len(req.Items))
+	for _, input := range req.Items {
+		name := strings.TrimSpace(input.Name)
+		if name == "" {
+			return apperror.BadRequest("invalid request payload", map[string]any{"name": "must not be empty"})
+		}
+
+		var id *string
+		if input.ID != nil {
+			normalizedID := strings.TrimSpace(*input.ID)
+			if err := validateUUID(normalizedID, "id"); err != nil {
+				return err
+			}
+			id = &normalizedID
+		}
+
+		items = append(items, BulkSaveItem{
+			ID:              id,
+			Name:            name,
+			AvailableAmount: *input.AvailableAmount,
+		})
 	}
-	return toResponse(item), nil
+	return s.repo.BulkSave(ctx, items)
 }
 
 func (s *Service) List(ctx context.Context, page pagination.Page) ([]Response, error) {
@@ -52,30 +68,6 @@ func (s *Service) GetByID(ctx context.Context, id string) (Response, error) {
 		return Response{}, err
 	}
 	item, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return Response{}, err
-	}
-	return toResponse(item), nil
-}
-
-func (s *Service) Update(ctx context.Context, id string, req UpdateRequest) (Response, error) {
-	if err := validateUUID(id, "item_id"); err != nil {
-		return Response{}, err
-	}
-	if req.Name == nil && req.AvailableAmount == nil {
-		return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"body": "at least one field is required"})
-	}
-	if req.Name != nil {
-		name := strings.TrimSpace(*req.Name)
-		if name == "" {
-			return Response{}, apperror.BadRequest("invalid request payload", map[string]any{"name": "must not be empty"})
-		}
-		req.Name = &name
-	}
-	if err := validation.Struct(req); err != nil {
-		return Response{}, err
-	}
-	item, err := s.repo.Update(ctx, id, req.Name, req.AvailableAmount)
 	if err != nil {
 		return Response{}, err
 	}
