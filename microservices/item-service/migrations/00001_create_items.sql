@@ -10,7 +10,7 @@ CREATE TABLE items (
 );
 
 CREATE UNIQUE INDEX items_name_active_unique
-ON items (name)
+ON items (lower(name))
 WHERE deleted_at IS NULL;
 
 -- +goose Down
