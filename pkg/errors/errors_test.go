@@ -37,6 +37,12 @@ func TestToGRPCStatus(t *testing.T) {
 			wantMsg:  "email already exists",
 		},
 		{
+			name:     "failed precondition",
+			err:      FailedPrecondition("requested amount exceeds available amount"),
+			wantCode: codes.FailedPrecondition,
+			wantMsg:  "requested amount exceeds available amount",
+		},
+		{
 			name:     "invalid credentials",
 			err:      InvalidCredentials("invalid email or password"),
 			wantCode: codes.Unauthenticated,
@@ -86,6 +92,9 @@ func TestTypedErrorsPreserveSentinelIdentity(t *testing.T) {
 	}
 	if !stderrors.Is(Conflict("email already exists"), ErrConflict) {
 		t.Fatal("expected Conflict to match ErrConflict")
+	}
+	if !stderrors.Is(FailedPrecondition("requested amount exceeds available amount"), ErrFailedPrecondition) {
+		t.Fatal("expected FailedPrecondition to match ErrFailedPrecondition")
 	}
 	if !stderrors.Is(InvalidCredentials("invalid email or password"), ErrInvalidCredentials) {
 		t.Fatal("expected InvalidCredentials to match ErrInvalidCredentials")
