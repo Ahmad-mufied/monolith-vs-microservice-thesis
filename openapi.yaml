@@ -1,60 +1,83 @@
 openapi: 3.0.3
-
 info:
   title: Skripsi Experimental API (Monolith & Microservices)
-  version: 1.4.0
-  description: |
-    Final OpenAPI specification for the undergraduate thesis benchmark project.
+  version: 1.5.0
+  description: 'Final OpenAPI specification for the undergraduate thesis benchmark project.
+
 
     This API contract is shared by both architecture implementations:
-    1. Monolithic Architecture exposes this REST API directly.
-    2. Microservices Architecture exposes this REST API through API Gateway,
-       while internal service-to-service communication uses gRPC.
 
-    The API is intentionally generic and designed for controlled benchmarking,
-    not for a production e-commerce system.
+    1. Monolithic Architecture exposes this REST API directly.
+
+    2. Microservices Architecture exposes this REST API through API Gateway, while internal service-to-service communication
+    uses gRPC.
+
+
+    The API is intentionally generic and designed for controlled benchmarking, not for a production e-commerce system.
+
 
     Main benchmark scenarios:
+
     - Login user: CPU-bound authentication workload.
+
     - Create transaction: write-heavy database workload.
+
     - Get enriched transactions: read-heavy aggregation workload.
-    - Bulk save items: optional bulk write workload.
+
+    - Sync active items: optional bulk write and synchronization workload.
+
 
     Response style:
+
     - Success response is represented by HTTP status code and concise response body.
-    - Success body does not include status: success.
-    - Error response uses a structured error object.
+
+    - Success body does not include `status: success`.
+
+    - Error response uses a structured `error` object.
+
     - Login and register responses return user summary to avoid an additional user-detail request.
-    - Create responses return generated id when needed.
-    - Update, delete, and bulk-save responses return message only.
+
+    - Create transaction returns generated id.
+
+    - Item synchronization returns message only.
+
     - GET responses return data and optional pagination meta.
 
+
+    Soft delete rule:
+
+    - Items use soft delete because PUT /api/v1/items synchronizes the active item list.
+
+    - Users do not use soft delete in the current API because there is no delete-user scenario.
+
+    - Transactions do not use soft delete in the current API because transactions are historical records.
+
+    '
 servers:
-  - url: http://localhost:8080
-    description: Local monolith server or local API Gateway
-  - url: http://api.skripsi.local
-    description: Local Minikube ingress for API Gateway
-  - url: http://monolith.skripsi.local
-    description: Local Minikube ingress for monolith
-  - url: https://api.skripsi.example
-    description: EKS ingress placeholder
-
+- url: http://localhost:8080
+  description: Local monolith server or local API Gateway
+- url: http://api.skripsi.local
+  description: Local Minikube ingress for API Gateway
+- url: http://monolith.skripsi.local
+  description: Local Minikube ingress for monolith
+- url: https://api.skripsi.example
+  description: EKS ingress placeholder
 tags:
-  - name: Health
-    description: Health check endpoints
-  - name: Auth
-    description: Authentication and user registration
-  - name: Items
-    description: Generic item management and bulk save
-  - name: Transactions
-    description: Transaction workload endpoints
-  - name: Admin
-    description: Administrative benchmark aggregation endpoints
-
+- name: Health
+  description: Health check endpoints
+- name: Auth
+  description: Authentication and user registration
+- name: Items
+  description: Generic item management and active item synchronization
+- name: Transactions
+  description: Transaction workload endpoints
+- name: Admin
+  description: Administrative benchmark aggregation endpoints
 paths:
   /healthz:
     get:
-      tags: [Health]
+      tags:
+      - Health
       summary: Health check
       description: Used by Docker Compose, Kubernetes probes, and smoke tests.
       operationId: healthCheck
@@ -65,15 +88,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
-
   /api/v1/auth/register:
     post:
-      tags: [Auth]
+      tags:
+      - Auth
       summary: Register a new user
-      description: |
-        Creates a new user account.
+      description: 'Creates a new user account.
+
         Register returns a user summary so the client can immediately obtain
-        the created user's basic identity without calling a separate detail endpoint.
+
+        the created user''s basic identity without calling a separate detail endpoint.
+
+        '
       operationId: registerUser
       security: []
       requestBody:
@@ -89,22 +115,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RegisterResponse'
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/auth/login:
     post:
-      tags: [Auth]
+      tags:
+      - Auth
       summary: '[BENCHMARK 1] Login user'
-      description: |
-        CPU-bound benchmark endpoint.
+      description: 'CPU-bound benchmark endpoint.
+
 
         This endpoint validates credentials and generates a JWT token.
+
         It is used to simulate authentication workload and cryptographic processing.
 
+
         Login returns token and user summary so the client can establish session context
+
         without calling a separate user-detail endpoint.
+
+        '
       operationId: loginUser
       security: []
       requestBody:
@@ -120,23 +154,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/items:
     get:
-      tags: [Items]
-      summary: Get item list
-      description: |
-        Returns paginated generic items.
-        Default ordering: created_at DESC, id DESC.
+      tags:
+      - Items
+      summary: Get active item list
+      description: 'Returns active items only. Soft-deleted items are not returned.
+
+
+        Default ordering: created_at DESC, id DESC.'
       operationId: getItems
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/LimitQuery'
-        - $ref: '#/components/parameters/OffsetQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+      - $ref: '#/components/parameters/OffsetQuery'
       responses:
         '200':
           description: Item list retrieved successfully
@@ -144,71 +182,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ItemListResponse'
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
-      tags: [Items]
-      summary: '[OPTIONAL BENCHMARK] Bulk save items'
-      description: |
-        Bulk save endpoint for generic item data.
+      tags:
+      - Items
+      summary: '[OPTIONAL BENCHMARK] Sync active items'
+      description: 'Synchronizes the full active item list.
 
-        This endpoint follows a bulk create-or-update pattern commonly used in
-        ERP-style master data synchronization.
+
+        This endpoint follows an ERP-style synchronization pattern.
+
 
         Semantics:
-        - Item with id and existing record: update the existing item.
-        - Item with id and no existing record: insert a new item using the provided id.
-        - Item without id: create a new item using database-generated UUIDv7.
-        - If a unique constraint such as item name is violated, return 409 Conflict.
+
+        - Item with `id` and existing active record: update the existing item.
+
+        - Item with `id` and existing soft-deleted record: reactivate the item and update its fields.
+
+        - Item with `id` and no existing record: insert a new item using the provided id.
+
+        - Item without `id`: create a new item using database-generated UUIDv7.
+
+        - Active items omitted from the request are soft-deleted.
+
+        - Soft delete means setting `deleted_at`, not physically deleting the row.
+
+        - If a unique constraint such as active item name is violated, return 409 Conflict.
+
         - The operation should be executed atomically in one database transaction.
+
         - If one item is invalid, rollback all changes.
 
-        Idempotence note:
-        - Items with id are idempotent by id.
-        - Items without id are treated as new item creation.
-      operationId: bulkSaveItems
+
+        Important:
+
+        - The request represents the full active item snapshot.
+
+        - Clients must not send only one paginated page as a sync payload.
+
+        '
+      operationId: syncItems
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BulkSaveItemsRequest'
+              $ref: '#/components/schemas/SyncItemsRequest'
             examples:
-              mixedCreateUpdate:
-                summary: Mixed create and update payload
+              syncActiveItems:
+                summary: Full active item snapshot
                 value:
                   items:
-                    - id: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001'
-                      name: Benchmark Item A
-                      available_amount: 1000
-                    - name: Benchmark Item B
-                      available_amount: 500
+                  - id: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001
+                    name: Benchmark Item A
+                    available_amount: 1000
+                  - name: Benchmark Item B
+                    available_amount: 500
       responses:
         '200':
-          description: Items saved successfully
+          description: Items synchronized successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
               example:
-                message: Items saved successfully
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+                message: Items synchronized successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/items/{item_id}:
     get:
-      tags: [Items]
-      summary: Get item detail
+      tags:
+      - Items
+      summary: Get active item detail
       operationId: getItemById
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/ItemIdPath'
+      - $ref: '#/components/parameters/ItemIdPath'
       responses:
         '200':
           description: Item retrieved successfully
@@ -216,51 +277,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ItemResponse'
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-    delete:
-      tags: [Items]
-      summary: Delete item
-      operationId: deleteItem
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ItemIdPath'
-      responses:
-        '200':
-          description: Item deleted successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MessageResponse'
-              example:
-                message: Item deleted successfully
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      description: Returns active item detail. If the item is soft-deleted, this endpoint returns 404 Not Found.
   /api/v1/transactions:
     post:
-      tags: [Transactions]
+      tags:
+      - Transactions
       summary: '[BENCHMARK 2] Create transaction'
-      description: |
-        I/O-bound benchmark endpoint.
+      description: 'I/O-bound benchmark endpoint.
+
 
         Creates a transaction with one or more item entries.
+
         Each transaction item contains an item_id and an amount.
 
+
         The term amount is intentionally generic. It avoids making the benchmark
+
         too specific to e-commerce inventory semantics while still providing a
+
         numeric workload field for transaction processing.
 
-        If any transaction item amount exceeds the related item's available_amount,
+
+        If any transaction item amount exceeds the related item''s available_amount,
+
         the transaction is rejected and returns 409 Conflict.
+
+
+
+        This endpoint does not deduct item available_amount. Item available_amount acts as a validation boundary for the benchmark
+        workload.'
       operationId: createTransaction
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -277,25 +331,32 @@ paths:
               example:
                 message: Transaction created successfully
                 data:
-                  id: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001'
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+                  id: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     get:
-      tags: [Transactions]
+      tags:
+      - Transactions
       summary: Get own transactions
-      description: |
-        Returns transactions owned by the authenticated user.
+      description: 'Returns transactions owned by the authenticated user.
+
         Default ordering: created_at DESC, id DESC.
+
+        '
       operationId: getOwnTransactions
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/LimitQuery'
-        - $ref: '#/components/parameters/OffsetQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+      - $ref: '#/components/parameters/OffsetQuery'
       responses:
         '200':
           description: Own transaction list retrieved successfully
@@ -303,18 +364,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionListResponse'
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/transactions/{transaction_id}:
     get:
-      tags: [Transactions]
+      tags:
+      - Transactions
       summary: Get transaction detail
       operationId: getTransactionById
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/TransactionIdPath'
+      - $ref: '#/components/parameters/TransactionIdPath'
       responses:
         '200':
           description: Transaction detail retrieved successfully
@@ -322,38 +385,54 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionResponse'
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/admin/transactions:
     get:
-      tags: [Admin]
+      tags:
+      - Admin
       summary: '[BENCHMARK 3] Get enriched transactions'
-      description: |
-        Read-heavy aggregation benchmark endpoint.
+      description: 'Read-heavy aggregation benchmark endpoint.
+
         Default ordering: created_at DESC, id DESC.
 
+
         Monolith implementation:
+
         - Usually implemented using direct SQL JOINs in a single database.
 
+
         Microservices implementation:
+
         - API Gateway requests transaction data.
+
         - API Gateway enriches transaction data by calling Auth Service and Item Service through gRPC.
+
         - This creates a controlled distributed aggregation workload.
 
+
         The response intentionally uses summary objects for user and item data.
+
         Item.available_amount is not returned in this endpoint because the transaction
+
         response only needs the item identity, item name, and transaction amount.
 
+
         This endpoint is used to observe latency, throughput, error rate,
+
         and service-to-service communication overhead.
+
+        '
       operationId: getEnrichedTransactions
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/LimitQuery'
-        - $ref: '#/components/parameters/OffsetQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+      - $ref: '#/components/parameters/OffsetQuery'
       responses:
         '200':
           description: Enriched transaction list retrieved successfully
@@ -361,16 +440,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EnrichedTransactionListResponse'
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-
   parameters:
     LimitQuery:
       name: limit
@@ -382,7 +461,6 @@ components:
         minimum: 1
         maximum: 100
         default: 50
-
     OffsetQuery:
       name: offset
       in: query
@@ -392,7 +470,6 @@ components:
         type: integer
         minimum: 0
         default: 0
-
     ItemIdPath:
       name: item_id
       in: path
@@ -401,8 +478,7 @@ components:
       schema:
         type: string
         format: uuid
-        example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001'
-
+        example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001
     TransactionIdPath:
       name: transaction_id
       in: path
@@ -411,63 +487,63 @@ components:
       schema:
         type: string
         format: uuid
-        example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001'
-
+        example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001
   responses:
     BadRequest:
       description: Bad request
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
               code: BAD_REQUEST
               message: Invalid request payload
-
     Unauthorized:
       description: Unauthorized
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
               code: UNAUTHORIZED
               message: Authentication is required
-
     NotFound:
       description: Resource not found
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
               code: NOT_FOUND
               message: Resource not found
-
     Conflict:
       description: Conflict
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
               code: CONFLICT
               message: Resource conflict
-
     InternalServerError:
       description: Internal server error
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
               code: INTERNAL_SERVER_ERROR
               message: Internal server error
-
   schemas:
     HealthResponse:
       type: object
-      required: [message]
+      required:
+      - message
       properties:
         message:
           type: string
@@ -479,39 +555,43 @@ components:
           type: string
           format: date-time
           example: '2026-05-05T12:00:00Z'
-
     MessageResponse:
       type: object
-      required: [message]
+      required:
+      - message
       properties:
         message:
           type: string
           example: Operation completed successfully
-
     IdResponse:
       type: object
-      required: [message, data]
+      required:
+      - message
+      - data
       properties:
         message:
           type: string
           example: Created successfully
         data:
           type: object
-          required: [id]
+          required:
+          - id
           properties:
             id:
               type: string
               format: uuid
               description: Database-generated UUIDv7.
-              example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001'
-
+              example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001
     ErrorResponse:
       type: object
-      required: [error]
+      required:
+      - error
       properties:
         error:
           type: object
-          required: [code, message]
+          required:
+          - code
+          - message
           properties:
             code:
               type: string
@@ -523,10 +603,12 @@ components:
               type: object
               additionalProperties: true
               nullable: true
-
     PaginationMeta:
       type: object
-      required: [limit, offset, total_returned]
+      required:
+      - limit
+      - offset
+      - total_returned
       properties:
         limit:
           type: integer
@@ -537,10 +619,12 @@ components:
         total_returned:
           type: integer
           example: 50
-
     RegisterRequest:
       type: object
-      required: [name, email, password]
+      required:
+      - name
+      - email
+      - password
       properties:
         name:
           type: string
@@ -555,24 +639,27 @@ components:
           type: string
           minLength: 8
           example: secret123
-
     RegisterResponse:
       type: object
-      required: [message, data]
+      required:
+      - message
+      - data
       properties:
         message:
           type: string
           example: User registered successfully
         data:
           type: object
-          required: [user]
+          required:
+          - user
           properties:
             user:
               $ref: '#/components/schemas/UserSummary'
-
     LoginRequest:
       type: object
-      required: [email, password]
+      required:
+      - email
+      - password
       properties:
         email:
           type: string
@@ -582,33 +669,40 @@ components:
           type: string
           minLength: 8
           example: secret123
-
     LoginResponse:
       type: object
-      required: [message, data]
+      required:
+      - message
+      - data
       properties:
         message:
           type: string
           example: Login successful
         data:
           type: object
-          required: [token, user]
+          required:
+          - token
+          - user
           properties:
             token:
               type: string
               example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
             user:
               $ref: '#/components/schemas/UserSummary'
-
     User:
       type: object
-      required: [id, name, email, created_at, updated_at]
+      required:
+      - id
+      - name
+      - email
+      - created_at
+      - updated_at
       properties:
         id:
           type: string
           format: uuid
           description: Database-generated UUIDv7.
-          example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001'
+          example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001
         name:
           type: string
           example: Ahmad Mufied
@@ -624,16 +718,18 @@ components:
           type: string
           format: date-time
           example: '2026-05-05T12:00:00Z'
-
     UserSummary:
       type: object
-      required: [id, name, email]
+      required:
+      - id
+      - name
+      - email
       properties:
         id:
           type: string
           format: uuid
           description: Database-generated UUIDv7.
-          example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001'
+          example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001
         name:
           type: string
           example: Ahmad Mufied
@@ -641,52 +737,20 @@ components:
           type: string
           format: email
           example: mufied@example.com
-
-    BulkSaveItemsRequest:
-      type: object
-      required: [items]
-      properties:
-        items:
-          type: array
-          minItems: 1
-          maxItems: 100
-          items:
-            $ref: '#/components/schemas/BulkSaveItemInput'
-
-    BulkSaveItemInput:
-      type: object
-      required: [name, available_amount]
-      properties:
-        id:
-          type: string
-          format: uuid
-          nullable: true
-          description: |
-            Optional item id.
-            If provided and the item exists, the item is updated.
-            If provided and the item does not exist, the item is inserted using this id.
-            If omitted, a new item is created with database-generated UUIDv7.
-          example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001'
-        name:
-          type: string
-          minLength: 1
-          maxLength: 160
-          example: Benchmark Item A
-        available_amount:
-          type: integer
-          minimum: 0
-          description: Generic available amount value owned by the item.
-          example: 1000
-
     Item:
       type: object
-      required: [id, name, available_amount, created_at, updated_at]
+      required:
+      - id
+      - name
+      - available_amount
+      - created_at
+      - updated_at
       properties:
         id:
           type: string
           format: uuid
           description: Database-generated UUIDv7.
-          example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001'
+          example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001
         name:
           type: string
           example: Benchmark Item A
@@ -703,30 +767,39 @@ components:
           type: string
           format: date-time
           example: '2026-05-05T12:00:00Z'
-
+      description: Active item representation. Soft-deleted rows are internal and are not returned by the public GET item
+        endpoints.
     ItemSummary:
       type: object
-      required: [id, name]
+      required:
+      - id
+      - name
+      - deleted
       properties:
         id:
           type: string
           format: uuid
           description: Database-generated UUIDv7.
-          example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001'
+          example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001
         name:
           type: string
           example: Benchmark Item A
-
+        deleted:
+          type: boolean
+          description: True if the item has been soft-deleted via sync omission. Used in transaction enrichment to indicate the item is no longer active.
+          example: false
     ItemResponse:
       type: object
-      required: [data]
+      required:
+      - data
       properties:
         data:
           $ref: '#/components/schemas/Item'
-
     ItemListResponse:
       type: object
-      required: [data, meta]
+      required:
+      - data
+      - meta
       properties:
         data:
           type: array
@@ -734,10 +807,10 @@ components:
             $ref: '#/components/schemas/Item'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-
     CreateTransactionRequest:
       type: object
-      required: [items]
+      required:
+      - items
       properties:
         items:
           type: array
@@ -745,34 +818,39 @@ components:
           maxItems: 20
           items:
             $ref: '#/components/schemas/CreateTransactionItemRequest'
-
     CreateTransactionItemRequest:
       type: object
-      required: [item_id, amount]
+      required:
+      - item_id
+      - amount
       properties:
         item_id:
           type: string
           format: uuid
-          example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001'
+          example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001
         amount:
           type: integer
           minimum: 1
           description: Generic transaction amount for the selected item.
           example: 2
-
     Transaction:
       type: object
-      required: [id, user_id, items, created_at, updated_at]
+      required:
+      - id
+      - user_id
+      - items
+      - created_at
+      - updated_at
       properties:
         id:
           type: string
           format: uuid
           description: Database-generated UUIDv7.
-          example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001'
+          example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001
         user_id:
           type: string
           format: uuid
-          example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001'
+          example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001
         items:
           type: array
           items:
@@ -785,30 +863,32 @@ components:
           type: string
           format: date-time
           example: '2026-05-05T12:00:00Z'
-
     TransactionItem:
       type: object
-      required: [item_id, amount]
+      required:
+      - item_id
+      - amount
       properties:
         item_id:
           type: string
           format: uuid
-          example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001'
+          example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001
         amount:
           type: integer
           minimum: 1
           example: 2
-
     TransactionResponse:
       type: object
-      required: [data]
+      required:
+      - data
       properties:
         data:
           $ref: '#/components/schemas/Transaction'
-
     TransactionListResponse:
       type: object
-      required: [data, meta]
+      required:
+      - data
+      - meta
       properties:
         data:
           type: array
@@ -816,15 +896,19 @@ components:
             $ref: '#/components/schemas/Transaction'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-
     EnrichedTransaction:
       type: object
-      required: [id, user, items, created_at, updated_at]
+      required:
+      - id
+      - user
+      - items
+      - created_at
+      - updated_at
       properties:
         id:
           type: string
           format: uuid
-          example: '018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001'
+          example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001
         user:
           $ref: '#/components/schemas/UserSummary'
         items:
@@ -839,10 +923,12 @@ components:
           type: string
           format: date-time
           example: '2026-05-05T12:00:00Z'
-
     EnrichedTransactionItem:
       type: object
-      required: [item, amount]
+      required:
+      - item
+      - amount
+      description: Transaction item enriched with item summary. If the item has been soft-deleted after the transaction was created, item.deleted will be true.
       properties:
         item:
           $ref: '#/components/schemas/ItemSummary'
@@ -850,10 +936,11 @@ components:
           type: integer
           minimum: 1
           example: 2
-
     EnrichedTransactionListResponse:
       type: object
-      required: [data, meta]
+      required:
+      - data
+      - meta
       properties:
         data:
           type: array
@@ -861,3 +948,41 @@ components:
             $ref: '#/components/schemas/EnrichedTransaction'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
+    SyncItemsRequest:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          minItems: 0
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/SyncItemInput'
+          description: Full active item snapshot. Active items omitted from this array are soft-deleted.
+      description: Full active item snapshot. Active items omitted from this request are soft-deleted.
+    SyncItemInput:
+      type: object
+      required:
+      - name
+      - available_amount
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional item id. If provided and active item exists, the item is updated. If provided and soft-deleted
+            item exists, the item is reactivated. If provided and no item exists, the item is inserted using this id. If omitted,
+            a new item is created with database-generated UUIDv7.
+          example: 018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+          example: Benchmark Item A
+        available_amount:
+          type: integer
+          minimum: 0
+          description: Generic available amount value owned by the item.
+          example: 1000
+      description: Input item for full active item synchronization.
