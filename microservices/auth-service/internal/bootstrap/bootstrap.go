@@ -7,6 +7,7 @@ import (
 	"net"
 	"os/signal"
 	"syscall"
+	"time"
 
 	grpcserveradapter "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/adapter/grpcserver"
 	postgresadapter "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/adapter/postgres"
@@ -16,6 +17,8 @@ import (
 	authv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/auth/v1"
 	"google.golang.org/grpc"
 )
+
+const shutdownTimeout = 10 * time.Second
 
 func Run() error {
 	cfg, err := config.Load()
@@ -53,7 +56,19 @@ func Run() error {
 
 	select {
 	case <-ctx.Done():
-		grpcServer.GracefulStop()
+		stopped := make(chan struct{})
+		go func() {
+			grpcServer.GracefulStop()
+			close(stopped)
+		}()
+
+		select {
+		case <-stopped:
+		case <-time.After(shutdownTimeout):
+			log.Printf("auth-service graceful shutdown timed out after %s; forcing stop", shutdownTimeout)
+			grpcServer.Stop()
+		}
+
 		return nil
 	case err := <-serverErr:
 		return fmt.Errorf("serve grpc: %w", err)
