@@ -297,17 +297,15 @@ Internal gRPC methods may include:
 
 ### 5.3 Item Service
 
-The Item Service owns item data and item allocation logic.
+The Item Service owns item data and active item synchronization behavior.
 
 Responsibilities:
 
-- create item,
-- get item by ID,
-- list items,
-- update item,
-- delete item,
-- get items by IDs,
-- validate and allocate item amount.
+- sync active items,
+- get active item by ID,
+- list active items,
+- get item summaries by IDs for enrichment,
+- validate transaction items against active item availability.
 
 Database ownership:
 
@@ -323,15 +321,13 @@ POST /api/v1/transactions
 
 Internal gRPC methods may include:
 
-- CreateItem,
+- SyncItems,
 - GetItemById,
-- GetItemsByIds,
+- GetItemSummariesByIds,
 - ListItems,
-- UpdateItem,
-- DeleteItem,
-- ValidateAndAllocate.
+- ValidateTransactionItems.
 
-`ValidateAndAllocate` is used by Transaction Service during transaction creation.
+`ValidateTransactionItems` is used by Transaction Service during transaction creation.
 
 ---
 
@@ -345,7 +341,7 @@ Responsibilities:
 - insert transaction_items,
 - get own transactions,
 - get all enriched transactions,
-- call Item Service for allocation,
+- call Item Service for transaction item validation,
 - call Auth Service for user enrichment,
 - call Item Service for item enrichment.
 
@@ -803,7 +799,7 @@ API Gateway
     v
 Transaction Service
     |
-    +-- Call Item Service ValidateAndAllocate
+    +-- Call Item Service ValidateTransactionItems
     |       |
     |       v
     |   item_db.items
@@ -825,9 +821,9 @@ Client/k6   API Gateway   Transaction Service   Item Service       item_db      
    |----------->|                 |                  |               |                 |
    |            | CreateTx gRPC   |                  |               |                 |
    |            |---------------->|                  |               |                 |
-   |            |                 | ValidateAllocate |               |                 |
+   |            |                 | ValidateItems    |               |                 |
    |            |                 |----------------->|               |                 |
-   |            |                 |                  | SELECT/UPDATE  |                 |
+   |            |                 |                  | SELECT active   |                 |
    |            |                 |                  |-------------->|                 |
    |            |                 |                  |<--------------|                 |
    |            |                 |<-----------------|               |                 |
@@ -842,7 +838,7 @@ Client/k6   API Gateway   Transaction Service   Item Service       item_db      
 
 Expected microservices characteristic:
 
-- item allocation is handled by Item Service,
+- item validation is handled by Item Service,
 - transaction persistence is handled by Transaction Service,
 - inter-service communication adds overhead,
 - service-level scaling can target hot services independently.
@@ -888,7 +884,7 @@ Transaction Service
     |
     +-- Call Auth Service GetUsersByIds
     |
-    +-- Call Item Service GetItemsByIds
+    +-- Call Item Service GetItemSummariesByIds
     |
     +-- Join/enrich in memory
     |
@@ -913,7 +909,7 @@ Client/k6   API Gateway   Transaction Svc    transaction_db    Auth Svc      aut
    |            |                |                                  | SELECT     |           |            |
    |            |                |                                  |----------->|           |            |
    |            |                |<---------------------------------|            |           |            |
-   |            |                | GetItemsByIds                                             |            |
+   |            |                | GetItemSummariesByIds                                     |            |
    |            |                |--------------------------------------------------------->|            |
    |            |                |                                                          | SELECT     |
    |            |                |                                                          |----------->|
@@ -1320,7 +1316,7 @@ API Gateway
 Transaction Service
     |
     v
-Item Service ValidateAndAllocate
+Item Service ValidateTransactionItems
     |
     v
 Transaction insert

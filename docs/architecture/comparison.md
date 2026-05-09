@@ -543,7 +543,7 @@ API Gateway
     v
 Transaction Service
     |
-    +-- gRPC ValidateAndAllocate
+    +-- gRPC ValidateTransactionItems
     |       |
     |       v
     |   Item Service
@@ -645,7 +645,7 @@ Transaction Service
     |
     +-- gRPC GetUsersByIds -> Auth Service
     |
-    +-- gRPC GetItemsByIds -> Item Service
+    +-- gRPC GetItemSummariesByIds -> Item Service
     |
     +-- In-memory enrichment
     |

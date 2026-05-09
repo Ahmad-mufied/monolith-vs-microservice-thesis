@@ -479,7 +479,7 @@ Microservices:
 ```text
 Transaction Service
 -> Auth Service GetUsersByIds
--> Item Service GetItemsByIds
+-> Item Service GetItemSummariesByIds
 -> in-memory enrichment
 ```
 
@@ -613,10 +613,10 @@ All operations are inside `mono_db`.
 Transaction Service
     |
     v
-Item Service ValidateAndAllocate
+Item Service ValidateTransactionItems
     |
     v
-item_db updates items.available_amount
+item_db validates active items against available_amount
     |
     v
 Transaction Service inserts transaction

@@ -173,12 +173,32 @@ Database timestamp fields use `TIMESTAMPTZ`.
 
 ## 7. Response Envelope
 
-All successful responses should follow a consistent envelope:
+Successful responses follow the current OpenAPI response bodies directly.
+
+Typical success shapes:
 
 ```json
 {
-  "status": "success",
   "data": {}
+}
+```
+
+Create and action responses may include a message:
+
+```json
+{
+  "message": "Operation completed successfully"
+}
+```
+
+Create responses may return generated ids:
+
+```json
+{
+  "message": "Created successfully",
+  "data": {
+    "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a1"
+  }
 }
 ```
 
@@ -186,7 +206,6 @@ List responses may include metadata:
 
 ```json
 {
-  "status": "success",
   "data": [],
   "meta": {
     "limit": 50,
@@ -200,7 +219,6 @@ All error responses should follow:
 
 ```json
 {
-  "status": "error",
   "error": {
     "code": "BAD_REQUEST",
     "message": "Invalid request payload",
@@ -247,7 +265,7 @@ The thesis benchmark focuses on three primary endpoints.
 | Benchmark | Endpoint | Workload Type | Purpose |
 |---|---|---|---|
 | Benchmark 1 | `POST /api/v1/auth/login` | CPU-bound | bcrypt password comparison and JWT signing |
-| Benchmark 2 | `POST /api/v1/transactions` | I/O-bound + state mutation | create transaction and allocate item amount |
+| Benchmark 2 | `POST /api/v1/transactions` | I/O-bound + validation | create transaction after validating item amounts against available_amount |
 | Benchmark 3 | `GET /api/v1/admin/transactions` | aggregation + network-bound | return enriched transaction data |
 
 These endpoints are the primary target for k6 scenarios.
@@ -282,13 +300,13 @@ Expected response:
 
 ```json
 {
-  "status": "success",
+  "message": "User registered successfully",
   "data": {
-    "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a1",
-    "name": "Ahmad Mufied",
-    "email": "mufied@example.com",
-    "created_at": "2026-05-03T10:15:30Z",
-    "updated_at": "2026-05-03T10:15:30Z"
+    "user": {
+      "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a1",
+      "name": "Ahmad Mufied",
+      "email": "mufied@example.com"
+    }
   }
 }
 ```
@@ -337,7 +355,7 @@ Expected response:
 
 ```json
 {
-  "status": "success",
+  "message": "Login successful",
   "data": {
     "token": "jwt-token",
     "user": {
@@ -387,13 +405,12 @@ Bearer JWT
 
 Purpose:
 
-Return available items.
+Return active items only.
 
 Expected response:
 
 ```json
 {
-  "status": "success",
   "data": [
     {
       "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
@@ -413,12 +430,12 @@ Expected response:
 
 ---
 
-## 11.2 Create Item
+## 11.2 Sync Active Items
 
 Endpoint:
 
 ```text
-POST /api/v1/items
+PUT /api/v1/items
 ```
 
 Authentication:
@@ -429,14 +446,31 @@ Bearer JWT
 
 Purpose:
 
-Create a new item.
+Synchronize the full active item snapshot.
 
 Expected request body:
 
 ```json
 {
-  "name": "Item 1",
-  "available_amount": 1000000
+  "items": [
+    {
+      "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
+      "name": "Item 1",
+      "available_amount": 1000000
+    },
+    {
+      "name": "Item 2",
+      "available_amount": 500000
+    }
+  ]
+}
+```
+
+Expected response:
+
+```json
+{
+  "message": "Items synchronized successfully"
 }
 ```
 
@@ -444,7 +478,10 @@ Notes:
 
 - API `available_amount` must be greater than or equal to 0,
 - API `available_amount` maps to the internal database column `items.available_amount`,
-- the database generates `id` using UUIDv7.
+- the database generates `id` using UUIDv7 when `id` is omitted,
+- active items omitted from the payload are soft-deleted by setting `deleted_at`,
+- soft-deleted items included again in the payload are reactivated,
+- the operation is atomic and must rollback all changes if one item is invalid.
 
 ---
 
@@ -466,64 +503,7 @@ item_id:
 
 Purpose:
 
-Return one item by ID.
-
----
-
-## 11.4 Update Item
-
-Endpoint:
-
-```text
-PUT /api/v1/items/{item_id}
-```
-
-Authentication:
-
-```text
-Bearer JWT
-```
-
-Purpose:
-
-Update item attributes.
-
-Expected request body:
-
-```json
-{
-  "name": "Updated Item",
-  "available_amount": 500000
-}
-```
-
-Notes:
-
-- updating API `available_amount` directly is allowed for CRUD/demo purposes,
-- API `available_amount` maps to the internal database column `items.available_amount`,
-- benchmark transaction allocation must use the transaction flow, not this endpoint.
-
----
-
-## 11.5 Delete Item
-
-Endpoint:
-
-```text
-DELETE /api/v1/items/{item_id}
-```
-
-Authentication:
-
-```text
-Bearer JWT
-```
-
-Purpose:
-
-Delete an item.
-
-For benchmark stability, delete operations should not be part of the main benchmark scenarios unless explicitly designed.
+Return one active item by ID.
 
 ---
 
@@ -592,18 +572,9 @@ Expected response:
 
 ```json
 {
-  "status": "success",
+  "message": "Transaction created successfully",
   "data": {
-    "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a3",
-    "user_id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a1",
-    "items": [
-      {
-        "item_id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
-        "amount": 2
-      }
-    ],
-    "created_at": "2026-05-03T10:15:30Z",
-    "updated_at": "2026-05-03T10:15:30Z"
+    "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a3"
   }
 }
 ```
@@ -613,7 +584,6 @@ Completion rule:
 The response must be returned only after:
 
 - item availability is validated,
-- internal item availability is updated,
 - transaction row is inserted,
 - transaction_items rows are inserted.
 
@@ -647,7 +617,6 @@ Expected response:
 
 ```json
 {
-  "status": "success",
   "data": [
     {
       "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a3",
@@ -716,7 +685,6 @@ Expected response:
 
 ```json
 {
-  "status": "success",
   "data": [
     {
       "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a3",
@@ -731,7 +699,8 @@ Expected response:
         {
           "item": {
             "id": "0196f5d2-3a6b-7d2a-bc91-8c91e2e8b6a2",
-            "name": "Item 1"
+            "name": "Item 1",
+            "deleted": false
           },
           "amount": 2
         }
@@ -758,7 +727,7 @@ Microservices implementation:
 Transaction Service
 -> transaction_db
 -> Auth Service GetUsersByIds
--> Item Service GetItemsByIds
+-> Item Service GetItemSummariesByIds
 -> in-memory enrichment
 ```
 
@@ -766,6 +735,7 @@ Notes:
 
 - This endpoint returns `UserSummary` and `ItemSummary`, not the full `User` and `Item` schemas.
 - `available_amount` is intentionally omitted from enriched item payloads because this endpoint represents transaction enrichment, not current inventory state.
+- `ItemSummary.deleted` indicates that the referenced item has been soft-deleted after the transaction was created.
 
 ---
 
@@ -1069,8 +1039,8 @@ ID format          : string, format uuid
 Domain term        : item
 Item field         : available_amount
 Allocation field   : amount
-Response envelope  : status + data
-Error envelope     : status + error
+Response envelope  : direct success body, optional message, optional data/meta
+Error envelope     : error
 Auth               : Bearer JWT
 Benchmark endpoints:
   - POST /api/v1/auth/login
