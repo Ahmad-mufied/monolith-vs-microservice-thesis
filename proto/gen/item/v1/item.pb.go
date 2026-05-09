@@ -765,7 +765,7 @@ const file_item_v1_item_proto_rawDesc = "" +
 	"\tListItems\x12\x19.item.v1.ListItemsRequest\x1a\x1a.item.v1.ListItemsResponse\x12H\n" +
 	"\vGetItemById\x12\x1b.item.v1.GetItemByIdRequest\x1a\x1c.item.v1.GetItemByIdResponse\x12f\n" +
 	"\x15GetItemSummariesByIds\x12%.item.v1.GetItemSummariesByIdsRequest\x1a&.item.v1.GetItemSummariesByIdsResponse\x12o\n" +
-	"\x18ValidateTransactionItems\x12(.item.v1.ValidateTransactionItemsRequest\x1a).item.v1.ValidateTransactionItemsResponseBAZ?github.com/mufied/skripsi-benchmark/proto/gen/go/item/v1;itemv1b\x06proto3"
+	"\x18ValidateTransactionItems\x12(.item.v1.ValidateTransactionItemsRequest\x1a).item.v1.ValidateTransactionItemsResponseBRZPgithub.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1;itemv1b\x06proto3"
 
 var (
 	file_item_v1_item_proto_rawDescOnce sync.Once

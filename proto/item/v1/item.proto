@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package item.v1;
 
-option go_package = "github.com/mufied/skripsi-benchmark/proto/gen/go/item/v1;itemv1";
+option go_package = "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1;itemv1";
 
 service ItemService {
   rpc SyncItems(SyncItemsRequest) returns (SyncItemsResponse);
