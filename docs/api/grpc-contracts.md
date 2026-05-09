@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This document describes the internal gRPC contract design for the microservices architecture.
+This document defines the final internal gRPC contract design for the microservices architecture in the thesis benchmark project.
 
 The external API is REST HTTP and is defined in:
 
@@ -12,34 +12,96 @@ openapi.yaml
 
 The internal microservices communication uses gRPC.
 
-The purpose of this document is to define:
+This document defines:
 
-- service-to-service contracts,
-- method responsibilities,
-- request and response semantics,
-- UUID representation,
-- error mapping expectations,
-- benchmark-related gRPC flows.
+```text
+- service boundaries
+- gRPC service methods
+- request and response semantics
+- UUID and timestamp representation
+- REST-to-gRPC mapping
+- error mapping
+- benchmark-relevant service flows
+```
+
+The gRPC contracts must preserve the external behavior defined by the latest OpenAPI specification.
 
 ---
 
-## 2. Scope
+## 2. Current REST API Alignment
+
+The latest REST API contract uses these principles:
+
+```text
+Success response:
+- represented by HTTP status code
+- no top-level status: success field
+
+Error response:
+- structured error object
+
+Register/Login:
+- return user summary
+- login also returns token
+
+Create transaction:
+- returns message + generated transaction id
+
+Item mutation:
+- PUT /api/v1/items performs bulk save
+- success response returns message only
+
+Enriched transaction:
+- uses UserSummary and ItemSummary
+- does not expose Item.available_amount inside enriched transaction items
+```
+
+The API Gateway is responsible for wrapping gRPC responses into REST response bodies.
+
+---
+
+## 3. Scope
 
 This document applies only to the microservices architecture.
 
-Microservices that use gRPC:
+Microservices using gRPC:
 
-- API Gateway as gRPC client,
-- Auth Service as gRPC server,
-- Item Service as gRPC server,
-- Transaction Service as gRPC server,
-- Transaction Service as gRPC client to Auth Service and Item Service.
+```text
+API Gateway
+Auth Service
+Item Service
+Transaction Service
+```
 
-The monolith does not use gRPC internally.
+Service roles:
+
+```text
+API Gateway
+→ REST HTTP server for external clients
+→ gRPC client to Auth, Item, and Transaction services
+→ JWT validation for protected routes
+→ REST response mapping
+→ enriched transaction aggregation
+
+Auth Service
+→ owns users and authentication
+→ owns auth_db
+
+Item Service
+→ owns item master data
+→ owns item_db
+
+Transaction Service
+→ owns transactions and transaction_items
+→ owns transaction_db
+→ calls Item Service only for transaction item validation during transaction creation
+```
+
+The monolith does not use internal gRPC.
 
 ---
 
-## 3. Proto File Locations
+## 4. Proto File Locations
 
 Proto files are stored under:
 
@@ -47,7 +109,7 @@ Proto files are stored under:
 proto/
 ```
 
-Final proto structure:
+Final structure:
 
 ```text
 proto/
@@ -62,15 +124,23 @@ proto/
         └── transaction.proto
 ```
 
-Generated Go code should be placed in a predictable generated package path, depending on the chosen code generation strategy.
+Recommended generated Go package structure:
 
-The exact output path can be finalized during implementation, but it must be consistent across services.
+```text
+proto/gen/auth/v1
+proto/gen/item/v1
+proto/gen/transaction/v1
+```
+
+Generated code must not be manually edited.
+
+Generated code should not be placed inside a service-specific `internal/` package if it must be imported by the API Gateway or another service.
 
 ---
 
-## 4. Communication Overview
+## 5. Communication Overview
 
-External client communication:
+External client flow:
 
 ```text
 Client / k6
@@ -82,41 +152,62 @@ REST HTTP
 API Gateway
 ```
 
-Internal microservices communication:
+Internal service flow:
+
+```text
+API Gateway
+    |
+    +--> Auth Service via gRPC
+    |
+    +--> Item Service via gRPC
+    |
+    +--> Transaction Service via gRPC
+```
+
+Transaction creation flow:
 
 ```text
 API Gateway
     |
     v
-gRPC
-    |
-    v
-Auth Service / Item Service / Transaction Service
-```
-
-Service-to-service communication:
-
-```text
 Transaction Service
     |
-    +--> Auth Service via gRPC
-    |
-    +--> Item Service via gRPC
+    v
+Item Service
 ```
 
-The API Gateway must not access databases directly.
+Enriched transaction flow:
 
-Business services must not access another service's database directly.
+```text
+API Gateway
+    |
+    +--> Transaction Service
+    |
+    +--> Auth Service
+    |
+    +--> Item Service
+    |
+    v
+API Gateway performs in-memory aggregation
+```
+
+Rules:
+
+```text
+- API Gateway must not access databases directly.
+- Business services must not access another service's database directly.
+- Business services communicate through gRPC only.
+```
 
 ---
 
-## 5. UUID Representation
+## 6. UUID Representation
 
 PostgreSQL stores IDs as native UUID.
 
 In gRPC contracts, UUID values are represented as strings.
 
-Example:
+Examples:
 
 ```proto
 string user_id = 1;
@@ -124,23 +215,20 @@ string item_id = 2;
 string transaction_id = 3;
 ```
 
-All UUID string fields must contain valid UUID values.
-
-The application code must validate UUID format at the appropriate boundary.
-
-Do not use custom string labels such as:
+Rules:
 
 ```text
-USR-001
-ITM-001
-TX-999
+- UUID values must use valid UUID string format.
+- PostgreSQL generates UUIDv7 for new records.
+- Services must validate UUID strings at service boundaries.
+- Do not use custom IDs such as USR-001, ITM-001, or TX-001.
 ```
 
 ---
 
-## 6. Timestamp Representation
+## 7. Timestamp Representation
 
-For simplicity, timestamps in gRPC responses may use string values in RFC3339 format.
+For this project, timestamps in gRPC responses use RFC3339 strings.
 
 Example:
 
@@ -149,54 +237,66 @@ string created_at = 10;
 string updated_at = 11;
 ```
 
-Alternative option:
+Reason:
+
+```text
+- simpler mapping to REST date-time strings
+- simpler implementation in Go
+- sufficient for thesis benchmarking
+```
+
+The REST API still returns timestamps as strings with `format: date-time`.
+
+---
+
+## 8. Authentication Context Propagation
+
+External JWT validation is handled by the API Gateway for protected REST routes.
+
+The API Gateway extracts the authenticated user id from the JWT and passes it explicitly to internal gRPC calls.
+
+Recommended approach:
+
+```text
+Use explicit user_id fields in gRPC request messages.
+```
+
+Example:
 
 ```proto
-google.protobuf.Timestamp created_at = 10;
-google.protobuf.Timestamp updated_at = 11;
+message CreateTransactionRequest {
+  string user_id = 1;
+  repeated TransactionItemInput items = 2;
+}
 ```
 
-Recommended for this project:
+Reason:
 
 ```text
-Use google.protobuf.Timestamp if implementation complexity is acceptable.
-Use string RFC3339 timestamps if simpler implementation is preferred.
+- easier to inspect
+- easier to test
+- easier to document
+- clearer for benchmark reproducibility
 ```
-
-The REST API must still return timestamps as `string` with `format: date-time`.
 
 ---
 
-## 7. Service List
-
-The microservices architecture defines these gRPC services:
-
-```text
-AuthService
-ItemService
-TransactionService
-```
-
-Service ownership:
-
-| Service | Owner | Database |
-|---|---|---|
-| AuthService | auth-service | auth_db |
-| ItemService | item-service | item_db |
-| TransactionService | transaction-service | transaction_db |
-
-API Gateway consumes all three services.
-
-Transaction Service consumes AuthService and ItemService for enrichment and allocation flows.
-
----
-
-## 8. AuthService Contract
+# 9. AuthService Contract
 
 Proto file:
 
 ```text
 proto/auth/v1/auth.proto
+```
+
+Recommended proto header:
+
+```proto
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/auth/v1;authv1";
 ```
 
 Service:
@@ -210,9 +310,7 @@ service AuthService {
 }
 ```
 
----
-
-## 8.1 Register
+## 9.1 Register
 
 Used by:
 
@@ -220,11 +318,13 @@ Used by:
 API Gateway
 ```
 
-Purpose:
+REST endpoint:
 
-Create a new user.
+```text
+POST /api/v1/auth/register
+```
 
-Request concept:
+Request:
 
 ```proto
 message RegisterRequest {
@@ -234,25 +334,50 @@ message RegisterRequest {
 }
 ```
 
-Response concept:
+Response:
 
 ```proto
 message RegisterResponse {
-  User user = 1;
+  UserSummary user = 1;
 }
 ```
 
 Behavior:
 
-- validate name, email, and password,
-- hash password,
-- insert user into `auth_db.users`,
-- database generates UUID using `uuidv7()`,
-- return created user without password_hash.
+```text
+- validate name
+- validate email
+- validate password
+- hash password
+- insert user into auth_db.users
+- database generates UUID using uuidv7()
+- return user summary without password_hash
+```
 
----
+Expected gRPC errors:
 
-## 8.2 Login
+```text
+InvalidArgument → invalid request payload
+AlreadyExists   → email already exists
+Internal        → database or unexpected server error
+```
+
+API Gateway maps success to REST:
+
+```json
+{
+  "message": "User registered successfully",
+  "data": {
+    "user": {
+      "id": "...",
+      "name": "...",
+      "email": "..."
+    }
+  }
+}
+```
+
+## 9.2 Login
 
 Used by:
 
@@ -260,17 +385,19 @@ Used by:
 API Gateway
 ```
 
+REST endpoint:
+
+```text
+POST /api/v1/auth/login
+```
+
 Benchmark:
 
 ```text
-Benchmark 1
+Benchmark 1: CPU-bound authentication workload
 ```
 
-Purpose:
-
-Authenticate user and return JWT.
-
-Request concept:
+Request:
 
 ```proto
 message LoginRequest {
@@ -279,44 +406,68 @@ message LoginRequest {
 }
 ```
 
-Response concept:
+Response:
 
 ```proto
 message LoginResponse {
   string token = 1;
-  User user = 2;
+  UserSummary user = 2;
 }
 ```
 
 Behavior:
 
-- find user by email,
-- compare password using bcrypt,
-- generate JWT,
-- return token and user data.
+```text
+- validate email and password
+- find user by email
+- compare password using bcrypt
+- generate JWT with authenticated user id in the standard subject claim
+- return token and user summary
+```
 
-Expected error cases:
+Expected gRPC errors:
 
-- user not found,
-- invalid password,
-- invalid request,
-- internal error.
+```text
+InvalidArgument  → invalid request payload
+Unauthenticated  → invalid email or password
+Internal         → database or unexpected server error
+```
 
----
+For invalid auth input, the service may attach field-level validation detail
+using gRPC `BadRequest` field violations, for example invalid `email` format or
+password exceeding bcrypt's 72-byte limit.
 
-## 8.3 GetUserById
+API Gateway maps success to REST:
+
+```json
+{
+  "message": "Login successful",
+  "data": {
+    "token": "...",
+    "user": {
+      "id": "...",
+      "name": "...",
+      "email": "..."
+    }
+  }
+}
+```
+
+## 9.3 GetUserById
 
 Used by:
 
 ```text
-Transaction Service
+API Gateway
 ```
 
 Purpose:
 
-Return one user by ID.
+```text
+Return one user summary by id.
+```
 
-Request concept:
+Request:
 
 ```proto
 message GetUserByIdRequest {
@@ -324,22 +475,28 @@ message GetUserByIdRequest {
 }
 ```
 
-Response concept:
+Response:
 
 ```proto
 message GetUserByIdResponse {
-  User user = 1;
+  UserSummary user = 1;
 }
 ```
 
----
+Expected gRPC errors:
 
-## 8.4 GetUsersByIds
+```text
+InvalidArgument → invalid UUID
+NotFound        → user not found
+Internal        → database or unexpected server error
+```
+
+## 9.4 GetUsersByIds
 
 Used by:
 
 ```text
-Transaction Service
+API Gateway
 ```
 
 Benchmark relevance:
@@ -348,11 +505,7 @@ Benchmark relevance:
 Benchmark 3: enriched transactions
 ```
 
-Purpose:
-
-Batch fetch users for transaction enrichment.
-
-Request concept:
+Request:
 
 ```proto
 message GetUsersByIdsRequest {
@@ -360,39 +513,31 @@ message GetUsersByIdsRequest {
 }
 ```
 
-Response concept:
+Response:
 
 ```proto
 message GetUsersByIdsResponse {
-  repeated User users = 1;
+  repeated UserSummary users = 1;
 }
 ```
 
 Behavior:
 
-- validate UUIDs,
-- query `auth_db.users`,
-- return matching users.
-
-Important:
-
-The response may return fewer users than requested if some IDs are missing. The Transaction Service must decide how to handle missing references.
+```text
+- validate UUID values
+- query auth_db.users
+- return matching user summaries
+```
 
 For benchmark consistency, seed data should ensure all referenced users exist.
 
----
-
-## 8.5 User Message
-
-Concept:
+## 9.5 UserSummary Message
 
 ```proto
-message User {
+message UserSummary {
   string id = 1;
   string name = 2;
   string email = 3;
-  string created_at = 4;
-  string updated_at = 5;
 }
 ```
 
@@ -405,7 +550,7 @@ password_hash
 
 ---
 
-## 9. ItemService Contract
+# 10. ItemService Contract
 
 Proto file:
 
@@ -413,23 +558,30 @@ Proto file:
 proto/item/v1/item.proto
 ```
 
+Recommended proto header:
+
+```proto
+syntax = "proto3";
+
+package item.v1;
+
+option go_package = "github.com/mufied/skripsi-benchmark/proto/gen/go/item/v1;itemv1";
+```
+
 Service:
 
 ```proto
 service ItemService {
-  rpc CreateItem(CreateItemRequest) returns (CreateItemResponse);
-  rpc GetItemById(GetItemByIdRequest) returns (GetItemByIdResponse);
-  rpc GetItemsByIds(GetItemsByIdsRequest) returns (GetItemsByIdsResponse);
+  rpc BulkSaveItems(BulkSaveItemsRequest) returns (BulkSaveItemsResponse);
   rpc ListItems(ListItemsRequest) returns (ListItemsResponse);
-  rpc UpdateItem(UpdateItemRequest) returns (UpdateItemResponse);
+  rpc GetItemById(GetItemByIdRequest) returns (GetItemByIdResponse);
   rpc DeleteItem(DeleteItemRequest) returns (DeleteItemResponse);
-  rpc ValidateAndAllocate(ValidateAndAllocateRequest) returns (ValidateAndAllocateResponse);
+  rpc GetItemSummariesByIds(GetItemSummariesByIdsRequest) returns (GetItemSummariesByIdsResponse);
+  rpc ValidateTransactionItems(ValidateTransactionItemsRequest) returns (ValidateTransactionItemsResponse);
 }
 ```
 
----
-
-## 9.1 CreateItem
+## 10.1 BulkSaveItems
 
 Used by:
 
@@ -437,39 +589,61 @@ Used by:
 API Gateway
 ```
 
-Purpose:
+REST endpoint:
 
-Create a new item.
+```text
+PUT /api/v1/items
+```
 
-Request concept:
+Optional benchmark:
+
+```text
+Bulk write workload
+```
+
+Request:
 
 ```proto
-message CreateItemRequest {
-  string name = 1;
-  int64 amount = 2;
+message BulkSaveItemsRequest {
+  repeated BulkSaveItemInput items = 1;
+}
+
+message BulkSaveItemInput {
+  string id = 1;
+  string name = 2;
+  int64 available_amount = 3;
 }
 ```
 
-Response concept:
+Response:
 
 ```proto
-message CreateItemResponse {
-  Item item = 1;
+message BulkSaveItemsResponse {
 }
 ```
 
 Behavior:
 
-- validate name,
-- validate `amount >= 0`,
-- map `amount` to the database column `items.available_amount`,
-- insert item into `item_db.items`,
-- database generates UUID using `uuidv7()`,
-- return created item.
+```text
+- if id is provided and item exists: update item
+- if id is provided and item does not exist: insert item using the provided id
+- if id is not provided: create new item using database-generated UUIDv7
+- if a unique constraint such as item name is violated: return AlreadyExists
+- execute the operation atomically in one database transaction
+- rollback all changes if one item is invalid
+```
 
----
+REST success response:
 
-## 9.2 GetItemById
+```json
+{
+  "message": "Items saved successfully"
+}
+```
+
+The gRPC response does not need to return item IDs because the REST API uses `GET /api/v1/items` to retrieve current item state.
+
+## 10.2 ListItems
 
 Used by:
 
@@ -477,11 +651,51 @@ Used by:
 API Gateway
 ```
 
-Purpose:
+REST endpoint:
 
-Return one item by ID.
+```text
+GET /api/v1/items
+```
 
-Request concept:
+Request:
+
+```proto
+message ListItemsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+```
+
+Response:
+
+```proto
+message ListItemsResponse {
+  repeated Item items = 1;
+  int32 total_returned = 2;
+}
+```
+
+Default ordering:
+
+```text
+created_at DESC, id DESC
+```
+
+## 10.3 GetItemById
+
+Used by:
+
+```text
+API Gateway
+```
+
+REST endpoint:
+
+```text
+GET /api/v1/items/{item_id}
+```
+
+Request:
 
 ```proto
 message GetItemByIdRequest {
@@ -489,7 +703,7 @@ message GetItemByIdRequest {
 }
 ```
 
-Response concept:
+Response:
 
 ```proto
 message GetItemByIdResponse {
@@ -497,9 +711,81 @@ message GetItemByIdResponse {
 }
 ```
 
----
+## 10.4 DeleteItem
 
-## 9.3 GetItemsByIds
+Used by:
+
+```text
+API Gateway
+```
+
+REST endpoint:
+
+```text
+DELETE /api/v1/items/{item_id}
+```
+
+Request:
+
+```proto
+message DeleteItemRequest {
+  string item_id = 1;
+}
+```
+
+Response:
+
+```proto
+message DeleteItemResponse {
+}
+```
+
+REST success response:
+
+```json
+{
+  "message": "Item deleted successfully"
+}
+```
+
+## 10.5 GetItemSummariesByIds
+
+Used by:
+
+```text
+API Gateway
+```
+
+Benchmark relevance:
+
+```text
+Benchmark 3: enriched transactions
+```
+
+Request:
+
+```proto
+message GetItemSummariesByIdsRequest {
+  repeated string item_ids = 1;
+}
+```
+
+Response:
+
+```proto
+message GetItemSummariesByIdsResponse {
+  repeated ItemSummary items = 1;
+}
+```
+
+Important:
+
+```text
+This method returns ItemSummary, not full Item.
+It must not return available_amount for the enriched transaction response.
+```
+
+## 10.6 ValidateTransactionItems
 
 Used by:
 
@@ -510,250 +796,119 @@ Transaction Service
 Benchmark relevance:
 
 ```text
-Benchmark 3: enriched transactions
+Benchmark 2: create transaction
 ```
 
-Purpose:
-
-Batch fetch items for transaction enrichment.
-
-Request concept:
+Request:
 
 ```proto
-message GetItemsByIdsRequest {
-  repeated string item_ids = 1;
-}
-```
-
-Response concept:
-
-```proto
-message GetItemsByIdsResponse {
-  repeated Item items = 1;
-}
-```
-
-For benchmark consistency, seed data should ensure all referenced items exist.
-
----
-
-## 9.4 ListItems
-
-Used by:
-
-```text
-API Gateway
-```
-
-Purpose:
-
-Return item list.
-
-Request concept:
-
-```proto
-message ListItemsRequest {
-  int32 limit = 1;
-  int32 offset = 2;
-}
-```
-
-Response concept:
-
-```proto
-message ListItemsResponse {
-  repeated Item items = 1;
-  int32 total_returned = 2;
-}
-```
-
----
-
-## 9.5 UpdateItem
-
-Used by:
-
-```text
-API Gateway
-```
-
-Purpose:
-
-Update item attributes.
-
-Request concept:
-
-```proto
-message UpdateItemRequest {
-  string item_id = 1;
-  string name = 2;
-  int64 amount = 3;
-}
-```
-
-Response concept:
-
-```proto
-message UpdateItemResponse {
-  Item item = 1;
-}
-```
-
-Notes:
-
-- this endpoint is for CRUD/demo behavior,
-- REST and gateway-facing item contracts use `amount`,
-- service persistence maps `amount` to `items.available_amount`,
-- benchmark transaction allocation should use `ValidateAndAllocate`, not direct item update.
-
----
-
-## 9.6 DeleteItem
-
-Used by:
-
-```text
-API Gateway
-```
-
-Purpose:
-
-Delete item.
-
-Request concept:
-
-```proto
-message DeleteItemRequest {
-  string item_id = 1;
-}
-```
-
-Response concept:
-
-```proto
-message DeleteItemResponse {
-  bool success = 1;
-}
-```
-
-Delete should not be part of primary benchmark scenarios unless explicitly designed.
-
----
-
-## 9.7 ValidateAndAllocate
-
-Used by:
-
-```text
-Transaction Service
-```
-
-Benchmark:
-
-```text
-Benchmark 2
-```
-
-Purpose:
-
-Validate item availability and deduct requested amount atomically.
-
-Request concept:
-
-```proto
-message ValidateAndAllocateRequest {
-  repeated AllocationRequest items = 1;
+message ValidateTransactionItemsRequest {
+  repeated TransactionItemValidationInput items = 1;
 }
 
-message AllocationRequest {
+message TransactionItemValidationInput {
   string item_id = 1;
   int64 amount = 2;
 }
 ```
 
-Response concept:
+Response:
 
 ```proto
-message ValidateAndAllocateResponse {
-  repeated AllocationResult items = 1;
-}
-
-message AllocationResult {
-  string item_id = 1;
-  int64 amount = 2;
-  int64 available_amount_after = 3;
+message ValidateTransactionItemsResponse {
 }
 ```
 
 Behavior:
 
-- validate UUID format,
-- validate `amount > 0`,
-- lock or update item rows safely,
-- ensure `available_amount >= amount`,
-- deduct requested amount,
-- return `available_amount_after`.
+```text
+- validate UUID format
+- validate amount > 0
+- check that every item exists
+- check that amount <= item.available_amount
+- return success if all items are valid
+- do not deduct available_amount
+```
 
-Expected error cases:
+Reason:
 
-- invalid item ID,
-- item not found,
-- invalid amount,
-- insufficient item amount,
-- database error.
+```text
+The latest REST contract only requires rejecting transactions whose amount exceeds available_amount.
+It does not require inventory deduction or allocation semantics.
+Keeping validation read-only avoids unnecessary distributed write complexity.
+```
 
-Atomicity requirement:
+Expected gRPC errors:
 
-For a multi-item transaction, allocation should be handled consistently. If one item allocation fails, the allocation operation should not partially allocate other items.
+```text
+InvalidArgument     → invalid item id or amount
+NotFound            → item not found
+FailedPrecondition  → amount exceeds available_amount
+Internal            → database or unexpected server error
+```
 
-Implementation option:
+## 10.7 Item Message
 
-Use a database transaction inside Item Service.
-
----
-
-## 9.8 Item Message
-
-Concept:
+Used by item list and detail responses.
 
 ```proto
 message Item {
   string id = 1;
   string name = 2;
-  int64 amount = 3;
+  int64 available_amount = 3;
   string created_at = 4;
   string updated_at = 5;
 }
 ```
 
-Use:
+Use `available_amount` for item state.
 
-```text
-amount
+Do not use `amount`, `stock`, or `quantity` for item state.
+
+## 10.8 ItemSummary Message
+
+Used by enriched transaction response.
+
+```proto
+message ItemSummary {
+  string id = 1;
+  string name = 2;
+}
 ```
 
-Do not use:
+Do not include:
 
 ```text
-availability
-stock
-quantity
+available_amount
+created_at
+updated_at
 ```
 
-Persistence note:
+Reason:
 
 ```text
-Item.amount maps to the service-owned database column items.available_amount.
+The enriched transaction response only needs item identity and item name.
+The transaction item amount is represented separately by TransactionEnrichedItem.amount.
 ```
 
 ---
 
-## 10. TransactionService Contract
+# 11. TransactionService Contract
 
 Proto file:
 
 ```text
 proto/transaction/v1/transaction.proto
+```
+
+Recommended proto header:
+
+```proto
+syntax = "proto3";
+
+package transaction.v1;
+
+option go_package = "github.com/mufied/skripsi-benchmark/proto/gen/go/transaction/v1;transactionv1";
 ```
 
 Service:
@@ -762,13 +917,12 @@ Service:
 service TransactionService {
   rpc CreateTransaction(CreateTransactionRequest) returns (CreateTransactionResponse);
   rpc GetOwnTransactions(GetOwnTransactionsRequest) returns (GetOwnTransactionsResponse);
-  rpc GetAllTransactionsEnriched(GetAllTransactionsEnrichedRequest) returns (GetAllTransactionsEnrichedResponse);
+  rpc GetTransactionById(GetTransactionByIdRequest) returns (GetTransactionByIdResponse);
+  rpc GetTransactionsForEnrichment(GetTransactionsForEnrichmentRequest) returns (GetTransactionsForEnrichmentResponse);
 }
 ```
 
----
-
-## 10.1 CreateTransaction
+## 11.1 CreateTransaction
 
 Used by:
 
@@ -776,17 +930,19 @@ Used by:
 API Gateway
 ```
 
+REST endpoint:
+
+```text
+POST /api/v1/transactions
+```
+
 Benchmark:
 
 ```text
-Benchmark 2
+Benchmark 2: write-heavy database workload
 ```
 
-Purpose:
-
-Create transaction and coordinate item allocation.
-
-Request concept:
+Request:
 
 ```proto
 message CreateTransactionRequest {
@@ -800,34 +956,43 @@ message TransactionItemInput {
 }
 ```
 
-Response concept:
+Response:
 
 ```proto
 message CreateTransactionResponse {
-  Transaction transaction = 1;
+  string transaction_id = 1;
 }
 ```
 
 Behavior:
 
-- validate user_id UUID,
-- validate item_id UUIDs,
-- validate `amount > 0`,
-- call Item Service `ValidateAndAllocate`,
-- insert transaction into `transaction_db.transactions`,
-- database generates transaction ID using `uuidv7()`,
-- insert transaction_items into `transaction_db.transaction_items`,
-- return transaction response.
+```text
+- validate user_id UUID
+- validate item_id UUIDs
+- validate amount > 0
+- call ItemService.ValidateTransactionItems
+- insert transaction into transaction_db.transactions
+- database generates transaction ID using uuidv7()
+- insert transaction items into transaction_db.transaction_items
+- return transaction_id
+```
 
-Completion rule:
+The response must only be returned after validation and transaction persistence are complete.
 
-The response must be returned only after item allocation and transaction persistence are completed.
+Do not implement asynchronous write-behind behavior.
 
-Do not return immediately after publishing an event or scheduling asynchronous work.
+REST success response:
 
----
+```json
+{
+  "message": "Transaction created successfully",
+  "data": {
+    "id": "..."
+  }
+}
+```
 
-## 10.2 GetOwnTransactions
+## 11.2 GetOwnTransactions
 
 Used by:
 
@@ -835,11 +1000,13 @@ Used by:
 API Gateway
 ```
 
-Purpose:
+REST endpoint:
 
-Return transactions for authenticated user.
+```text
+GET /api/v1/transactions
+```
 
-Request concept:
+Request:
 
 ```proto
 message GetOwnTransactionsRequest {
@@ -849,7 +1016,7 @@ message GetOwnTransactionsRequest {
 }
 ```
 
-Response concept:
+Response:
 
 ```proto
 message GetOwnTransactionsResponse {
@@ -858,18 +1025,13 @@ message GetOwnTransactionsResponse {
 }
 ```
 
-Behavior:
+Default ordering:
 
-- validate user_id,
-- query `transaction_db.transactions`,
-- query `transaction_db.transaction_items`,
-- return user's transaction history.
+```text
+created_at DESC, id DESC
+```
 
-This endpoint does not need full enrichment unless explicitly required by the REST contract.
-
----
-
-## 10.3 GetAllTransactionsEnriched
+## 11.3 GetTransactionById
 
 Used by:
 
@@ -877,154 +1039,207 @@ Used by:
 API Gateway
 ```
 
+REST endpoint:
+
+```text
+GET /api/v1/transactions/{transaction_id}
+```
+
+Request:
+
+```proto
+message GetTransactionByIdRequest {
+  string transaction_id = 1;
+  string user_id = 2;
+}
+```
+
+Response:
+
+```proto
+message GetTransactionByIdResponse {
+  Transaction transaction = 1;
+}
+```
+
+Behavior:
+
+```text
+- validate transaction_id
+- validate user_id
+- return transaction only if it belongs to the authenticated user
+```
+
+## 11.4 GetTransactionsForEnrichment
+
+Used by:
+
+```text
+API Gateway
+```
+
+REST endpoint:
+
+```text
+GET /api/v1/admin/transactions
+```
+
 Benchmark:
 
 ```text
-Benchmark 3
+Benchmark 3: read-heavy distributed aggregation workload
 ```
 
-Purpose:
-
-Return transactions enriched with user and item details.
-
-Request concept:
+Request:
 
 ```proto
-message GetAllTransactionsEnrichedRequest {
+message GetTransactionsForEnrichmentRequest {
   int32 limit = 1;
   int32 offset = 2;
 }
 ```
 
-Response concept:
+Response:
 
 ```proto
-message GetAllTransactionsEnrichedResponse {
-  repeated TransactionEnriched transactions = 1;
+message GetTransactionsForEnrichmentResponse {
+  repeated TransactionForEnrichment transactions = 1;
   int32 total_returned = 2;
 }
 ```
 
 Behavior:
 
-1. query transactions from `transaction_db`,
-2. query transaction_items from `transaction_db`,
-3. collect unique user_ids,
-4. collect unique item_ids,
-5. call Auth Service `GetUsersByIds`,
-6. call Item Service `GetItemsByIds`,
-7. join/enrich data in memory,
-8. return enriched transactions.
+```text
+- query transactions from transaction_db
+- query transaction_items from transaction_db
+- return transaction data with user_id and item_ids
+- do not call Auth Service
+- do not call Item Service
+```
 
-This is the distributed join/fan-out benchmark flow.
+The API Gateway performs enrichment by calling:
 
----
+```text
+AuthService.GetUsersByIds
+ItemService.GetItemSummariesByIds
+```
 
-## 10.4 Transaction Message
+## 11.5 Transaction Message
 
-Concept:
+Used by regular transaction list and detail responses.
 
 ```proto
 message Transaction {
   string id = 1;
   string user_id = 2;
-  reserved 3; // status is persisted internally but not exposed by the current REST schema.
-  repeated TransactionItem items = 4;
-  string created_at = 5;
-  string updated_at = 6;
+  repeated TransactionItem items = 3;
+  string created_at = 4;
+  string updated_at = 5;
 }
 ```
 
-The Transaction Service may persist a `status` column internally. The current REST `Transaction` schema in `openapi.yaml` does not expose `status`.
+The current REST schema does not expose transaction status.
 
----
-
-## 10.5 TransactionItem Message
-
-Concept:
+## 11.6 TransactionItem Message
 
 ```proto
 message TransactionItem {
   string item_id = 1;
   int64 amount = 2;
-  reserved 3; // available_amount_after is internal persistence data in the current REST schema.
+}
+```
+
+The current REST TransactionItem response exposes only:
+
+```text
+item_id
+amount
+```
+
+Do not expose `available_amount_after`, `created_at`, or `updated_at` unless the REST contract is updated.
+
+## 11.7 TransactionForEnrichment Message
+
+Used internally by the API Gateway to construct REST `EnrichedTransaction`.
+
+```proto
+message TransactionForEnrichment {
+  string id = 1;
+  string user_id = 2;
+  repeated TransactionItem items = 3;
   string created_at = 4;
   string updated_at = 5;
 }
 ```
 
-The Transaction Service may store `available_amount_after` internally in `transaction_items`, and `ValidateAndAllocate` may return it to the service during creation. The current REST `TransactionItem` response in `openapi.yaml` exposes only `item_id` and `amount`.
+API Gateway maps this together with `UserSummary` and `ItemSummary` into the REST response.
 
 ---
 
-## 10.6 TransactionEnriched Message
+# 12. API Gateway Responsibilities
 
-Concept:
+The API Gateway is responsible for:
 
-```proto
-message TransactionEnriched {
-  string id = 1;
-  reserved 2; // status is persisted internally but not exposed by the current REST schema.
-  UserSnapshot user = 3;
-  repeated TransactionEnrichedItem items = 4;
-  string created_at = 5;
-  string updated_at = 6;
-}
+```text
+- exposing REST HTTP endpoints
+- parsing REST requests
+- validating JWT for protected routes
+- extracting authenticated user_id
+- calling internal gRPC services
+- mapping gRPC responses to REST responses
+- mapping gRPC errors to REST errors
+- performing enriched transaction aggregation
 ```
 
-The enriched response may define local view messages instead of importing full Auth and Item message types directly.
+The API Gateway must not:
 
-Example:
-
-```proto
-message UserSnapshot {
-  string id = 1;
-  string name = 2;
-  string email = 3;
-}
-
-message ItemSnapshot {
-  string id = 1;
-  string name = 2;
-  int64 amount = 3;
-  string created_at = 4;
-  string updated_at = 5;
-}
-
-message TransactionEnrichedItem {
-  ItemSnapshot item = 1;
-  int64 amount = 2;
-}
+```text
+- access service databases directly
+- bypass gRPC service boundaries
+- return raw gRPC errors to external clients
 ```
-
-Reason:
-
-The Transaction Service response should expose the data shape needed by the API Gateway, without leaking unnecessary internal fields.
 
 ---
 
-## 11. Error Mapping
+# 13. REST-to-gRPC Mapping
 
-gRPC errors should be mapped to HTTP errors by the API Gateway.
+| REST Endpoint | gRPC Flow |
+|---|---|
+| `POST /api/v1/auth/register` | `API Gateway -> AuthService.Register` |
+| `POST /api/v1/auth/login` | `API Gateway -> AuthService.Login` |
+| `PUT /api/v1/items` | `API Gateway -> ItemService.BulkSaveItems` |
+| `GET /api/v1/items` | `API Gateway -> ItemService.ListItems` |
+| `GET /api/v1/items/{item_id}` | `API Gateway -> ItemService.GetItemById` |
+| `DELETE /api/v1/items/{item_id}` | `API Gateway -> ItemService.DeleteItem` |
+| `POST /api/v1/transactions` | `API Gateway -> TransactionService.CreateTransaction`, then `TransactionService -> ItemService.ValidateTransactionItems` |
+| `GET /api/v1/transactions` | `API Gateway -> TransactionService.GetOwnTransactions` |
+| `GET /api/v1/transactions/{transaction_id}` | `API Gateway -> TransactionService.GetTransactionById` |
+| `GET /api/v1/admin/transactions` | `API Gateway -> TransactionService.GetTransactionsForEnrichment`, `AuthService.GetUsersByIds`, `ItemService.GetItemSummariesByIds` |
+
+---
+
+# 14. Error Mapping
+
+gRPC errors must be mapped to REST errors by the API Gateway.
 
 | gRPC Code | HTTP Code | Meaning |
 |---|---:|---|
-| `InvalidArgument` | 400 | invalid request |
-| `Unauthenticated` | 401 | invalid or missing token |
-| `PermissionDenied` | 403 | forbidden |
-| `NotFound` | 404 | resource not found |
-| `AlreadyExists` | 409 | duplicate resource |
-| `FailedPrecondition` | 409 | insufficient item amount |
-| `Aborted` | 409 | allocation conflict |
-| `Unavailable` | 503 | upstream service unavailable |
-| `DeadlineExceeded` | 504 | upstream timeout |
-| `Internal` | 500 | internal error |
+| `InvalidArgument` | 400 | Invalid request |
+| `Unauthenticated` | 401 | Invalid or missing authentication |
+| `PermissionDenied` | 403 | Forbidden |
+| `NotFound` | 404 | Resource not found |
+| `AlreadyExists` | 409 | Duplicate resource |
+| `FailedPrecondition` | 409 | Business rule conflict, such as amount exceeding available_amount |
+| `Aborted` | 409 | Transaction or concurrency conflict |
+| `Unavailable` | 503 | Upstream service unavailable |
+| `DeadlineExceeded` | 504 | Upstream timeout |
+| `Internal` | 500 | Internal error |
 
-API Gateway must convert internal errors into the standard REST error envelope:
+REST error envelope:
 
 ```json
 {
-  "status": "error",
   "error": {
     "code": "BAD_REQUEST",
     "message": "Invalid request payload",
@@ -1033,82 +1248,44 @@ API Gateway must convert internal errors into the standard REST error envelope:
 }
 ```
 
+Do not include a top-level `status` field in error responses.
+
 Do not expose raw gRPC error details directly to external clients.
 
 ---
 
-## 12. Timeout Rules
+# 15. Timeout Rules
 
-Each gRPC call should use context with timeout.
-
-Recommended starting values:
+Every gRPC call should use a context timeout.
 
 | Call | Suggested Timeout |
 |---|---:|
+| API Gateway -> AuthService.Register | 2s |
 | API Gateway -> AuthService.Login | 2s |
+| API Gateway -> ItemService.BulkSaveItems | 3s |
+| API Gateway -> ItemService.ListItems | 2s |
 | API Gateway -> TransactionService.CreateTransaction | 3s |
-| TransactionService -> ItemService.ValidateAndAllocate | 2s |
-| TransactionService -> AuthService.GetUsersByIds | 2s |
-| TransactionService -> ItemService.GetItemsByIds | 2s |
+| TransactionService -> ItemService.ValidateTransactionItems | 2s |
+| API Gateway -> TransactionService.GetTransactionsForEnrichment | 2s |
+| API Gateway -> AuthService.GetUsersByIds | 2s |
+| API Gateway -> ItemService.GetItemSummariesByIds | 2s |
 
-Timeout values can be adjusted during implementation, but they must be consistent across benchmark runs.
-
-Do not add retries unless explicitly required and documented, because retries can change benchmark semantics.
-
----
-
-## 13. Authentication Context Propagation
-
-External JWT validation happens at the API Gateway for protected routes.
-
-The API Gateway should pass authenticated user identity to internal services.
-
-Possible mechanisms:
-
-1. include `user_id` in gRPC request fields,
-2. include user context in gRPC metadata.
-
-Recommended for this project:
-
-```text
-Use explicit user_id fields in gRPC request messages for benchmark clarity.
-```
-
-Example:
-
-```proto
-message CreateTransactionRequest {
-  string user_id = 1;
-  repeated TransactionItemInput items = 2;
-}
-```
+Do not add retries unless explicitly required and documented.
 
 Reason:
 
-Explicit fields are easier to inspect, test, and document.
+```text
+Retries can change benchmark semantics and may hide failure behavior.
+```
 
 ---
 
-## 14. Benchmark Flow Mapping
+# 16. Benchmark Flow Mapping
 
-## 14.1 Login
-
-REST endpoint:
+## 16.1 Benchmark 1: Login
 
 ```text
-POST /api/v1/auth/login
-```
-
-gRPC call:
-
-```text
-API Gateway -> AuthService.Login
-```
-
-Flow:
-
-```text
-Client
+Client / k6
 -> API Gateway
 -> AuthService.Login
 -> auth_db.users
@@ -1116,30 +1293,22 @@ Client
 -> Client
 ```
 
----
-
-## 14.2 Create Transaction
-
-REST endpoint:
+Measured workload:
 
 ```text
-POST /api/v1/transactions
+- request parsing
+- password hash comparison
+- JWT generation
+- database lookup
 ```
 
-gRPC calls:
+## 16.2 Benchmark 2: Create Transaction
 
 ```text
-API Gateway -> TransactionService.CreateTransaction
-TransactionService -> ItemService.ValidateAndAllocate
-```
-
-Flow:
-
-```text
-Client
+Client / k6
 -> API Gateway
 -> TransactionService.CreateTransaction
--> ItemService.ValidateAndAllocate
+-> ItemService.ValidateTransactionItems
 -> item_db.items
 -> transaction_db.transactions
 -> transaction_db.transaction_items
@@ -1147,142 +1316,208 @@ Client
 -> Client
 ```
 
----
-
-## 14.3 Enriched Transactions
-
-REST endpoint:
+Measured workload:
 
 ```text
-GET /api/v1/admin/transactions
+- REST-to-gRPC gateway overhead
+- transaction validation
+- service-to-service call
+- transaction database writes
 ```
 
-gRPC calls:
+## 16.3 Benchmark 3: Get Enriched Transactions
 
 ```text
-API Gateway -> TransactionService.GetAllTransactionsEnriched
-TransactionService -> AuthService.GetUsersByIds
-TransactionService -> ItemService.GetItemsByIds
-```
-
-Flow:
-
-```text
-Client
+Client / k6
 -> API Gateway
--> TransactionService.GetAllTransactionsEnriched
+-> TransactionService.GetTransactionsForEnrichment
 -> transaction_db
+-> API Gateway
 -> AuthService.GetUsersByIds
 -> auth_db
--> ItemService.GetItemsByIds
+-> API Gateway
+-> ItemService.GetItemSummariesByIds
 -> item_db
--> TransactionService in-memory enrichment
+-> API Gateway in-memory enrichment
+-> Client
+```
+
+Measured workload:
+
+```text
+- distributed read aggregation
+- gateway fan-out
+- batch gRPC calls
+- in-memory joining
+- response serialization
+```
+
+## 16.4 Optional Benchmark: Bulk Save Items
+
+```text
+Client / k6
+-> API Gateway
+-> ItemService.BulkSaveItems
+-> item_db.items
 -> API Gateway
 -> Client
 ```
 
----
-
-## 15. Code Generation Rules
-
-After editing proto files:
-
-1. regenerate Go code,
-2. update affected gRPC servers,
-3. update affected gRPC clients,
-4. update API Gateway mapping,
-5. update unit/integration tests,
-6. update this document if behavior changes.
-
-Do not manually edit generated code.
-
-Generated code should not be placed inside service-specific `internal/` folders if it needs to be imported by multiple services.
-
----
-
-## 16. Contract Compatibility Rules
-
-Do not break existing fields casually.
-
-If a field is no longer used:
-
-- keep it temporarily if compatibility is needed,
-- mark as deprecated in proto comments,
-- avoid reusing field numbers.
-
-Proto field number rule:
+Measured workload:
 
 ```text
-Never reuse deleted field numbers.
+- bulk JSON parsing
+- REST-to-gRPC mapping
+- batch validation
+- insert/update branching
+- database transaction
 ```
-
-For this thesis project, compatibility history may be simple, but using safe proto practices prevents accidental contract breakage.
 
 ---
 
-## 17. Fairness Rules
+# 17. Fairness Rules
 
-The gRPC implementation must preserve external API equivalence.
+The gRPC implementation must preserve external API equivalence with the monolith.
 
-Do not allow microservices to do less work than the monolith before returning a response.
+Rules:
 
-Specifically, for `CreateTransaction`:
-
-The response must only return after:
-
-- item availability validation,
-- item allocation,
-- transaction insert,
-- transaction_items insert.
+```text
+- Microservices must not do less work than the monolith before returning a response.
+- API Gateway must call the relevant service for each REST endpoint.
+- CreateTransaction must complete validation and transaction persistence before returning.
+- Enriched transaction must perform distributed aggregation through gRPC calls.
+- The API Gateway must not directly query service databases.
+```
 
 Do not implement:
 
 ```text
-publish event -> return response -> process allocation later
+publish event -> return response -> process later
 ```
 
-Reason:
-
-That would make microservices response time not comparable to the monolith synchronous response time.
+for any benchmark endpoint.
 
 ---
 
-## 18. Out of Scope
+# 18. Code Generation Rules
 
-The following are not part of the initial gRPC contract design:
+After editing proto files:
 
-- Kafka,
-- RabbitMQ,
-- asynchronous event-driven transaction flow,
-- saga pattern,
-- compensation mechanism,
-- distributed transaction coordinator,
-- service mesh,
-- circuit breaker,
-- retries,
-- KEDA-based autoscaling,
-- RPS-based autoscaling.
+```text
+1. regenerate Go code
+2. update affected gRPC servers
+3. update affected gRPC clients
+4. update API Gateway mapping
+5. update tests
+6. update this document if behavior changes
+```
+
+Do not manually edit generated code.
+
+---
+
+# 19. Compatibility Rules
+
+Do not reuse proto field numbers.
+
+If a field is removed:
+
+```proto
+reserved 3;
+reserved "old_field_name";
+```
+
+If a field is no longer used but compatibility matters:
+
+```text
+- keep it temporarily
+- mark it as deprecated in comments
+- do not reuse its field number
+```
+
+---
+
+# 20. Out of Scope
+
+The following are out of scope for the initial implementation:
+
+```text
+Kafka
+RabbitMQ
+asynchronous transaction processing
+saga pattern
+distributed transaction coordinator
+service mesh
+circuit breaker
+automatic retries
+KEDA-based autoscaling
+RPS-based autoscaling
+```
 
 These can be discussed as future work, but they are not part of the main experimental design.
 
 ---
 
-## 19. Summary
+# 21. Development Priority
 
-The internal microservices contract uses gRPC.
+Recommended implementation order:
+
+```text
+1. Auth Service
+2. Item Service
+3. Transaction Service
+4. API Gateway
+5. Dockerfiles for MSA services
+6. ECR repositories for MSA services
+7. CodeBuild buildspec update for all images
+8. k6 smoke test through API Gateway
+9. Datadog tracing
+10. Kubernetes deployment
+```
+
+For immediate development, start with:
+
+```text
+AuthService.Register
+AuthService.Login
+AuthService.GetUserById
+AuthService.GetUsersByIds
+```
+
+---
+
+# 22. Summary
 
 Final contract rules:
 
 ```text
-External API       : REST HTTP through API Gateway
-Internal protocol  : gRPC
-ID representation  : string UUID
-Auth ownership     : AuthService
-Item ownership     : ItemService
-Transaction owner  : TransactionService
-Benchmark 1        : AuthService.Login
-Benchmark 2        : TransactionService.CreateTransaction + ItemService.ValidateAndAllocate
-Benchmark 3        : TransactionService.GetAllTransactionsEnriched + batch calls to Auth and Item services
+External API      : REST HTTP through API Gateway
+Internal protocol : gRPC
+ID representation : string UUID
+Timestamp format  : string RFC3339
+Auth ownership    : AuthService
+Item ownership    : ItemService
+Transaction owner : TransactionService
+Gateway role      : REST mapping, JWT validation, distributed enrichment
 ```
 
-The gRPC contracts must preserve service ownership boundaries while keeping external behavior equivalent to the monolith.
+Benchmark mapping:
+
+```text
+Benchmark 1:
+API Gateway -> AuthService.Login
+
+Benchmark 2:
+API Gateway -> TransactionService.CreateTransaction
+TransactionService -> ItemService.ValidateTransactionItems
+
+Benchmark 3:
+API Gateway -> TransactionService.GetTransactionsForEnrichment
+API Gateway -> AuthService.GetUsersByIds
+API Gateway -> ItemService.GetItemSummariesByIds
+
+Optional benchmark:
+API Gateway -> ItemService.BulkSaveItems
+```
+
+The gRPC contracts must preserve service ownership boundaries while keeping the external REST behavior equivalent to the monolith implementation.
