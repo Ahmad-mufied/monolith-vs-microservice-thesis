@@ -1021,7 +1021,7 @@ When updating `openapi.yaml`, ensure:
 - transaction responses include `amount`,
 - transaction responses follow the current `Transaction` and `TransactionItem` schemas,
 - `created_at` and `updated_at` are included where relevant,
-- error response uses `status` plus nested `error`,
+- error response uses a top-level `error` object only, without a `status` field,
 - benchmark endpoint descriptions are updated,
 - security requirements are consistent.
 
