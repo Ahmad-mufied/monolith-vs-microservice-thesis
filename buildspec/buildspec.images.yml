@@ -1,0 +1,50 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_REGION: ap-southeast-1
+    ECR_NAMESPACE: skripsi
+    IMAGE_TAG_FALLBACK_PREFIX: manual
+
+phases:
+  pre_build:
+    commands:
+      - echo "Starting pre_build phase..."
+      - echo "Checking monolith Dockerfile..."
+      - test -f monolith/Dockerfile
+      - echo "Resolving AWS account and ECR registry..."
+      - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - export ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - export MONOLITH_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/monolith
+      - echo "Resolving image tag..."
+      - export IMAGE_TAG=$(printf '%.7s' "${CODEBUILD_RESOLVED_SOURCE_VERSION:-}")
+      - if [ -z "$IMAGE_TAG" ]; then export IMAGE_TAG="$IMAGE_TAG_FALLBACK_PREFIX-$(date +%Y%m%d%H%M%S)"; fi
+      - echo "AWS_REGION=$AWS_REGION"
+      - echo "ECR_REGISTRY=$ECR_REGISTRY"
+      - echo "MONOLITH_REPOSITORY_URI=$MONOLITH_REPOSITORY_URI"
+      - echo "IMAGE_TAG=$IMAGE_TAG"
+      - echo "Checking ECR repository for monolith..."
+      - aws ecr describe-repositories --repository-names "$ECR_NAMESPACE/monolith" --region "$AWS_REGION"
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+  build:
+    commands:
+      - echo "Starting build phase..."
+      - echo "Building monolith image..."
+      - docker build -t "monolith:$IMAGE_TAG" -f monolith/Dockerfile .
+      - docker tag "monolith:$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG"
+
+  post_build:
+    commands:
+      - echo "Starting post_build phase..."
+      - echo "Pushing monolith image..."
+      - docker push "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Writing image detail artifact..."
+      - printf '{"tag":"%s","images":{"monolith":"%s"},"commit":"%s"}' "$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG" "$CODEBUILD_RESOLVED_SOURCE_VERSION" > image-detail.json
+      - echo "Build and push completed."
+      - cat image-detail.json
+
+artifacts:
+  files:
+    - image-detail.json
