@@ -293,7 +293,7 @@ CREATE TABLE items (
 Notes:
 
 - `available_amount` represents available allocatable amount,
-- `available_amount` is updated during transaction allocation,
+- `available_amount` is used as a validation boundary during transaction creation,
 - REST API `Item.available_amount` maps to this column,
 - do not use `stock`, `quantity`, or `availability`.
 
