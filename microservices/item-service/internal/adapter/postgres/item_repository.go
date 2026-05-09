@@ -180,7 +180,7 @@ WHERE deleted_at IS NULL
 		return pkgerrors.Internal("internal server error", fmt.Errorf("iterate validated items: %w", err))
 	}
 
-	if len(found) != len(items) {
+	if len(found) != len(requestedAmounts) {
 		return pkgerrors.NotFound("item not found")
 	}
 
