@@ -67,6 +67,10 @@ proto/gen/*
 proto/gen/auth/*
 !proto/gen/auth/v1/
 !proto/gen/auth/v1/*.pb.go
+!proto/gen/item/
+proto/gen/item/*
+!proto/gen/item/v1/
+!proto/gen/item/v1/*.pb.go
 
 # =========================
 # Logs
