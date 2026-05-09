@@ -115,7 +115,7 @@ Each service has its own ECR repository because each service is a separate deplo
 GitHub repository remains one monorepo:
 
 ```text
-skripsi-benchmark
+monolith-vs-microservice-thesis
 ```
 
 ECR repositories are separated per image:
