@@ -377,7 +377,7 @@ phases:
       - export MONOLITH_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/monolith
 
       - echo "Resolving image tag..."
-      - export IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
+      - export IMAGE_TAG=$(printf '%.7s' "${CODEBUILD_RESOLVED_SOURCE_VERSION:-}")
       - if [ -z "$IMAGE_TAG" ]; then export IMAGE_TAG="$IMAGE_TAG_FALLBACK_PREFIX-$(date +%Y%m%d%H%M%S)"; fi
 
       - echo "AWS_REGION=$AWS_REGION"
