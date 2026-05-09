@@ -80,6 +80,10 @@ func Internal(message string, cause error) error {
 }
 
 func ToGRPCStatus(err error) error {
+	if err == nil {
+		return nil
+	}
+
 	message := publicMessage(err)
 
 	code := codes.Internal

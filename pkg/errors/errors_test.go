@@ -9,6 +9,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+func TestToGRPCStatusNil(t *testing.T) {
+	if got := ToGRPCStatus(nil); got != nil {
+		t.Fatalf("expected nil, got %v", got)
+	}
+}
+
 func TestToGRPCStatus(t *testing.T) {
 	tests := []struct {
 		name        string
