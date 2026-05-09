@@ -821,7 +821,7 @@ Client/k6   API Gateway   Transaction Service   Item Service       item_db      
    |----------->|                 |                  |               |                 |
    |            | CreateTx gRPC   |                  |               |                 |
    |            |---------------->|                  |               |                 |
-   |            |                 | ValidateItems    |               |                 |
+   |            |                 | ValidateTransactionItems |               |                 |
    |            |                 |----------------->|               |                 |
    |            |                 |                  | SELECT active   |                 |
    |            |                 |                  |-------------->|                 |
