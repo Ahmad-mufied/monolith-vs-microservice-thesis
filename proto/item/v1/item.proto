@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package item.v1;
+
+option go_package = "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1;itemv1";
+
+service ItemService {
+  rpc SyncItems(SyncItemsRequest) returns (SyncItemsResponse);
+  rpc ListItems(ListItemsRequest) returns (ListItemsResponse);
+  rpc GetItemById(GetItemByIdRequest) returns (GetItemByIdResponse);
+  rpc GetItemSummariesByIds(GetItemSummariesByIdsRequest) returns (GetItemSummariesByIdsResponse);
+  rpc ValidateTransactionItems(ValidateTransactionItemsRequest) returns (ValidateTransactionItemsResponse);
+}
+
+message SyncItemsRequest {
+  // Full active item snapshot. Active items omitted from this request are soft-deleted.
+  repeated SyncItemInput items = 1;
+}
+
+message SyncItemInput {
+  // Empty id means create a new item using database-generated UUIDv7.
+  // Non-empty id means update/reactivate if exists, or insert using the provided id if it does not exist.
+  string id = 1;
+  string name = 2;
+  int64 available_amount = 3;
+}
+
+message SyncItemsResponse {}
+
+message ListItemsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListItemsResponse {
+  repeated Item items = 1;
+  int32 total_returned = 2;
+}
+
+message GetItemByIdRequest {
+  string item_id = 1;
+}
+
+message GetItemByIdResponse {
+  Item item = 1;
+}
+
+message GetItemSummariesByIdsRequest {
+  // Returns summaries for all requested item_ids, including soft-deleted items.
+  // Caller should check the deleted field to determine if the item is still active.
+  repeated string item_ids = 1;
+}
+
+message GetItemSummariesByIdsResponse {
+  repeated ItemSummary items = 1;
+}
+
+message ValidateTransactionItemsRequest {
+  repeated TransactionItemValidationInput items = 1;
+}
+
+message TransactionItemValidationInput {
+  string item_id = 1;
+  int64 amount = 2;
+}
+
+message ValidateTransactionItemsResponse {}
+
+message Item {
+  string id = 1;
+  string name = 2;
+  int64 available_amount = 3;
+  string created_at = 4;
+  string updated_at = 5;
+}
+
+message ItemSummary {
+  string id = 1;
+  string name = 2;
+  // deleted is true if the item has been soft-deleted via sync omission.
+  // Used by transaction enrichment to indicate the item is no longer active.
+  bool deleted = 3;
+}
