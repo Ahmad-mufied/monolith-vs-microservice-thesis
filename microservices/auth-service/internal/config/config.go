@@ -31,6 +31,9 @@ func Load() (*Config, error) {
 	if cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET is required")
 	}
+	if cfg.JWTExpiry <= 0 {
+		return nil, fmt.Errorf("JWT_EXPIRY must be a positive duration")
+	}
 	if cfg.BcryptCost < 4 || cfg.BcryptCost > 31 {
 		return nil, fmt.Errorf("BCRYPT_COST must be between 4 and 31")
 	}
