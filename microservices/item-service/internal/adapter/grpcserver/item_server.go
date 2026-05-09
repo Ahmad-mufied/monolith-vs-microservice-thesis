@@ -54,14 +54,16 @@ func (s *ItemServer) ListItems(ctx context.Context, req *itemv1.ListItemsRequest
 		return nil, pkgerrors.ToGRPCStatus(err)
 	}
 
+	var totalReturned int32
 	respItems := make([]*itemv1.Item, 0, len(items))
 	for _, item := range items {
 		respItems = append(respItems, domainItemToProto(item))
+		totalReturned++
 	}
 
 	return &itemv1.ListItemsResponse{
 		Items:         respItems,
-		TotalReturned: int32(len(respItems)),
+		TotalReturned: totalReturned,
 	}, nil
 }
 
