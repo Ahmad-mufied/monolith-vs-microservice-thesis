@@ -10,21 +10,25 @@ phases:
   pre_build:
     commands:
       - echo "Starting pre_build phase..."
-      - echo "Checking monolith Dockerfile..."
+      - echo "Checking Dockerfiles..."
       - test -f monolith/Dockerfile
+      - test -f microservices/auth-service/Dockerfile
       - echo "Resolving AWS account and ECR registry..."
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - export ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
       - export MONOLITH_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/monolith
+      - export AUTH_SERVICE_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/auth-service
       - echo "Resolving image tag..."
       - export IMAGE_TAG=$(printf '%.7s' "${CODEBUILD_RESOLVED_SOURCE_VERSION:-}")
       - if [ -z "$IMAGE_TAG" ]; then export IMAGE_TAG="$IMAGE_TAG_FALLBACK_PREFIX-$(date +%Y%m%d%H%M%S)"; fi
       - echo "AWS_REGION=$AWS_REGION"
       - echo "ECR_REGISTRY=$ECR_REGISTRY"
       - echo "MONOLITH_REPOSITORY_URI=$MONOLITH_REPOSITORY_URI"
+      - echo "AUTH_SERVICE_REPOSITORY_URI=$AUTH_SERVICE_REPOSITORY_URI"
       - echo "IMAGE_TAG=$IMAGE_TAG"
-      - echo "Checking ECR repository for monolith..."
+      - echo "Checking ECR repositories..."
       - aws ecr describe-repositories --repository-names "$ECR_NAMESPACE/monolith" --region "$AWS_REGION"
+      - aws ecr describe-repositories --repository-names "$ECR_NAMESPACE/auth-service" --region "$AWS_REGION"
       - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
@@ -34,14 +38,19 @@ phases:
       - echo "Building monolith image..."
       - docker build -t "monolith:$IMAGE_TAG" -f monolith/Dockerfile .
       - docker tag "monolith:$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Building auth-service image..."
+      - docker build -t "auth-service:$IMAGE_TAG" -f microservices/auth-service/Dockerfile .
+      - docker tag "auth-service:$IMAGE_TAG" "$AUTH_SERVICE_REPOSITORY_URI:$IMAGE_TAG"
 
   post_build:
     commands:
       - echo "Starting post_build phase..."
       - echo "Pushing monolith image..."
       - docker push "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Pushing auth-service image..."
+      - docker push "$AUTH_SERVICE_REPOSITORY_URI:$IMAGE_TAG"
       - echo "Writing image detail artifact..."
-      - printf '{"tag":"%s","images":{"monolith":"%s"},"commit":"%s"}' "$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG" "$CODEBUILD_RESOLVED_SOURCE_VERSION" > image-detail.json
+      - printf '{"tag":"%s","images":{"monolith":"%s","auth_service":"%s"},"commit":"%s"}' "$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG" "$AUTH_SERVICE_REPOSITORY_URI:$IMAGE_TAG" "$CODEBUILD_RESOLVED_SOURCE_VERSION" > image-detail.json
       - echo "Build and push completed."
       - cat image-detail.json
 

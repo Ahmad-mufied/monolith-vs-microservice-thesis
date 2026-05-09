@@ -12,13 +12,14 @@ Push image to Amazon ECR
 Do not deploy to EKS yet
 ```
 
-The first target image is:
+The current target images are:
 
 ```text
 skripsi/monolith
+skripsi/auth-service
 ```
 
-Microservices images will be added after the monolith image build pipeline is validated.
+The current pipeline now validates the monolith build path together with the first microservice image build path for `auth-service`.
 
 ---
 
@@ -36,10 +37,11 @@ AWS region:
 ap-southeast-1
 ```
 
-Initial ECR repository:
+Current ECR repositories:
 
 ```text
 skripsi/monolith
+skripsi/auth-service
 ```
 
 Image tag strategy:
@@ -48,10 +50,11 @@ Image tag strategy:
 git short SHA
 ```
 
-Example image URI:
+Example image URIs:
 
 ```text
 720166597212.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/monolith:a1b2c3d
+720166597212.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/auth-service:a1b2c3d
 ```
 
 The ECR repository uses immutable image tags.
@@ -93,17 +96,17 @@ EKS pulls image from Amazon ECR during deployment
 
 The ECR repositories use the `skripsi/` namespace.
 
-Current repository:
+Current repositories:
 
 ```text
 skripsi/monolith
+skripsi/auth-service
 ```
 
-Future repositories:
+Next repositories:
 
 ```text
 skripsi/api-gateway
-skripsi/auth-service
 skripsi/item-service
 skripsi/transaction-service
 skripsi/seed-runner
@@ -170,7 +173,7 @@ Example metadata:
 Recommended ECR configuration:
 
 ```text
-Repository name : skripsi/monolith
+Repositories    : skripsi/monolith, skripsi/auth-service
 Visibility      : Private
 Region          : ap-southeast-1
 Tag mutability  : Immutable
@@ -226,7 +229,7 @@ buildspec/buildspec.images.yml
 Recommended CodeBuild project name:
 
 ```text
-skripsi-monolith-build
+skripsi-images-build
 ```
 
 Recommended settings:
@@ -337,7 +340,7 @@ Replace the account id if needed.
 }
 ```
 
-For future microservices repositories, update the ECR resource scope to:
+To allow the current multi-image scope and future service additions, use the ECR resource scope:
 
 ```text
 arn:aws:ecr:ap-southeast-1:720166597212:repository/skripsi/*
@@ -368,13 +371,15 @@ phases:
   pre_build:
     commands:
       - echo "Starting pre_build phase..."
-      - echo "Checking monolith Dockerfile..."
+      - echo "Checking Dockerfiles..."
       - test -f monolith/Dockerfile
+      - test -f microservices/auth-service/Dockerfile
 
       - echo "Resolving AWS account and ECR registry..."
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - export ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
       - export MONOLITH_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/monolith
+      - export AUTH_SERVICE_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/auth-service
 
       - echo "Resolving image tag..."
       - export IMAGE_TAG=$(printf '%.7s' "${CODEBUILD_RESOLVED_SOURCE_VERSION:-}")
@@ -383,10 +388,12 @@ phases:
       - echo "AWS_REGION=$AWS_REGION"
       - echo "ECR_REGISTRY=$ECR_REGISTRY"
       - echo "MONOLITH_REPOSITORY_URI=$MONOLITH_REPOSITORY_URI"
+      - echo "AUTH_SERVICE_REPOSITORY_URI=$AUTH_SERVICE_REPOSITORY_URI"
       - echo "IMAGE_TAG=$IMAGE_TAG"
 
-      - echo "Checking ECR repository for monolith..."
+      - echo "Checking ECR repositories..."
       - aws ecr describe-repositories --repository-names "$ECR_NAMESPACE/monolith" --region "$AWS_REGION"
+      - aws ecr describe-repositories --repository-names "$ECR_NAMESPACE/auth-service" --region "$AWS_REGION"
 
       - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
@@ -397,15 +404,20 @@ phases:
       - echo "Building monolith image..."
       - docker build -t "monolith:$IMAGE_TAG" -f monolith/Dockerfile .
       - docker tag "monolith:$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Building auth-service image..."
+      - docker build -t "auth-service:$IMAGE_TAG" -f microservices/auth-service/Dockerfile .
+      - docker tag "auth-service:$IMAGE_TAG" "$AUTH_SERVICE_REPOSITORY_URI:$IMAGE_TAG"
 
   post_build:
     commands:
       - echo "Starting post_build phase..."
       - echo "Pushing monolith image..."
       - docker push "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Pushing auth-service image..."
+      - docker push "$AUTH_SERVICE_REPOSITORY_URI:$IMAGE_TAG"
 
       - echo "Writing image detail artifact..."
-      - printf '{"tag":"%s","images":{"monolith":"%s"},"commit":"%s"}' "$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG" "$CODEBUILD_RESOLVED_SOURCE_VERSION" > image-detail.json
+      - printf '{"tag":"%s","images":{"monolith":"%s","auth_service":"%s"},"commit":"%s"}' "$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG" "$AUTH_SERVICE_REPOSITORY_URI:$IMAGE_TAG" "$CODEBUILD_RESOLVED_SOURCE_VERSION" > image-detail.json
 
       - echo "Build and push completed."
       - cat image-detail.json
@@ -416,10 +428,16 @@ artifacts:
 ```
 
 This buildspec uses a generic image-pipeline filename so the same pattern can
-be extended later for `api-gateway`, `auth-service`, `item-service`, and
-`transaction-service`.
+be extended later for `api-gateway`, `item-service`, and `transaction-service`.
 
-For the current phase, it still builds and pushes only the monolith image.
+For the current phase, it builds and pushes:
+
+```text
+skripsi/monolith
+skripsi/auth-service
+```
+
+Both images use the same git short SHA tag from the same commit.
 
 This buildspec only pushes the git short SHA tag.
 
@@ -436,7 +454,7 @@ Flow:
 ```text
 CodeBuild
 → Build projects
-→ skripsi-monolith-build
+→ skripsi-images-build
 → Start build
 ```
 
@@ -446,6 +464,7 @@ After the build succeeds, check:
 ECR
 → Repositories
 → skripsi/monolith
+→ skripsi/auth-service
 → Images
 ```
 
@@ -482,10 +501,10 @@ PR merged to main
 CodeBuild triggered
     |
     v
-Build monolith Docker image
+Build monolith and auth-service Docker images
     |
     v
-Push image to ECR with git short SHA tag
+Push both images to ECR with the same git short SHA tag
 ```
 
 This trigger also fires for direct pushes to `main`.
@@ -518,11 +537,10 @@ Deployment to EKS will be handled separately during the benchmark phase.
 
 ## 15. Next Step
 
-After monolith build and push works, add ECR repositories and build steps for:
+After monolith and auth-service build and push work, add ECR repositories and build steps for:
 
 ```text
 skripsi/api-gateway
-skripsi/auth-service
 skripsi/item-service
 skripsi/transaction-service
 ```

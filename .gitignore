@@ -58,6 +58,16 @@ go.work.sum
 # Remove this rule if generated code will be committed.
 proto/gen/
 
+# Auth PR needs generated auth stubs and proto/gen module metadata committed.
+!proto/gen/
+proto/gen/*
+!proto/gen/go.mod
+!proto/gen/go.sum
+!proto/gen/auth/
+proto/gen/auth/*
+!proto/gen/auth/v1/
+!proto/gen/auth/v1/*.pb.go
+
 # =========================
 # Logs
 # =========================

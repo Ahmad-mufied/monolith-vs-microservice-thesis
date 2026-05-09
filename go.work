@@ -6,4 +6,6 @@ use (
 	./microservices/item-service
 	./microservices/transaction-service
 	./monolith
+	./pkg
+	./proto/gen
 )
