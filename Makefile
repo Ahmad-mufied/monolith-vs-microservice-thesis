@@ -167,11 +167,11 @@ security: gosec
 
 .PHONY: gofix go-fix fix
 gofix:
-	cd $(MONOLITH_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./...; else echo "skip fix ($(MONOLITH_DIR)): no go packages"; fi
-	cd $(API_GATEWAY_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./...; else echo "skip fix ($(API_GATEWAY_DIR)): no go packages"; fi
-	cd $(AUTH_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./...; else echo "skip fix ($(AUTH_SERVICE_DIR)): no go packages"; fi
-	cd $(ITEM_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./...; else echo "skip fix ($(ITEM_SERVICE_DIR)): no go packages"; fi
-	cd $(TRANSACTION_SERVICE_DIR) && pkgs="$$(go list ./... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./...; else echo "skip fix ($(TRANSACTION_SERVICE_DIR)): no go packages"; fi
+	pkgs="$$(go list ./$(MONOLITH_DIR)/... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./$(MONOLITH_DIR)/...; else echo "skip fix ($(MONOLITH_DIR)): no go packages"; fi
+	pkgs="$$(go list ./$(API_GATEWAY_DIR)/... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./$(API_GATEWAY_DIR)/...; else echo "skip fix ($(API_GATEWAY_DIR)): no go packages"; fi
+	pkgs="$$(go list ./$(AUTH_SERVICE_DIR)/... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./$(AUTH_SERVICE_DIR)/...; else echo "skip fix ($(AUTH_SERVICE_DIR)): no go packages"; fi
+	pkgs="$$(go list ./$(ITEM_SERVICE_DIR)/... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./$(ITEM_SERVICE_DIR)/...; else echo "skip fix ($(ITEM_SERVICE_DIR)): no go packages"; fi
+	pkgs="$$(go list ./$(TRANSACTION_SERVICE_DIR)/... 2>/dev/null || true)" && if [ -n "$$pkgs" ]; then go fix ./$(TRANSACTION_SERVICE_DIR)/...; else echo "skip fix ($(TRANSACTION_SERVICE_DIR)): no go packages"; fi
 
 go-fix: gofix
 fix: gofix
