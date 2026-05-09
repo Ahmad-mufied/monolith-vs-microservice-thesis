@@ -383,7 +383,7 @@ API Gateway
     v
 Transaction Service
     |
-    +-- gRPC ValidateAndAllocate
+    +-- gRPC ValidateTransactionItems
     |       |
     |       v
     |   Item Service
@@ -458,7 +458,7 @@ Transaction Service
     |       v
     |   Auth Service -> auth_db
     |
-    +-- gRPC GetItemsByIds
+    +-- gRPC GetItemSummariesByIds
     |       |
     |       v
     |   Item Service -> item_db

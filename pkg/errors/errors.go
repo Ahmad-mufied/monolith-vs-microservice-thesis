@@ -13,6 +13,7 @@ var (
 	ErrNotFound           = stderrors.New("not found")
 	ErrInvalidCredentials = stderrors.New("invalid credentials")
 	ErrConflict           = stderrors.New("conflict")
+	ErrFailedPrecondition = stderrors.New("failed precondition")
 	ErrInvalidInput       = stderrors.New("invalid input")
 	ErrInternal           = stderrors.New("internal")
 )
@@ -71,6 +72,10 @@ func InvalidCredentials(message string) error {
 	return &Error{kind: ErrInvalidCredentials, message: message}
 }
 
+func FailedPrecondition(message string) error {
+	return &Error{kind: ErrFailedPrecondition, message: message}
+}
+
 func NotFound(message string) error {
 	return &Error{kind: ErrNotFound, message: message}
 }
@@ -94,6 +99,8 @@ func ToGRPCStatus(err error) error {
 		code = codes.Unauthenticated
 	case stderrors.Is(err, ErrConflict):
 		code = codes.AlreadyExists
+	case stderrors.Is(err, ErrFailedPrecondition):
+		code = codes.FailedPrecondition
 	case stderrors.Is(err, ErrInvalidInput):
 		code = codes.InvalidArgument
 	}
@@ -123,6 +130,8 @@ func publicMessage(err error) string {
 		return "invalid request payload"
 	case stderrors.Is(err, ErrConflict):
 		return "conflict"
+	case stderrors.Is(err, ErrFailedPrecondition):
+		return "failed precondition"
 	case stderrors.Is(err, ErrInvalidCredentials):
 		return "invalid credentials"
 	case stderrors.Is(err, ErrNotFound):
