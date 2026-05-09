@@ -96,7 +96,7 @@ func TestSyncItems(t *testing.T) {
 		},
 		{
 			name:        "rejects invalid uuid",
-			input:       []domain.SyncItemInput{{ID: strPtr("not-a-uuid"), Name: "Laptop", AvailableAmount: 10}},
+			input:       []domain.SyncItemInput{{ID: new("not-a-uuid"), Name: "Laptop", AvailableAmount: 10}},
 			repoFn:      noCallSyncFn(t),
 			wantErr:     pkgerrors.ErrInvalidInput,
 			wantField:   "id",
@@ -515,5 +515,3 @@ func noCallValidateFn(t *testing.T) func(context.Context, []domain.TransactionIt
 		return nil
 	}
 }
-
-func strPtr(s string) *string { return &s }
