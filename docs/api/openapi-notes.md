@@ -896,9 +896,6 @@ TransactionEnrichedItem:
 ErrorResponse:
   type: object
   properties:
-    status:
-      type: string
-      example: error
     error:
       type: object
       properties:
