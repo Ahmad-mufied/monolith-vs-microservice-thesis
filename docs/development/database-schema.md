@@ -372,14 +372,13 @@ CREATE TABLE transaction_items (
   transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
   item_id UUID NOT NULL REFERENCES items(id),
   amount INT NOT NULL CHECK (amount > 0),
-  available_amount_after INT NOT NULL CHECK (available_amount_after >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (transaction_id, item_id)
 );
 ```
 
-`amount` stores the amount requested for an item in a transaction. `available_amount_after` stores the internal post-allocation value used for persistence and analysis. The current REST `TransactionItem` response in `openapi.yaml` exposes `item_id` and `amount`; it does not expose `available_amount_after`.
+`amount` stores the amount requested for an item in a transaction. The current REST `TransactionItem` response in `openapi.yaml` exposes `item_id` and `amount` only.
 
 Microservices schema:
 
@@ -388,7 +387,6 @@ CREATE TABLE transaction_items (
   transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
   item_id UUID NOT NULL,
   amount INT NOT NULL CHECK (amount > 0),
-  available_amount_after INT NOT NULL CHECK (available_amount_after >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (transaction_id, item_id)
@@ -414,6 +412,8 @@ PRIMARY KEY (transaction_id, item_id)
 Meaning:
 
 The same item appears only once in the same transaction.
+
+For the microservices architecture, item availability is validated by Item Service before persistence. Transaction Service stores only the requested `amount`, not a post-validation availability snapshot.
 
 ---
 

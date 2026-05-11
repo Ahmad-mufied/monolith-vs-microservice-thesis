@@ -71,6 +71,10 @@ proto/gen/auth/*
 proto/gen/item/*
 !proto/gen/item/v1/
 !proto/gen/item/v1/*.pb.go
+!proto/gen/transaction/
+proto/gen/transaction/*
+!proto/gen/transaction/v1/
+!proto/gen/transaction/v1/*.pb.go
 
 # =========================
 # Logs
@@ -189,3 +193,4 @@ coverage/
 
 .idea/*
 .qodo/*
+.kiro/*
