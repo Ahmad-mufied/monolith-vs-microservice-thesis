@@ -275,8 +275,3 @@ func assertValidationDetail(t *testing.T, err error, wantField, wantMessage stri
 		t.Fatalf("details[%q] = %v, want %q", wantField, gotMessage, wantMessage)
 	}
 }
-
-//go:fix inline
-func strPtr(value string) *string {
-	return new(value)
-}
