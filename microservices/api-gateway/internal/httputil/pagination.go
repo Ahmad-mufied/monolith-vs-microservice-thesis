@@ -15,22 +15,26 @@ const (
 
 // ParsePage parses limit and offset query params.
 func ParsePage(c echo.Context) (limit, offset int32, err error) {
-	lim, e := parseIntParam(c.QueryParam("limit"), defaultLimit)
+	lim, e := parseInt32Param(c.QueryParam("limit"), defaultLimit)
 	if e != nil || lim < 1 || lim > maxLimit {
 		return 0, 0, &AppError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "limit must be between 1 and 100"}
 	}
 
-	off, e := parseIntParam(c.QueryParam("offset"), defaultOffset)
+	off, e := parseInt32Param(c.QueryParam("offset"), defaultOffset)
 	if e != nil || off < 0 {
 		return 0, 0, &AppError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "offset must be >= 0"}
 	}
 
-	return int32(lim), int32(off), nil
+	return lim, off, nil
 }
 
-func parseIntParam(v string, def int) (int, error) {
+func parseInt32Param(v string, def int32) (int32, error) {
 	if v == "" {
 		return def, nil
 	}
-	return strconv.Atoi(v)
+	n, err := strconv.ParseInt(v, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return int32(n), nil //nolint:gosec // safe: ParseInt with bitSize=32 guarantees int32 range
 }
