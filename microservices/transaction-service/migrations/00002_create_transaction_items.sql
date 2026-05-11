@@ -3,7 +3,6 @@ CREATE TABLE transaction_items (
   transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
   item_id UUID NOT NULL,
   amount INT NOT NULL CHECK (amount > 0),
-  available_amount_after INT NOT NULL CHECK (available_amount_after >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (transaction_id, item_id)

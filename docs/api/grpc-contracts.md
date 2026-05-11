@@ -144,11 +144,11 @@ service TransactionService {
 }
 ```
 
-`CreateTransaction` maps to `POST /api/v1/transactions`. It validates item amounts through `ItemService.ValidateTransactionItems`, persists transaction data, and returns `transaction_id`. It must not return before validation and persistence are complete.
+`CreateTransaction` maps to `POST /api/v1/transactions`. It validates item amounts through `ItemService.ValidateTransactionItems`, persists transaction data, and returns `transaction_id`. `ValidateTransactionItems` is validation-only in the current contract, so `CreateTransaction` does not deduct `available_amount` and does not store any `available_amount_after` snapshot.
 
 Transactions are historical records and do not use soft delete in the current scope.
 
-`GetTransactionsForEnrichment` returns raw transaction data. It does not call AuthService or ItemService. API Gateway performs enrichment by calling:
+`GetTransactionsForEnrichment` returns raw transaction data only. It does not call AuthService or ItemService. API Gateway performs enrichment by calling:
 
 ```text
 AuthService.GetUsersByIds

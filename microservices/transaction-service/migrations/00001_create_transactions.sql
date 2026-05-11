@@ -9,10 +9,10 @@ CREATE TABLE transactions (
 );
 
 CREATE INDEX idx_transactions_user_id_created_at
-ON transactions(user_id, created_at DESC);
+ON transactions(user_id, created_at DESC, id DESC);
 
 CREATE INDEX idx_transactions_created_at
-ON transactions(created_at DESC);
+ON transactions(created_at DESC, id DESC);
 
 -- +goose Down
 DROP TABLE transactions;

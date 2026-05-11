@@ -55,6 +55,18 @@ func TestToGRPCStatus(t *testing.T) {
 			wantMsg:  "user not found",
 		},
 		{
+			name:     "unavailable",
+			err:      Unavailable("item service unavailable"),
+			wantCode: codes.Unavailable,
+			wantMsg:  "item service unavailable",
+		},
+		{
+			name:     "deadline exceeded",
+			err:      DeadlineExceeded("item service request timed out"),
+			wantCode: codes.DeadlineExceeded,
+			wantMsg:  "item service request timed out",
+		},
+		{
 			name:     "internal",
 			err:      Internal("internal server error", stderrors.New("db timeout")),
 			wantCode: codes.Internal,
@@ -104,6 +116,12 @@ func TestTypedErrorsPreserveSentinelIdentity(t *testing.T) {
 	}
 	if !stderrors.Is(Internal("internal server error", stderrors.New("cause")), ErrInternal) {
 		t.Fatal("expected Internal to match ErrInternal")
+	}
+	if !stderrors.Is(Unavailable("item service unavailable"), ErrUnavailable) {
+		t.Fatal("expected Unavailable to match ErrUnavailable")
+	}
+	if !stderrors.Is(DeadlineExceeded("item service request timed out"), ErrDeadlineExceeded) {
+		t.Fatal("expected DeadlineExceeded to match ErrDeadlineExceeded")
 	}
 }
 
