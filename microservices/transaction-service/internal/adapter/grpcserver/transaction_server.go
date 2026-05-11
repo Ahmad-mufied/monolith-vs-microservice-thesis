@@ -48,14 +48,16 @@ func (s *TransactionServer) GetOwnTransactions(ctx context.Context, req *transac
 		return nil, pkgerrors.ToGRPCStatus(err)
 	}
 
+	var totalReturned int32
 	respTransactions := make([]*transactionv1.Transaction, 0, len(transactions))
 	for _, transaction := range transactions {
 		respTransactions = append(respTransactions, domainTransactionToProto(transaction))
+		totalReturned++
 	}
 
 	return &transactionv1.GetOwnTransactionsResponse{
 		Transactions:  respTransactions,
-		TotalReturned: int32(len(respTransactions)),
+		TotalReturned: totalReturned,
 	}, nil
 }
 
@@ -76,14 +78,16 @@ func (s *TransactionServer) GetTransactionsForEnrichment(ctx context.Context, re
 		return nil, pkgerrors.ToGRPCStatus(err)
 	}
 
+	var totalReturned int32
 	respTransactions := make([]*transactionv1.TransactionForEnrichment, 0, len(transactions))
 	for _, transaction := range transactions {
 		respTransactions = append(respTransactions, domainTransactionForEnrichmentToProto(transaction))
+		totalReturned++
 	}
 
 	return &transactionv1.GetTransactionsForEnrichmentResponse{
 		Transactions:  respTransactions,
-		TotalReturned: int32(len(respTransactions)),
+		TotalReturned: totalReturned,
 	}, nil
 }
 
