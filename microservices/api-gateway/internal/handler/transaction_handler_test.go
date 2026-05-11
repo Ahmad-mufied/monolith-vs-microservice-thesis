@@ -88,7 +88,7 @@ func TestTransactionHandler_CreateTransaction(t *testing.T) {
 			}
 			h := NewTransactionHandler(fake, nil, nil)
 			c, rec := newEchoCtx(http.MethodPost, "/api/v1/transactions", tt.body)
-			c.Set("user_id", tt.userID)
+			c.Set(middleware.UserIDContextKey, tt.userID)
 			runHandler(h.CreateTransaction, c)
 
 			if rec.Code != tt.wantStatus {
