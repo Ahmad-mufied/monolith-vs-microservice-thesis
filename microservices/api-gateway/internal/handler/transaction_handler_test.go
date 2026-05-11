@@ -296,6 +296,20 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 			wantLen:         1,
 			wantItemDeleted: true,
 		},
+		{
+			name: "nil user entry in auth response is skipped safely",
+			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+				return rawTxs, nil
+			},
+			authClientFn: func(_ context.Context, _ []string) ([]*dto.UserSummary, error) {
+				return []*dto.UserSummary{nil}, nil
+			},
+			itemClientFn: func(_ context.Context, ids []string) ([]dto.ItemSummary, error) {
+				return []dto.ItemSummary{{ID: ids[0], Name: "Item A"}}, nil
+			},
+			wantStatus: http.StatusOK,
+			wantLen:    1,
+		},
 	}
 
 	for _, tt := range tests {

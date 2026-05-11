@@ -124,6 +124,9 @@ func (h *TransactionHandler) GetAllEnriched(c echo.Context) error {
 	// Build lookup maps.
 	userMap := make(map[string]*dto.UserSummary, len(users))
 	for _, u := range users {
+		if u == nil || u.ID == "" {
+			continue
+		}
 		userMap[u.ID] = u
 	}
 	itemMap := make(map[string]dto.ItemSummary, len(itemSummaries))

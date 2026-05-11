@@ -32,6 +32,9 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	if err != nil {
 		return httputil.Error(c, err)
 	}
+	if user == nil {
+		return httputil.Error(c, &httputil.AppError{Status: http.StatusInternalServerError, Code: "INTERNAL_SERVER_ERROR", Message: "invalid auth service response"})
+	}
 	return httputil.MessageData(c, http.StatusCreated, "User registered successfully", dto.RegisterDataResult{User: *user})
 }
 
@@ -43,6 +46,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	token, user, err := h.client.Login(c.Request().Context(), req.Email, req.Password)
 	if err != nil {
 		return httputil.Error(c, err)
+	}
+	if user == nil {
+		return httputil.Error(c, &httputil.AppError{Status: http.StatusInternalServerError, Code: "INTERNAL_SERVER_ERROR", Message: "invalid auth service response"})
 	}
 	return httputil.MessageData(c, http.StatusOK, "Login successful", dto.LoginDataResult{Token: token, User: *user})
 }
