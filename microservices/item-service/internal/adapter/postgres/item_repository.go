@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/domain"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
@@ -12,8 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-const rollbackTimeout = 5 * time.Second
 
 type ItemRepository struct {
 	pool *pgxpool.Pool
@@ -28,29 +25,21 @@ func (r *ItemRepository) SyncItems(ctx context.Context, items []domain.SyncItemI
 	if err != nil {
 		return pkgerrors.Internal("internal server error", fmt.Errorf("begin sync items transaction: %w", err))
 	}
-	defer rollbackTx(tx)
+	defer func() { _ = tx.Rollback(context.Background()) }()
 
-	keepIDs := make([]string, 0, len(items))
-	for _, item := range items {
-		if item.ID != nil {
-			keepIDs = append(keepIDs, *item.ID)
-		}
-	}
+	keepIDs, inserts, upserts := partitionSyncItems(items)
 
 	if err := softDeleteOmittedItems(ctx, tx, keepIDs); err != nil {
-		return mapRepositoryError("soft delete omitted items", err)
+		return pkgerrors.Internal("internal server error", fmt.Errorf("soft delete omitted items: %w", err))
 	}
-
-	for _, item := range items {
-		if item.ID == nil {
-			if err := insertItem(ctx, tx, item); err != nil {
-				return mapRepositoryError("insert item", err)
-			}
-			continue
+	if len(inserts) > 0 {
+		if err := batchInsertItems(ctx, tx, inserts); err != nil {
+			return err
 		}
-
-		if err := upsertItem(ctx, tx, item); err != nil {
-			return mapRepositoryError("upsert item", err)
+	}
+	if len(upserts) > 0 {
+		if err := batchUpsertItems(ctx, tx, upserts); err != nil {
+			return err
 		}
 	}
 
@@ -66,8 +55,7 @@ SELECT id, name, available_amount, created_at, updated_at, deleted_at
 FROM items
 WHERE deleted_at IS NULL
 ORDER BY created_at DESC, id DESC
-LIMIT $1 OFFSET $2;
-`
+LIMIT $1 OFFSET $2`
 
 	rows, err := r.pool.Query(ctx, query, limit, offset)
 	if err != nil {
@@ -95,8 +83,7 @@ func (r *ItemRepository) GetItemByID(ctx context.Context, id string) (*domain.It
 SELECT id, name, available_amount, created_at, updated_at, deleted_at
 FROM items
 WHERE id = $1::uuid
-  AND deleted_at IS NULL;
-`
+  AND deleted_at IS NULL`
 
 	row := r.pool.QueryRow(ctx, query, id)
 	item, err := scanItem(row)
@@ -118,8 +105,7 @@ func (r *ItemRepository) GetItemSummariesByIDs(ctx context.Context, ids []string
 	const query = `
 SELECT id, name, deleted_at IS NOT NULL AS deleted
 FROM items
-WHERE id = ANY($1::uuid[]);
-`
+WHERE id = ANY($1::uuid[])`
 
 	rows, err := r.pool.Query(ctx, query, ids)
 	if err != nil {
@@ -158,8 +144,7 @@ func (r *ItemRepository) ValidateTransactionItems(ctx context.Context, items []d
 SELECT id, available_amount
 FROM items
 WHERE deleted_at IS NULL
-  AND id = ANY($1::uuid[]);
-`
+  AND id = ANY($1::uuid[])`
 
 	rows, err := r.pool.Query(ctx, query, itemIDs)
 	if err != nil {
@@ -193,50 +178,73 @@ WHERE deleted_at IS NULL
 	return nil
 }
 
+// softDeleteOmittedItems sets deleted_at on all active items whose IDs are
+// not in keepIDs. An empty keepIDs means soft-delete all active items.
 func softDeleteOmittedItems(ctx context.Context, tx pgx.Tx, keepIDs []string) error {
-	if len(keepIDs) == 0 {
-		const query = `
-UPDATE items
-SET deleted_at = now(), updated_at = now()
-WHERE deleted_at IS NULL;
-`
-		_, err := tx.Exec(ctx, query)
-		return err
-	}
-
 	const query = `
 UPDATE items
 SET deleted_at = now(), updated_at = now()
 WHERE deleted_at IS NULL
-  AND NOT (id = ANY($1::uuid[]));
-`
+  AND NOT (id = ANY($1::uuid[]))`
 	_, err := tx.Exec(ctx, query, keepIDs)
 	return err
 }
 
-func insertItem(ctx context.Context, tx pgx.Tx, item domain.SyncItemInput) error {
+// partitionSyncItems splits the payload into:
+//   - keepIDs: IDs to exclude from soft-delete
+//   - inserts: items without ID (DB generates UUID)
+//   - upserts: items with ID (insert or reactivate)
+func partitionSyncItems(items []domain.SyncItemInput) (keepIDs []string, inserts []domain.SyncItemInput, upserts []domain.SyncItemInput) {
+	for _, item := range items {
+		if item.ID == nil {
+			inserts = append(inserts, item)
+		} else {
+			keepIDs = append(keepIDs, *item.ID)
+			upserts = append(upserts, item)
+		}
+	}
+	return
+}
+
+// batchInsertItems inserts all items without a client-provided ID in one query.
+func batchInsertItems(ctx context.Context, tx pgx.Tx, items []domain.SyncItemInput) error {
+	names := make([]string, len(items))
+	amounts := make([]int64, len(items))
+	for i, item := range items {
+		names[i] = item.Name
+		amounts[i] = item.AvailableAmount
+	}
 	const query = `
 INSERT INTO items (name, available_amount)
-VALUES ($1, $2);
-`
-	_, err := tx.Exec(ctx, query, item.Name, item.AvailableAmount)
-	return err
+SELECT unnest($1::text[]), unnest($2::bigint[])`
+	_, err := tx.Exec(ctx, query, names, amounts)
+	return mapConflictError(err)
 }
 
-func upsertItem(ctx context.Context, tx pgx.Tx, item domain.SyncItemInput) error {
+// batchUpsertItems upserts all items with a client-provided ID in one query,
+// reactivating any that were previously soft-deleted.
+func batchUpsertItems(ctx context.Context, tx pgx.Tx, items []domain.SyncItemInput) error {
+	ids := make([]string, len(items))
+	names := make([]string, len(items))
+	amounts := make([]int64, len(items))
+	for i, item := range items {
+		ids[i] = *item.ID
+		names[i] = item.Name
+		amounts[i] = item.AvailableAmount
+	}
 	const query = `
 INSERT INTO items (id, name, available_amount, deleted_at)
-VALUES ($1::uuid, $2, $3, NULL)
+SELECT unnest($1::uuid[]), unnest($2::text[]), unnest($3::bigint[]), NULL
 ON CONFLICT (id) DO UPDATE
-SET name = EXCLUDED.name,
+SET name             = EXCLUDED.name,
     available_amount = EXCLUDED.available_amount,
-    deleted_at = NULL,
-    updated_at = now();
-`
-	_, err := tx.Exec(ctx, query, *item.ID, item.Name, item.AvailableAmount)
-	return err
+    deleted_at       = NULL,
+    updated_at       = now()`
+	_, err := tx.Exec(ctx, query, ids, names, amounts)
+	return mapConflictError(err)
 }
 
+// scanItem scans a row into a domain.Item. Works with both pgx.Row and pgx.Rows.
 func scanItem(row interface{ Scan(dest ...any) error }) (*domain.Item, error) {
 	var item domain.Item
 	if err := row.Scan(
@@ -252,16 +260,14 @@ func scanItem(row interface{ Scan(dest ...any) error }) (*domain.Item, error) {
 	return &item, nil
 }
 
-func mapRepositoryError(action string, err error) error {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+// mapConflictError translates a PostgreSQL unique-violation (23505) into a
+// domain-level Conflict error. Other errors are returned as Internal.
+func mapConflictError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "23505" {
 		return pkgerrors.Conflict("item name already exists")
 	}
-	return pkgerrors.Internal("internal server error", fmt.Errorf("%s: %w", action, err))
-}
-
-func rollbackTx(tx pgx.Tx) {
-	ctx, cancel := context.WithTimeout(context.Background(), rollbackTimeout)
-	defer cancel()
-	_ = tx.Rollback(ctx)
+	return pkgerrors.Internal("internal server error", fmt.Errorf("upsert item: %w", err))
 }
