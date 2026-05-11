@@ -38,8 +38,7 @@ func Run() error {
 	}
 	defer pool.Close()
 
-	itemConn, err := grpc.DialContext(
-		ctx,
+	itemConn, err := grpc.NewClient(
 		cfg.ItemServiceAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
