@@ -135,6 +135,14 @@ func TestAuthHandler_Register(t *testing.T) {
 			},
 			wantStatus: http.StatusInternalServerError,
 		},
+		{
+			name: "nil user with no error returns 500",
+			body: `{"name":"Ahmad","email":"a@b.com","password":"pass1234"}`,
+			clientFn: func(_ context.Context, _, _, _ string) (*dto.UserSummary, error) {
+				return nil, nil
+			},
+			wantStatus: http.StatusInternalServerError,
+		},
 	}
 
 	for _, tt := range tests {
@@ -200,6 +208,14 @@ func TestAuthHandler_Login(t *testing.T) {
 			body: `{"email":"a@b.com","password":"pass1234"}`,
 			clientFn: func(_ context.Context, _, _ string) (string, *dto.UserSummary, error) {
 				return "", nil, &httputil.AppError{Status: http.StatusInternalServerError, Code: "INTERNAL_SERVER_ERROR", Message: "internal"}
+			},
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name: "nil user with no error returns 500",
+			body: `{"email":"a@b.com","password":"pass1234"}`,
+			clientFn: func(_ context.Context, _, _ string) (string, *dto.UserSummary, error) {
+				return "tok", nil, nil
 			},
 			wantStatus: http.StatusInternalServerError,
 		},
