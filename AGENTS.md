@@ -352,8 +352,8 @@ Client/k6
 → API Gateway
 → Transaction Service
 → transaction_db
-→ Auth Service GetUsersByIds
-→ Item Service GetItemSummariesByIds
+→ API Gateway calls Auth Service GetUsersByIds
+→ API Gateway calls Item Service GetItemSummariesByIds
 → API Gateway joins/enriches in memory
 → response
 
