@@ -9,6 +9,7 @@ import (
 
 type HealthHandler struct{}
 
+// NewHealthHandler creates and returns a new HealthHandler.
 func NewHealthHandler() *HealthHandler { return &HealthHandler{} }
 
 func (h *HealthHandler) Handle(c echo.Context) error {

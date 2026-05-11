@@ -17,7 +17,12 @@ type AppError struct {
 func (e *AppError) Error() string { return e.Message }
 
 // FromGRPCError maps a gRPC status error to an AppError.
-// Returns nil if err is nil.
+// FromGRPCError converts a gRPC error into an AppError suitable for HTTP responses.
+// If err is nil, it returns nil. For recognized gRPC status codes it maps them to
+// corresponding HTTP status codes and application-level error codes (for example,
+// InvalidArgument -> 400 BAD_REQUEST, Unauthenticated -> 401 UNAUTHORIZED, NotFound -> 404 NOT_FOUND).
+// If the error is not a gRPC status error or the status code is not handled, it
+// returns an AppError representing an internal server error (500, "INTERNAL_SERVER_ERROR").
 func FromGRPCError(err error) *AppError {
 	if err == nil {
 		return nil
