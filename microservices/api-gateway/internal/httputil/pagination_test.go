@@ -63,6 +63,11 @@ func TestParsePage(t *testing.T) {
 			query:       "offset=abc",
 			wantErrCode: "BAD_REQUEST",
 		},
+		{
+			name:        "offset exceeds int32",
+			query:       "offset=2147483648",
+			wantErrCode: "BAD_REQUEST",
+		},
 	}
 
 	for _, tt := range tests {
