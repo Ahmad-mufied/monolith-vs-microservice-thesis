@@ -97,6 +97,22 @@ func TestTransactionServer_CreateTransaction(t *testing.T) {
 			wantCode: codes.Unavailable,
 		},
 		{
+			name: "usecase conflict",
+			req:  &transactionv1.CreateTransactionRequest{},
+			ucFn: func(ctx context.Context, userID string, items []domain.TransactionItem) (string, error) {
+				return "", pkgerrors.Conflict("transaction conflict")
+			},
+			wantCode: codes.AlreadyExists,
+		},
+		{
+			name: "usecase deadline exceeded",
+			req:  &transactionv1.CreateTransactionRequest{},
+			ucFn: func(ctx context.Context, userID string, items []domain.TransactionItem) (string, error) {
+				return "", pkgerrors.DeadlineExceeded("item service request timed out")
+			},
+			wantCode: codes.DeadlineExceeded,
+		},
+		{
 			name: "usecase internal",
 			req:  &transactionv1.CreateTransactionRequest{},
 			ucFn: func(ctx context.Context, userID string, items []domain.TransactionItem) (string, error) {
