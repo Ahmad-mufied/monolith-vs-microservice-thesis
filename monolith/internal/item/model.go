@@ -6,11 +6,12 @@ type Item struct {
 	ID              string
 	Name            string
 	AvailableAmount int
+	DeletedAt       *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
 
-type BulkSaveItem struct {
+type SyncItem struct {
 	ID              *string
 	Name            string
 	AvailableAmount int
@@ -25,7 +26,13 @@ type Response struct {
 }
 
 func toResponse(item Item) Response {
-	return Response(item)
+	return Response{
+		ID:              item.ID,
+		Name:            item.Name,
+		AvailableAmount: item.AvailableAmount,
+		CreatedAt:       item.CreatedAt,
+		UpdatedAt:       item.UpdatedAt,
+	}
 }
 
 func toResponses(items []Item) []Response {

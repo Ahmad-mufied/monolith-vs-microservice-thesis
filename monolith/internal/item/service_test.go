@@ -12,17 +12,17 @@ import (
 )
 
 type fakeRepo struct {
-	items         []Item
-	item          Item
-	err           error
-	deletedID     string
-	bulkSaved     []BulkSaveItem
-	bulkSaveCalls int
+	items       []Item
+	item        Item
+	err         error
+	synced      []SyncItem
+	syncCalls   int
+	requestedID string
 }
 
-func (f *fakeRepo) BulkSave(_ context.Context, items []BulkSaveItem) error {
-	f.bulkSaveCalls++
-	f.bulkSaved = items
+func (f *fakeRepo) SyncItems(_ context.Context, items []SyncItem) error {
+	f.syncCalls++
+	f.synced = items
 	return f.err
 }
 
@@ -33,102 +33,107 @@ func (f *fakeRepo) List(context.Context, int, int) ([]Item, error) {
 	return f.items, nil
 }
 
-func (f *fakeRepo) GetByID(context.Context, string) (Item, error) {
+func (f *fakeRepo) GetByID(_ context.Context, id string) (Item, error) {
+	f.requestedID = id
 	if f.err != nil {
 		return Item{}, f.err
 	}
 	return f.item, nil
 }
 
-func (f *fakeRepo) Delete(_ context.Context, id string) error {
-	f.deletedID = id
-	return f.err
-}
-
-func TestServiceBulkSave(t *testing.T) {
+func TestServiceSyncItems(t *testing.T) {
 	amount10 := 10
 	amount20 := 20
 	amount0 := 0
 	negativeOne := -1
-	existingID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001"
-	newID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2002"
+	itemID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001"
+	upperItemID := "018F5F60-7C35-7CCF-9C3C-0A5E6F6F2001"
 
 	tests := []struct {
-		name           string
-		req            BulkSaveRequest
-		repo           *fakeRepo
-		wantError      bool
-		wantCode       apperror.Code
-		wantRepoCalls  int
-		wantSavedCount int
+		name            string
+		req             SyncItemsRequest
+		repo            *fakeRepo
+		wantError       bool
+		wantCode        apperror.Code
+		wantRepoCalls   int
+		wantSyncedCount int
 	}{
 		{
-			name: "mixed insert update payload",
-			req: BulkSaveRequest{Items: []BulkSaveItemRequest{
-				{ID: &existingID, Name: " Existing Item ", AvailableAmount: &amount10},
+			name: "mixed update and insert payload",
+			req: SyncItemsRequest{Items: []SyncItemRequest{
+				{ID: new(upperItemID), Name: " Existing Item ", AvailableAmount: &amount10},
 				{Name: " New Item ", AvailableAmount: &amount20},
 			}},
-			repo:           &fakeRepo{},
-			wantRepoCalls:  1,
-			wantSavedCount: 2,
+			repo:            &fakeRepo{},
+			wantRepoCalls:   1,
+			wantSyncedCount: 2,
 		},
 		{
-			name: "insert with provided uuid",
-			req: BulkSaveRequest{Items: []BulkSaveItemRequest{
-				{ID: &newID, Name: "Provided ID Item", AvailableAmount: &amount10},
-			}},
-			repo:           &fakeRepo{},
-			wantRepoCalls:  1,
-			wantSavedCount: 1,
+			name:            "empty snapshot is allowed",
+			req:             SyncItemsRequest{Items: []SyncItemRequest{}},
+			repo:            &fakeRepo{},
+			wantRepoCalls:   1,
+			wantSyncedCount: 0,
 		},
 		{
-			name: "insert with generated uuid",
-			req: BulkSaveRequest{Items: []BulkSaveItemRequest{
-				{Name: "Generated ID Item", AvailableAmount: &amount10},
-			}},
-			repo:           &fakeRepo{},
-			wantRepoCalls:  1,
-			wantSavedCount: 1,
-		},
-		{
-			name:      "invalid uuid",
-			req:       BulkSaveRequest{Items: []BulkSaveItemRequest{{ID: new("bad"), Name: "Item", AvailableAmount: &amount10}}},
+			name:      "nil items is rejected",
+			req:       SyncItemsRequest{Items: nil},
 			repo:      &fakeRepo{},
 			wantError: true,
 			wantCode:  apperror.CodeBadRequest,
 		},
 		{
-			name:      "blank name causes full rollback before repo call",
-			req:       BulkSaveRequest{Items: []BulkSaveItemRequest{{Name: " ", AvailableAmount: &amount10}, {Name: "Still Valid", AvailableAmount: &amount20}}},
+			name:      "invalid uuid",
+			req:       SyncItemsRequest{Items: []SyncItemRequest{{ID: new("bad"), Name: "Item", AvailableAmount: &amount10}}},
+			repo:      &fakeRepo{},
+			wantError: true,
+			wantCode:  apperror.CodeBadRequest,
+		},
+		{
+			name:      "blank name",
+			req:       SyncItemsRequest{Items: []SyncItemRequest{{Name: "   ", AvailableAmount: &amount10}}},
+			repo:      &fakeRepo{},
+			wantError: true,
+			wantCode:  apperror.CodeBadRequest,
+		},
+		{
+			name:      "duplicate ids are rejected",
+			req:       SyncItemsRequest{Items: []SyncItemRequest{{ID: new(itemID), Name: "Item A", AvailableAmount: &amount10}, {ID: new(upperItemID), Name: "Item B", AvailableAmount: &amount20}}},
+			repo:      &fakeRepo{},
+			wantError: true,
+			wantCode:  apperror.CodeBadRequest,
+		},
+		{
+			name:      "duplicate names are rejected case-insensitive",
+			req:       SyncItemsRequest{Items: []SyncItemRequest{{Name: "Laptop", AvailableAmount: &amount10}, {Name: " laptop ", AvailableAmount: &amount20}}},
 			repo:      &fakeRepo{},
 			wantError: true,
 			wantCode:  apperror.CodeBadRequest,
 		},
 		{
 			name:      "missing amount",
-			req:       BulkSaveRequest{Items: []BulkSaveItemRequest{{Name: "Item"}}},
+			req:       SyncItemsRequest{Items: []SyncItemRequest{{Name: "Item"}}},
 			repo:      &fakeRepo{},
 			wantError: true,
 			wantCode:  apperror.CodeBadRequest,
 		},
 		{
 			name:      "negative amount",
-			req:       BulkSaveRequest{Items: []BulkSaveItemRequest{{Name: "Item", AvailableAmount: &negativeOne}}},
+			req:       SyncItemsRequest{Items: []SyncItemRequest{{Name: "Item", AvailableAmount: &negativeOne}}},
 			repo:      &fakeRepo{},
 			wantError: true,
 			wantCode:  apperror.CodeBadRequest,
 		},
 		{
-			name:           "zero amount allowed",
-			req:            BulkSaveRequest{Items: []BulkSaveItemRequest{{Name: "Item", AvailableAmount: &amount0}}},
-			repo:           &fakeRepo{},
-			wantError:      false,
-			wantRepoCalls:  1,
-			wantSavedCount: 1,
+			name:            "zero amount is allowed",
+			req:             SyncItemsRequest{Items: []SyncItemRequest{{Name: "Item", AvailableAmount: &amount0}}},
+			repo:            &fakeRepo{},
+			wantRepoCalls:   1,
+			wantSyncedCount: 1,
 		},
 		{
 			name:          "conflict bubbles up",
-			req:           BulkSaveRequest{Items: []BulkSaveItemRequest{{Name: "Item", AvailableAmount: &amount10}}},
+			req:           SyncItemsRequest{Items: []SyncItemRequest{{Name: "Item", AvailableAmount: &amount10}}},
 			repo:          &fakeRepo{err: apperror.Conflict("item name already exists")},
 			wantError:     true,
 			wantCode:      apperror.CodeConflict,
@@ -138,23 +143,23 @@ func TestServiceBulkSave(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := NewService(tt.repo).BulkSave(context.Background(), tt.req)
+			err := NewService(tt.repo).SyncItems(context.Background(), tt.req)
 			assertAppError(t, err, tt.wantError, tt.wantCode)
-			if tt.repo.bulkSaveCalls != tt.wantRepoCalls {
-				t.Fatalf("repo bulk save calls = %d, want %d", tt.repo.bulkSaveCalls, tt.wantRepoCalls)
+			if tt.repo.syncCalls != tt.wantRepoCalls {
+				t.Fatalf("repo sync calls = %d, want %d", tt.repo.syncCalls, tt.wantRepoCalls)
 			}
-			if tt.wantSavedCount > 0 && len(tt.repo.bulkSaved) != tt.wantSavedCount {
-				t.Fatalf("saved items = %+v", tt.repo.bulkSaved)
+			if tt.wantSyncedCount > 0 && len(tt.repo.synced) != tt.wantSyncedCount {
+				t.Fatalf("synced items = %+v", tt.repo.synced)
 			}
-			if tt.name == "mixed insert update payload" {
-				if tt.repo.bulkSaved[0].ID == nil || *tt.repo.bulkSaved[0].ID != existingID {
-					t.Fatalf("first id = %+v, want %s", tt.repo.bulkSaved[0].ID, existingID)
+			if tt.name == "mixed update and insert payload" {
+				if tt.repo.synced[0].ID == nil || *tt.repo.synced[0].ID != itemID {
+					t.Fatalf("first id = %+v, want %s", tt.repo.synced[0].ID, itemID)
 				}
-				if tt.repo.bulkSaved[0].Name != "Existing Item" || tt.repo.bulkSaved[1].Name != "New Item" {
-					t.Fatalf("saved items = %+v", tt.repo.bulkSaved)
+				if tt.repo.synced[0].Name != "Existing Item" || tt.repo.synced[1].Name != "New Item" {
+					t.Fatalf("synced items = %+v", tt.repo.synced)
 				}
-				if tt.repo.bulkSaved[1].ID != nil {
-					t.Fatalf("expected generated-id item to keep nil ID, got %+v", tt.repo.bulkSaved[1].ID)
+				if tt.repo.synced[1].ID != nil {
+					t.Fatalf("expected generated-id item to keep nil ID, got %+v", tt.repo.synced[1].ID)
 				}
 			}
 		})
@@ -185,21 +190,27 @@ func TestServiceList(t *testing.T) {
 
 func TestServiceGetByID(t *testing.T) {
 	now := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
+	itemID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001"
+	upperItemID := "018F5F60-7C35-7CCF-9C3C-0A5E6F6F2001"
 	tests := []struct {
-		name      string
-		id        string
-		repo      *fakeRepo
-		wantError bool
-		wantCode  apperror.Code
+		name            string
+		id              string
+		repo            *fakeRepo
+		wantError       bool
+		wantCode        apperror.Code
+		wantRequestedID string
 	}{
-		{name: "success", id: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", repo: &fakeRepo{item: Item{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", CreatedAt: now, UpdatedAt: now}}},
+		{name: "success", id: upperItemID, repo: &fakeRepo{item: Item{ID: itemID, CreatedAt: now, UpdatedAt: now}}, wantRequestedID: itemID},
 		{name: "invalid id", id: "bad", repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
-		{name: "not found", id: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", repo: &fakeRepo{err: apperror.NotFound("item not found")}, wantError: true, wantCode: apperror.CodeNotFound},
+		{name: "not found", id: itemID, repo: &fakeRepo{err: apperror.NotFound("item not found")}, wantError: true, wantCode: apperror.CodeNotFound, wantRequestedID: itemID},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := NewService(tt.repo).GetByID(context.Background(), tt.id)
 			assertAppError(t, err, tt.wantError, tt.wantCode)
+			if tt.wantRequestedID != "" && tt.repo.requestedID != tt.wantRequestedID {
+				t.Fatalf("requested id = %q, want %q", tt.repo.requestedID, tt.wantRequestedID)
+			}
 			if !tt.wantError && got.ID == "" {
 				t.Fatal("expected item ID")
 			}
@@ -207,42 +218,31 @@ func TestServiceGetByID(t *testing.T) {
 	}
 }
 
-func TestServiceDelete(t *testing.T) {
-	tests := []struct {
-		name      string
-		id        string
-		repo      *fakeRepo
-		wantError bool
-		wantCode  apperror.Code
-	}{
-		{name: "success", id: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", repo: &fakeRepo{}},
-		{name: "invalid id", id: "bad", repo: &fakeRepo{}, wantError: true, wantCode: apperror.CodeBadRequest},
-		{name: "not found", id: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", repo: &fakeRepo{err: apperror.NotFound("item not found")}, wantError: true, wantCode: apperror.CodeNotFound},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := NewService(tt.repo).Delete(context.Background(), tt.id)
-			assertAppError(t, err, tt.wantError, tt.wantCode)
-		})
-	}
-}
-
-func TestServiceBulkSaveValidationDetails(t *testing.T) {
+func TestServiceSyncItemsValidationDetails(t *testing.T) {
 	service := NewService(&fakeRepo{})
 	amount := 10
+	itemID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001"
 
-	err := service.BulkSave(context.Background(), BulkSaveRequest{
-		Items: []BulkSaveItemRequest{{Name: " ", AvailableAmount: &amount}},
+	err := service.SyncItems(context.Background(), SyncItemsRequest{
+		Items: []SyncItemRequest{{Name: " ", AvailableAmount: &amount}},
 	})
-	assertValidationDetail(t, err, "name", "must not be empty")
+	assertValidationDetail(t, err, "name", "is required")
 
-	err = service.BulkSave(context.Background(), BulkSaveRequest{
-		Items: []BulkSaveItemRequest{{ID: new("bad"), Name: "Item", AvailableAmount: &amount}},
+	err = service.SyncItems(context.Background(), SyncItemsRequest{
+		Items: []SyncItemRequest{{ID: new("bad"), Name: "Item", AvailableAmount: &amount}},
 	})
 	assertValidationDetail(t, err, "id", "must be a valid UUID")
 
-	err = service.BulkSave(context.Background(), BulkSaveRequest{
-		Items: []BulkSaveItemRequest{{Name: strings.Repeat("a", 161), AvailableAmount: &amount}},
+	err = service.SyncItems(context.Background(), SyncItemsRequest{
+		Items: []SyncItemRequest{
+			{ID: new(itemID), Name: "Item A", AvailableAmount: &amount},
+			{ID: new(strings.ToUpper(itemID)), Name: "Item B", AvailableAmount: &amount},
+		},
+	})
+	assertValidationDetail(t, err, "id", "must not contain duplicate values")
+
+	err = service.SyncItems(context.Background(), SyncItemsRequest{
+		Items: []SyncItemRequest{{Name: strings.Repeat("a", 161), AvailableAmount: &amount}},
 	})
 	assertValidationDetail(t, err, "name", "must be at most 160 characters")
 }
