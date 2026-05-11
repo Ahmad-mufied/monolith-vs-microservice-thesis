@@ -744,7 +744,7 @@ func noEnrichmentRepo(t *testing.T) *fakeTransactionRepository {
 
 func repeatItems(itemID string, count int) []domain.TransactionItem {
 	items := make([]domain.TransactionItem, 0, count)
-	for i := 0; i < count; i++ {
+	for range count {
 		items = append(items, domain.TransactionItem{
 			ItemID: itemID,
 			Amount: 1,
