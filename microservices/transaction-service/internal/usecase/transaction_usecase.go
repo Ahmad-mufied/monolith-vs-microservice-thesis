@@ -110,9 +110,6 @@ func (u *TransactionUsecase) GetTransactionByID(ctx context.Context, transaction
 	if err != nil {
 		return nil, err
 	}
-	if len(transactions) == 0 {
-		return nil, pkgerrors.NotFound("transaction not found")
-	}
 
 	return transactions[0], nil
 }
