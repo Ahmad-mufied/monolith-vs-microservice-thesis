@@ -9,5 +9,9 @@ CREATE TABLE items (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX items_name_active_unique
+ON items (lower(name))
+WHERE deleted_at IS NULL;
+
 -- +goose Down
 DROP TABLE items;
