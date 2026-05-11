@@ -57,6 +57,9 @@ func TestTransactionServer_CreateTransaction(t *testing.T) {
 				if userID != "01968ad4-98b1-79c8-a6f0-ec21f8f434c6" || len(items) != 1 {
 					t.Fatalf("unexpected create input: userID=%q items=%#v", userID, items)
 				}
+				if items[0].ItemID != "01968ad4-98b1-79c8-a6f0-ec21f8f434c7" || items[0].Amount != 2 {
+					t.Fatalf("unexpected mapped item: %#v", items[0])
+				}
 				return "01968ad4-98b1-79c8-a6f0-ec21f8f434d0", nil
 			},
 			wantID: "01968ad4-98b1-79c8-a6f0-ec21f8f434d0",
@@ -181,6 +184,24 @@ func TestTransactionServer_GetOwnTransactions(t *testing.T) {
 			if resp.GetTotalReturned() != tt.wantTotal {
 				t.Fatalf("TotalReturned = %d, want %d", resp.GetTotalReturned(), tt.wantTotal)
 			}
+			if int32(len(resp.GetTransactions())) != tt.wantTotal {
+				t.Fatalf("len(Transactions) = %d, want %d", len(resp.GetTransactions()), tt.wantTotal)
+			}
+			if tt.wantTotal > 0 {
+				first := resp.GetTransactions()[0]
+				if first.GetId() != "01968ad4-98b1-79c8-a6f0-ec21f8f434d0" {
+					t.Fatalf("Transactions[0].Id = %q, want %q", first.GetId(), "01968ad4-98b1-79c8-a6f0-ec21f8f434d0")
+				}
+				if first.GetUserId() != "01968ad4-98b1-79c8-a6f0-ec21f8f434c6" {
+					t.Fatalf("Transactions[0].UserId = %q, want %q", first.GetUserId(), "01968ad4-98b1-79c8-a6f0-ec21f8f434c6")
+				}
+				if len(first.GetItems()) != 1 || first.GetItems()[0].GetItemId() != "01968ad4-98b1-79c8-a6f0-ec21f8f434c7" || first.GetItems()[0].GetAmount() != 2 {
+					t.Fatalf("unexpected item mapping: %#v", first.GetItems())
+				}
+				if first.GetCreatedAt() != createdAt.UTC().Format(time.RFC3339) {
+					t.Fatalf("Transactions[0].CreatedAt = %q, want %q", first.GetCreatedAt(), createdAt.UTC().Format(time.RFC3339))
+				}
+			}
 		})
 	}
 }
@@ -193,6 +214,8 @@ func TestTransactionServer_GetTransactionById(t *testing.T) {
 		req      *transactionv1.GetTransactionByIdRequest
 		ucFn     func(ctx context.Context, transactionID, userID string) (*domain.Transaction, error)
 		wantCode codes.Code
+		wantID   string
+		wantUID  string
 	}{
 		{
 			name: "success response mapping",
@@ -206,6 +229,8 @@ func TestTransactionServer_GetTransactionById(t *testing.T) {
 					UpdatedAt: createdAt,
 				}, nil
 			},
+			wantID:  "01968ad4-98b1-79c8-a6f0-ec21f8f434d0",
+			wantUID: "01968ad4-98b1-79c8-a6f0-ec21f8f434c6",
 		},
 		{
 			name: "invalid uuid mapping",
@@ -228,7 +253,7 @@ func TestTransactionServer_GetTransactionById(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := NewTransactionServer(&fakeTransactionUsecase{getTransactionByIDFn: tt.ucFn})
-			_, err := srv.GetTransactionById(context.Background(), tt.req)
+			resp, err := srv.GetTransactionById(context.Background(), tt.req)
 			if tt.wantCode != codes.OK {
 				if status.Code(err) != tt.wantCode {
 					t.Fatalf("code = %v, want %v", status.Code(err), tt.wantCode)
@@ -237,6 +262,21 @@ func TestTransactionServer_GetTransactionById(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+			if resp.GetTransaction().GetId() != tt.wantID {
+				t.Fatalf("Transaction.Id = %q, want %q", resp.GetTransaction().GetId(), tt.wantID)
+			}
+			if resp.GetTransaction().GetUserId() != tt.wantUID {
+				t.Fatalf("Transaction.UserId = %q, want %q", resp.GetTransaction().GetUserId(), tt.wantUID)
+			}
+			if len(resp.GetTransaction().GetItems()) != 1 {
+				t.Fatalf("len(Items) = %d, want 1", len(resp.GetTransaction().GetItems()))
+			}
+			if resp.GetTransaction().GetItems()[0].GetItemId() != "01968ad4-98b1-79c8-a6f0-ec21f8f434c7" || resp.GetTransaction().GetItems()[0].GetAmount() != 2 {
+				t.Fatalf("unexpected item mapping: %#v", resp.GetTransaction().GetItems()[0])
+			}
+			if resp.GetTransaction().GetCreatedAt() != createdAt.UTC().Format(time.RFC3339) {
+				t.Fatalf("CreatedAt = %q, want %q", resp.GetTransaction().GetCreatedAt(), createdAt.UTC().Format(time.RFC3339))
 			}
 		})
 	}
@@ -299,6 +339,24 @@ func TestTransactionServer_GetTransactionsForEnrichment(t *testing.T) {
 			}
 			if resp.GetTotalReturned() != tt.wantTotal {
 				t.Fatalf("TotalReturned = %d, want %d", resp.GetTotalReturned(), tt.wantTotal)
+			}
+			if int32(len(resp.GetTransactions())) != tt.wantTotal {
+				t.Fatalf("len(Transactions) = %d, want %d", len(resp.GetTransactions()), tt.wantTotal)
+			}
+			if tt.wantTotal > 0 {
+				first := resp.GetTransactions()[0]
+				if first.GetId() != "01968ad4-98b1-79c8-a6f0-ec21f8f434d0" {
+					t.Fatalf("Transactions[0].Id = %q, want %q", first.GetId(), "01968ad4-98b1-79c8-a6f0-ec21f8f434d0")
+				}
+				if first.GetUserId() != "01968ad4-98b1-79c8-a6f0-ec21f8f434c6" {
+					t.Fatalf("Transactions[0].UserId = %q, want %q", first.GetUserId(), "01968ad4-98b1-79c8-a6f0-ec21f8f434c6")
+				}
+				if len(first.GetItems()) != 1 || first.GetItems()[0].GetItemId() != "01968ad4-98b1-79c8-a6f0-ec21f8f434c7" || first.GetItems()[0].GetAmount() != 1 {
+					t.Fatalf("unexpected item mapping: %#v", first.GetItems())
+				}
+				if first.GetCreatedAt() != createdAt.UTC().Format(time.RFC3339) {
+					t.Fatalf("Transactions[0].CreatedAt = %q, want %q", first.GetCreatedAt(), createdAt.UTC().Format(time.RFC3339))
+				}
 			}
 		})
 	}
