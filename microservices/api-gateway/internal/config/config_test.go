@@ -84,7 +84,10 @@ func TestLoad(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set env vars for this test.
+			// Reset all config keys for deterministic isolation.
+			for _, k := range []string{"HTTP_PORT", "JWT_SECRET", "AUTH_SERVICE_ADDR", "ITEM_SERVICE_ADDR", "TRANSACTION_SERVICE_ADDR"} {
+				t.Setenv(k, "")
+			}
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
