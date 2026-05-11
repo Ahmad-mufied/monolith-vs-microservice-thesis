@@ -290,8 +290,8 @@ Responsibilities:
 - list items,
 - update item,
 - delete item,
-- GetItemsByIds,
-- ValidateAndAllocate.
+- GetItemSummariesByIds,
+- ValidateTransactionItems.
 
 Owns:
 
@@ -304,10 +304,9 @@ Responsibilities:
 
 - create transaction,
 - get own transactions,
-- get all enriched transactions,
-- call Item Service for ValidateAndAllocate,
-- call Auth Service for user enrichment,
-- call Item Service for item enrichment.
+- get transaction by ID,
+- get raw transactions for enrichment,
+- call Item Service for ValidateTransactionItems.
 
 Owns:
 
@@ -340,8 +339,8 @@ Benchmark 2 create transaction flow:
 Client/k6
 → API Gateway
 → Transaction Service
-→ Item Service via gRPC ValidateAndAllocate
-→ item_db updates available_amount
+→ Item Service via gRPC ValidateTransactionItems
+→ item_db validates available_amount (validation-only, no deduction)
 → Transaction Service inserts transaction using INSERT ... RETURNING id
 → Transaction Service inserts transaction_items
 → API Gateway
@@ -354,9 +353,8 @@ Client/k6
 → Transaction Service
 → transaction_db
 → Auth Service GetUsersByIds
-→ Item Service GetItemsByIds
-→ Transaction Service joins/enriches in memory
-→ API Gateway
+→ Item Service GetItemSummariesByIds
+→ API Gateway joins/enriches in memory
 → response
 
 Do not add caching, message queues, retries, circuit breakers, asynchronous processing, or saga/compensation mechanisms unless explicitly requested.
