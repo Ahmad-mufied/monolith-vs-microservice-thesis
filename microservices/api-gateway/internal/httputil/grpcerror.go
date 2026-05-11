@@ -23,9 +23,8 @@ func FromGRPCError(err error) *AppError {
 		return nil
 	}
 
-	msg := err.Error()
 	if st, ok := status.FromError(err); ok {
-		msg = st.Message()
+		msg := st.Message()
 		switch st.Code() {
 		case codes.InvalidArgument:
 			return &AppError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: msg}
