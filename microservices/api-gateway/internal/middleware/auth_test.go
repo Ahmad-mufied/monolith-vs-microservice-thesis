@@ -76,6 +76,9 @@ func TestUserIDFromBearer(t *testing.T) {
 				if ae.Status != tt.wantStatus {
 					t.Errorf("status = %d, want %d", ae.Status, tt.wantStatus)
 				}
+				if ae.Code != "UNAUTHORIZED" {
+					t.Errorf("code = %q, want UNAUTHORIZED", ae.Code)
+				}
 				return
 			}
 
@@ -137,6 +140,9 @@ func TestUserIDFromContext(t *testing.T) {
 				}
 				if ae.Status != tt.wantStatus {
 					t.Errorf("status = %d, want %d", ae.Status, tt.wantStatus)
+				}
+				if ae.Code != "UNAUTHORIZED" {
+					t.Errorf("code = %q, want UNAUTHORIZED", ae.Code)
 				}
 				return
 			}
