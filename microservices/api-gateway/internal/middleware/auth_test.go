@@ -1,11 +1,13 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
 	pkgjwt "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/jwt"
 	"github.com/labstack/echo/v4"
 )
@@ -66,12 +68,13 @@ func TestUserIDFromBearer(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
 				}
-				ae, ok := err.(*authError)
+				var ae *httputil.AppError
+				ok := errors.As(err, &ae)
 				if !ok {
-					t.Fatalf("error type = %T, want *authError", err)
+					t.Fatalf("error type = %T, want *httputil.AppError", err)
 				}
-				if ae.status != tt.wantStatus {
-					t.Errorf("status = %d, want %d", ae.status, tt.wantStatus)
+				if ae.Status != tt.wantStatus {
+					t.Errorf("status = %d, want %d", ae.Status, tt.wantStatus)
 				}
 				return
 			}
@@ -127,12 +130,13 @@ func TestUserIDFromContext(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
 				}
-				ae, ok := err.(*authError)
+				var ae *httputil.AppError
+				ok := errors.As(err, &ae)
 				if !ok {
-					t.Fatalf("error type = %T, want *authError", err)
+					t.Fatalf("error type = %T, want *httputil.AppError", err)
 				}
-				if ae.status != tt.wantStatus {
-					t.Errorf("status = %d, want %d", ae.status, tt.wantStatus)
+				if ae.Status != tt.wantStatus {
+					t.Errorf("status = %d, want %d", ae.Status, tt.wantStatus)
 				}
 				return
 			}
