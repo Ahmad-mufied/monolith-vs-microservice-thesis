@@ -11,10 +11,9 @@ import (
 )
 
 type HandlerService interface {
-	BulkSave(ctx context.Context, req BulkSaveRequest) error
+	SyncItems(ctx context.Context, req SyncItemsRequest) error
 	List(ctx context.Context, page pagination.Page) ([]Response, error)
 	GetByID(ctx context.Context, id string) (Response, error)
-	Delete(ctx context.Context, id string) error
 }
 
 type Handler struct {
@@ -27,20 +26,19 @@ func NewHandler(service HandlerService) *Handler {
 
 func (h *Handler) RegisterRoutes(group *echo.Group) {
 	group.GET("/items", h.List)
-	group.PUT("/items", h.BulkSave)
+	group.PUT("/items", h.SyncItems)
 	group.GET("/items/:item_id", h.GetByID)
-	group.DELETE("/items/:item_id", h.Delete)
 }
 
-func (h *Handler) BulkSave(c echo.Context) error {
-	var req BulkSaveRequest
+func (h *Handler) SyncItems(c echo.Context) error {
+	var req SyncItemsRequest
 	if err := c.Bind(&req); err != nil {
 		return httputil.Error(c, apperror.BadRequest("invalid request payload", nil))
 	}
-	if err := h.service.BulkSave(c.Request().Context(), req); err != nil {
+	if err := h.service.SyncItems(c.Request().Context(), req); err != nil {
 		return httputil.Error(c, err)
 	}
-	return httputil.Message(c, http.StatusOK, "Items saved successfully")
+	return httputil.Message(c, http.StatusOK, "Items synchronized successfully")
 }
 
 func (h *Handler) List(c echo.Context) error {
@@ -61,11 +59,4 @@ func (h *Handler) GetByID(c echo.Context) error {
 		return httputil.Error(c, err)
 	}
 	return httputil.Success(c, http.StatusOK, resp)
-}
-
-func (h *Handler) Delete(c echo.Context) error {
-	if err := h.service.Delete(c.Request().Context(), c.Param("item_id")); err != nil {
-		return httputil.Error(c, err)
-	}
-	return httputil.Message(c, http.StatusOK, "Item deleted successfully")
 }

@@ -14,16 +14,16 @@ import (
 )
 
 type fakeItemService struct {
-	list         []Response
-	resp         Response
-	err          error
-	page         pagination.Page
-	id           string
-	lastBulkSave BulkSaveRequest
+	list          []Response
+	resp          Response
+	err           error
+	page          pagination.Page
+	id            string
+	lastSyncItems SyncItemsRequest
 }
 
-func (f *fakeItemService) BulkSave(_ context.Context, req BulkSaveRequest) error {
-	f.lastBulkSave = req
+func (f *fakeItemService) SyncItems(_ context.Context, req SyncItemsRequest) error {
+	f.lastSyncItems = req
 	return f.err
 }
 
@@ -35,11 +35,6 @@ func (f *fakeItemService) List(_ context.Context, page pagination.Page) ([]Respo
 func (f *fakeItemService) GetByID(_ context.Context, id string) (Response, error) {
 	f.id = id
 	return f.resp, f.err
-}
-
-func (f *fakeItemService) Delete(_ context.Context, id string) error {
-	f.id = id
-	return f.err
 }
 
 func TestHandlerRegisterRoutes(t *testing.T) {
@@ -67,8 +62,8 @@ func TestHandlerRegisterRoutes(t *testing.T) {
 	if !hasRoute(http.MethodGet, "/api/v1/items/:item_id") {
 		t.Fatal("expected GET /api/v1/items/:item_id route")
 	}
-	if !hasRoute(http.MethodDelete, "/api/v1/items/:item_id") {
-		t.Fatal("expected DELETE /api/v1/items/:item_id route")
+	if hasRoute(http.MethodDelete, "/api/v1/items/:item_id") {
+		t.Fatal("did not expect DELETE /api/v1/items/:item_id route")
 	}
 	if hasRoute(http.MethodPost, "/api/v1/items") {
 		t.Fatal("did not expect POST /api/v1/items route")
@@ -78,7 +73,7 @@ func TestHandlerRegisterRoutes(t *testing.T) {
 	}
 }
 
-func TestHandlerBulkSave(t *testing.T) {
+func TestHandlerSyncItems(t *testing.T) {
 	amount := 10
 	tests := []struct {
 		name       string
@@ -98,7 +93,7 @@ func TestHandlerBulkSave(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rec := executeItemHandler(http.MethodPut, "/api/v1/items", tt.body, nil, NewHandler(tt.service).BulkSave)
+			rec := executeItemHandler(http.MethodPut, "/api/v1/items", tt.body, nil, NewHandler(tt.service).SyncItems)
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
 			}
@@ -107,14 +102,14 @@ func TestHandlerBulkSave(t *testing.T) {
 				if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 					t.Fatalf("unmarshal response: %v", err)
 				}
-				if got["message"] != "Items saved successfully" {
+				if got["message"] != "Items synchronized successfully" {
 					t.Fatalf("message = %q", got["message"])
 				}
-				if len(tt.service.lastBulkSave.Items) != 1 {
-					t.Fatalf("bulk save items = %+v", tt.service.lastBulkSave.Items)
+				if len(tt.service.lastSyncItems.Items) != 1 {
+					t.Fatalf("sync items = %+v", tt.service.lastSyncItems.Items)
 				}
-				if tt.service.lastBulkSave.Items[0].AvailableAmount == nil || *tt.service.lastBulkSave.Items[0].AvailableAmount != amount {
-					t.Fatalf("available_amount = %+v, want 10", tt.service.lastBulkSave.Items[0].AvailableAmount)
+				if tt.service.lastSyncItems.Items[0].AvailableAmount == nil || *tt.service.lastSyncItems.Items[0].AvailableAmount != amount {
+					t.Fatalf("available_amount = %+v, want 10", tt.service.lastSyncItems.Items[0].AvailableAmount)
 				}
 			}
 		})
@@ -150,39 +145,25 @@ func TestHandlerList(t *testing.T) {
 	}
 }
 
-func TestHandlerGetAndDelete(t *testing.T) {
+func TestHandlerGetByID(t *testing.T) {
 	tests := []struct {
 		name       string
-		method     string
-		handler    func(*Handler) echo.HandlerFunc
 		service    *fakeItemService
 		wantStatus int
 	}{
-		{name: "get success", method: http.MethodGet, handler: func(h *Handler) echo.HandlerFunc { return h.GetByID }, service: &fakeItemService{resp: Response{ID: "item"}}, wantStatus: http.StatusOK},
-		{name: "get not found", method: http.MethodGet, handler: func(h *Handler) echo.HandlerFunc { return h.GetByID }, service: &fakeItemService{err: apperror.NotFound("item not found")}, wantStatus: http.StatusNotFound},
-		{name: "delete success", method: http.MethodDelete, handler: func(h *Handler) echo.HandlerFunc { return h.Delete }, service: &fakeItemService{}, wantStatus: http.StatusOK},
-		{name: "delete conflict", method: http.MethodDelete, handler: func(h *Handler) echo.HandlerFunc { return h.Delete }, service: &fakeItemService{err: apperror.Conflict("item is referenced by transaction")}, wantStatus: http.StatusConflict},
-		{name: "delete not found", method: http.MethodDelete, handler: func(h *Handler) echo.HandlerFunc { return h.Delete }, service: &fakeItemService{err: apperror.NotFound("item not found")}, wantStatus: http.StatusNotFound},
+		{name: "success", service: &fakeItemService{resp: Response{ID: "item"}}, wantStatus: http.StatusOK},
+		{name: "not found", service: &fakeItemService{err: apperror.NotFound("item not found")}, wantStatus: http.StatusNotFound},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := NewHandler(tt.service)
-			rec := executeItemHandler(tt.method, "/api/v1/items/item-1", "", map[string]string{"item_id": "item-1"}, tt.handler(h))
+			rec := executeItemHandler(http.MethodGet, "/api/v1/items/item-1", "", map[string]string{"item_id": "item-1"}, h.GetByID)
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
 			}
 			if tt.wantStatus < 400 && tt.service.id != "item-1" {
 				t.Fatalf("id = %q, want item-1", tt.service.id)
-			}
-			if tt.name == "delete success" {
-				var got map[string]string
-				if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
-					t.Fatalf("unmarshal response: %v", err)
-				}
-				if got["message"] != "Item deleted successfully" {
-					t.Fatalf("message = %q", got["message"])
-				}
 			}
 		})
 	}
