@@ -32,6 +32,7 @@ type TransactionHandler struct {
 	itemClient enrichItemClient
 }
 
+// authentication enrichment, and item enrichment clients.
 func NewTransactionHandler(tx transactionClient, auth enrichAuthClient, item enrichItemClient) *TransactionHandler {
 	return &TransactionHandler{txClient: tx, authClient: auth, itemClient: item}
 }
@@ -163,6 +164,8 @@ func (h *TransactionHandler) GetAllEnriched(c echo.Context) error {
 	return httputil.List(c, http.StatusOK, enriched, limit, offset, len(enriched))
 }
 
+// setToSlice converts a map[string]struct{} (used as a set) into a slice containing its keys.
+// The order of keys in the returned slice is unspecified; the slice length equals the number of map entries.
 func setToSlice(m map[string]struct{}) []string {
 	s := make([]string, 0, len(m))
 	for k := range m {

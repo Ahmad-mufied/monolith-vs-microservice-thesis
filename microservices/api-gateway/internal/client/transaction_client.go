@@ -13,6 +13,8 @@ type TransactionClient struct {
 	grpc transactionv1.TransactionServiceClient
 }
 
+// NewTransactionClient creates a TransactionClient that wraps the provided transactionv1.TransactionServiceClient.
+// The returned *TransactionClient delegates RPC calls to the underlying gRPC client.
 func NewTransactionClient(grpc transactionv1.TransactionServiceClient) *TransactionClient {
 	return &TransactionClient{grpc: grpc}
 }
@@ -81,6 +83,10 @@ func (c *TransactionClient) GetTransactionsForEnrichment(ctx context.Context, li
 	return txs, nil
 }
 
+// protoTransactionToDTO converts a protobuf Transaction into a dto.Transaction.
+// If tx is nil it returns an empty dto.Transaction. The returned DTO contains
+// the transaction's ID, user ID, items (mapped to dto.TransactionItem), and
+// created/updated timestamps.
 func protoTransactionToDTO(tx *transactionv1.Transaction) dto.Transaction {
 	if tx == nil {
 		return dto.Transaction{}

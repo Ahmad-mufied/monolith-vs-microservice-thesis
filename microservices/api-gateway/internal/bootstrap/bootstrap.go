@@ -21,6 +21,13 @@ import (
 
 const shutdownTimeout = 10 * time.Second
 
+// Run starts the API gateway: it loads configuration, opens gRPC connections to
+// backend services, constructs HTTP handlers and router, and serves HTTP until
+// a termination signal is received or the server fails.
+//
+// On successful receipt of SIGINT or SIGTERM it attempts a graceful shutdown with
+// a fixed timeout and returns nil. It returns an error if configuration loading,
+// any gRPC connection cannot be established, or if the HTTP server stops with an error.
 func Run() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -83,6 +90,8 @@ func Run() error {
 	}
 }
 
+// closeConn closes the provided gRPC client connection.
+// If closing fails, it logs the error with the service name and does not return it.
 func closeConn(conn *grpc.ClientConn, name string) {
 	if err := conn.Close(); err != nil {
 		log.Printf("close %s service conn: %v", name, err)

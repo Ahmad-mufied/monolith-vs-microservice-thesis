@@ -14,6 +14,7 @@ type ItemClient struct {
 	grpc itemv1.ItemServiceClient
 }
 
+// NewItemClient creates an ItemClient that wraps the provided gRPC itemv1.ItemServiceClient.
 func NewItemClient(grpc itemv1.ItemServiceClient) *ItemClient {
 	return &ItemClient{grpc: grpc}
 }
@@ -70,6 +71,9 @@ func (c *ItemClient) GetItemSummariesByIDs(ctx context.Context, ids []string) ([
 	return items, nil
 }
 
+// protoItemToDTO converts an itemv1.Item protobuf message to a dto.Item.
+// If the input is nil it returns the zero-value dto.Item.
+// The returned DTO contains ID, Name, AvailableAmount, CreatedAt and UpdatedAt copied from the protobuf message.
 func protoItemToDTO(it *itemv1.Item) dto.Item {
 	if it == nil {
 		return dto.Item{}

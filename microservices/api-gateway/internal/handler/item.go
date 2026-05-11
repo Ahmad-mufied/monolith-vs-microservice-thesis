@@ -20,6 +20,7 @@ type ItemHandler struct {
 	client itemClient
 }
 
+// NewItemHandler returns a new ItemHandler that delegates item operations to the provided client.
 func NewItemHandler(client itemClient) *ItemHandler {
 	return &ItemHandler{client: client}
 }

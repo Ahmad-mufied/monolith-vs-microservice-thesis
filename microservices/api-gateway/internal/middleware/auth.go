@@ -14,7 +14,11 @@ const userIDKey = "user_id"
 // UserIDContextKey is the exported key used to store user_id in Echo context.
 const UserIDContextKey = userIDKey
 
-// Auth returns an Echo middleware that validates JWT Bearer tokens.
+// Auth returns an Echo middleware that validates JWT bearer tokens from the
+// Authorization header. On successful validation it stores the token subject as
+// the authenticated user ID in the Echo context under userIDKey and calls the
+// next handler; on validation error it responds with the standardized
+// unauthorized error via httputil.Error.
 func Auth(secret string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -28,7 +32,10 @@ func Auth(secret string) echo.MiddlewareFunc {
 	}
 }
 
-// UserIDFromBearer extracts and validates the user ID from an Authorization header.
+// UserIDFromBearer extracts the authenticated user ID from an HTTP Authorization header containing a JWT Bearer token.
+// It validates that the header is present and formatted as "Bearer <token>", verifies the token with the provided secret,
+// and returns the token's subject on success. It returns an unauthorized AppError when the header is missing or malformed,
+// the token is invalid, or the token subject is empty.
 func UserIDFromBearer(header, secret string) (string, error) {
 	if header == "" {
 		return "", unauthorized("missing authorization header")
@@ -51,7 +58,8 @@ func UserIDFromBearer(header, secret string) (string, error) {
 	return claims.Subject, nil
 }
 
-// UserIDFromContext retrieves the authenticated user ID from Echo context.
+// UserIDFromContext retrieves the authenticated user ID stored in the Echo context.
+// It returns the user ID string, or an `httputil.AppError` (HTTP 401) when no valid authenticated user is present.
 func UserIDFromContext(c echo.Context) (string, error) {
 	userID, ok := c.Get(userIDKey).(string)
 	if !ok || userID == "" {
@@ -60,6 +68,7 @@ func UserIDFromContext(c echo.Context) (string, error) {
 	return userID, nil
 }
 
+// unauthorized constructs an *httputil.AppError with HTTP 401 status, code "UNAUTHORIZED", and the provided message.
 func unauthorized(message string) *httputil.AppError {
 	return &httputil.AppError{Status: http.StatusUnauthorized, Code: "UNAUTHORIZED", Message: message}
 }

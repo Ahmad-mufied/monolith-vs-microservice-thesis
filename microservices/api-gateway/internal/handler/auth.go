@@ -19,6 +19,7 @@ type AuthHandler struct {
 	client authClient
 }
 
+// NewAuthHandler creates an AuthHandler that uses the provided authClient.
 func NewAuthHandler(client authClient) *AuthHandler {
 	return &AuthHandler{client: client}
 }

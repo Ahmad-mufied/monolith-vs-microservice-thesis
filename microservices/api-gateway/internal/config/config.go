@@ -15,6 +15,16 @@ type Config struct {
 	TransactionServiceAddr string
 }
 
+// Load constructs a Config from environment variables and validates required fields.
+// 
+// Load reads the following environment variables:
+// - HTTP_PORT (defaults to "8080" if unset)
+// - JWT_SECRET
+// - AUTH_SERVICE_ADDR
+// - ITEM_SERVICE_ADDR
+// - TRANSACTION_SERVICE_ADDR
+//
+// It returns an error if any of JWT_SECRET, AUTH_SERVICE_ADDR, ITEM_SERVICE_ADDR, or TRANSACTION_SERVICE_ADDR are empty.
 func Load() (*Config, error) {
 	cfg := &Config{
 		HTTPPort:               pkgconfig.GetEnv("HTTP_PORT", "8080"),

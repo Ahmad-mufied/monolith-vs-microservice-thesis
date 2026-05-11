@@ -13,6 +13,7 @@ type AuthClient struct {
 	grpc authv1.AuthServiceClient
 }
 
+// NewAuthClient returns an AuthClient that wraps the provided gRPC AuthServiceClient.
 func NewAuthClient(grpc authv1.AuthServiceClient) *AuthClient {
 	return &AuthClient{grpc: grpc}
 }
@@ -45,6 +46,8 @@ func (c *AuthClient) GetUsersByIDs(ctx context.Context, ids []string) ([]*dto.Us
 	return users, nil
 }
 
+// protoUserSummaryToDTO converts a protobuf authv1.UserSummary into a dto.UserSummary.
+// It returns nil if the input is nil.
 func protoUserSummaryToDTO(u *authv1.UserSummary) *dto.UserSummary {
 	if u == nil {
 		return nil
