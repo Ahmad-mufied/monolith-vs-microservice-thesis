@@ -45,7 +45,11 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("dial item service: %w", err)
 	}
-	defer itemConn.Close()
+	defer func() {
+		if err := itemConn.Close(); err != nil {
+			log.Printf("close item service client: %v", err)
+		}
+	}()
 
 	repo := postgresadapter.NewTransactionRepository(pool)
 	itemClient := grpcclientadapter.NewItemClient(itemv1.NewItemServiceClient(itemConn))
