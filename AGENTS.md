@@ -464,7 +464,6 @@ Use checks:
 
 available_amount >= 0
 amount > 0
-available_amount_after >= 0
 
 ## Database Layout
 
