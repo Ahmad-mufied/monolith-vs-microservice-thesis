@@ -76,6 +76,13 @@ func TestServiceSyncItems(t *testing.T) {
 			wantSyncedCount: 0,
 		},
 		{
+			name:      "nil items is rejected",
+			req:       SyncItemsRequest{Items: nil},
+			repo:      &fakeRepo{},
+			wantError: true,
+			wantCode:  apperror.CodeBadRequest,
+		},
+		{
 			name:      "invalid uuid",
 			req:       SyncItemsRequest{Items: []SyncItemRequest{{ID: new("bad"), Name: "Item", AvailableAmount: &amount10}}},
 			repo:      &fakeRepo{},

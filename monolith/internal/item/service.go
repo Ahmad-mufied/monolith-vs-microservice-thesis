@@ -25,6 +25,9 @@ func NewService(repo Repository) *Service {
 }
 
 func (s *Service) SyncItems(ctx context.Context, req SyncItemsRequest) error {
+	if req.Items == nil {
+		return apperror.BadRequest("invalid request payload", map[string]any{"items": "is required"})
+	}
 	if err := validation.Struct(req); err != nil {
 		return err
 	}
