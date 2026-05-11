@@ -47,6 +47,8 @@ func (c *ItemClient) ValidateTransactionItems(ctx context.Context, items []domai
 		return pkgerrors.FailedPrecondition("requested amount exceeds available amount")
 	case codes.InvalidArgument:
 		return pkgerrors.InvalidInput("invalid request payload")
+	case codes.Aborted:
+		return pkgerrors.Conflict("transaction conflict")
 	case codes.DeadlineExceeded:
 		return pkgerrors.DeadlineExceeded("item service request timed out")
 	case codes.Unavailable:
