@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
@@ -49,6 +50,9 @@ func (c *ItemClient) GetItemByID(ctx context.Context, itemID string) (*dto.Item,
 	resp, err := c.grpc.GetItemById(ctx, &itemv1.GetItemByIdRequest{ItemId: itemID})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)
+	}
+	if resp.GetItem() == nil {
+		return nil, &httputil.AppError{Status: http.StatusInternalServerError, Code: "INTERNAL_SERVER_ERROR", Message: "invalid item service response"}
 	}
 	item := protoItemToDTO(resp.GetItem())
 	return &item, nil

@@ -119,6 +119,11 @@ func TestItemClient_GetItemByID(t *testing.T) {
 			wantName: "Item A",
 		},
 		{name: "NotFound -> 404", grpcErr: status.Error(codes.NotFound, "not found"), wantStatus: http.StatusNotFound},
+		{
+			name:       "nil item in response returns 500",
+			grpcResp:   &itemv1.GetItemByIdResponse{Item: nil},
+			wantStatus: http.StatusInternalServerError,
+		},
 	}
 
 	for _, tt := range tests {
