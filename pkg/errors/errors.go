@@ -15,6 +15,8 @@ var (
 	ErrConflict           = stderrors.New("conflict")
 	ErrFailedPrecondition = stderrors.New("failed precondition")
 	ErrInvalidInput       = stderrors.New("invalid input")
+	ErrUnavailable        = stderrors.New("unavailable")
+	ErrDeadlineExceeded   = stderrors.New("deadline exceeded")
 	ErrInternal           = stderrors.New("internal")
 )
 
@@ -80,6 +82,14 @@ func NotFound(message string) error {
 	return &Error{kind: ErrNotFound, message: message}
 }
 
+func Unavailable(message string) error {
+	return &Error{kind: ErrUnavailable, message: message}
+}
+
+func DeadlineExceeded(message string) error {
+	return &Error{kind: ErrDeadlineExceeded, message: message}
+}
+
 func Internal(message string, cause error) error {
 	return &Error{kind: ErrInternal, message: message, cause: cause}
 }
@@ -103,6 +113,10 @@ func ToGRPCStatus(err error) error {
 		code = codes.FailedPrecondition
 	case stderrors.Is(err, ErrInvalidInput):
 		code = codes.InvalidArgument
+	case stderrors.Is(err, ErrUnavailable):
+		code = codes.Unavailable
+	case stderrors.Is(err, ErrDeadlineExceeded):
+		code = codes.DeadlineExceeded
 	}
 
 	st := status.New(code, message)
@@ -136,6 +150,10 @@ func publicMessage(err error) string {
 		return "invalid credentials"
 	case stderrors.Is(err, ErrNotFound):
 		return "not found"
+	case stderrors.Is(err, ErrUnavailable):
+		return "service unavailable"
+	case stderrors.Is(err, ErrDeadlineExceeded):
+		return "request timeout"
 	default:
 		return "internal server error"
 	}
