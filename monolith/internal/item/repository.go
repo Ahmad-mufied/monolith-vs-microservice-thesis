@@ -169,6 +169,9 @@ func scanItem(row interface{ Scan(...any) error }) (Item, error) {
 // mapConflictError translates a PostgreSQL unique-violation (23505) into a
 // domain-level Conflict error. Other errors are returned as-is.
 func mapConflictError(err error) error {
+	if err == nil {
+		return nil
+	}
 	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "23505" {
 		return apperror.Conflict("item name already exists")
 	}
