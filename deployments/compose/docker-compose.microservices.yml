@@ -1,0 +1,66 @@
+name: skripsi-microservices
+
+services:
+  auth-service:
+    build:
+      context: ../..
+      dockerfile: microservices/auth-service/Dockerfile
+    image: skripsi/auth-service:local
+    container_name: skripsi-auth-service
+    restart: unless-stopped
+    env_file:
+      - ../../env/auth-service.compose.env
+    ports:
+      - "50051:50051"
+    networks:
+      - skripsi-local
+
+  item-service:
+    build:
+      context: ../..
+      dockerfile: microservices/item-service/Dockerfile
+    image: skripsi/item-service:local
+    container_name: skripsi-item-service
+    restart: unless-stopped
+    env_file:
+      - ../../env/item-service.compose.env
+    ports:
+      - "50052:50052"
+    networks:
+      - skripsi-local
+
+  transaction-service:
+    build:
+      context: ../..
+      dockerfile: microservices/transaction-service/Dockerfile
+    image: skripsi/transaction-service:local
+    container_name: skripsi-transaction-service
+    restart: unless-stopped
+    env_file:
+      - ../../env/transaction-service.compose.env
+    ports:
+      - "50053:50053"
+    networks:
+      - skripsi-local
+
+  api-gateway:
+    build:
+      context: ../..
+      dockerfile: microservices/api-gateway/Dockerfile
+    image: skripsi/api-gateway:local
+    container_name: skripsi-api-gateway
+    restart: unless-stopped
+    env_file:
+      - ../../env/api-gateway.compose.env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - item-service
+      - transaction-service
+    networks:
+      - skripsi-local
+
+networks:
+  skripsi-local:
+    external: true

@@ -56,7 +56,8 @@ deployments/
         ├── monolith.yaml
         └── ingress.yaml
 scripts/
-├── env-init.sh
+├── env-init-base.sh
+├── env-init-monolith.sh
 └── create-local-secrets.sh
 ```
 
@@ -109,7 +110,7 @@ openapi.yaml
 ### 1. Generate Local Env Files
 
 ```bash
-make env-init
+make env-init-monolith
 ```
 
 This creates ignored local files:
@@ -275,7 +276,8 @@ Expected body includes:
 
 ```json
 {
-  "status": "ok"
+  "message": "ok",
+  "service": "monolith"
 }
 ```
 
@@ -308,18 +310,24 @@ TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
 echo "$TOKEN"
 ```
 
-### 4. Create Item
+### 4. Sync Active Items
 
 ```bash
-ITEM_ID=$(curl -s -X POST http://localhost:8080/api/v1/items \
+curl -s -X PUT http://localhost:8080/api/v1/items \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "Benchmark Item A",
-    "available_amount": 1000
-  }' | jq -r '.data.id')
-
-echo "$ITEM_ID"
+    "items": [
+      {
+        "name": "Benchmark Item A",
+        "available_amount": 1000
+      },
+      {
+        "name": "Benchmark Item B",
+        "available_amount": 500
+      }
+    ]
+  }' | jq
 ```
 
 Item availability uses:
@@ -339,6 +347,16 @@ curl -s "http://localhost:8080/api/v1/items?limit=10&offset=0" \
   -H "Authorization: Bearer $TOKEN" | jq
 ```
 
+Capture one item id:
+
+```bash
+ITEM_ID=$(curl -s "http://localhost:8080/api/v1/items?limit=10&offset=0" \
+  -H "Authorization: Bearer $TOKEN" \
+  | jq -r '.data[] | select(.name=="Benchmark Item A") | .id')
+
+echo "$ITEM_ID"
+```
+
 ### 6. Get Item Detail
 
 ```bash
@@ -346,16 +364,37 @@ curl -s "http://localhost:8080/api/v1/items/$ITEM_ID" \
   -H "Authorization: Bearer $TOKEN" | jq
 ```
 
-### 7. Update Item
+### 7. Resync Items
 
 ```bash
-curl -s -X PUT "http://localhost:8080/api/v1/items/$ITEM_ID" \
+curl -s -X PUT http://localhost:8080/api/v1/items \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "Benchmark Item A Updated",
-    "available_amount": 1500
+    "items": [
+      {
+        "name": "Benchmark Item A Updated",
+        "available_amount": 1500
+      },
+      {
+        "name": "Benchmark Item B",
+        "available_amount": 500
+      }
+    ]
   }' | jq
+```
+
+Because `PUT /api/v1/items` is a full active snapshot, active items omitted from
+the payload are soft-deleted.
+
+Refresh the item id after resync:
+
+```bash
+ITEM_ID=$(curl -s "http://localhost:8080/api/v1/items?limit=10&offset=0" \
+  -H "Authorization: Bearer $TOKEN" \
+  | jq -r '.data[] | select(.name=="Benchmark Item A Updated") | .id')
+
+echo "$ITEM_ID"
 ```
 
 ### 8. Create Transaction
@@ -1188,7 +1227,7 @@ You should assume a full rerun is required when one of the following happens:
 In those cases, repeat:
 
 ```text
-env-init
+env-init-monolith
 start database
 bootstrap database if needed
 run migration

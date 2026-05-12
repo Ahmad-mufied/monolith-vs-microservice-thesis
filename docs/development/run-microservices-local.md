@@ -1,0 +1,638 @@
+# Run Microservices Locally
+
+Use this document to run the microservices architecture locally for manual
+integration testing.
+
+The local MSA flow supports:
+
+- Docker Compose PostgreSQL,
+- Docker Compose for the MSA application stack,
+- optional `go run` for each service process when debugging from the host,
+- API Gateway as the only external REST entry point,
+- gRPC between API Gateway and internal services.
+
+Use Docker Compose when you want to validate local deployment behavior. Use
+`go run` when you want faster service-by-service debugging.
+
+## 1. Runtime Layout
+
+Local ports:
+
+| Component | Protocol | Port | Public entry point |
+|---|---:|---:|---|
+| API Gateway | HTTP REST | `8080` | yes |
+| Auth Service | gRPC | `50051` | no |
+| Item Service | gRPC | `50052` | no |
+| Transaction Service | gRPC | `50053` | no |
+| PostgreSQL | PostgreSQL | `5432` | local only |
+
+Local databases:
+
+| Component | Database |
+|---|---|
+| Auth Service | `auth_db` |
+| Item Service | `item_db` |
+| Transaction Service | `transaction_db` |
+| API Gateway | no database |
+
+Important:
+
+- stop the monolith app before using API Gateway on port `8080`,
+- keep the Compose PostgreSQL container running,
+- do not run monolith and MSA tests against the same external port at the same time.
+
+## 2. Stop Monolith, Keep PostgreSQL
+
+If the monolith app was started with Docker Compose:
+
+```bash
+docker compose -f deployments/compose/docker-compose.monolith.yml down
+```
+
+If the monolith app was started with `make run-monolith`, stop that terminal
+with `Ctrl+C`.
+
+Keep PostgreSQL running:
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+```
+
+Expected PostgreSQL container:
+
+```text
+skripsi-postgres
+```
+
+## 3. Generate Local Env Files
+
+First create the base local env files:
+
+```bash
+make env-init-base
+```
+
+Then create MSA-specific env files:
+
+```bash
+make env-init-microservices
+```
+
+Generated local files:
+
+```text
+env/api-gateway.env
+env/auth-service.env
+env/item-service.env
+env/transaction-service.env
+env/api-gateway.compose.env
+env/auth-service.compose.env
+env/item-service.compose.env
+env/transaction-service.compose.env
+```
+
+These files are ignored by Git because they contain local secrets and database
+URLs.
+
+## 4. Env File Contents
+
+### API Gateway
+
+File:
+
+```text
+env/api-gateway.env
+```
+
+Expected keys:
+
+```env
+HTTP_PORT=8080
+JWT_SECRET=<same-local-secret-as-auth-service>
+AUTH_SERVICE_ADDR=localhost:50051
+ITEM_SERVICE_ADDR=localhost:50052
+TRANSACTION_SERVICE_ADDR=localhost:50053
+```
+
+### Auth Service
+
+File:
+
+```text
+env/auth-service.env
+```
+
+Expected keys:
+
+```env
+GRPC_PORT=50051
+DATABASE_URL=postgres://postgres:<password>@localhost:5432/auth_db?sslmode=disable
+AUTH_DATABASE_URL=postgres://postgres:<password>@localhost:5432/auth_db?sslmode=disable
+JWT_SECRET=<same-local-secret-as-api-gateway>
+JWT_EXPIRY=24h
+BCRYPT_COST=12
+```
+
+`DATABASE_URL` is used by the service process.
+
+`AUTH_DATABASE_URL` is used by local migration commands.
+
+### Item Service
+
+File:
+
+```text
+env/item-service.env
+```
+
+Expected keys:
+
+```env
+GRPC_PORT=50052
+DATABASE_URL=postgres://postgres:<password>@localhost:5432/item_db?sslmode=disable
+ITEM_DATABASE_URL=postgres://postgres:<password>@localhost:5432/item_db?sslmode=disable
+```
+
+### Transaction Service
+
+File:
+
+```text
+env/transaction-service.env
+```
+
+Expected keys:
+
+```env
+GRPC_PORT=50053
+DATABASE_URL=postgres://postgres:<password>@localhost:5432/transaction_db?sslmode=disable
+TRANSACTION_DATABASE_URL=postgres://postgres:<password>@localhost:5432/transaction_db?sslmode=disable
+ITEM_SERVICE_ADDR=localhost:50052
+```
+
+Transaction Service calls Item Service over gRPC for transaction item
+validation.
+
+## 5. Run Migrations
+
+Run all MSA migrations:
+
+```bash
+make migrate-microservices-local
+```
+
+Equivalent manual commands:
+
+```bash
+set -a
+source env/auth-service.env
+source env/item-service.env
+source env/transaction-service.env
+set +a
+
+goose -dir microservices/auth-service/migrations postgres "$AUTH_DATABASE_URL" up
+goose -dir microservices/item-service/migrations postgres "$ITEM_DATABASE_URL" up
+goose -dir microservices/transaction-service/migrations postgres "$TRANSACTION_DATABASE_URL" up
+```
+
+Check migration status:
+
+```bash
+set -a
+source env/auth-service.env
+source env/item-service.env
+source env/transaction-service.env
+set +a
+
+goose -dir microservices/auth-service/migrations postgres "$AUTH_DATABASE_URL" status
+goose -dir microservices/item-service/migrations postgres "$ITEM_DATABASE_URL" status
+goose -dir microservices/transaction-service/migrations postgres "$TRANSACTION_DATABASE_URL" status
+```
+
+## 6. Start Services With Docker Compose
+
+Start the MSA application stack:
+
+```bash
+make compose-microservices-up
+```
+
+Equivalent command:
+
+```bash
+docker compose -f deployments/compose/docker-compose.microservices.yml up --build
+```
+
+Started containers:
+
+```text
+skripsi-auth-service
+skripsi-item-service
+skripsi-transaction-service
+skripsi-api-gateway
+```
+
+The API Gateway is exposed at:
+
+```text
+http://localhost:8080
+```
+
+## 7. Alternative: Start Services With Go Run
+
+Use four separate terminals.
+
+Start Auth Service:
+
+```bash
+make run-auth-service-local
+```
+
+Expected log:
+
+```text
+auth-service gRPC listening on :50051
+```
+
+Start Item Service:
+
+```bash
+make run-item-service-local
+```
+
+Expected log:
+
+```text
+item-service gRPC listening on :50052
+```
+
+Start Transaction Service:
+
+```bash
+make run-transaction-service-local
+```
+
+Expected log:
+
+```text
+transaction-service gRPC listening on :50053
+```
+
+Start API Gateway:
+
+```bash
+make run-api-gateway-local
+```
+
+Expected log:
+
+```text
+api-gateway HTTP listening on :8080
+```
+
+## 8. Health Check
+
+Endpoint:
+
+- `GET /healthz`
+
+Request:
+
+```bash
+curl -i http://localhost:8080/healthz
+```
+
+Expected result:
+
+- HTTP `200 OK`
+- response body contains:
+  - `message: "ok"`
+  - `service: "api-gateway"`
+  - `timestamp`
+
+## 9. Manual Integration Test Flow
+
+Set base URL:
+
+```bash
+BASE_URL="http://localhost:8080"
+TOKEN=""
+ITEM_ID=""
+TRANSACTION_ID=""
+```
+
+### 9.1 Register User
+
+```bash
+curl -i -X POST "$BASE_URL/api/v1/auth/register" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "MSA Manual User",
+    "email": "msa-manual@example.com",
+    "password": "password123"
+  }'
+```
+
+SQL check in `auth_db`:
+
+```bash
+set -a
+source env/auth-service.env
+set +a
+
+psql "$AUTH_DATABASE_URL" -c "
+SELECT id, name, email, password_hash IS NOT NULL AS has_password_hash, created_at, updated_at
+FROM users
+WHERE lower(email) = 'msa-manual@example.com';
+"
+```
+
+### 9.2 Login User
+
+```bash
+TOKEN=$(curl -s -X POST "$BASE_URL/api/v1/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "msa-manual@example.com",
+    "password": "password123"
+  }' | jq -r '.data.token')
+
+echo "$TOKEN"
+```
+
+Expected result:
+
+- token is not empty,
+- token can be used against protected routes.
+
+### 9.3 Sync Active Items
+
+```bash
+curl -i -X PUT "$BASE_URL/api/v1/items" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "items": [
+      {
+        "name": "MSA Item A",
+        "available_amount": 1000
+      },
+      {
+        "name": "MSA Item B",
+        "available_amount": 500
+      }
+    ]
+  }'
+```
+
+SQL check in `item_db`:
+
+```bash
+set -a
+source env/item-service.env
+set +a
+
+psql "$ITEM_DATABASE_URL" -c "
+SELECT id, name, available_amount, deleted_at, created_at, updated_at
+FROM items
+WHERE lower(name) IN ('msa item a', 'msa item b')
+ORDER BY name;
+"
+```
+
+### 9.4 List Active Items
+
+```bash
+curl -s "$BASE_URL/api/v1/items?limit=10&offset=0" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+Capture an item id:
+
+```bash
+ITEM_ID=$(curl -s "$BASE_URL/api/v1/items?limit=10&offset=0" \
+  -H "Authorization: Bearer $TOKEN" \
+  | jq -r '.data[] | select(.name=="MSA Item A") | .id')
+
+echo "$ITEM_ID"
+```
+
+### 9.5 Get Item Detail
+
+```bash
+curl -s "$BASE_URL/api/v1/items/$ITEM_ID" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+### 9.6 Create Transaction
+
+```bash
+TRANSACTION_ID=$(curl -s -X POST "$BASE_URL/api/v1/transactions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"items\": [
+      {
+        \"item_id\": \"$ITEM_ID\",
+        \"amount\": 2
+      }
+    ]
+  }" | jq -r '.data.id')
+
+echo "$TRANSACTION_ID"
+```
+
+SQL check in `transaction_db`:
+
+```bash
+set -a
+source env/transaction-service.env
+set +a
+
+psql "$TRANSACTION_DATABASE_URL" -c "
+SELECT id, user_id, status, created_at, updated_at
+FROM transactions
+WHERE id = '$TRANSACTION_ID'::uuid;
+"
+
+psql "$TRANSACTION_DATABASE_URL" -c "
+SELECT transaction_id, item_id, amount, created_at, updated_at
+FROM transaction_items
+WHERE transaction_id = '$TRANSACTION_ID'::uuid
+ORDER BY item_id;
+"
+```
+
+Check that Item Service did not deduct `available_amount`:
+
+```bash
+set -a
+source env/item-service.env
+set +a
+
+psql "$ITEM_DATABASE_URL" -c "
+SELECT id, name, available_amount
+FROM items
+WHERE id = '$ITEM_ID'::uuid;
+"
+```
+
+Expected result:
+
+- transaction rows exist in `transaction_db`,
+- item row exists in `item_db`,
+- `available_amount` remains unchanged.
+
+### 9.7 List Own Transactions
+
+```bash
+curl -s "$BASE_URL/api/v1/transactions?limit=10&offset=0" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+### 9.8 Get Transaction Detail
+
+```bash
+curl -s "$BASE_URL/api/v1/transactions/$TRANSACTION_ID" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+### 9.9 Get Enriched Transactions
+
+```bash
+curl -s "$BASE_URL/api/v1/admin/transactions?limit=10&offset=0" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+Expected behavior:
+
+- API Gateway asks Transaction Service for raw transaction data,
+- API Gateway asks Auth Service for user summaries,
+- API Gateway asks Item Service for item summaries,
+- API Gateway enriches the final REST response in memory.
+
+## 10. Negative Test Examples
+
+Missing auth header:
+
+```bash
+curl -i "$BASE_URL/api/v1/items"
+```
+
+Wrong password:
+
+```bash
+curl -i -X POST "$BASE_URL/api/v1/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "msa-manual@example.com",
+    "password": "wrong-password"
+  }'
+```
+
+Invalid item id:
+
+```bash
+curl -i -X POST "$BASE_URL/api/v1/transactions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "items": [
+      {
+        "item_id": "not-a-uuid",
+        "amount": 1
+      }
+    ]
+  }'
+```
+
+Amount above availability:
+
+```bash
+curl -i -X POST "$BASE_URL/api/v1/transactions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"items\": [
+      {
+        \"item_id\": \"$ITEM_ID\",
+        \"amount\": 999999
+      }
+    ]
+  }"
+```
+
+## 11. Stop Local MSA
+
+For Docker Compose MSA:
+
+```bash
+docker compose -f deployments/compose/docker-compose.microservices.yml down
+```
+
+For `go run` MSA, stop each service process with `Ctrl+C` in its terminal.
+
+Keep PostgreSQL running if you want to inspect data.
+
+If you want to clean all local Compose data, use:
+
+```bash
+make compose-down
+```
+
+Important:
+
+- `make compose-down` uses `down -v`,
+- it removes the local PostgreSQL volume,
+- it destroys local `mono_db`, `auth_db`, `item_db`, and `transaction_db` data.
+
+## 12. Troubleshooting
+
+### Port 8080 already in use
+
+Most likely the monolith app is still running.
+
+Stop monolith first, then rerun:
+
+```bash
+make run-api-gateway-local
+```
+
+### Missing env file
+
+Run:
+
+```bash
+make env-init-microservices
+```
+
+### Migration cannot connect
+
+Check PostgreSQL is running:
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+```
+
+Check the generated env URLs:
+
+```bash
+sed -n '1,120p' env/auth-service.env
+sed -n '1,120p' env/item-service.env
+sed -n '1,120p' env/transaction-service.env
+```
+
+### API Gateway returns upstream errors
+
+Check all gRPC services are running:
+
+```bash
+ss -ltnp | rg '50051|50052|50053|8080'
+```
+
+Also check the service address values in:
+
+```text
+env/api-gateway.env
+env/transaction-service.env
+```
