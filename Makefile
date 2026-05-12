@@ -58,7 +58,9 @@ help:
 	@echo "Available commands:"
 	@echo ""
 	@echo "Development:"
-	@echo "  make env-init"
+	@echo "  make env-init-base"
+	@echo "  make env-init-monolith"
+	@echo "  make env-init-microservices"
 	@echo "  make fmt"
 	@echo "  make test"
 	@echo "  make lint"
@@ -72,10 +74,15 @@ help:
 	@echo ""
 	@echo "Run locally with go run:"
 	@echo "  make run-monolith"
+	@echo "  make run-monolith-local"
 	@echo "  make run-api-gateway"
 	@echo "  make run-auth-service"
 	@echo "  make run-item-service"
 	@echo "  make run-transaction-service"
+	@echo "  make run-api-gateway-local"
+	@echo "  make run-auth-service-local"
+	@echo "  make run-item-service-local"
+	@echo "  make run-transaction-service-local"
 	@echo ""
 	@echo "Docker Compose:"
 	@echo "  make compose-db-up"
@@ -87,6 +94,7 @@ help:
 	@echo "  make migrate-monolith-local"
 	@echo "  make migrate-monolith"
 	@echo "  make migrate-microservices"
+	@echo "  make migrate-microservices-local"
 	@echo ""
 	@echo "Seed:"
 	@echo "  make seed-monolith"
@@ -111,9 +119,17 @@ help:
 # Local Env
 # =========================
 
-.PHONY: env-init
-env-init:
-	bash scripts/env-init.sh
+.PHONY: env-init-base
+env-init-base:
+	bash scripts/env-init-base.sh
+
+.PHONY: env-init-monolith
+env-init-monolith: env-init-base
+	bash scripts/env-init-monolith.sh
+
+.PHONY: env-init-microservices
+env-init-microservices: env-init-base
+	bash scripts/env-init-microservices.sh
 
 # =========================
 # Go Development
@@ -196,6 +212,10 @@ proto:
 run-monolith:
 	cd $(MONOLITH_DIR) && go run ./cmd/server
 
+.PHONY: run-monolith-local
+run-monolith-local:
+	bash -c 'set -a; source $(MONOLITH_ENV); DATABASE_URL="$$MONO_DATABASE_URL"; set +a; cd $(MONOLITH_DIR) && go run ./cmd/server'
+
 .PHONY: run-api-gateway
 run-api-gateway:
 	cd $(API_GATEWAY_DIR) && go run ./cmd/server
@@ -211,6 +231,22 @@ run-item-service:
 .PHONY: run-transaction-service
 run-transaction-service:
 	cd $(TRANSACTION_SERVICE_DIR) && go run ./cmd/server
+
+.PHONY: run-api-gateway-local
+run-api-gateway-local:
+	bash -c 'set -a; source $(API_GATEWAY_ENV); set +a; cd $(API_GATEWAY_DIR) && go run ./cmd/server'
+
+.PHONY: run-auth-service-local
+run-auth-service-local:
+	bash -c 'set -a; source $(AUTH_SERVICE_ENV); set +a; cd $(AUTH_SERVICE_DIR) && go run ./cmd/server'
+
+.PHONY: run-item-service-local
+run-item-service-local:
+	bash -c 'set -a; source $(ITEM_SERVICE_ENV); set +a; cd $(ITEM_SERVICE_DIR) && go run ./cmd/server'
+
+.PHONY: run-transaction-service-local
+run-transaction-service-local:
+	bash -c 'set -a; source $(TRANSACTION_SERVICE_ENV); set +a; cd $(TRANSACTION_SERVICE_DIR) && go run ./cmd/server'
 
 # =========================
 # Docker Build
@@ -278,6 +314,10 @@ migrate-transaction:
 
 .PHONY: migrate-microservices
 migrate-microservices: migrate-auth migrate-item migrate-transaction
+
+.PHONY: migrate-microservices-local
+migrate-microservices-local:
+	bash -c 'set -a; source $(AUTH_SERVICE_ENV); source $(ITEM_SERVICE_ENV); source $(TRANSACTION_SERVICE_ENV); set +a; $(MAKE) migrate-microservices'
 
 # =========================
 # Seed and Reset
