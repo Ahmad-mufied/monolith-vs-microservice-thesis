@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ ! -f env/postgres.env || ! -f env/monolith.env ]]; then
-  echo "missing env files; run: make env-init" >&2
+  echo "missing env files; run: make env-init-monolith" >&2
   exit 1
 fi
 
