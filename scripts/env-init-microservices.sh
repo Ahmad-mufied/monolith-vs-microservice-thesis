@@ -95,18 +95,18 @@ TRANSACTION_SERVICE_ADDR=localhost:50053"
 
 write_if_missing "env/auth-service.compose.env" "GRPC_PORT=50051
 DATABASE_URL=${compose_auth_database_url}
-AUTH_DATABASE_URL=${auth_database_url}
+AUTH_DATABASE_URL=${compose_auth_database_url}
 JWT_SECRET=${jwt_secret}
 JWT_EXPIRY=24h
 BCRYPT_COST=12"
 
 write_if_missing "env/item-service.compose.env" "GRPC_PORT=50052
 DATABASE_URL=${compose_item_database_url}
-ITEM_DATABASE_URL=${item_database_url}"
+ITEM_DATABASE_URL=${compose_item_database_url}"
 
 write_if_missing "env/transaction-service.compose.env" "GRPC_PORT=50053
 DATABASE_URL=${compose_transaction_database_url}
-TRANSACTION_DATABASE_URL=${transaction_database_url}
+TRANSACTION_DATABASE_URL=${compose_transaction_database_url}
 ITEM_SERVICE_ADDR=item-service:50052"
 
 write_if_missing "env/api-gateway.compose.env" "HTTP_PORT=8080
