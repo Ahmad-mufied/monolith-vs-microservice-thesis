@@ -214,7 +214,7 @@ run-monolith:
 
 .PHONY: run-monolith-local
 run-monolith-local:
-	bash -c 'set -a; source $(MONOLITH_ENV); DATABASE_URL="$$MONO_DATABASE_URL"; set +a; cd $(MONOLITH_DIR) && go run ./cmd/server'
+	bash -c 'set -euo pipefail; set -a; source $(MONOLITH_ENV); DATABASE_URL="$${MONO_DATABASE_URL:?MONO_DATABASE_URL is required}"; set +a; cd $(MONOLITH_DIR) && go run ./cmd/server'
 
 .PHONY: run-api-gateway
 run-api-gateway:
@@ -234,19 +234,19 @@ run-transaction-service:
 
 .PHONY: run-api-gateway-local
 run-api-gateway-local:
-	bash -c 'set -a; source $(API_GATEWAY_ENV); set +a; cd $(API_GATEWAY_DIR) && go run ./cmd/server'
+	bash -c 'set -euo pipefail; set -a; source $(API_GATEWAY_ENV); set +a; cd $(API_GATEWAY_DIR) && go run ./cmd/server'
 
 .PHONY: run-auth-service-local
 run-auth-service-local:
-	bash -c 'set -a; source $(AUTH_SERVICE_ENV); set +a; cd $(AUTH_SERVICE_DIR) && go run ./cmd/server'
+	bash -c 'set -euo pipefail; set -a; source $(AUTH_SERVICE_ENV); set +a; cd $(AUTH_SERVICE_DIR) && go run ./cmd/server'
 
 .PHONY: run-item-service-local
 run-item-service-local:
-	bash -c 'set -a; source $(ITEM_SERVICE_ENV); set +a; cd $(ITEM_SERVICE_DIR) && go run ./cmd/server'
+	bash -c 'set -euo pipefail; set -a; source $(ITEM_SERVICE_ENV); set +a; cd $(ITEM_SERVICE_DIR) && go run ./cmd/server'
 
 .PHONY: run-transaction-service-local
 run-transaction-service-local:
-	bash -c 'set -a; source $(TRANSACTION_SERVICE_ENV); set +a; cd $(TRANSACTION_SERVICE_DIR) && go run ./cmd/server'
+	bash -c 'set -euo pipefail; set -a; source $(TRANSACTION_SERVICE_ENV); set +a; cd $(TRANSACTION_SERVICE_DIR) && go run ./cmd/server'
 
 # =========================
 # Docker Build
@@ -298,7 +298,7 @@ migrate-monolith:
 
 .PHONY: migrate-monolith-local
 migrate-monolith-local:
-	bash -c 'set -a; source $(MONOLITH_ENV); set +a; goose -dir $(MONOLITH_DIR)/migrations postgres "$$MONO_DATABASE_URL" up'
+	bash -c 'set -euo pipefail; set -a; source $(MONOLITH_ENV); set +a; goose -dir $(MONOLITH_DIR)/migrations postgres "$${MONO_DATABASE_URL:?MONO_DATABASE_URL is required}" up'
 
 .PHONY: migrate-auth
 migrate-auth:
@@ -317,7 +317,7 @@ migrate-microservices: migrate-auth migrate-item migrate-transaction
 
 .PHONY: migrate-microservices-local
 migrate-microservices-local:
-	bash -c 'set -a; source $(AUTH_SERVICE_ENV); source $(ITEM_SERVICE_ENV); source $(TRANSACTION_SERVICE_ENV); set +a; $(MAKE) migrate-microservices'
+	bash -c 'set -euo pipefail; set -a; source $(AUTH_SERVICE_ENV); source $(ITEM_SERVICE_ENV); source $(TRANSACTION_SERVICE_ENV); set +a; $(MAKE) migrate-microservices'
 
 # =========================
 # Seed and Reset
