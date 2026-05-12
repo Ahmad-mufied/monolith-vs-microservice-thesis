@@ -34,13 +34,10 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 	}()
 
 	orderedItems := orderedItemsForAllocation(items)
-	availableAfter := make(map[string]int, len(orderedItems))
 	for _, item := range orderedItems {
-		after, err := allocateItem(ctx, tx, item)
-		if err != nil {
+		if err := validateItem(ctx, tx, item); err != nil {
 			return Transaction{}, err
 		}
-		availableAfter[item.ItemID] = after
 	}
 
 	transaction, err := insertTransaction(ctx, tx, userID)
@@ -50,7 +47,7 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 
 	transaction.Items = make([]Item, 0, len(orderedItems))
 	for _, item := range orderedItems {
-		if err := insertTransactionItem(ctx, tx, transaction.ID, item, availableAfter[item.ItemID]); err != nil {
+		if err := insertTransactionItem(ctx, tx, transaction.ID, item); err != nil {
 			return Transaction{}, err
 		}
 		transaction.Items = append(transaction.Items, Item(item))
@@ -138,14 +135,12 @@ SELECT
   u.id::text,
   u.name,
   u.email,
-	u.created_at,
-	u.updated_at,
-	i.id::text,
-	i.name,
-	ti.available_amount_after,
-	i.created_at,
-	i.updated_at,
-	ti.amount
+  u.created_at,
+  u.updated_at,
+  i.id::text,
+  i.name,
+  i.deleted_at IS NOT NULL AS deleted,
+  ti.amount
 FROM (
 	  SELECT id, user_id, created_at, updated_at
 	  FROM transactions
@@ -177,9 +172,7 @@ ORDER BY t.created_at DESC, t.id DESC, i.id`
 			&row.UserUpdatedAt,
 			&row.ItemID,
 			&row.ItemName,
-			&row.ItemAvailableAmount,
-			&row.ItemCreatedAt,
-			&row.ItemUpdatedAt,
+			&row.ItemDeleted,
 			&row.Amount,
 		); err != nil {
 			return nil, apperror.Internal("internal server error", fmt.Errorf("scanning enriched transaction: %w", err))
@@ -204,11 +197,9 @@ ORDER BY t.created_at DESC, t.id DESC, i.id`
 		}
 		tx.Items = append(tx.Items, EnrichedItem{
 			Item: ItemDetail{
-				ID:              row.ItemID,
-				Name:            row.ItemName,
-				AvailableAmount: row.ItemAvailableAmount,
-				CreatedAt:       row.ItemCreatedAt,
-				UpdatedAt:       row.ItemUpdatedAt,
+				ID:      row.ItemID,
+				Name:    row.ItemName,
+				Deleted: row.ItemDeleted,
 			},
 			Amount: row.Amount,
 		})
@@ -301,27 +292,18 @@ func transactionIDs(transactions []Transaction) []string {
 	return ids
 }
 
-func allocateItem(ctx context.Context, tx pgx.Tx, item CreateItemRequest) (int, error) {
+func validateItem(ctx context.Context, tx pgx.Tx, item CreateItemRequest) error {
 	var availableAmount int
-	if err := tx.QueryRow(ctx, `SELECT available_amount FROM items WHERE id = $1::uuid FOR UPDATE`, item.ItemID).Scan(&availableAmount); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT available_amount FROM items WHERE id = $1::uuid AND deleted_at IS NULL`, item.ItemID).Scan(&availableAmount); err != nil {
 		if err == pgx.ErrNoRows {
-			return 0, apperror.NotFound("item not found")
+			return apperror.NotFound("item not found")
 		}
-		return 0, apperror.Internal("internal server error", fmt.Errorf("locking item: %w", err))
+		return apperror.Internal("internal server error", fmt.Errorf("validating item: %w", err))
 	}
 	if availableAmount < item.Amount {
-		return 0, apperror.Conflict("insufficient available amount")
+		return apperror.Conflict("insufficient available amount")
 	}
-
-	var availableAfter int
-	if err := tx.QueryRow(ctx, `
-UPDATE items
-SET available_amount = available_amount - $2, updated_at = now()
-WHERE id = $1::uuid
-RETURNING available_amount`, item.ItemID, item.Amount).Scan(&availableAfter); err != nil {
-		return 0, apperror.Internal("internal server error", fmt.Errorf("allocating item: %w", err))
-	}
-	return availableAfter, nil
+	return nil
 }
 
 func insertTransaction(ctx context.Context, tx pgx.Tx, userID string) (Transaction, error) {
@@ -347,11 +329,11 @@ func isMissingTransactionUserError(err error) bool {
 	return pgErr.Code == "23503" && pgErr.TableName == "transactions" && pgErr.ConstraintName == "transactions_user_id_fkey"
 }
 
-func insertTransactionItem(ctx context.Context, tx pgx.Tx, transactionID string, item CreateItemRequest, availableAfter int) error {
+func insertTransactionItem(ctx context.Context, tx pgx.Tx, transactionID string, item CreateItemRequest) error {
 	const query = `
-INSERT INTO transaction_items (transaction_id, item_id, amount, available_amount_after)
-VALUES ($1::uuid, $2::uuid, $3, $4)`
-	if _, err := tx.Exec(ctx, query, transactionID, item.ItemID, item.Amount, availableAfter); err != nil {
+INSERT INTO transaction_items (transaction_id, item_id, amount)
+VALUES ($1::uuid, $2::uuid, $3)`
+	if _, err := tx.Exec(ctx, query, transactionID, item.ItemID, item.Amount); err != nil {
 		return apperror.Internal("internal server error", fmt.Errorf("inserting transaction item: %w", err))
 	}
 	return nil
@@ -368,8 +350,6 @@ type enrichedRow struct {
 	UserUpdatedAt        time.Time
 	ItemID               string
 	ItemName             string
-	ItemAvailableAmount  int
-	ItemCreatedAt        time.Time
-	ItemUpdatedAt        time.Time
+	ItemDeleted          bool
 	Amount               int
 }

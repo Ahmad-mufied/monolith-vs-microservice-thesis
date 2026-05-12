@@ -37,11 +37,9 @@ type EnrichedItem struct {
 }
 
 type ItemDetail struct {
-	ID              string
-	Name            string
-	AvailableAmount int
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID      string
+	Name    string
+	Deleted bool
 }
 
 type Response struct {
@@ -93,8 +91,9 @@ type ItemDetailResponse struct {
 }
 
 type ItemSummaryResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Deleted bool   `json:"deleted"`
 }
 
 func toResponse(tx Transaction) Response {
@@ -118,8 +117,9 @@ func toEnrichedResponse(tx EnrichedTransaction) EnrichedResponse {
 	for _, item := range tx.Items {
 		items = append(items, EnrichedItemResponse{
 			Item: ItemSummaryResponse{
-				ID:   item.Item.ID,
-				Name: item.Item.Name,
+				ID:      item.Item.ID,
+				Name:    item.Item.Name,
+				Deleted: item.Item.Deleted,
 			},
 			Amount: item.Amount,
 		})
