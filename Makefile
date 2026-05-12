@@ -317,7 +317,7 @@ migrate-microservices: migrate-auth migrate-item migrate-transaction
 
 .PHONY: migrate-microservices-local
 migrate-microservices-local:
-	bash -c 'set -euo pipefail; set -a; source $(AUTH_SERVICE_ENV); source $(ITEM_SERVICE_ENV); source $(TRANSACTION_SERVICE_ENV); set +a; $(MAKE) migrate-microservices'
+	bash -c 'set -euo pipefail; set -a; source $(AUTH_SERVICE_ENV); source $(ITEM_SERVICE_ENV); source $(TRANSACTION_SERVICE_ENV); : "$${AUTH_DATABASE_URL:?AUTH_DATABASE_URL is required}"; : "$${ITEM_DATABASE_URL:?ITEM_DATABASE_URL is required}"; : "$${TRANSACTION_DATABASE_URL:?TRANSACTION_DATABASE_URL is required}"; set +a; $(MAKE) migrate-microservices'
 
 # =========================
 # Seed and Reset
