@@ -285,9 +285,14 @@ CREATE TABLE items (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   name TEXT NOT NULL,
   available_amount INT NOT NULL CHECK (available_amount >= 0),
+  deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX items_name_active_unique
+ON items (lower(name))
+WHERE deleted_at IS NULL;
 ```
 
 Notes:
@@ -295,6 +300,8 @@ Notes:
 - `available_amount` represents available allocatable amount,
 - `available_amount` is used as a validation boundary during transaction creation,
 - REST API `Item.available_amount` maps to this column,
+- `deleted_at` is used for soft delete via `PUT /api/v1/items` sync — items omitted from the sync payload are soft-deleted,
+- `items_name_active_unique` enforces name uniqueness among active items only,
 - do not use `stock`, `quantity`, or `availability`.
 
 Owned by:
@@ -495,6 +502,10 @@ Current indexes used in migrations:
 CREATE UNIQUE INDEX idx_users_email_lower_unique
 ON users(lower(email));
 
+CREATE UNIQUE INDEX items_name_active_unique
+ON items(lower(name))
+WHERE deleted_at IS NULL;
+
 CREATE INDEX idx_transactions_user_id_created_at_id
 ON transactions(user_id, created_at DESC, id DESC);
 
@@ -510,6 +521,7 @@ Purpose:
 | Index | Purpose |
 |---|---|
 | `users(lower(email))` | case-insensitive email uniqueness |
+| `items(lower(name)) WHERE deleted_at IS NULL` | active item name uniqueness |
 | `transactions(user_id, created_at DESC, id DESC)` | get own transactions |
 | `transactions(created_at DESC, id DESC)` | admin transaction listing |
 | `transaction_items(item_id)` | item reference lookup or analysis |
@@ -589,9 +601,6 @@ Begin DB transaction
     |
     v
 Validate items.available_amount
-    |
-    v
-Update items.available_amount
     |
     v
 Insert transactions RETURNING id
@@ -703,8 +712,7 @@ The schema does not include:
 - Kafka event log,
 - Redis cache,
 - saga state,
-- audit log table,
-- soft delete columns.
+- audit log table.
 
 These may be added only if the research scope changes.
 
