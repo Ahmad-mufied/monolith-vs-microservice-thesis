@@ -16,10 +16,13 @@ The current target images are:
 
 ```text
 skripsi/monolith
+skripsi/api-gateway
 skripsi/auth-service
+skripsi/item-service
+skripsi/transaction-service
 ```
 
-The current pipeline now validates the monolith build path together with the first microservice image build path for `auth-service`.
+The current pipeline validates the monolith build path together with all microservice image build paths.
 
 ---
 
@@ -41,7 +44,10 @@ Current ECR repositories:
 
 ```text
 skripsi/monolith
+skripsi/api-gateway
 skripsi/auth-service
+skripsi/item-service
+skripsi/transaction-service
 ```
 
 Image tag strategy:
@@ -54,7 +60,10 @@ Example image URIs:
 
 ```text
 720166597212.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/monolith:a1b2c3d
+720166597212.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/api-gateway:a1b2c3d
 720166597212.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/auth-service:a1b2c3d
+720166597212.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/item-service:a1b2c3d
+720166597212.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/transaction-service:a1b2c3d
 ```
 
 The ECR repository uses immutable image tags.
@@ -100,15 +109,15 @@ Current repositories:
 
 ```text
 skripsi/monolith
+skripsi/api-gateway
 skripsi/auth-service
+skripsi/item-service
+skripsi/transaction-service
 ```
 
 Next repositories:
 
 ```text
-skripsi/api-gateway
-skripsi/item-service
-skripsi/transaction-service
 skripsi/seed-runner
 skripsi/k6-runner
 ```
@@ -173,7 +182,7 @@ Example metadata:
 Recommended ECR configuration:
 
 ```text
-Repositories    : skripsi/monolith, skripsi/auth-service
+Repositories    : skripsi/monolith, skripsi/api-gateway, skripsi/auth-service, skripsi/item-service, skripsi/transaction-service
 Visibility      : Private
 Region          : ap-southeast-1
 Tag mutability  : Immutable
@@ -373,13 +382,19 @@ phases:
       - echo "Starting pre_build phase..."
       - echo "Checking Dockerfiles..."
       - test -f monolith/Dockerfile
+      - test -f microservices/api-gateway/Dockerfile
       - test -f microservices/auth-service/Dockerfile
+      - test -f microservices/item-service/Dockerfile
+      - test -f microservices/transaction-service/Dockerfile
 
       - echo "Resolving AWS account and ECR registry..."
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - export ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
       - export MONOLITH_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/monolith
+      - export API_GATEWAY_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/api-gateway
       - export AUTH_SERVICE_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/auth-service
+      - export ITEM_SERVICE_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/item-service
+      - export TRANSACTION_SERVICE_REPOSITORY_URI=$ECR_REGISTRY/$ECR_NAMESPACE/transaction-service
 
       - echo "Resolving image tag..."
       - export IMAGE_TAG=$(printf '%.7s' "${CODEBUILD_RESOLVED_SOURCE_VERSION:-}")
@@ -388,12 +403,18 @@ phases:
       - echo "AWS_REGION=$AWS_REGION"
       - echo "ECR_REGISTRY=$ECR_REGISTRY"
       - echo "MONOLITH_REPOSITORY_URI=$MONOLITH_REPOSITORY_URI"
+      - echo "API_GATEWAY_REPOSITORY_URI=$API_GATEWAY_REPOSITORY_URI"
       - echo "AUTH_SERVICE_REPOSITORY_URI=$AUTH_SERVICE_REPOSITORY_URI"
+      - echo "ITEM_SERVICE_REPOSITORY_URI=$ITEM_SERVICE_REPOSITORY_URI"
+      - echo "TRANSACTION_SERVICE_REPOSITORY_URI=$TRANSACTION_SERVICE_REPOSITORY_URI"
       - echo "IMAGE_TAG=$IMAGE_TAG"
 
       - echo "Checking ECR repositories..."
       - aws ecr describe-repositories --repository-names "$ECR_NAMESPACE/monolith" --region "$AWS_REGION"
+      - aws ecr describe-repositories --repository-names "$ECR_NAMESPACE/api-gateway" --region "$AWS_REGION"
       - aws ecr describe-repositories --repository-names "$ECR_NAMESPACE/auth-service" --region "$AWS_REGION"
+      - aws ecr describe-repositories --repository-names "$ECR_NAMESPACE/item-service" --region "$AWS_REGION"
+      - aws ecr describe-repositories --repository-names "$ECR_NAMESPACE/transaction-service" --region "$AWS_REGION"
 
       - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
@@ -404,20 +425,39 @@ phases:
       - echo "Building monolith image..."
       - docker build -t "monolith:$IMAGE_TAG" -f monolith/Dockerfile .
       - docker tag "monolith:$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG"
+
+      - echo "Building api-gateway image..."
+      - docker build -t "api-gateway:$IMAGE_TAG" -f microservices/api-gateway/Dockerfile .
+      - docker tag "api-gateway:$IMAGE_TAG" "$API_GATEWAY_REPOSITORY_URI:$IMAGE_TAG"
+
       - echo "Building auth-service image..."
       - docker build -t "auth-service:$IMAGE_TAG" -f microservices/auth-service/Dockerfile .
       - docker tag "auth-service:$IMAGE_TAG" "$AUTH_SERVICE_REPOSITORY_URI:$IMAGE_TAG"
+
+      - echo "Building item-service image..."
+      - docker build -t "item-service:$IMAGE_TAG" -f microservices/item-service/Dockerfile .
+      - docker tag "item-service:$IMAGE_TAG" "$ITEM_SERVICE_REPOSITORY_URI:$IMAGE_TAG"
+
+      - echo "Building transaction-service image..."
+      - docker build -t "transaction-service:$IMAGE_TAG" -f microservices/transaction-service/Dockerfile .
+      - docker tag "transaction-service:$IMAGE_TAG" "$TRANSACTION_SERVICE_REPOSITORY_URI:$IMAGE_TAG"
 
   post_build:
     commands:
       - echo "Starting post_build phase..."
       - echo "Pushing monolith image..."
       - docker push "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Pushing api-gateway image..."
+      - docker push "$API_GATEWAY_REPOSITORY_URI:$IMAGE_TAG"
       - echo "Pushing auth-service image..."
       - docker push "$AUTH_SERVICE_REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Pushing item-service image..."
+      - docker push "$ITEM_SERVICE_REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Pushing transaction-service image..."
+      - docker push "$TRANSACTION_SERVICE_REPOSITORY_URI:$IMAGE_TAG"
 
       - echo "Writing image detail artifact..."
-      - printf '{"tag":"%s","images":{"monolith":"%s","auth_service":"%s"},"commit":"%s"}' "$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG" "$AUTH_SERVICE_REPOSITORY_URI:$IMAGE_TAG" "$CODEBUILD_RESOLVED_SOURCE_VERSION" > image-detail.json
+      - printf '{"tag":"%s","images":{"monolith":"%s","api_gateway":"%s","auth_service":"%s","item_service":"%s","transaction_service":"%s"},"commit":"%s"}' "$IMAGE_TAG" "$MONOLITH_REPOSITORY_URI:$IMAGE_TAG" "$API_GATEWAY_REPOSITORY_URI:$IMAGE_TAG" "$AUTH_SERVICE_REPOSITORY_URI:$IMAGE_TAG" "$ITEM_SERVICE_REPOSITORY_URI:$IMAGE_TAG" "$TRANSACTION_SERVICE_REPOSITORY_URI:$IMAGE_TAG" "$CODEBUILD_RESOLVED_SOURCE_VERSION" > image-detail.json
 
       - echo "Build and push completed."
       - cat image-detail.json
@@ -428,16 +468,19 @@ artifacts:
 ```
 
 This buildspec uses a generic image-pipeline filename so the same pattern can
-be extended later for `api-gateway`, `item-service`, and `transaction-service`.
+be extended later for `seed-runner` and `k6-runner`.
 
 For the current phase, it builds and pushes:
 
 ```text
 skripsi/monolith
+skripsi/api-gateway
 skripsi/auth-service
+skripsi/item-service
+skripsi/transaction-service
 ```
 
-Both images use the same git short SHA tag from the same commit.
+All images use the same git short SHA tag from the same commit.
 
 This buildspec only pushes the git short SHA tag.
 
@@ -464,7 +507,10 @@ After the build succeeds, check:
 ECR
 → Repositories
 → skripsi/monolith
+→ skripsi/api-gateway
 → skripsi/auth-service
+→ skripsi/item-service
+→ skripsi/transaction-service
 → Images
 ```
 
@@ -501,10 +547,10 @@ PR merged to main
 CodeBuild triggered
     |
     v
-Build monolith and auth-service Docker images
+Build monolith, api-gateway, auth-service, item-service, and transaction-service Docker images
     |
     v
-Push both images to ECR with the same git short SHA tag
+Push all images to ECR with the same git short SHA tag
 ```
 
 This trigger also fires for direct pushes to `main`.
@@ -537,12 +583,11 @@ Deployment to EKS will be handled separately during the benchmark phase.
 
 ## 15. Next Step
 
-After monolith and auth-service build and push work, add ECR repositories and build steps for:
+After all service images build and push work, add ECR repositories and build steps for:
 
 ```text
-skripsi/api-gateway
-skripsi/item-service
-skripsi/transaction-service
+skripsi/seed-runner
+skripsi/k6-runner
 ```
 
 All images should use the same git short SHA tag when built from the same commit.
