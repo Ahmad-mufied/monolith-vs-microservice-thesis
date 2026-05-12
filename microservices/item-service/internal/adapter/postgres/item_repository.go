@@ -181,12 +181,15 @@ WHERE deleted_at IS NULL
 // softDeleteOmittedItems sets deleted_at on all active items whose IDs are
 // not in keepIDs. An empty keepIDs means soft-delete all active items.
 func softDeleteOmittedItems(ctx context.Context, tx pgx.Tx, keepIDs []string) error {
-	const query = `
+	const softDeleteOmittedItemsQuery = `
 UPDATE items
 SET deleted_at = now(), updated_at = now()
 WHERE deleted_at IS NULL
-  AND NOT (id = ANY($1::uuid[]))`
-	_, err := tx.Exec(ctx, query, keepIDs)
+  AND (
+    cardinality(COALESCE($1::uuid[], ARRAY[]::uuid[])) = 0
+    OR NOT (id = ANY(COALESCE($1::uuid[], ARRAY[]::uuid[])))
+  )`
+	_, err := tx.Exec(ctx, softDeleteOmittedItemsQuery, keepIDs)
 	return err
 }
 

@@ -100,7 +100,10 @@ func softDeleteOmittedItems(ctx context.Context, tx pgx.Tx, keepIDs []string) er
 UPDATE items
 SET deleted_at = now(), updated_at = now()
 WHERE deleted_at IS NULL
-  AND NOT (id = ANY($1::uuid[]))`
+  AND (
+    cardinality(COALESCE($1::uuid[], ARRAY[]::uuid[])) = 0
+    OR NOT (id = ANY(COALESCE($1::uuid[], ARRAY[]::uuid[])))
+  )`
 	_, err := tx.Exec(ctx, query, keepIDs)
 	return err
 }
