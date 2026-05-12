@@ -63,14 +63,6 @@ type EnrichedResponse struct {
 	UpdatedAt time.Time              `json:"updated_at"`
 }
 
-type UserResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
 type UserSummaryResponse struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
@@ -80,14 +72,6 @@ type UserSummaryResponse struct {
 type EnrichedItemResponse struct {
 	Item   ItemSummaryResponse `json:"item"`
 	Amount int                 `json:"amount"`
-}
-
-type ItemDetailResponse struct {
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
-	AvailableAmount int       `json:"available_amount"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type ItemSummaryResponse struct {
