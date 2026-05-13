@@ -107,6 +107,7 @@ help:
 	@echo "  make minikube-stop"
 	@echo "  make minikube-load-monolith"
 	@echo "  make minikube-deploy-postgres"
+	@echo "  make minikube-sync-postgres-password  # internal recovery step"
 	@echo "  make minikube-db-bootstrap"
 	@echo "  make minikube-migrate-monolith"
 	@echo "  make minikube-deploy-monolith"
@@ -390,21 +391,26 @@ minikube-deploy-postgres: create-local-secrets
 	kubectl apply -f $(K8S_DIR)/namespaces/benchmark.yaml
 	kubectl apply -f $(K8S_DIR)/local/postgres.yaml
 	kubectl wait --for=condition=ready pod/postgres-0 -n benchmark --timeout=180s
+	$(MAKE) minikube-sync-postgres-password
+
+.PHONY: minikube-sync-postgres-password
+minikube-sync-postgres-password:
+	kubectl exec -n benchmark postgres-0 -- /bin/sh -ec 'psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d postgres -c "ALTER USER \"$$POSTGRES_USER\" WITH PASSWORD '\''$$POSTGRES_PASSWORD'\'';"'
 
 .PHONY: minikube-db-bootstrap
-minikube-db-bootstrap: create-local-secrets
+minikube-db-bootstrap: minikube-deploy-postgres
 	kubectl delete job db-bootstrap-job -n benchmark --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/local/db-bootstrap-job.yaml
 	kubectl wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=180s
 
 .PHONY: minikube-migrate-monolith
-minikube-migrate-monolith: create-local-secrets
+minikube-migrate-monolith: minikube-db-bootstrap
 	kubectl delete job monolith-migration-job -n mono --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/monolith/migration-job.yaml
 	kubectl wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 
 .PHONY: minikube-deploy-monolith
-minikube-deploy-monolith: create-local-secrets
+minikube-deploy-monolith: minikube-migrate-monolith
 	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
 	kubectl rollout status deployment/monolith -n mono --timeout=180s

@@ -537,6 +537,15 @@ make minikube-deploy-postgres
 
 This target automatically runs `make create-local-secrets` first.
 
+It also synchronizes the in-cluster `postgres` user password after the pod
+becomes Ready. This makes repeated local Minikube reruns more reliable when the
+local env files are regenerated but the PostgreSQL data directory already
+exists.
+
+You normally do not need to run `make minikube-sync-postgres-password`
+manually. It is an internal recovery step that is already executed by
+`make minikube-deploy-postgres`.
+
 PostgreSQL DNS inside the cluster:
 
 ```text
@@ -549,7 +558,9 @@ postgres.benchmark.svc.cluster.local
 make minikube-db-bootstrap
 ```
 
-This target also refreshes local Kubernetes Secrets before creating the Job.
+This target now depends on `make minikube-deploy-postgres`, so the local
+PostgreSQL pod is applied, waited, and password-synchronized before the
+bootstrap Job runs.
 
 Check logs:
 
@@ -563,8 +574,8 @@ kubectl logs job/db-bootstrap-job -n benchmark
 make minikube-migrate-monolith
 ```
 
-This target refreshes the Kubernetes Secret first, then creates the migration
-Job.
+This target now depends on `make minikube-db-bootstrap`, so the monolith
+migration Job runs only after the bootstrap Job is complete.
 
 Check logs:
 
@@ -578,8 +589,9 @@ kubectl logs job/monolith-migration-job -n mono
 make minikube-deploy-monolith
 ```
 
-This target refreshes the Kubernetes Secret first, then rolls out the
-Deployment.
+This target now depends on `make minikube-migrate-monolith`, so the Deployment
+rolls out only after PostgreSQL, bootstrap, and schema migration have all
+completed successfully.
 
 Check status:
 
@@ -636,6 +648,20 @@ Then:
 ```bash
 curl -i http://monolith.skripsi.local/healthz
 ```
+
+### Recommended full Minikube monolith sequence
+
+```bash
+make env-init-base
+make env-init-monolith
+make minikube-start
+make minikube-load-monolith
+make minikube-deploy-monolith
+```
+
+Because `make minikube-deploy-monolith` now depends on the PostgreSQL deploy,
+password sync, bootstrap job, and migration job, it is the safest high-level
+entry point for a full local monolith Minikube run.
 
 ## Step Verification Checklist
 

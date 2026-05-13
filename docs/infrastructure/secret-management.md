@@ -349,6 +349,10 @@ Important note:
 - it generates an in-cluster value for `BOOTSTRAP_DATABASE_URL`,
 - it rewrites the hostname to
   `postgres.benchmark.svc.cluster.local`.
+- the local Minikube flow also synchronizes the in-cluster `postgres` user
+  password after the PostgreSQL pod becomes Ready, so regenerated local env
+  files remain usable even if the local PostgreSQL data directory already
+  exists.
 
 Monolith secret for local cluster:
 
