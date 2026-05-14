@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -77,12 +78,18 @@ func SeedMicroservicesData(ctx context.Context, cfg MicroservicesConfig, mode st
 	}
 
 	if err := withPool(ctx, cfg.AuthDatabaseURL, func(pool *pgxpool.Pool) error {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(ctx)
+
 		for _, user := range ds.Users {
 			hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), 12)
 			if err != nil {
 				return err
 			}
-			_, err = pool.Exec(ctx, `
+			_, err = tx.Exec(ctx, `
 				INSERT INTO users (name, email, password_hash)
 				VALUES ($1, $2, $3)
 			`, user.Name, user.Email, string(hash))
@@ -90,38 +97,45 @@ func SeedMicroservicesData(ctx context.Context, cfg MicroservicesConfig, mode st
 				return err
 			}
 		}
-		return nil
+		return tx.Commit(ctx)
 	}); err != nil {
 		return fmt.Errorf("seed auth_db: %w", err)
 	}
 
 	if err := withPool(ctx, cfg.ItemDatabaseURL, func(pool *pgxpool.Pool) error {
-		for _, item := range ds.Items {
-			if item.ID == "" {
-				_, err := pool.Exec(ctx, `
-					INSERT INTO items (name, available_amount)
-					VALUES ($1, $2)
-				`, item.Name, item.AvailableAmount)
-				if err != nil {
-					return err
-				}
-				continue
-			}
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(ctx)
 
-			_, err := pool.Exec(ctx, `
-				INSERT INTO items (id, name, available_amount)
-				VALUES ($1, $2, $3)
-			`, item.ID, item.Name, item.AvailableAmount)
-			if err != nil {
+		for _, item := range ds.Items {
+			if err := insertMicroserviceItem(ctx, tx, item); err != nil {
 				return err
 			}
 		}
-		return nil
+		return tx.Commit(ctx)
 	}); err != nil {
 		return fmt.Errorf("seed item_db: %w", err)
 	}
 
 	return nil
+}
+
+func insertMicroserviceItem(ctx context.Context, tx pgx.Tx, item itemSeed) error {
+	if item.ID == "" {
+		_, err := tx.Exec(ctx, `
+			INSERT INTO items (name, available_amount)
+			VALUES ($1, $2)
+		`, item.Name, item.AvailableAmount)
+		return err
+	}
+
+	_, err := tx.Exec(ctx, `
+		INSERT INTO items (id, name, available_amount)
+		VALUES ($1, $2, $3)
+	`, item.ID, item.Name, item.AvailableAmount)
+	return err
 }
 
 func (c MicroservicesConfig) validate() error {
