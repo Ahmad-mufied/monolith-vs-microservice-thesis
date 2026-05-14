@@ -278,16 +278,19 @@ run-transaction-service-local:
 docker-build-monolith:
 	docker build -t $(MONOLITH_IMAGE) -f $(MONOLITH_DIR)/Dockerfile .
 
+.PHONY: docker-build-seed
+docker-build-seed:
+	docker build -t $(SEED_IMAGE) -f seed/Dockerfile .
+
 .PHONY: docker-build-microservices
 docker-build-microservices:
 	docker build -t $(API_GATEWAY_IMAGE) -f $(API_GATEWAY_DIR)/Dockerfile .
 	docker build -t $(AUTH_SERVICE_IMAGE) -f $(AUTH_SERVICE_DIR)/Dockerfile .
 	docker build -t $(ITEM_SERVICE_IMAGE) -f $(ITEM_SERVICE_DIR)/Dockerfile .
 	docker build -t $(TRANSACTION_SERVICE_IMAGE) -f $(TRANSACTION_SERVICE_DIR)/Dockerfile .
-	docker build -t $(SEED_IMAGE) -f seed/Dockerfile .
 
 .PHONY: docker-build-all
-docker-build-all: docker-build-monolith docker-build-microservices
+docker-build-all: docker-build-monolith docker-build-seed docker-build-microservices
 
 # =========================
 # Docker Compose
@@ -421,17 +424,20 @@ minikube-delete:
 .PHONY: minikube-load-images
 minikube-load-images: minikube-load-monolith minikube-load-microservices
 
+.PHONY: minikube-load-seed
+minikube-load-seed: docker-build-seed
+	docker save $(SEED_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
+
 .PHONY: minikube-load-monolith
-minikube-load-monolith: docker-build-monolith
+minikube-load-monolith: minikube-load-seed docker-build-monolith
 	docker save $(MONOLITH_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
 
 .PHONY: minikube-load-microservices
-minikube-load-microservices: docker-build-microservices
+minikube-load-microservices: minikube-load-seed docker-build-microservices
 	docker save $(API_GATEWAY_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
 	docker save $(AUTH_SERVICE_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
 	docker save $(ITEM_SERVICE_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
 	docker save $(TRANSACTION_SERVICE_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
-	docker save $(SEED_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
 
 .PHONY: minikube-deploy-postgres
 minikube-deploy-postgres: create-local-postgres-secrets
@@ -451,13 +457,13 @@ minikube-db-bootstrap: minikube-deploy-postgres
 	kubectl wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=180s
 
 .PHONY: minikube-migrate-monolith
-minikube-migrate-monolith: create-local-secrets minikube-db-bootstrap
+minikube-migrate-monolith: minikube-load-monolith create-local-secrets minikube-db-bootstrap
 	kubectl delete job monolith-migration-job -n mono --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/monolith/migration-job.yaml
 	kubectl wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 
 .PHONY: minikube-reset-monolith-data
-minikube-reset-monolith-data:
+minikube-reset-monolith-data: minikube-load-seed
 	kubectl delete job reset-monolith-data-job -n mono --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/monolith/reset-monolith-data-job.yaml
 	kubectl wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=180s
@@ -487,14 +493,14 @@ minikube-bootstrap-monolith-benchmark:
 	$(MAKE) minikube-deploy-monolith
 
 .PHONY: minikube-deploy-monolith
-minikube-deploy-monolith:
+minikube-deploy-monolith: minikube-load-monolith
 	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/resource-management.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
 	kubectl rollout status deployment/monolith -n mono --timeout=180s
 
 .PHONY: minikube-migrate-microservices
-minikube-migrate-microservices: create-local-secrets-microservices minikube-db-bootstrap
+minikube-migrate-microservices: minikube-load-microservices create-local-secrets-microservices minikube-db-bootstrap
 	kubectl delete job auth-migration-job -n msa --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/microservices/auth-migration-job.yaml
 	kubectl wait --for=condition=complete job/auth-migration-job -n msa --timeout=180s
@@ -506,7 +512,7 @@ minikube-migrate-microservices: create-local-secrets-microservices minikube-db-b
 	kubectl wait --for=condition=complete job/transaction-migration-job -n msa --timeout=180s
 
 .PHONY: minikube-reset-microservices-data
-minikube-reset-microservices-data:
+minikube-reset-microservices-data: minikube-load-seed
 	kubectl delete job reset-microservices-data-job -n msa --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/microservices/reset-microservices-data-job.yaml
 	kubectl wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=180s
@@ -536,7 +542,7 @@ minikube-bootstrap-microservices-benchmark:
 	$(MAKE) minikube-deploy-microservices
 
 .PHONY: minikube-deploy-microservices
-minikube-deploy-microservices:
+minikube-deploy-microservices: minikube-load-microservices
 	kubectl apply -f $(K8S_DIR)/microservices/auth-service.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/item-service.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/transaction-service.yaml
