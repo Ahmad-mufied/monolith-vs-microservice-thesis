@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: db-bootstrap-job
-  namespace: benchmark
+  namespace: local-database
 spec:
   backoffLimit: 3
   template:

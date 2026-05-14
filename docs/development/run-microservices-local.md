@@ -636,3 +636,95 @@ Also check the service address values in:
 env/api-gateway.env
 env/transaction-service.env
 ```
+
+## 13. Minikube Local Kubernetes
+
+Use this path when you want to validate the microservices stack on local
+Kubernetes instead of Docker Compose.
+
+### Canonical smoke flow
+
+```bash
+make env-init-base
+make env-init-microservices
+make minikube-start
+make minikube-load-microservices
+make minikube-bootstrap-microservices-smoke
+make minikube-port-forward-api-gateway
+```
+
+This flow will:
+
+- create local PostgreSQL and DB bootstrap secrets,
+- create `msa` service secrets,
+- run `db-bootstrap-job`,
+- run `auth-migration-job`, `item-migration-job`, and `transaction-migration-job`,
+- reset the three microservices databases,
+- seed the smoke dataset,
+- deploy `auth-service`, `item-service`, `transaction-service`, and `api-gateway`,
+- apply namespace `ResourceQuota` and per-service HPA.
+
+From another terminal:
+
+```bash
+curl -i http://localhost:8080/healthz
+```
+
+### Canonical benchmark-prep flow
+
+```bash
+make env-init-base
+make env-init-microservices
+make minikube-start
+make minikube-load-microservices
+make minikube-bootstrap-microservices-benchmark
+```
+
+Use the smoke flow for fast local verification.
+
+Use the benchmark-prep flow when you want the larger deterministic dataset for later load testing.
+
+### Access via ingress
+
+Start the Minikube tunnel:
+
+```bash
+minikube tunnel
+```
+
+Add to `/etc/hosts`:
+
+```text
+127.0.0.1 api.skripsi.local
+```
+
+Then access:
+
+```bash
+curl -i http://api.skripsi.local/healthz
+```
+
+### Manual seed and reset targets
+
+If you need to rerun only the data lifecycle without rebuilding the app stack:
+
+```bash
+make minikube-reset-microservices-data
+make minikube-seed-microservices-smoke
+make minikube-seed-microservices-benchmark
+```
+
+These commands assume the shared PostgreSQL pod and microservices schemas are
+already ready. Use `make minikube-bootstrap-microservices-smoke` or
+`make minikube-bootstrap-microservices-benchmark` when you need the full setup
+path.
+
+Smoke dataset intent:
+
+- small deterministic data for local verification,
+- fast login / item sync / transaction smoke tests.
+
+Benchmark dataset intent:
+
+- larger deterministic data for later load-test preparation,
+- same dataset shape on every rerun.

@@ -1,5 +1,7 @@
 FROM golang:1.26.2-alpine AS builder
 
+ARG GOOSE_VERSION=v3.27.1
+
 RUN apk add --no-cache ca-certificates git
 
 WORKDIR /src
@@ -10,6 +12,7 @@ COPY microservices/transaction-service/go.mod microservices/transaction-service/
 
 WORKDIR /src/microservices/transaction-service
 RUN GOWORK=off go mod download
+RUN go install github.com/pressly/goose/v3/cmd/goose@${GOOSE_VERSION}
 
 WORKDIR /src
 COPY pkg ./pkg
@@ -28,6 +31,8 @@ RUN addgroup -g 10001 -S app && adduser -S -D -H -u 10001 -G app app
 WORKDIR /app
 
 COPY --from=builder /out/transaction-service /usr/local/bin/transaction-service
+COPY --from=builder /go/bin/goose /usr/local/bin/goose
+COPY microservices/transaction-service/migrations ./migrations
 
 USER 10001:10001
 
