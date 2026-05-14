@@ -613,6 +613,10 @@ make minikube-seed-monolith-smoke
 make minikube-seed-monolith-benchmark
 ```
 
+These commands assume the PostgreSQL pod and monolith schema are already ready.
+Use `make minikube-bootstrap-monolith-smoke` or
+`make minikube-bootstrap-monolith-benchmark` when you need the full setup path.
+
 ### 10. Access Monolith
 
 Use port-forward for the simplest local test:

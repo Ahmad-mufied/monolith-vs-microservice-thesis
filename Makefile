@@ -457,7 +457,7 @@ minikube-migrate-monolith: create-local-secrets minikube-db-bootstrap
 	kubectl wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 
 .PHONY: minikube-reset-monolith-data
-minikube-reset-monolith-data: minikube-migrate-monolith
+minikube-reset-monolith-data:
 	kubectl delete job reset-monolith-data-job -n mono --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/monolith/reset-monolith-data-job.yaml
 	kubectl wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=180s
@@ -476,11 +476,13 @@ minikube-seed-monolith-benchmark: minikube-reset-monolith-data
 
 .PHONY: minikube-bootstrap-monolith-smoke
 minikube-bootstrap-monolith-smoke:
+	$(MAKE) minikube-migrate-monolith
 	$(MAKE) minikube-seed-monolith-smoke
 	$(MAKE) minikube-deploy-monolith
 
 .PHONY: minikube-bootstrap-monolith-benchmark
 minikube-bootstrap-monolith-benchmark:
+	$(MAKE) minikube-migrate-monolith
 	$(MAKE) minikube-seed-monolith-benchmark
 	$(MAKE) minikube-deploy-monolith
 
@@ -504,7 +506,7 @@ minikube-migrate-microservices: create-local-secrets-microservices minikube-db-b
 	kubectl wait --for=condition=complete job/transaction-migration-job -n msa --timeout=180s
 
 .PHONY: minikube-reset-microservices-data
-minikube-reset-microservices-data: minikube-migrate-microservices
+minikube-reset-microservices-data:
 	kubectl delete job reset-microservices-data-job -n msa --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/microservices/reset-microservices-data-job.yaml
 	kubectl wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=180s
@@ -523,11 +525,13 @@ minikube-seed-microservices-benchmark: minikube-reset-microservices-data
 
 .PHONY: minikube-bootstrap-microservices-smoke
 minikube-bootstrap-microservices-smoke:
+	$(MAKE) minikube-migrate-microservices
 	$(MAKE) minikube-seed-microservices-smoke
 	$(MAKE) minikube-deploy-microservices
 
 .PHONY: minikube-bootstrap-microservices-benchmark
 minikube-bootstrap-microservices-benchmark:
+	$(MAKE) minikube-migrate-microservices
 	$(MAKE) minikube-seed-microservices-benchmark
 	$(MAKE) minikube-deploy-microservices
 

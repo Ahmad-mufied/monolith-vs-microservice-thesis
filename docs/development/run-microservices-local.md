@@ -714,6 +714,11 @@ make minikube-seed-microservices-smoke
 make minikube-seed-microservices-benchmark
 ```
 
+These commands assume the shared PostgreSQL pod and microservices schemas are
+already ready. Use `make minikube-bootstrap-microservices-smoke` or
+`make minikube-bootstrap-microservices-benchmark` when you need the full setup
+path.
+
 Smoke dataset intent:
 
 - small deterministic data for local verification,
