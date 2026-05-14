@@ -542,6 +542,10 @@ becomes Ready. This makes repeated local Minikube reruns more reliable when the
 local env files are regenerated but the PostgreSQL data directory already
 exists.
 
+The sync step now sources fresh credentials from `env/postgres.env` and passes
+them into the `kubectl exec` process, so it does not depend on the running
+`postgres-0` pod still exposing up-to-date secret-backed environment values.
+
 You normally do not need to run `make minikube-sync-postgres-password`
 manually. It is an internal recovery step that is already executed by
 `make minikube-deploy-postgres`.
