@@ -92,6 +92,10 @@ func SeedMicroservicesData(ctx context.Context, cfg MicroservicesConfig, mode st
 			_, err = tx.Exec(ctx, `
 				INSERT INTO users (name, email, password_hash)
 				VALUES ($1, $2, $3)
+				ON CONFLICT (email) DO UPDATE
+				SET
+					name = EXCLUDED.name,
+					password_hash = EXCLUDED.password_hash
 			`, user.Name, user.Email, string(hash))
 			if err != nil {
 				return err
@@ -134,6 +138,10 @@ func insertMicroserviceItem(ctx context.Context, tx pgx.Tx, item itemSeed) error
 	_, err := tx.Exec(ctx, `
 		INSERT INTO items (id, name, available_amount)
 		VALUES ($1, $2, $3)
+		ON CONFLICT (id) DO UPDATE
+		SET
+			name = EXCLUDED.name,
+			available_amount = EXCLUDED.available_amount
 	`, item.ID, item.Name, item.AvailableAmount)
 	return err
 }
