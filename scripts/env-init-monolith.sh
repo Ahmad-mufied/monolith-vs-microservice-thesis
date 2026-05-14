@@ -44,6 +44,33 @@ write_if_missing() {
   echo "created $file"
 }
 
+write_or_update_env_value() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+
+  if [[ ! -f "$file" ]]; then
+    printf "%s=%s\n" "$key" "$value" >"$file"
+    echo "created $file"
+    return
+  fi
+
+  local current_value
+  current_value="$(read_env_value "$file" "$key")"
+  if [[ "$current_value" == "$value" ]]; then
+    echo "skip $file ($key already up to date)"
+    return
+  fi
+
+  if grep -q -E "^${key}=" "$file"; then
+    perl -0pi -e "s#^${key}=.*#${key}=${value}#m" "$file"
+  else
+    printf "%s=%s\n" "$key" "$value" >>"$file"
+  fi
+
+  echo "updated $file"
+}
+
 if [[ ! -f env/postgres.env ]]; then
   echo "missing env/postgres.env; run: make env-init-base" >&2
   exit 1
@@ -82,6 +109,9 @@ HTTP_MAX_HEADER_BYTES=1048576
 JWT_SECRET=${jwt_secret}
 DATADOG_ENABLED=false"
 
-write_if_missing "env/db-bootstrap.env" "BOOTSTRAP_DATABASE_URL=postgres://${encoded_postgres_user}:${encoded_postgres_password}@postgres.local-database.svc.cluster.local:5432/bootstrap?sslmode=disable"
+write_or_update_env_value \
+  "env/db-bootstrap.env" \
+  "BOOTSTRAP_DATABASE_URL" \
+  "postgres://${encoded_postgres_user}:${encoded_postgres_password}@postgres.local-database.svc.cluster.local:5432/bootstrap?sslmode=disable"
 
 echo "local monolith env initialization complete"
