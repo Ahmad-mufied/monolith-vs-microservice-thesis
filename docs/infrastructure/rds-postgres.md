@@ -139,8 +139,18 @@ Goose SQL migration
 After migrations:
 
 ```text
-seed-monolith-job
-seed-microservices-job
+seed-monolith-smoke-data-job
+seed-monolith-benchmark-data-job
+seed-microservices-smoke-data-job
+seed-microservices-benchmark-data-job
+```
+
+Reset jobs should run before the selected seed job when a scenario needs clean
+mutable data:
+
+```text
+reset-monolith-data-job
+reset-microservices-data-job
 ```
 
 Seed jobs insert benchmark data and capture generated UUIDs with:

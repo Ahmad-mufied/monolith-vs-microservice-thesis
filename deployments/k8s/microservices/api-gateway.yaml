@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: monolith
-  namespace: mono
+  name: api-gateway
+  namespace: msa
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: monolith
+      app: api-gateway
   template:
     metadata:
       labels:
-        app: monolith
+        app: api-gateway
     spec:
       terminationGracePeriodSeconds: 20
       securityContext:
@@ -19,8 +19,8 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: monolith
-          image: skripsi/monolith:local
+        - name: api-gateway
+          image: skripsi/api-gateway:local
           imagePullPolicy: Never
           securityContext:
             allowPrivilegeEscalation: false
@@ -31,7 +31,7 @@ spec:
                 - ALL
           envFrom:
             - secretRef:
-                name: monolith-env
+                name: api-gateway-secret
           ports:
             - name: http
               containerPort: 8080
@@ -58,20 +58,20 @@ spec:
             timeoutSeconds: 2
           resources:
             requests:
-              cpu: 1000m
-              memory: 1024Mi
+              cpu: 250m
+              memory: 256Mi
             limits:
-              cpu: 1000m
-              memory: 1024Mi
+              cpu: 250m
+              memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: monolith
-  namespace: mono
+  name: api-gateway
+  namespace: msa
 spec:
   selector:
-    app: monolith
+    app: api-gateway
   ports:
     - name: http
       port: 8080

@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: monolith
-  namespace: mono
+  name: auth-service
+  namespace: msa
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: monolith
+      app: auth-service
   template:
     metadata:
       labels:
-        app: monolith
+        app: auth-service
     spec:
       terminationGracePeriodSeconds: 20
       securityContext:
@@ -19,8 +19,8 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: monolith
-          image: skripsi/monolith:local
+        - name: auth-service
+          image: skripsi/auth-service:local
           imagePullPolicy: Never
           securityContext:
             allowPrivilegeEscalation: false
@@ -31,48 +31,45 @@ spec:
                 - ALL
           envFrom:
             - secretRef:
-                name: monolith-env
+                name: auth-service-secret
           ports:
-            - name: http
-              containerPort: 8080
+            - name: grpc
+              containerPort: 50051
           startupProbe:
-            httpGet:
-              path: /healthz
-              port: http
+            tcpSocket:
+              port: grpc
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 12
           readinessProbe:
-            httpGet:
-              path: /healthz
-              port: http
+            tcpSocket:
+              port: grpc
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 2
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
+            tcpSocket:
+              port: grpc
             initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 2
           resources:
             requests:
-              cpu: 1000m
-              memory: 1024Mi
+              cpu: 250m
+              memory: 256Mi
             limits:
-              cpu: 1000m
-              memory: 1024Mi
+              cpu: 250m
+              memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: monolith
-  namespace: mono
+  name: auth-service
+  namespace: msa
 spec:
   selector:
-    app: monolith
+    app: auth-service
   ports:
-    - name: http
-      port: 8080
-      targetPort: http
+    - name: grpc
+      port: 50051
+      targetPort: grpc

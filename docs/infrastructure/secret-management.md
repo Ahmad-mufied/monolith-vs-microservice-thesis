@@ -113,7 +113,7 @@ BOOTSTRAP_DATABASE_URL
 Current local generation path:
 
 ```text
-scripts/create-local-secrets.sh
+scripts/create-local-postgres-secrets.sh
 ```
 
 Example:
@@ -310,16 +310,18 @@ The repository currently uses two slightly different patterns:
 - AWS EKS should also use Kubernetes Secrets, but the exact creation flow may be
   managed separately from the local helper script.
 
-### Current local Minikube secret generation
+### Local Minikube helper flow
 
-These commands reflect the current local behavior implemented by
-`scripts/create-local-secrets.sh`.
+Use these helper scripts for the repository's default local Minikube path.
+
+They keep the ignored local env files as the source input, then rewrite only the values that must change for in-cluster DNS and local Kubernetes secret names.
 
 Namespaces:
 
 ```bash
 kubectl apply -f deployments/k8s/namespaces/benchmark.yaml
 kubectl create namespace mono --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace msa --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 PostgreSQL runtime secret for local cluster:
@@ -340,7 +342,7 @@ Purpose:
 DB bootstrap secret for local cluster:
 
 ```bash
-bash scripts/create-local-secrets.sh
+bash scripts/create-local-postgres-secrets.sh
 ```
 
 Important note:
@@ -354,28 +356,39 @@ Important note:
   files remain usable even if the local PostgreSQL data directory already
   exists.
 
-Monolith secret for local cluster:
+Monolith secret helper:
 
 ```bash
 bash scripts/create-local-secrets.sh
 ```
 
-Important note:
+Important note for monolith local Minikube:
 
-- the current helper script does not apply `env/monolith.env` verbatim for
-  Minikube,
-- it rewrites `DATABASE_URL` from Compose host `postgres` to the in-cluster DNS
-  name `postgres.benchmark.svc.cluster.local`,
-- this allows the same base local env files to support both Compose and
-  Minikube.
+- the helper does not apply `env/monolith.env` verbatim,
+- it rewrites `DATABASE_URL` from the Compose host to `postgres.benchmark.svc.cluster.local`,
+- this keeps the same base local env file usable for both Compose and Minikube.
+
+Microservices secret helper:
+
+```bash
+bash scripts/create-local-secrets-microservices.sh
+```
+
+Important note for microservices local Minikube:
+
+- the helper rewrites each service `DATABASE_URL` to `postgres.benchmark.svc.cluster.local`,
+- it also rewrites gRPC addresses to in-cluster service DNS using the configured service ports,
+- this keeps the host-run env files reusable while still producing valid Kubernetes Secrets.
 
 Reference:
 
 ```text
+scripts/create-local-postgres-secrets.sh
 scripts/create-local-secrets.sh
+scripts/create-local-secrets-microservices.sh
 ```
 
-### General Kubernetes secret creation pattern
+### Manual Kubernetes secret creation pattern
 
 If you are creating secrets manually outside the local helper flow, use this
 general pattern and choose names that match the manifests being applied.
@@ -427,6 +440,12 @@ kubectl create secret generic transaction-service-secret \
   -n msa \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
+
+Important note for microservices local Minikube:
+
+- `scripts/create-local-secrets-microservices.sh` rewrites each service `DATABASE_URL` to `postgres.benchmark.svc.cluster.local`,
+- it also rewrites gRPC addresses to in-cluster service DNS using the configured service ports,
+- this keeps the host-run env files reusable while still producing valid Kubernetes Secrets.
 
 ---
 

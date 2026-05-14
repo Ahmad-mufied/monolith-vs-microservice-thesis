@@ -599,9 +599,21 @@ Check status:
 kubectl get pods -n mono
 kubectl get svc -n mono
 kubectl get hpa -n mono
+kubectl get resourcequota -n mono
 ```
 
-### 9. Access Monolith
+### 9. Run Monolith Data Lifecycle Only
+
+Use these targets when you want to rebuild the benchmark dataset without
+changing the monolith Deployment:
+
+```bash
+make minikube-reset-monolith-data
+make minikube-seed-monolith-smoke
+make minikube-seed-monolith-benchmark
+```
+
+### 10. Access Monolith
 
 Use port-forward for the simplest local test:
 
@@ -656,12 +668,22 @@ make env-init-base
 make env-init-monolith
 make minikube-start
 make minikube-load-monolith
-make minikube-deploy-monolith
+make minikube-bootstrap-monolith-smoke
 ```
 
-Because `make minikube-deploy-monolith` now depends on the PostgreSQL deploy,
-password sync, bootstrap job, and migration job, it is the safest high-level
-entry point for a full local monolith Minikube run.
+Choose `make minikube-bootstrap-monolith-smoke` for fast local verification.
+
+Use `make minikube-bootstrap-monolith-benchmark` when you want the same lifecycle with the larger deterministic benchmark dataset for later load testing.
+
+These bootstrap targets run:
+
+- PostgreSQL deploy,
+- password sync,
+- bootstrap job,
+- migration job,
+- monolith data reset,
+- monolith smoke or benchmark seed,
+- monolith deployment rollout.
 
 ## Step Verification Checklist
 

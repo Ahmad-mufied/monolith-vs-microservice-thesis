@@ -266,7 +266,7 @@ Or using Makefile:
 ```bash
 make compose-monolith-up
 make migrate-monolith
-make seed-monolith
+make seed-monolith-data DATASET=benchmark
 make run-monolith
 ```
 
@@ -322,7 +322,7 @@ Or using Makefile:
 ```bash
 make compose-microservices-up
 make migrate-microservices
-make seed-microservices
+make seed-microservices-data DATASET=benchmark
 ```
 
 ---
@@ -685,13 +685,13 @@ Seed Jobs insert benchmark datasets.
 Monolith:
 
 ```text
-seed-monolith-job
+seed-monolith-benchmark-data-job
 ```
 
 Microservices:
 
 ```text
-seed-microservices-job
+seed-microservices-benchmark-data-job
 ```
 
 Seed jobs should run after migration jobs and before benchmark execution.
@@ -817,7 +817,7 @@ Run db-bootstrap-job if not already completed
 Run monolith-migration-job
     |
     v
-Run seed-monolith-job
+Run seed-monolith-benchmark-data-job
     |
     v
 Deploy monolith
@@ -847,8 +847,8 @@ Expanded sequence:
 4. Wait until db-bootstrap-job is complete.
 5. Run monolith-migration-job.
 6. Wait until monolith-migration-job is complete.
-7. Run seed-monolith-job.
-8. Wait until seed-monolith-job is complete.
+7. Run seed-monolith-benchmark-data-job.
+8. Wait until seed-monolith-benchmark-data-job is complete.
 9. Deploy monolith application.
 10. Apply ResourceQuota and HPA.
 11. Validate deployment readiness.
@@ -879,7 +879,7 @@ Run item-migration-job
 Run transaction-migration-job
     |
     v
-Run seed-microservices-job
+Run seed-microservices-benchmark-data-job
     |
     v
 Deploy Auth Service
@@ -912,27 +912,29 @@ Upload results to S3
 Expanded sequence:
 
 ```text
-1. Create namespace msa.
-2. Create api-gateway-secret.
-3. Create auth-service-secret.
-4. Create item-service-secret.
-5. Create transaction-service-secret.
-6. Run db-bootstrap-job.
-7. Wait until db-bootstrap-job is complete.
-8. Run auth-migration-job.
-9. Run item-migration-job.
-10. Run transaction-migration-job.
-11. Wait until all migration jobs are complete.
-12. Run seed-microservices-job.
-13. Wait until seed-microservices-job is complete.
-14. Deploy Auth Service.
-15. Deploy Item Service.
-16. Deploy Transaction Service.
-17. Deploy API Gateway.
-18. Apply ResourceQuota and HPAs.
-19. Validate all service readiness.
-20. Run k6 benchmark Job.
-21. Upload benchmark results to S3.
+1. Create local PostgreSQL and db-bootstrap secrets.
+2. Create namespace msa.
+3. Create api-gateway-secret.
+4. Create auth-service-secret.
+5. Create item-service-secret.
+6. Create transaction-service-secret.
+7. Run db-bootstrap-job.
+8. Wait until db-bootstrap-job is complete.
+9. Run auth-migration-job.
+10. Run item-migration-job.
+11. Run transaction-migration-job.
+12. Wait until all migration jobs are complete.
+13. Run reset-microservices-data-job.
+14. Run either seed-microservices-smoke-data-job or seed-microservices-benchmark-data-job.
+15. Wait until the selected seed job is complete.
+16. Deploy Auth Service.
+17. Deploy Item Service.
+18. Deploy Transaction Service.
+19. Deploy API Gateway.
+20. Apply ResourceQuota and HPAs.
+21. Validate all service readiness.
+22. Run k6 benchmark Job.
+23. Upload benchmark results to S3.
 ```
 
 ---
@@ -964,6 +966,15 @@ The Makefile should act as a command center.
 
 Recommended targets:
 
+For day-to-day local Kubernetes usage, prefer these entry points first:
+
+- monolith smoke: `make minikube-bootstrap-monolith-smoke`
+- monolith benchmark prep: `make minikube-bootstrap-monolith-benchmark`
+- microservices smoke: `make minikube-bootstrap-microservices-smoke`
+- microservices benchmark prep: `make minikube-bootstrap-microservices-benchmark`
+
+Treat the longer list below as a reference inventory.
+
 ```text
 make run-monolith
 make run-auth-service
@@ -978,18 +989,31 @@ make compose-down
 make migrate-monolith
 make migrate-microservices
 
-make seed-monolith
-make seed-microservices
+make seed-monolith-data DATASET=smoke
+make seed-monolith-data DATASET=benchmark
+make seed-microservices-data DATASET=smoke
+make seed-microservices-data DATASET=benchmark
 
-make reset-monolith
-make reset-microservices
+make reset-monolith-data
+make reset-microservices-data
 
 make minikube-start
 make minikube-load-images
+make minikube-load-microservices
+make minikube-bootstrap-monolith-smoke
+make minikube-bootstrap-monolith-benchmark
 make minikube-deploy-monolith
+make minikube-migrate-microservices
+make minikube-reset-microservices-data
+make minikube-seed-microservices-smoke
+make minikube-seed-microservices-benchmark
+make minikube-bootstrap-microservices-smoke
+make minikube-bootstrap-microservices-benchmark
 make minikube-deploy-microservices
 
+make create-local-postgres-secrets
 make create-local-secrets
+make create-local-secrets-microservices
 make db-bootstrap
 make deploy-monolith
 make deploy-microservices
@@ -1005,20 +1029,363 @@ Critical experiment behavior must be documented.
 
 ---
 
-## 23. Kubernetes Job List
+## 23. Local Kubernetes Command Reference
+
+Use this section as the low-level operational reference for the local Minikube
+flow implemented in this repository.
+
+The `make` targets remain the primary entry points. The commands below are the
+manual equivalents you can use for inspection, debugging, or step-by-step
+reruns.
+
+### 23.1 Cluster lifecycle
+
+Start the local cluster:
+
+```bash
+minikube start --driver=docker --cpus=2 --memory=3072 --disk-size=20g
+minikube addons enable ingress
+minikube addons enable metrics-server
+```
+
+Command notes:
+
+- `minikube start ...`: starts the local Kubernetes cluster with the expected CPU, memory, and disk size.
+- `minikube addons enable ingress`: enables the local ingress controller for hostname-based access.
+- `minikube addons enable metrics-server`: enables metrics collection so HPA can evaluate CPU usage.
+
+Check status:
+
+```bash
+minikube status
+kubectl get nodes
+kubectl get ns
+```
+
+Command notes:
+
+- `minikube status`: shows whether the Minikube host, kubelet, and apiserver are healthy.
+- `kubectl get nodes`: shows node readiness from the Kubernetes control plane.
+- `kubectl get ns`: lists namespaces currently available in the cluster.
+
+Stop or reset:
+
+```bash
+minikube stop
+minikube delete
+```
+
+Command notes:
+
+- `minikube stop`: stops the cluster runtime while usually keeping cluster state and PVC-backed data.
+- `minikube delete`: removes the whole local cluster and should be treated as a full reset.
+
+### 23.2 Image build and load
+
+Build the local images with host Docker:
+
+```bash
+docker build -t skripsi/monolith:local -f monolith/Dockerfile .
+docker build -t skripsi/api-gateway:local -f microservices/api-gateway/Dockerfile .
+docker build -t skripsi/auth-service:local -f microservices/auth-service/Dockerfile .
+docker build -t skripsi/item-service:local -f microservices/item-service/Dockerfile .
+docker build -t skripsi/transaction-service:local -f microservices/transaction-service/Dockerfile .
+docker build -t skripsi/seed-runner:local -f seed/Dockerfile .
+```
+
+Command notes:
+
+- each `docker build -t ...`: builds one local application or utility image from the current repository source.
+
+Load the images into the Minikube node runtime:
+
+```bash
+docker save skripsi/monolith:local | docker exec -i minikube docker load
+docker save skripsi/api-gateway:local | docker exec -i minikube docker load
+docker save skripsi/auth-service:local | docker exec -i minikube docker load
+docker save skripsi/item-service:local | docker exec -i minikube docker load
+docker save skripsi/transaction-service:local | docker exec -i minikube docker load
+docker save skripsi/seed-runner:local | docker exec -i minikube docker load
+```
+
+Command notes:
+
+- each `docker save ... | docker exec -i minikube docker load`: transfers a host-built image into the Docker runtime used by the Minikube node.
+
+### 23.3 Shared PostgreSQL preparation
+
+Create namespaces and PostgreSQL secrets:
+
+```bash
+kubectl apply -f deployments/k8s/namespaces/benchmark.yaml
+kubectl create namespace mono --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace msa --dry-run=client -o yaml | kubectl apply -f -
+
+bash scripts/create-local-postgres-secrets.sh
+```
+
+Command notes:
+
+- `kubectl apply -f deployments/k8s/namespaces/benchmark.yaml`: creates or updates the shared `benchmark` namespace definition.
+- `kubectl create namespace mono ...`: creates the monolith namespace if it does not exist.
+- `kubectl create namespace msa ...`: creates the microservices namespace if it does not exist.
+- `bash scripts/create-local-postgres-secrets.sh`: generates the local PostgreSQL and DB bootstrap Kubernetes secrets from env files.
+
+Deploy PostgreSQL and wait until Ready:
+
+```bash
+kubectl apply -f deployments/k8s/local/postgres.yaml
+kubectl wait --for=condition=ready pod/postgres-0 -n benchmark --timeout=180s
+```
+
+Command notes:
+
+- `kubectl apply -f deployments/k8s/local/postgres.yaml`: deploys the local PostgreSQL Service and StatefulSet.
+- `kubectl wait --for=condition=ready ...`: blocks until the PostgreSQL pod is ready to accept connections.
+
+Synchronize the in-cluster `postgres` password:
+
+```bash
+kubectl exec -n benchmark postgres-0 -- /bin/sh -ec \
+  'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD '\''$POSTGRES_PASSWORD'\'';"'
+```
+
+Command notes:
+
+- `kubectl exec ... ALTER USER ...`: aligns the in-cluster `postgres` password with the latest generated local secret values.
+
+Run DB bootstrap:
+
+```bash
+kubectl delete job db-bootstrap-job -n benchmark --ignore-not-found
+kubectl apply -f deployments/k8s/local/db-bootstrap-job.yaml
+kubectl wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=180s
+kubectl logs job/db-bootstrap-job -n benchmark
+```
+
+Command notes:
+
+- `kubectl delete job db-bootstrap-job ...`: removes any old bootstrap job object before rerunning it.
+- `kubectl apply -f deployments/k8s/local/db-bootstrap-job.yaml`: starts the job that creates the internal application databases.
+- `kubectl wait --for=condition=complete ...`: waits until the bootstrap job finishes successfully.
+- `kubectl logs job/db-bootstrap-job ...`: prints bootstrap logs for verification or debugging.
+
+### 23.4 Monolith manual flow
+
+Create the monolith secret:
+
+```bash
+bash scripts/create-local-secrets.sh
+```
+
+Command notes:
+
+- `bash scripts/create-local-secrets.sh`: creates the monolith Kubernetes secret and rewrites local DB host values for in-cluster DNS.
+
+Run migration, reset, and seed jobs:
+
+```bash
+kubectl delete job monolith-migration-job -n mono --ignore-not-found
+kubectl apply -f deployments/k8s/monolith/migration-job.yaml
+kubectl wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
+
+kubectl delete job reset-monolith-data-job -n mono --ignore-not-found
+kubectl apply -f deployments/k8s/monolith/reset-monolith-data-job.yaml
+kubectl wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=180s
+
+kubectl delete job seed-monolith-smoke-data-job -n mono --ignore-not-found
+kubectl apply -f deployments/k8s/monolith/seed-monolith-smoke-data-job.yaml
+kubectl wait --for=condition=complete job/seed-monolith-smoke-data-job -n mono --timeout=180s
+```
+
+Command notes:
+
+- `kubectl delete job monolith-migration-job ...`: removes the old migration job object so it can be rerun cleanly.
+- `kubectl apply -f deployments/k8s/monolith/migration-job.yaml`: starts the monolith schema migration job.
+- `kubectl wait --for=condition=complete job/monolith-migration-job ...`: waits until schema migration completes.
+- `kubectl delete/apply/wait reset-monolith-data-job ...`: reruns the monolith data reset job.
+- `kubectl delete/apply/wait seed-monolith-smoke-data-job ...`: reruns the monolith smoke dataset seed job.
+
+Swap the last two commands to `seed-monolith-benchmark-data-job.yaml` when you
+need the benchmark dataset instead of the smoke dataset.
+
+Deploy and inspect monolith:
+
+```bash
+kubectl apply -f deployments/k8s/monolith/monolith.yaml
+kubectl apply -f deployments/k8s/monolith/resource-management.yaml
+kubectl apply -f deployments/k8s/monolith/ingress.yaml
+kubectl rollout status deployment/monolith -n mono --timeout=180s
+
+kubectl get pods,svc,hpa,resourcequota -n mono
+kubectl logs job/monolith-migration-job -n mono
+```
+
+Command notes:
+
+- `kubectl apply -f deployments/k8s/monolith/monolith.yaml`: deploys the monolith application and Service.
+- `kubectl apply -f deployments/k8s/monolith/resource-management.yaml`: applies the monolith ResourceQuota and HPA.
+- `kubectl apply -f deployments/k8s/monolith/ingress.yaml`: applies the monolith ingress resource.
+- `kubectl rollout status deployment/monolith ...`: waits until the monolith Deployment finishes rolling out.
+- `kubectl get pods,svc,hpa,resourcequota -n mono`: gives a quick summary of monolith runtime state.
+- `kubectl logs job/monolith-migration-job -n mono`: shows migration logs if schema setup needs inspection.
+
+Access monolith:
+
+```bash
+kubectl port-forward svc/monolith -n mono 8080:8080
+curl -i http://localhost:8080/healthz
+```
+
+Command notes:
+
+- `kubectl port-forward svc/monolith ...`: exposes the monolith Service on the local machine.
+- `curl -i http://localhost:8080/healthz`: verifies that the monolith HTTP endpoint is responding.
+
+### 23.5 Microservices manual flow
+
+Create the microservices secrets:
+
+```bash
+bash scripts/create-local-secrets-microservices.sh
+```
+
+Command notes:
+
+- `bash scripts/create-local-secrets-microservices.sh`: creates the gateway and service secrets and rewrites local values for in-cluster DNS and service addresses.
+
+Run migration, reset, and seed jobs:
+
+```bash
+kubectl delete job auth-migration-job -n msa --ignore-not-found
+kubectl apply -f deployments/k8s/microservices/auth-migration-job.yaml
+kubectl wait --for=condition=complete job/auth-migration-job -n msa --timeout=180s
+
+kubectl delete job item-migration-job -n msa --ignore-not-found
+kubectl apply -f deployments/k8s/microservices/item-migration-job.yaml
+kubectl wait --for=condition=complete job/item-migration-job -n msa --timeout=180s
+
+kubectl delete job transaction-migration-job -n msa --ignore-not-found
+kubectl apply -f deployments/k8s/microservices/transaction-migration-job.yaml
+kubectl wait --for=condition=complete job/transaction-migration-job -n msa --timeout=180s
+
+kubectl delete job reset-microservices-data-job -n msa --ignore-not-found
+kubectl apply -f deployments/k8s/microservices/reset-microservices-data-job.yaml
+kubectl wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=180s
+
+kubectl delete job seed-microservices-smoke-data-job -n msa --ignore-not-found
+kubectl apply -f deployments/k8s/microservices/seed-microservices-smoke-data-job.yaml
+kubectl wait --for=condition=complete job/seed-microservices-smoke-data-job -n msa --timeout=180s
+```
+
+Command notes:
+
+- `kubectl delete/apply/wait auth-migration-job ...`: reruns the `auth_db` schema migration.
+- `kubectl delete/apply/wait item-migration-job ...`: reruns the `item_db` schema migration.
+- `kubectl delete/apply/wait transaction-migration-job ...`: reruns the `transaction_db` schema migration.
+- `kubectl delete/apply/wait reset-microservices-data-job ...`: clears mutable microservices benchmark data.
+- `kubectl delete/apply/wait seed-microservices-smoke-data-job ...`: reruns the microservices smoke dataset seed job.
+
+Swap the last two commands to `seed-microservices-benchmark-data-job.yaml` when
+you need the benchmark dataset instead of the smoke dataset.
+
+Deploy and inspect microservices:
+
+```bash
+kubectl apply -f deployments/k8s/microservices/auth-service.yaml
+kubectl apply -f deployments/k8s/microservices/item-service.yaml
+kubectl apply -f deployments/k8s/microservices/transaction-service.yaml
+kubectl apply -f deployments/k8s/microservices/api-gateway.yaml
+kubectl apply -f deployments/k8s/microservices/resource-management.yaml
+kubectl apply -f deployments/k8s/microservices/api-gateway-ingress.yaml
+
+kubectl rollout status deployment/auth-service -n msa --timeout=180s
+kubectl rollout status deployment/item-service -n msa --timeout=180s
+kubectl rollout status deployment/transaction-service -n msa --timeout=180s
+kubectl rollout status deployment/api-gateway -n msa --timeout=180s
+
+kubectl get pods,svc,hpa,resourcequota -n msa
+kubectl logs job/auth-migration-job -n msa
+kubectl logs job/item-migration-job -n msa
+kubectl logs job/transaction-migration-job -n msa
+```
+
+Command notes:
+
+- `kubectl apply -f .../auth-service.yaml`: deploys the auth-service workload and Service.
+- `kubectl apply -f .../item-service.yaml`: deploys the item-service workload and Service.
+- `kubectl apply -f .../transaction-service.yaml`: deploys the transaction-service workload and Service.
+- `kubectl apply -f .../api-gateway.yaml`: deploys the API Gateway workload and Service.
+- `kubectl apply -f .../resource-management.yaml`: applies the shared ResourceQuota and per-service HPAs.
+- `kubectl apply -f .../api-gateway-ingress.yaml`: applies ingress for the API Gateway.
+- `kubectl rollout status deployment/...`: waits until each microservice Deployment is available.
+- `kubectl get pods,svc,hpa,resourcequota -n msa`: gives a quick summary of microservices runtime state.
+- `kubectl logs job/... -n msa`: shows migration logs for troubleshooting.
+
+Access API Gateway:
+
+```bash
+kubectl port-forward svc/api-gateway -n msa 8080:8080
+curl -i http://localhost:8080/healthz
+```
+
+Command notes:
+
+- `kubectl port-forward svc/api-gateway ...`: exposes the API Gateway Service on the local machine.
+- `curl -i http://localhost:8080/healthz`: verifies that the gateway HTTP endpoint is responding.
+
+### 23.6 Ingress access
+
+Start the tunnel:
+
+```bash
+minikube tunnel
+```
+
+Command notes:
+
+- `minikube tunnel`: enables local access to Kubernetes LoadBalancer and ingress routes.
+
+Add these local hosts:
+
+```text
+127.0.0.1 monolith.skripsi.local
+127.0.0.1 api.skripsi.local
+```
+
+Then access:
+
+```bash
+curl -i http://monolith.skripsi.local/healthz
+curl -i http://api.skripsi.local/healthz
+```
+
+Command notes:
+
+- each `curl -i .../healthz`: verifies ingress-based access for the monolith or API Gateway.
+
+---
+
+## 24. Kubernetes Job List
 
 Recommended Kubernetes Jobs:
 
 ```text
-deployments/k8s/jobs/
-├── db-bootstrap-job.yaml
-├── monolith-migration-job.yaml
-├── auth-migration-job.yaml
-├── item-migration-job.yaml
-├── transaction-migration-job.yaml
-├── seed-monolith-job.yaml
-├── seed-microservices-job.yaml
-└── k6-benchmark-job.yaml
+deployments/k8s/
+├── local/
+│   └── db-bootstrap-job.yaml
+├── monolith/
+│   ├── monolith-migration-job.yaml
+│   ├── reset-monolith-data-job.yaml
+│   ├── seed-monolith-smoke-data-job.yaml
+│   └── seed-monolith-benchmark-data-job.yaml
+└── microservices/
+    ├── auth-migration-job.yaml
+    ├── item-migration-job.yaml
+    ├── transaction-migration-job.yaml
+    ├── reset-microservices-data-job.yaml
+    ├── seed-microservices-smoke-data-job.yaml
+    └── seed-microservices-benchmark-data-job.yaml
 ```
 
 Job responsibilities:
@@ -1030,13 +1397,17 @@ Job responsibilities:
 | `auth-migration-job` | migrate `auth_db` |
 | `item-migration-job` | migrate `item_db` |
 | `transaction-migration-job` | migrate `transaction_db` |
-| `seed-monolith-job` | seed monolith benchmark data |
-| `seed-microservices-job` | seed microservices benchmark data |
+| `reset-monolith-data-job` | clear mutable monolith benchmark data |
+| `seed-monolith-smoke-data-job` | seed small deterministic monolith smoke data |
+| `seed-monolith-benchmark-data-job` | seed deterministic monolith benchmark data |
+| `reset-microservices-data-job` | clear mutable microservices benchmark data |
+| `seed-microservices-smoke-data-job` | seed small deterministic microservices smoke data |
+| `seed-microservices-benchmark-data-job` | seed deterministic microservices benchmark data |
 | `k6-benchmark-job` | run benchmark and upload results |
 
 ---
 
-## 24. Kubernetes Secret List
+## 25. Kubernetes Secret List
 
 Recommended Kubernetes Secrets:
 
@@ -1071,7 +1442,7 @@ Do not store static AWS access keys in any Kubernetes Secret.
 
 ---
 
-## 25. Local Persistence And Cleanup Rules
+## 26. Local Persistence And Cleanup Rules
 
 For local validation, stopping compute is not always the same as deleting data.
 
@@ -1110,7 +1481,7 @@ and cleanup commands is docs/development/run-monolith-local.md.
 
 ---
 
-## 26. What Counts as Final Result
+## 27. What Counts as Final Result
 
 Final result source:
 
@@ -1137,7 +1508,7 @@ Docker Compose and Minikube results may be used only for:
 
 ---
 
-## 27. Result Storage
+## 28. Result Storage
 
 Final benchmark results must be uploaded to S3 before destroying infrastructure.
 
@@ -1171,7 +1542,7 @@ Do not run `terraform destroy` before verifying result files in S3.
 
 ---
 
-## 28. Summary
+## 29. Summary
 
 Final deployment strategy:
 
