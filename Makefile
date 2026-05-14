@@ -442,7 +442,7 @@ minikube-deploy-postgres: create-local-postgres-secrets
 
 .PHONY: minikube-sync-postgres-password
 minikube-sync-postgres-password:
-	kubectl exec -n benchmark postgres-0 -- /bin/sh -ec 'psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d postgres -c "ALTER USER \"$$POSTGRES_USER\" WITH PASSWORD '\''$$POSTGRES_PASSWORD'\'';"'
+	kubectl exec -n benchmark postgres-0 -- /bin/sh -ec 'printf "%s\n" "SELECT format('\''ALTER USER %I WITH PASSWORD %L'\'', :'\''role'\'', :'\''password'\'') \\\\gexec" | psql -v ON_ERROR_STOP=1 -v role="$$POSTGRES_USER" -v password="$$POSTGRES_PASSWORD" -U "$$POSTGRES_USER" -d postgres'
 
 .PHONY: minikube-db-bootstrap
 minikube-db-bootstrap: minikube-deploy-postgres
