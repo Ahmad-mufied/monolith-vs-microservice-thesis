@@ -1,8 +1,8 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: monolith-migration-job
-  namespace: mono
+  name: auth-migration-job
+  namespace: msa
 spec:
   backoffLimit: 3
   template:
@@ -14,7 +14,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: migration
-          image: skripsi/monolith:local
+          image: skripsi/auth-service:local
           imagePullPolicy: Never
           securityContext:
             allowPrivilegeEscalation: false
@@ -25,7 +25,7 @@ spec:
                 - ALL
           envFrom:
             - secretRef:
-                name: monolith-env
+                name: auth-service-secret
           resources:
             requests:
               cpu: 100m

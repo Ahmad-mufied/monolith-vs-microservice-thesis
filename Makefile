@@ -24,11 +24,14 @@ API_GATEWAY_IMAGE := skripsi/api-gateway:local
 AUTH_SERVICE_IMAGE := skripsi/auth-service:local
 ITEM_SERVICE_IMAGE := skripsi/item-service:local
 TRANSACTION_SERVICE_IMAGE := skripsi/transaction-service:local
+SEED_IMAGE := skripsi/seed-runner:local
 
 MINIKUBE_CPUS ?= 2
 MINIKUBE_MEMORY ?= 3072
 MINIKUBE_DISK_SIZE ?= 20g
+MINIKUBE_NODE_CONTAINER ?= minikube
 MONOLITH_PORT ?= 8080
+API_GATEWAY_PORT ?= 8080
 
 # =========================
 # Env Files
@@ -96,23 +99,42 @@ help:
 	@echo "  make migrate-microservices"
 	@echo "  make migrate-microservices-local"
 	@echo ""
-	@echo "Seed:"
-	@echo "  make seed-monolith"
-	@echo "  make seed-microservices"
-	@echo "  make reset-monolith"
-	@echo "  make reset-microservices"
+	@echo "Seed and Reset:"
+	@echo "  make reset-monolith-data"
+	@echo "  make seed-monolith-data DATASET=smoke"
+	@echo "  make seed-monolith-data DATASET=benchmark"
+	@echo "  make reset-microservices-data"
+	@echo "  make seed-microservices-data DATASET=smoke"
+	@echo "  make seed-microservices-data DATASET=benchmark"
 	@echo ""
 	@echo "Minikube:"
 	@echo "  make minikube-start"
 	@echo "  make minikube-stop"
 	@echo "  make minikube-load-monolith"
+	@echo "  make minikube-load-microservices"
 	@echo "  make minikube-deploy-postgres"
+	@echo "  make minikube-sync-postgres-password  # internal recovery step"
 	@echo "  make minikube-db-bootstrap"
 	@echo "  make minikube-migrate-monolith"
+	@echo "  make minikube-reset-monolith-data"
+	@echo "  make minikube-seed-monolith-smoke"
+	@echo "  make minikube-seed-monolith-benchmark"
+	@echo "  make minikube-bootstrap-monolith-smoke"
+	@echo "  make minikube-bootstrap-monolith-benchmark"
 	@echo "  make minikube-deploy-monolith"
+	@echo "  make minikube-migrate-microservices"
+	@echo "  make minikube-reset-microservices-data"
+	@echo "  make minikube-seed-microservices-smoke"
+	@echo "  make minikube-seed-microservices-benchmark"
+	@echo "  make minikube-bootstrap-microservices-smoke"
+	@echo "  make minikube-bootstrap-microservices-benchmark"
+	@echo "  make minikube-deploy-microservices"
 	@echo "  make minikube-port-forward-monolith"
+	@echo "  make minikube-port-forward-api-gateway"
 	@echo "  make minikube-load-images"
+	@echo "  make create-local-postgres-secrets"
 	@echo "  make create-local-secrets"
+	@echo "  make create-local-secrets-microservices"
 	@echo ""
 
 # =========================
@@ -256,15 +278,19 @@ run-transaction-service-local:
 docker-build-monolith:
 	docker build -t $(MONOLITH_IMAGE) -f $(MONOLITH_DIR)/Dockerfile .
 
+.PHONY: docker-build-seed
+docker-build-seed:
+	docker build -t $(SEED_IMAGE) -f seed/Dockerfile .
+
 .PHONY: docker-build-microservices
 docker-build-microservices:
-	docker build -t $(API_GATEWAY_IMAGE) ./$(API_GATEWAY_DIR)
-	docker build -t $(AUTH_SERVICE_IMAGE) ./$(AUTH_SERVICE_DIR)
-	docker build -t $(ITEM_SERVICE_IMAGE) ./$(ITEM_SERVICE_DIR)
-	docker build -t $(TRANSACTION_SERVICE_IMAGE) ./$(TRANSACTION_SERVICE_DIR)
+	docker build -t $(API_GATEWAY_IMAGE) -f $(API_GATEWAY_DIR)/Dockerfile .
+	docker build -t $(AUTH_SERVICE_IMAGE) -f $(AUTH_SERVICE_DIR)/Dockerfile .
+	docker build -t $(ITEM_SERVICE_IMAGE) -f $(ITEM_SERVICE_DIR)/Dockerfile .
+	docker build -t $(TRANSACTION_SERVICE_IMAGE) -f $(TRANSACTION_SERVICE_DIR)/Dockerfile .
 
 .PHONY: docker-build-all
-docker-build-all: docker-build-monolith docker-build-microservices
+docker-build-all: docker-build-monolith docker-build-seed docker-build-microservices
 
 # =========================
 # Docker Compose
@@ -323,37 +349,59 @@ migrate-microservices-local:
 # Seed and Reset
 # =========================
 
-.PHONY: seed-monolith
-seed-monolith:
-	go run ./seed/scripts/seed-monolith.go \
-		--database-url="$$MONO_DATABASE_URL"
+.PHONY: seed-monolith-data
+seed-monolith-data:
+	@bash -ec 'set -a; source env/monolith.env; set +a; \
+		: "$${MONO_DATABASE_URL:?MONO_DATABASE_URL is required}"; \
+		cd seed && go run ./cmd/seed-runner seed-monolith-data \
+			--dataset="$${DATASET:-smoke}" \
+			--database-url="$$MONO_DATABASE_URL"'
 
-.PHONY: seed-microservices
-seed-microservices:
-	go run ./seed/scripts/seed-microservices.go \
-		--auth-database-url="$$AUTH_DATABASE_URL" \
-		--item-database-url="$$ITEM_DATABASE_URL" \
-		--transaction-database-url="$$TRANSACTION_DATABASE_URL"
+.PHONY: seed-microservices-data
+seed-microservices-data:
+	@bash -ec 'set -a; source env/auth-service.env; source env/item-service.env; source env/transaction-service.env; set +a; \
+		: "$${AUTH_DATABASE_URL:?AUTH_DATABASE_URL is required}"; \
+		: "$${ITEM_DATABASE_URL:?ITEM_DATABASE_URL is required}"; \
+		: "$${TRANSACTION_DATABASE_URL:?TRANSACTION_DATABASE_URL is required}"; \
+		cd seed && go run ./cmd/seed-runner seed-microservices-data \
+			--dataset="$${DATASET:-smoke}" \
+			--auth-database-url="$$AUTH_DATABASE_URL" \
+			--item-database-url="$$ITEM_DATABASE_URL" \
+			--transaction-database-url="$$TRANSACTION_DATABASE_URL"'
 
-.PHONY: reset-monolith
-reset-monolith:
-	go run ./seed/scripts/reset-monolith.go \
-		--database-url="$$MONO_DATABASE_URL"
+.PHONY: reset-monolith-data
+reset-monolith-data:
+	@bash -ec 'set -a; source env/monolith.env; set +a; \
+		: "$${MONO_DATABASE_URL:?MONO_DATABASE_URL is required}"; \
+		cd seed && go run ./cmd/seed-runner reset-monolith-data \
+			--database-url="$$MONO_DATABASE_URL"'
 
-.PHONY: reset-microservices
-reset-microservices:
-	go run ./seed/scripts/reset-microservices.go \
-		--auth-database-url="$$AUTH_DATABASE_URL" \
-		--item-database-url="$$ITEM_DATABASE_URL" \
-		--transaction-database-url="$$TRANSACTION_DATABASE_URL"
+.PHONY: reset-microservices-data
+reset-microservices-data:
+	@bash -ec 'set -a; source env/auth-service.env; source env/item-service.env; source env/transaction-service.env; set +a; \
+		: "$${AUTH_DATABASE_URL:?AUTH_DATABASE_URL is required}"; \
+		: "$${ITEM_DATABASE_URL:?ITEM_DATABASE_URL is required}"; \
+		: "$${TRANSACTION_DATABASE_URL:?TRANSACTION_DATABASE_URL is required}"; \
+		cd seed && go run ./cmd/seed-runner reset-microservices-data \
+			--auth-database-url="$$AUTH_DATABASE_URL" \
+			--item-database-url="$$ITEM_DATABASE_URL" \
+			--transaction-database-url="$$TRANSACTION_DATABASE_URL"'
 
 # =========================
 # Kubernetes Local Secrets
 # =========================
 
+.PHONY: create-local-postgres-secrets
+create-local-postgres-secrets:
+	bash scripts/create-local-postgres-secrets.sh
+
 .PHONY: create-local-secrets
 create-local-secrets:
 	bash scripts/create-local-secrets.sh
+
+.PHONY: create-local-secrets-microservices
+create-local-secrets-microservices:
+	bash scripts/create-local-secrets-microservices.sh
 
 # =========================
 # Minikube
@@ -374,44 +422,152 @@ minikube-delete:
 	minikube delete
 
 .PHONY: minikube-load-images
-minikube-load-images:
-	eval $$(minikube docker-env) && docker build -t $(MONOLITH_IMAGE) -f $(MONOLITH_DIR)/Dockerfile .
-	eval $$(minikube docker-env) && docker build -t $(API_GATEWAY_IMAGE) ./$(API_GATEWAY_DIR)
-	eval $$(minikube docker-env) && docker build -t $(AUTH_SERVICE_IMAGE) ./$(AUTH_SERVICE_DIR)
-	eval $$(minikube docker-env) && docker build -t $(ITEM_SERVICE_IMAGE) ./$(ITEM_SERVICE_DIR)
-	eval $$(minikube docker-env) && docker build -t $(TRANSACTION_SERVICE_IMAGE) ./$(TRANSACTION_SERVICE_DIR)
+minikube-load-images: minikube-load-monolith minikube-load-microservices
+
+.PHONY: minikube-load-seed
+minikube-load-seed: docker-build-seed
+	docker save $(SEED_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
 
 .PHONY: minikube-load-monolith
-minikube-load-monolith:
-	eval $$(minikube docker-env) && docker build -t $(MONOLITH_IMAGE) -f $(MONOLITH_DIR)/Dockerfile .
+minikube-load-monolith: minikube-load-seed docker-build-monolith
+	docker save $(MONOLITH_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
+
+.PHONY: minikube-load-microservices
+minikube-load-microservices: minikube-load-seed docker-build-microservices
+	docker save $(API_GATEWAY_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
+	docker save $(AUTH_SERVICE_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
+	docker save $(ITEM_SERVICE_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
+	docker save $(TRANSACTION_SERVICE_IMAGE) | docker exec -i $(MINIKUBE_NODE_CONTAINER) docker load
 
 .PHONY: minikube-deploy-postgres
-minikube-deploy-postgres: create-local-secrets
-	kubectl apply -f $(K8S_DIR)/namespaces/benchmark.yaml
+minikube-deploy-postgres: create-local-postgres-secrets
+	kubectl apply -f $(K8S_DIR)/namespaces/local.yaml
 	kubectl apply -f $(K8S_DIR)/local/postgres.yaml
-	kubectl wait --for=condition=ready pod/postgres-0 -n benchmark --timeout=180s
+	kubectl wait --for=condition=ready pod/postgres-0 -n local-database --timeout=180s
+	$(MAKE) minikube-sync-postgres-password
+
+.PHONY: minikube-sync-postgres-password
+minikube-sync-postgres-password:
+	@test -f env/postgres.env || { echo "missing env/postgres.env; run: make env-init-base" >&2; exit 1; }
+	set -a; . env/postgres.env; set +a; \
+	: "$${POSTGRES_USER:?POSTGRES_USER must be set in env/postgres.env}"; \
+	: "$${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in env/postgres.env}"; \
+	kubectl exec -n local-database postgres-0 -- env \
+	POSTGRES_USER="$$POSTGRES_USER" \
+	POSTGRES_PASSWORD="$$POSTGRES_PASSWORD" \
+	/bin/sh -ec 'printf "%s\n" "SELECT format('\''ALTER USER %I WITH PASSWORD %L'\'', :'\''role'\'', :'\''password'\'') \gexec" | psql -v ON_ERROR_STOP=1 -v role="$$POSTGRES_USER" -v password="$$POSTGRES_PASSWORD" -U "$$POSTGRES_USER" -d postgres'
 
 .PHONY: minikube-db-bootstrap
-minikube-db-bootstrap: create-local-secrets
-	kubectl delete job db-bootstrap-job -n benchmark --ignore-not-found
+minikube-db-bootstrap: minikube-deploy-postgres
+	kubectl delete job db-bootstrap-job -n local-database --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/local/db-bootstrap-job.yaml
-	kubectl wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=180s
+	kubectl wait --for=condition=complete job/db-bootstrap-job -n local-database --timeout=180s
 
 .PHONY: minikube-migrate-monolith
-minikube-migrate-monolith: create-local-secrets
+minikube-migrate-monolith: minikube-load-monolith create-local-secrets minikube-db-bootstrap
 	kubectl delete job monolith-migration-job -n mono --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/monolith/migration-job.yaml
 	kubectl wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 
+.PHONY: minikube-reset-monolith-data
+minikube-reset-monolith-data: minikube-load-seed create-local-secrets
+	kubectl delete job reset-monolith-data-job -n mono --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/monolith/reset-monolith-data-job.yaml
+	kubectl wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=180s
+
+.PHONY: minikube-seed-monolith-smoke
+minikube-seed-monolith-smoke: minikube-reset-monolith-data
+	kubectl delete job seed-monolith-smoke-data-job -n mono --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/monolith/seed-monolith-smoke-data-job.yaml
+	kubectl wait --for=condition=complete job/seed-monolith-smoke-data-job -n mono --timeout=180s
+
+.PHONY: minikube-seed-monolith-benchmark
+minikube-seed-monolith-benchmark: minikube-reset-monolith-data
+	kubectl delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/monolith/seed-monolith-benchmark-data-job.yaml
+	kubectl wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=180s
+
+.PHONY: minikube-bootstrap-monolith-smoke
+minikube-bootstrap-monolith-smoke:
+	$(MAKE) minikube-migrate-monolith
+	$(MAKE) minikube-seed-monolith-smoke
+	$(MAKE) minikube-deploy-monolith
+
+.PHONY: minikube-bootstrap-monolith-benchmark
+minikube-bootstrap-monolith-benchmark:
+	$(MAKE) minikube-migrate-monolith
+	$(MAKE) minikube-seed-monolith-benchmark
+	$(MAKE) minikube-deploy-monolith
+
 .PHONY: minikube-deploy-monolith
-minikube-deploy-monolith: create-local-secrets
+minikube-deploy-monolith: minikube-load-monolith create-local-secrets
 	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
+	kubectl apply -f $(K8S_DIR)/monolith/resource-management.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
 	kubectl rollout status deployment/monolith -n mono --timeout=180s
+
+.PHONY: minikube-migrate-microservices
+minikube-migrate-microservices: minikube-load-microservices create-local-secrets-microservices minikube-db-bootstrap
+	kubectl delete job auth-migration-job -n msa --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/microservices/auth-migration-job.yaml
+	kubectl wait --for=condition=complete job/auth-migration-job -n msa --timeout=180s
+	kubectl delete job item-migration-job -n msa --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/microservices/item-migration-job.yaml
+	kubectl wait --for=condition=complete job/item-migration-job -n msa --timeout=180s
+	kubectl delete job transaction-migration-job -n msa --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/microservices/transaction-migration-job.yaml
+	kubectl wait --for=condition=complete job/transaction-migration-job -n msa --timeout=180s
+
+.PHONY: minikube-reset-microservices-data
+minikube-reset-microservices-data: minikube-load-seed create-local-secrets-microservices
+	kubectl delete job reset-microservices-data-job -n msa --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/microservices/reset-microservices-data-job.yaml
+	kubectl wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=180s
+
+.PHONY: minikube-seed-microservices-smoke
+minikube-seed-microservices-smoke: minikube-reset-microservices-data
+	kubectl delete job seed-microservices-smoke-data-job -n msa --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/microservices/seed-microservices-smoke-data-job.yaml
+	kubectl wait --for=condition=complete job/seed-microservices-smoke-data-job -n msa --timeout=180s
+
+.PHONY: minikube-seed-microservices-benchmark
+minikube-seed-microservices-benchmark: minikube-reset-microservices-data
+	kubectl delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/microservices/seed-microservices-benchmark-data-job.yaml
+	kubectl wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=180s
+
+.PHONY: minikube-bootstrap-microservices-smoke
+minikube-bootstrap-microservices-smoke:
+	$(MAKE) minikube-migrate-microservices
+	$(MAKE) minikube-seed-microservices-smoke
+	$(MAKE) minikube-deploy-microservices
+
+.PHONY: minikube-bootstrap-microservices-benchmark
+minikube-bootstrap-microservices-benchmark:
+	$(MAKE) minikube-migrate-microservices
+	$(MAKE) minikube-seed-microservices-benchmark
+	$(MAKE) minikube-deploy-microservices
+
+.PHONY: minikube-deploy-microservices
+minikube-deploy-microservices: minikube-load-microservices create-local-secrets-microservices
+	kubectl apply -f $(K8S_DIR)/microservices/auth-service.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/item-service.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/transaction-service.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/api-gateway.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/resource-management.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/api-gateway-ingress.yaml
+	kubectl rollout status deployment/auth-service -n msa --timeout=180s
+	kubectl rollout status deployment/item-service -n msa --timeout=180s
+	kubectl rollout status deployment/transaction-service -n msa --timeout=180s
+	kubectl rollout status deployment/api-gateway -n msa --timeout=180s
 
 .PHONY: minikube-port-forward-monolith
 minikube-port-forward-monolith:
 	kubectl port-forward svc/monolith -n mono $(MONOLITH_PORT):8080
+
+.PHONY: minikube-port-forward-api-gateway
+minikube-port-forward-api-gateway:
+	kubectl port-forward svc/api-gateway -n msa $(API_GATEWAY_PORT):8080
 
 .PHONY: minikube-status
 minikube-status:

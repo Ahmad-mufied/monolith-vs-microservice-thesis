@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: monolith-migration-job
+  name: reset-monolith-data-job
   namespace: mono
 spec:
   backoffLimit: 3
@@ -13,8 +13,8 @@ spec:
           type: RuntimeDefault
       restartPolicy: OnFailure
       containers:
-        - name: migration
-          image: skripsi/monolith:local
+        - name: reset
+          image: skripsi/seed-runner:local
           imagePullPolicy: Never
           securityContext:
             allowPrivilegeEscalation: false
@@ -23,9 +23,12 @@ spec:
             capabilities:
               drop:
                 - ALL
-          envFrom:
-            - secretRef:
-                name: monolith-env
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: monolith-env
+                  key: DATABASE_URL
           resources:
             requests:
               cpu: 100m
@@ -34,6 +37,6 @@ spec:
               cpu: 100m
               memory: 128Mi
           command:
-            - /bin/sh
-            - -ec
-            - goose -dir /app/migrations postgres "$DATABASE_URL" up
+            - /usr/local/bin/seed-runner
+            - reset-monolith-data
+            - --database-url=$(DATABASE_URL)
