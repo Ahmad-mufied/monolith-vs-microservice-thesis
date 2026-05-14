@@ -1375,7 +1375,7 @@ deployments/k8s/
 ├── local/
 │   └── db-bootstrap-job.yaml
 ├── monolith/
-│   ├── monolith-migration-job.yaml
+│   ├── migration-job.yaml
 │   ├── reset-monolith-data-job.yaml
 │   ├── seed-monolith-smoke-data-job.yaml
 │   └── seed-monolith-benchmark-data-job.yaml
