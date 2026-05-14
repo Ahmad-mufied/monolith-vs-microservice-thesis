@@ -448,7 +448,10 @@ minikube-deploy-postgres: create-local-postgres-secrets
 
 .PHONY: minikube-sync-postgres-password
 minikube-sync-postgres-password:
+	@test -f env/postgres.env || { echo "missing env/postgres.env; run: make env-init-base" >&2; exit 1; }
 	set -a; . env/postgres.env; set +a; \
+	: "$${POSTGRES_USER:?POSTGRES_USER must be set in env/postgres.env}"; \
+	: "$${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in env/postgres.env}"; \
 	kubectl exec -n local-database postgres-0 -- env \
 	POSTGRES_USER="$$POSTGRES_USER" \
 	POSTGRES_PASSWORD="$$POSTGRES_PASSWORD" \
