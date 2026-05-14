@@ -319,9 +319,7 @@ They keep the ignored local env files as the source input, then rewrite only the
 Namespaces:
 
 ```bash
-kubectl apply -f deployments/k8s/namespaces/benchmark.yaml
-kubectl create namespace mono --dry-run=client -o yaml | kubectl apply -f -
-kubectl create namespace msa --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f deployments/k8s/namespaces/local.yaml
 ```
 
 PostgreSQL runtime secret for local cluster:
@@ -329,7 +327,7 @@ PostgreSQL runtime secret for local cluster:
 ```bash
 kubectl create secret generic postgres-local-env \
   --from-env-file=env/postgres.env \
-  -n benchmark \
+  -n local-database \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
@@ -350,7 +348,7 @@ Important note:
 - the current helper script does not apply `env/db-bootstrap.env` verbatim,
 - it generates an in-cluster value for `BOOTSTRAP_DATABASE_URL`,
 - it rewrites the hostname to
-  `postgres.benchmark.svc.cluster.local`.
+  `postgres.local-database.svc.cluster.local`.
 - the local Minikube flow also synchronizes the in-cluster `postgres` user
   password after the PostgreSQL pod becomes Ready, so regenerated local env
   files remain usable even if the local PostgreSQL data directory already
@@ -365,7 +363,7 @@ bash scripts/create-local-secrets.sh
 Important note for monolith local Minikube:
 
 - the helper does not apply `env/monolith.env` verbatim,
-- it rewrites `DATABASE_URL` from the Compose host to `postgres.benchmark.svc.cluster.local`,
+- it rewrites `DATABASE_URL` from the Compose host to `postgres.local-database.svc.cluster.local`,
 - this keeps the same base local env file usable for both Compose and Minikube.
 
 Microservices secret helper:
@@ -376,7 +374,7 @@ bash scripts/create-local-secrets-microservices.sh
 
 Important note for microservices local Minikube:
 
-- the helper rewrites each service `DATABASE_URL` to `postgres.benchmark.svc.cluster.local`,
+- the helper rewrites each service `DATABASE_URL` to `postgres.local-database.svc.cluster.local`,
 - it also rewrites gRPC addresses to in-cluster service DNS using the configured service ports,
 - this keeps the host-run env files reusable while still producing valid Kubernetes Secrets.
 
@@ -396,18 +394,18 @@ general pattern and choose names that match the manifests being applied.
 DB bootstrap:
 
 ```bash
-kubectl create namespace benchmark --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f deployments/k8s/namespaces/local.yaml
 
 kubectl create secret generic db-bootstrap-env \
   --from-env-file=env/db-bootstrap.env \
-  -n benchmark \
+  -n local-database \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 Monolith:
 
 ```bash
-kubectl create namespace mono --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f deployments/k8s/namespaces/local.yaml
 
 kubectl create secret generic monolith-env \
   --from-env-file=env/monolith.env \
@@ -418,7 +416,7 @@ kubectl create secret generic monolith-env \
 Microservices:
 
 ```bash
-kubectl create namespace msa --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f deployments/k8s/namespaces/local.yaml
 
 kubectl create secret generic api-gateway-secret \
   --from-env-file=env/api-gateway.env \
@@ -443,7 +441,7 @@ kubectl create secret generic transaction-service-secret \
 
 Important note for microservices local Minikube:
 
-- `scripts/create-local-secrets-microservices.sh` rewrites each service `DATABASE_URL` to `postgres.benchmark.svc.cluster.local`,
+- `scripts/create-local-secrets-microservices.sh` rewrites each service `DATABASE_URL` to `postgres.local-database.svc.cluster.local`,
 - it also rewrites gRPC addresses to in-cluster service DNS using the configured service ports,
 - this keeps the host-run env files reusable while still producing valid Kubernetes Secrets.
 

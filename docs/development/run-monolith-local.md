@@ -48,7 +48,7 @@ deployments/
 │   ├── docker-compose.monolith.yml
 │   └── initdb/001-create-databases.sql
 └── k8s/
-    ├── namespaces/benchmark.yaml
+    ├── namespaces/local.yaml
     ├── local/postgres.yaml
     ├── local/db-bootstrap-job.yaml
     └── monolith/
@@ -504,13 +504,13 @@ DATABASE_URL=postgres://postgres:<generated-local-password>@postgres:5432/mono_d
 `monolith-env` Secret with:
 
 ```env
-DATABASE_URL=postgres://postgres:<generated-local-password>@postgres.benchmark.svc.cluster.local:5432/mono_db?sslmode=disable
+DATABASE_URL=postgres://postgres:<generated-local-password>@postgres.local-database.svc.cluster.local:5432/mono_db?sslmode=disable
 ```
 
 `env/db-bootstrap.env` must still contain:
 
 ```env
-BOOTSTRAP_DATABASE_URL=postgres://postgres:<generated-local-password>@postgres.benchmark.svc.cluster.local:5432/bootstrap?sslmode=disable
+BOOTSTRAP_DATABASE_URL=postgres://postgres:<generated-local-password>@postgres.local-database.svc.cluster.local:5432/bootstrap?sslmode=disable
 ```
 
 ### 4. Create Kubernetes Secrets
@@ -520,12 +520,12 @@ make create-local-secrets
 ```
 
 This command also rewrites the Kubernetes `monolith-env` Secret so the in-cluster
-application uses the PostgreSQL Service DNS in namespace `benchmark`.
+application uses the PostgreSQL Service DNS in namespace `local-database`.
 
 Check:
 
 ```bash
-kubectl get secret -n benchmark
+kubectl get secret -n local-database
 kubectl get secret -n mono
 ```
 
@@ -549,7 +549,7 @@ manually. It is an internal recovery step that is already executed by
 PostgreSQL DNS inside the cluster:
 
 ```text
-postgres.benchmark.svc.cluster.local
+postgres.local-database.svc.cluster.local
 ```
 
 ### 6. Run DB Bootstrap Job
@@ -565,7 +565,7 @@ bootstrap Job runs.
 Check logs:
 
 ```bash
-kubectl logs job/db-bootstrap-job -n benchmark
+kubectl logs job/db-bootstrap-job -n local-database
 ```
 
 ### 7. Run Monolith Migration Job
@@ -870,7 +870,7 @@ Confirm Minikube runtime configuration was generated from the local env files.
 Commands:
 
 ```bash
-kubectl get secret -n benchmark postgres-local-env db-bootstrap-env
+kubectl get secret -n local-database postgres-local-env db-bootstrap-env
 kubectl get secret -n mono monolith-env
 ```
 
@@ -890,10 +890,10 @@ Confirm in-cluster PostgreSQL and its persistent storage are ready.
 Commands:
 
 ```bash
-kubectl get pods -n benchmark
-kubectl get svc -n benchmark postgres
-kubectl get pvc -n benchmark
-kubectl describe pod postgres-0 -n benchmark
+kubectl get pods -n local-database
+kubectl get svc -n local-database postgres
+kubectl get pvc -n local-database
+kubectl describe pod postgres-0 -n local-database
 ```
 
 Success indicators:
@@ -913,9 +913,9 @@ Confirm the application databases were created inside the cluster PostgreSQL.
 Commands:
 
 ```bash
-kubectl get job db-bootstrap-job -n benchmark
-kubectl logs job/db-bootstrap-job -n benchmark
-kubectl exec -n benchmark postgres-0 -- sh -ec 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d "${POSTGRES_DB:-bootstrap}" -c "\l"'
+kubectl get job db-bootstrap-job -n local-database
+kubectl logs job/db-bootstrap-job -n local-database
+kubectl exec -n local-database postgres-0 -- sh -ec 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d "${POSTGRES_DB:-bootstrap}" -c "\l"'
 ```
 
 Success indicators:
@@ -937,7 +937,7 @@ Commands:
 ```bash
 kubectl get job monolith-migration-job -n mono
 kubectl logs job/monolith-migration-job -n mono
-kubectl exec -n benchmark postgres-0 -- sh -ec 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d mono_db -c "\dt"'
+kubectl exec -n local-database postgres-0 -- sh -ec 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d mono_db -c "\dt"'
 ```
 
 Success indicators:
@@ -1026,12 +1026,12 @@ remove data
 | `docker compose -f deployments/compose/docker-compose.db.yml down -v` | stop Compose PostgreSQL and remove named volume | No | No | Deletes Compose PostgreSQL persistent volume. |
 | `docker compose -f deployments/compose/docker-compose.monolith.yml down` | stop monolith app container only | Yes | Yes | App stops, DB data remains in PostgreSQL. |
 | `make compose-down` | stop all Compose stacks and remove volumes | No | No | Current target uses `down -v`, so local Compose DB data is deleted. |
-| `kubectl delete job db-bootstrap-job -n benchmark` | remove completed bootstrap job object | Yes | Yes | Deletes Job object only, not the created databases. |
+| `kubectl delete job db-bootstrap-job -n local-database` | remove completed bootstrap job object | Yes | Yes | Deletes Job object only, not the created databases. |
 | `kubectl delete job monolith-migration-job -n mono` | remove completed migration job object | Yes | Yes | Deletes Job object only, not the migrated schema. |
 | `kubectl delete deployment monolith -n mono` | remove monolith pods | Yes | Yes | App stops, PostgreSQL data remains. |
 | `kubectl scale deployment monolith -n mono --replicas=0` | stop monolith pods without deleting object | Yes | Yes | Useful if you want a reversible app-only stop. |
-| `kubectl delete statefulset postgres -n benchmark` | remove PostgreSQL pod controller | Usually yes | Usually yes | Data remains only if PVC is not deleted. |
-| `kubectl delete pvc postgres-data-postgres-0 -n benchmark` | delete PostgreSQL persistent volume claim | No | No | This removes the Minikube PostgreSQL data volume. |
+| `kubectl delete statefulset postgres -n local-database` | remove PostgreSQL pod controller | Usually yes | Usually yes | Data remains only if PVC is not deleted. |
+| `kubectl delete pvc postgres-data-postgres-0 -n local-database` | delete PostgreSQL persistent volume claim | No | No | This removes the Minikube PostgreSQL data volume. |
 
 ### What Happens After Laptop Restart
 
@@ -1056,8 +1056,8 @@ Recommended verification after restart:
 ```bash
 minikube start --driver=docker --cpus=2 --memory=3072 --disk-size=20g
 kubectl get pods -A
-kubectl get pvc -n benchmark
-kubectl exec -n benchmark postgres-0 -- sh -ec 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d mono_db -c "\dt"'
+kubectl get pvc -n local-database
+kubectl exec -n local-database postgres-0 -- sh -ec 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -U "$POSTGRES_USER" -d mono_db -c "\dt"'
 ```
 
 #### Docker Compose
@@ -1187,7 +1187,7 @@ Restart commands:
 ```bash
 minikube start --driver=docker --cpus=2 --memory=3072 --disk-size=20g
 kubectl get nodes
-kubectl get pvc -n benchmark
+kubectl get pvc -n local-database
 ```
 
 Effect:
@@ -1272,7 +1272,7 @@ Effect:
 You should assume a full rerun is required when one of the following happens:
 
 - you ran `minikube delete`,
-- you deleted the PostgreSQL PVC in namespace `benchmark`,
+- you deleted the PostgreSQL PVC in namespace `local-database`,
 - you ran Compose teardown with `down -v`,
 - you manually removed the local Docker volume used by Compose PostgreSQL.
 

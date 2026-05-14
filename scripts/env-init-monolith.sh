@@ -82,6 +82,6 @@ HTTP_MAX_HEADER_BYTES=1048576
 JWT_SECRET=${jwt_secret}
 DATADOG_ENABLED=false"
 
-write_if_missing "env/db-bootstrap.env" "BOOTSTRAP_DATABASE_URL=postgres://${encoded_postgres_user}:${encoded_postgres_password}@postgres.benchmark.svc.cluster.local:5432/bootstrap?sslmode=disable"
+write_if_missing "env/db-bootstrap.env" "BOOTSTRAP_DATABASE_URL=postgres://${encoded_postgres_user}:${encoded_postgres_password}@postgres.local-database.svc.cluster.local:5432/bootstrap?sslmode=disable"
 
 echo "local monolith env initialization complete"

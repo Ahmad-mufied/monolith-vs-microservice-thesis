@@ -805,7 +805,7 @@ Application pods should not run schema migration automatically.
 ## 19. Monolith Deployment Flow
 
 ```text
-Create namespace mono
+Apply local Kubernetes namespaces
     |
     v
 Create monolith-env
@@ -841,7 +841,7 @@ Upload results to S3
 Expanded sequence:
 
 ```text
-1. Create namespace mono.
+1. Apply the local Kubernetes namespace manifest.
 2. Create monolith-env.
 3. Run db-bootstrap-job.
 4. Wait until db-bootstrap-job is complete.
@@ -861,7 +861,7 @@ Expanded sequence:
 ## 20. Microservices Deployment Flow
 
 ```text
-Create namespace msa
+Apply local Kubernetes namespaces
     |
     v
 Create service secrets
@@ -913,7 +913,7 @@ Expanded sequence:
 
 ```text
 1. Create local PostgreSQL and db-bootstrap secrets.
-2. Create namespace msa.
+2. Apply the local Kubernetes namespace manifest.
 3. Create api-gateway-secret.
 4. Create auth-service-secret.
 5. Create item-service-secret.
@@ -1117,25 +1117,21 @@ Command notes:
 Create namespaces and PostgreSQL secrets:
 
 ```bash
-kubectl apply -f deployments/k8s/namespaces/benchmark.yaml
-kubectl create namespace mono --dry-run=client -o yaml | kubectl apply -f -
-kubectl create namespace msa --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f deployments/k8s/namespaces/local.yaml
 
 bash scripts/create-local-postgres-secrets.sh
 ```
 
 Command notes:
 
-- `kubectl apply -f deployments/k8s/namespaces/benchmark.yaml`: creates or updates the shared `benchmark` namespace definition.
-- `kubectl create namespace mono ...`: creates the monolith namespace if it does not exist.
-- `kubectl create namespace msa ...`: creates the microservices namespace if it does not exist.
+- `kubectl apply -f deployments/k8s/namespaces/local.yaml`: creates or updates the local Kubernetes namespaces used by the Minikube flow.
 - `bash scripts/create-local-postgres-secrets.sh`: generates the local PostgreSQL and DB bootstrap Kubernetes secrets from env files.
 
 Deploy PostgreSQL and wait until Ready:
 
 ```bash
 kubectl apply -f deployments/k8s/local/postgres.yaml
-kubectl wait --for=condition=ready pod/postgres-0 -n benchmark --timeout=180s
+kubectl wait --for=condition=ready pod/postgres-0 -n local-database --timeout=180s
 ```
 
 Command notes:
@@ -1146,7 +1142,7 @@ Command notes:
 Synchronize the in-cluster `postgres` password:
 
 ```bash
-kubectl exec -n benchmark postgres-0 -- /bin/sh -ec \
+kubectl exec -n local-database postgres-0 -- /bin/sh -ec \
   'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD '\''$POSTGRES_PASSWORD'\'';"'
 ```
 
@@ -1157,10 +1153,10 @@ Command notes:
 Run DB bootstrap:
 
 ```bash
-kubectl delete job db-bootstrap-job -n benchmark --ignore-not-found
+kubectl delete job db-bootstrap-job -n local-database --ignore-not-found
 kubectl apply -f deployments/k8s/local/db-bootstrap-job.yaml
-kubectl wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=180s
-kubectl logs job/db-bootstrap-job -n benchmark
+kubectl wait --for=condition=complete job/db-bootstrap-job -n local-database --timeout=180s
+kubectl logs job/db-bootstrap-job -n local-database
 ```
 
 Command notes:
@@ -1412,7 +1408,7 @@ Job responsibilities:
 Recommended Kubernetes Secrets:
 
 ```text
-benchmark namespace:
+local-database namespace:
 - db-bootstrap-env
 - k6-runner-secret
 

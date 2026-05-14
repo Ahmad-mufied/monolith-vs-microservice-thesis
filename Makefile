@@ -441,20 +441,20 @@ minikube-load-microservices: minikube-load-seed docker-build-microservices
 
 .PHONY: minikube-deploy-postgres
 minikube-deploy-postgres: create-local-postgres-secrets
-	kubectl apply -f $(K8S_DIR)/namespaces/benchmark.yaml
+	kubectl apply -f $(K8S_DIR)/namespaces/local.yaml
 	kubectl apply -f $(K8S_DIR)/local/postgres.yaml
-	kubectl wait --for=condition=ready pod/postgres-0 -n benchmark --timeout=180s
+	kubectl wait --for=condition=ready pod/postgres-0 -n local-database --timeout=180s
 	$(MAKE) minikube-sync-postgres-password
 
 .PHONY: minikube-sync-postgres-password
 minikube-sync-postgres-password:
-	kubectl exec -n benchmark postgres-0 -- /bin/sh -ec 'printf "%s\n" "SELECT format('\''ALTER USER %I WITH PASSWORD %L'\'', :'\''role'\'', :'\''password'\'') \gexec" | psql -v ON_ERROR_STOP=1 -v role="$$POSTGRES_USER" -v password="$$POSTGRES_PASSWORD" -U "$$POSTGRES_USER" -d postgres'
+	kubectl exec -n local-database postgres-0 -- /bin/sh -ec 'printf "%s\n" "SELECT format('\''ALTER USER %I WITH PASSWORD %L'\'', :'\''role'\'', :'\''password'\'') \gexec" | psql -v ON_ERROR_STOP=1 -v role="$$POSTGRES_USER" -v password="$$POSTGRES_PASSWORD" -U "$$POSTGRES_USER" -d postgres'
 
 .PHONY: minikube-db-bootstrap
 minikube-db-bootstrap: minikube-deploy-postgres
-	kubectl delete job db-bootstrap-job -n benchmark --ignore-not-found
+	kubectl delete job db-bootstrap-job -n local-database --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/local/db-bootstrap-job.yaml
-	kubectl wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=180s
+	kubectl wait --for=condition=complete job/db-bootstrap-job -n local-database --timeout=180s
 
 .PHONY: minikube-migrate-monolith
 minikube-migrate-monolith: minikube-load-monolith create-local-secrets minikube-db-bootstrap

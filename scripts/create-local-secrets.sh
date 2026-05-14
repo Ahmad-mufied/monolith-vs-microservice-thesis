@@ -33,7 +33,7 @@ cat >"$tmp_monolith_env" <<EOFMONO
 APP_ENV=${APP_ENV}
 APP_PORT=${APP_PORT}
 SERVICE_NAME=${SERVICE_NAME}
-DATABASE_URL=postgres://${encoded_user}:${encoded_pass}@postgres.benchmark.svc.cluster.local:5432/mono_db?sslmode=disable
+DATABASE_URL=postgres://${encoded_user}:${encoded_pass}@postgres.local-database.svc.cluster.local:5432/mono_db?sslmode=disable
 DB_POOL_MAX_CONNS=${DB_POOL_MAX_CONNS:-25}
 DB_POOL_MIN_CONNS=${DB_POOL_MIN_CONNS:-2}
 DB_POOL_MAX_CONN_LIFETIME=${DB_POOL_MAX_CONN_LIFETIME:-5m}
@@ -48,8 +48,6 @@ HTTP_MAX_HEADER_BYTES=${HTTP_MAX_HEADER_BYTES:-1048576}
 JWT_SECRET=${JWT_SECRET}
 DATADOG_ENABLED=${DATADOG_ENABLED}
 EOFMONO
-
-kubectl create namespace mono --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic monolith-env \
   --namespace mono \

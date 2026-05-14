@@ -36,9 +36,9 @@ set +a
 encoded_user="$(url_encode "$POSTGRES_USER")"
 encoded_pass="$(url_encode "$POSTGRES_PASSWORD")"
 
-cluster_auth_database_url="postgres://${encoded_user}:${encoded_pass}@postgres.benchmark.svc.cluster.local:5432/auth_db?sslmode=disable"
-cluster_item_database_url="postgres://${encoded_user}:${encoded_pass}@postgres.benchmark.svc.cluster.local:5432/item_db?sslmode=disable"
-cluster_transaction_database_url="postgres://${encoded_user}:${encoded_pass}@postgres.benchmark.svc.cluster.local:5432/transaction_db?sslmode=disable"
+cluster_auth_database_url="postgres://${encoded_user}:${encoded_pass}@postgres.local-database.svc.cluster.local:5432/auth_db?sslmode=disable"
+cluster_item_database_url="postgres://${encoded_user}:${encoded_pass}@postgres.local-database.svc.cluster.local:5432/item_db?sslmode=disable"
+cluster_transaction_database_url="postgres://${encoded_user}:${encoded_pass}@postgres.local-database.svc.cluster.local:5432/transaction_db?sslmode=disable"
 
 api_gateway_http_port="$(read_env_value env/api-gateway.env HTTP_PORT)"
 api_gateway_http_port="${api_gateway_http_port:-8080}"
@@ -104,8 +104,6 @@ DATABASE_URL=${cluster_transaction_database_url}
 TRANSACTION_DATABASE_URL=${cluster_transaction_database_url}
 ITEM_SERVICE_ADDR=item-service:${item_grpc_port}
 EOFTX
-
-kubectl create namespace msa --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic api-gateway-secret \
   --namespace msa \
