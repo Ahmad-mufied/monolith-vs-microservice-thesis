@@ -47,6 +47,17 @@ api_gateway_jwt_secret="$(read_env_value env/api-gateway.env JWT_SECRET)"
 auth_grpc_port="$(read_env_value env/auth-service.env GRPC_PORT)"
 auth_grpc_port="${auth_grpc_port:-50051}"
 auth_jwt_secret="$(read_env_value env/auth-service.env JWT_SECRET)"
+
+if [[ -z "${api_gateway_jwt_secret:-}" ]]; then
+  echo "JWT_SECRET must be non-empty in env/api-gateway.env" >&2
+  exit 1
+fi
+
+if [[ -z "${auth_jwt_secret:-}" ]]; then
+  echo "JWT_SECRET must be non-empty in env/auth-service.env" >&2
+  exit 1
+fi
+
 auth_jwt_expiry="$(read_env_value env/auth-service.env JWT_EXPIRY)"
 auth_jwt_expiry="${auth_jwt_expiry:-24h}"
 auth_bcrypt_cost="$(read_env_value env/auth-service.env BCRYPT_COST)"

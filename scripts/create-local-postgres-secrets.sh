@@ -15,6 +15,16 @@ set -a
 source env/postgres.env
 set +a
 
+if [[ -z "${POSTGRES_USER:-}" ]]; then
+  echo "POSTGRES_USER must be non-empty in env/postgres.env" >&2
+  exit 1
+fi
+
+if [[ -z "${POSTGRES_PASSWORD:-}" ]]; then
+  echo "POSTGRES_PASSWORD must be non-empty in env/postgres.env" >&2
+  exit 1
+fi
+
 encoded_user="$(url_encode "$POSTGRES_USER")"
 encoded_pass="$(url_encode "$POSTGRES_PASSWORD")"
 

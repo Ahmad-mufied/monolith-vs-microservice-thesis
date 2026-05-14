@@ -18,6 +18,11 @@ source env/postgres.env
 source env/monolith.env
 set +a
 
+if [[ -z "${JWT_SECRET:-}" ]]; then
+  echo "JWT_SECRET must be non-empty in env/monolith.env" >&2
+  exit 1
+fi
+
 encoded_user="$(url_encode "$POSTGRES_USER")"
 encoded_pass="$(url_encode "$POSTGRES_PASSWORD")"
 
