@@ -485,7 +485,7 @@ minikube-bootstrap-monolith-benchmark:
 	$(MAKE) minikube-deploy-monolith
 
 .PHONY: minikube-deploy-monolith
-minikube-deploy-monolith: minikube-migrate-monolith
+minikube-deploy-monolith:
 	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/resource-management.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
@@ -532,7 +532,7 @@ minikube-bootstrap-microservices-benchmark:
 	$(MAKE) minikube-deploy-microservices
 
 .PHONY: minikube-deploy-microservices
-minikube-deploy-microservices: minikube-migrate-microservices
+minikube-deploy-microservices:
 	kubectl apply -f $(K8S_DIR)/microservices/auth-service.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/item-service.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/transaction-service.yaml
