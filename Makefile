@@ -463,7 +463,7 @@ minikube-migrate-monolith: minikube-load-monolith create-local-secrets minikube-
 	kubectl wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 
 .PHONY: minikube-reset-monolith-data
-minikube-reset-monolith-data: minikube-load-seed
+minikube-reset-monolith-data: minikube-load-seed create-local-secrets
 	kubectl delete job reset-monolith-data-job -n mono --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/monolith/reset-monolith-data-job.yaml
 	kubectl wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=180s
@@ -493,7 +493,7 @@ minikube-bootstrap-monolith-benchmark:
 	$(MAKE) minikube-deploy-monolith
 
 .PHONY: minikube-deploy-monolith
-minikube-deploy-monolith: minikube-load-monolith
+minikube-deploy-monolith: minikube-load-monolith create-local-secrets
 	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/resource-management.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
@@ -512,7 +512,7 @@ minikube-migrate-microservices: minikube-load-microservices create-local-secrets
 	kubectl wait --for=condition=complete job/transaction-migration-job -n msa --timeout=180s
 
 .PHONY: minikube-reset-microservices-data
-minikube-reset-microservices-data: minikube-load-seed
+minikube-reset-microservices-data: minikube-load-seed create-local-secrets-microservices
 	kubectl delete job reset-microservices-data-job -n msa --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/microservices/reset-microservices-data-job.yaml
 	kubectl wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=180s
@@ -542,7 +542,7 @@ minikube-bootstrap-microservices-benchmark:
 	$(MAKE) minikube-deploy-microservices
 
 .PHONY: minikube-deploy-microservices
-minikube-deploy-microservices: minikube-load-microservices
+minikube-deploy-microservices: minikube-load-microservices create-local-secrets-microservices
 	kubectl apply -f $(K8S_DIR)/microservices/auth-service.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/item-service.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/transaction-service.yaml
