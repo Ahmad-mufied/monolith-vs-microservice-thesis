@@ -64,6 +64,16 @@ monolith-vs-microservice-thesis/
 ├── go.work.sum
 ├── .gitignore
 ├── .dockerignore
+├── .env
+├── .golangci.yml
+├── Makefile
+├── openapi.yaml
+├── buf.yaml
+├── buf.gen.yaml
+│
+├── .github/
+├── buildspec/
+├── env/
 │
 ├── docs/
 ├── monolith/
@@ -84,13 +94,24 @@ Top-level folder responsibilities:
 | `AGENTS.md` | Codex repository guidance |
 | `go.work` | Go workspace for monolith and services |
 | `go.work.sum` | Go workspace checksums |
+| `.gitignore` | Git ignore rules |
+| `.dockerignore` | Docker ignore rules |
+| `.env` | environment variables (not committed) |
+| `.golangci.yml` | golangci-lint configuration |
+| `Makefile` | build and task automation |
+| `openapi.yaml` | external REST API contract (source of truth) |
+| `buf.yaml` | buf module configuration for proto |
+| `buf.gen.yaml` | buf code generation configuration |
+| `.github/` | GitHub Actions CI workflows |
+| `buildspec/` | AWS CodeBuild specifications |
+| `env/` | environment configuration files |
 | `docs/` | project documentation |
 | `monolith/` | monolithic implementation |
 | `microservices/` | microservices implementation |
-| `proto/` | gRPC contracts |
+| `proto/` | gRPC contracts and generated code |
 | `pkg/` | shared technical utilities |
-| `seed/` | benchmark dataset and seed scripts |
-| `deployments/` | Kubernetes and Helm manifests |
+| `seed/` | benchmark seed tool |
+| `deployments/` | Docker Compose and Kubernetes manifests |
 | `infra/` | Terraform infrastructure |
 | `k6/` | benchmark scripts and runner |
 | `scripts/` | operational automation scripts |
@@ -113,20 +134,28 @@ docs/
 │   ├── overview.md
 │   ├── monolith.md
 │   ├── microservices.md
-│   ├── comparison.md
-│   └── diagrams/
+│   └── comparison.md
 │
 ├── api/
 │   ├── openapi-notes.md
 │   └── grpc-contracts.md
 │
+├── deployment/
+│   └── codebuild-ecr.md
+│
 ├── development/
 │   ├── project-structure.md
 │   ├── database-schema.md
-│   └── database-migration.md
+│   ├── database-migration.md
+│   ├── validation-strategy.md
+│   ├── local-deployment.md
+│   ├── run-monolith-local.md
+│   └── run-microservices-local.md
 │
 └── infrastructure/
-    └── rds-postgres.md
+    ├── rds-postgres.md
+    ├── deployment-strategy.md
+    └── secret-management.md
 ```
 
 Rule:
@@ -152,6 +181,7 @@ Final structure:
 monolith/
 ├── go.mod
 ├── go.sum
+├── Dockerfile
 │
 ├── cmd/
 │   └── server/
@@ -159,9 +189,46 @@ monolith/
 │
 ├── internal/
 │   ├── auth/
+│   │   ├── dto.go
+│   │   ├── handler.go
+│   │   ├── handler_test.go
+│   │   ├── model.go
+│   │   ├── password.go
+│   │   ├── repository.go
+│   │   ├── service.go
+│   │   └── service_test.go
+│   │
+│   ├── health/
+│   │   ├── handler.go
+│   │   └── handler_test.go
+│   │
 │   ├── item/
+│   │   ├── dto.go
+│   │   ├── handler.go
+│   │   ├── handler_test.go
+│   │   ├── model.go
+│   │   ├── repository.go
+│   │   ├── service.go
+│   │   └── service_test.go
+│   │
 │   ├── transaction/
+│   │   ├── dto.go
+│   │   ├── handler.go
+│   │   ├── handler_test.go
+│   │   ├── model.go
+│   │   ├── repository.go
+│   │   ├── service.go
+│   │   └── service_test.go
+│   │
 │   └── shared/
+│       ├── apperror/
+│       ├── config/
+│       ├── db/
+│       ├── httputil/
+│       ├── jwtutil/
+│       ├── middleware/
+│       ├── pagination/
+│       └── validation/
 │
 └── migrations/
     ├── 00001_create_users.sql
@@ -206,6 +273,7 @@ microservices/
 microservices/api-gateway/
 ├── go.mod
 ├── go.sum
+├── Dockerfile
 │
 ├── cmd/
 │   └── server/
@@ -217,6 +285,7 @@ microservices/api-gateway/
     ├── middleware/
     ├── dto/
     ├── router/
+    ├── httputil/
     ├── config/
     └── bootstrap/
 ```
@@ -237,6 +306,7 @@ Rules:
 microservices/auth-service/
 ├── go.mod
 ├── go.sum
+├── Dockerfile
 │
 ├── cmd/
 │   └── server/
@@ -249,7 +319,6 @@ microservices/auth-service/
 │   ├── adapter/
 │   │   ├── postgres/
 │   │   └── grpcserver/
-│   ├── security/
 │   ├── config/
 │   └── bootstrap/
 │
@@ -271,6 +340,8 @@ Rules:
 ```text
 microservices/item-service/
 ├── go.mod
+├── go.sum
+├── Dockerfile
 │
 ├── cmd/
 │   └── server/
@@ -305,6 +376,8 @@ Rules:
 ```text
 microservices/transaction-service/
 ├── go.mod
+├── go.sum
+├── Dockerfile
 │
 ├── cmd/
 │   └── server/
@@ -354,9 +427,22 @@ proto/
 ├── item/
 │   └── v1/
 │       └── item.proto
-└── transaction/
-    └── v1/
-        └── transaction.proto
+├── transaction/
+│   └── v1/
+│       └── transaction.proto
+│
+└── gen/
+    ├── go.mod
+    ├── go.sum
+    ├── auth/v1/
+    │   ├── auth.pb.go
+    │   └── auth_grpc.pb.go
+    ├── item/v1/
+    │   ├── item.pb.go
+    │   └── item_grpc.pb.go
+    └── transaction/v1/
+        ├── transaction.pb.go
+        └── transaction_grpc.pb.go
 ```
 
 Rules:
@@ -364,6 +450,7 @@ Rules:
 - proto files are the source of truth for internal gRPC contracts,
 - UUID values are represented as strings in proto,
 - do not manually edit generated code,
+- `gen/` contains generated Go gRPC code from `buf generate`,
 - regenerate Go code after proto changes.
 
 ---
@@ -380,21 +467,31 @@ Final structure:
 
 ```text
 pkg/
+├── go.mod
+├── go.sum
 ├── config/
+│   └── config.go
 ├── logger/
-├── observability/
-├── response/
+│   └── logger.go
+├── observability/          # not yet implemented
+├── response/               # not yet implemented
 ├── errors/
+│   ├── errors.go
+│   └── errors_test.go
 ├── jwt/
+│   ├── jwt.go
+│   └── jwt_test.go
 ├── postgres/
+│   └── postgres.go
 └── validator/
+    └── validator.go
 ```
 
 Allowed in `pkg/`:
 
 - config loader,
 - logger helper,
-- observability helper,
+- observability helper (Datadog integration),
 - response helper,
 - error helper,
 - JWT utility,
@@ -430,14 +527,25 @@ Final structure:
 
 ```text
 seed/
-├── datasets/
-└── scripts/
+├── go.mod
+├── go.sum
+├── Dockerfile
+│
+├── cmd/
+│   └── seed-runner/
+│       └── main.go
+│
+└── internal/
+    └── seed/
+        ├── monolith.go
+        └── microservices.go
 ```
 
 Rules:
 
-- seed data is central,
+- seed is implemented as a Go application,
 - seed is separate from migration,
+- seed runs as a Kubernetes Job via Docker container,
 - seed scripts capture generated UUIDs using `INSERT ... RETURNING id`,
 - seed scripts maintain logical-to-generated ID mappings,
 - seed data must be logically equivalent for monolith and microservices.
@@ -456,28 +564,54 @@ Final structure:
 
 ```text
 deployments/
-├── helm/
-│   ├── monolith/
-│   ├── api-gateway/
-│   ├── auth-service/
-│   ├── item-service/
-│   ├── transaction-service/
-│   └── k6-runner/
+├── compose/
+│   ├── docker-compose.db.yml
+│   ├── docker-compose.monolith.yml
+│   ├── docker-compose.microservices.yml
+│   └── initdb/
+│       └── 001-create-databases.sql
 │
 └── k8s/
+    ├── local/
+    │   ├── postgres.yaml
+    │   └── db-bootstrap-job.yaml
+    │
     ├── namespaces/
-    ├── quotas/
-    ├── hpa/
-    ├── jobs/
-    └── node-placement/
+    │   └── local.yaml
+    │
+    ├── monolith/
+    │   ├── monolith.yaml
+    │   ├── ingress.yaml
+    │   ├── migration-job.yaml
+    │   ├── resource-management.yaml
+    │   ├── reset-monolith-data-job.yaml
+    │   ├── seed-monolith-benchmark-data-job.yaml
+    │   └── seed-monolith-smoke-data-job.yaml
+    │
+    └── microservices/
+        ├── api-gateway.yaml
+        ├── api-gateway-ingress.yaml
+        ├── auth-service.yaml
+        ├── auth-migration-job.yaml
+        ├── item-service.yaml
+        ├── item-migration-job.yaml
+        ├── transaction-service.yaml
+        ├── transaction-migration-job.yaml
+        ├── resource-management.yaml
+        ├── reset-microservices-data-job.yaml
+        ├── seed-microservices-benchmark-data-job.yaml
+        └── seed-microservices-smoke-data-job.yaml
 ```
 
 Rules:
 
+- `compose/` is used for local development,
+- `k8s/local/` is used for local Kubernetes development,
 - migration runs via Kubernetes Job,
 - seed runs via Kubernetes Job,
 - migration and seed must not run during benchmark execution,
-- API Gateway has no migration job.
+- API Gateway has no migration job,
+- resource management includes ResourceQuota and HPA definitions.
 
 ---
 
@@ -489,7 +623,9 @@ Path:
 infra/
 ```
 
-Final structure:
+Status: **Not yet implemented.**
+
+Planned structure:
 
 ```text
 infra/
@@ -504,7 +640,7 @@ infra/
             └── iam/
 ```
 
-Terraform manages:
+Terraform will manage:
 
 - VPC,
 - EKS cluster,
@@ -525,7 +661,9 @@ Path:
 k6/
 ```
 
-Final structure:
+Status: **Not yet implemented.**
+
+Planned structure:
 
 ```text
 k6/
@@ -553,10 +691,17 @@ Path:
 scripts/
 ```
 
-Final structure:
+Current structure:
 
 ```text
 scripts/
+├── create-local-postgres-secrets.sh
+├── create-local-secrets.sh
+├── create-local-secrets-microservices.sh
+├── env-init-base.sh
+├── env-init-monolith.sh
+├── env-init-microservices.sh
+└── go-mod-tidy-all.sh
 ```
 
 Scripts should be simple wrappers around documented commands.
