@@ -503,7 +503,6 @@ I/O-bound + state mutation
 Main operations:
 
 - validate item availability,
-- deduct `available_amount`,
 - insert transaction,
 - insert transaction_items.
 
@@ -519,7 +518,6 @@ Monolith
     |
     +-- Begin DB transaction
     +-- Validate item available_amount
-    +-- Update items.available_amount
     +-- Insert transactions RETURNING id
     +-- Insert transaction_items
     +-- Commit
@@ -1062,7 +1060,6 @@ Chosen create transaction semantics:
 ```text
 Request is complete only after:
 - item allocation has been validated,
-- available_amount has been updated,
 - transaction has been inserted,
 - transaction_items have been inserted,
 - response is returned.
