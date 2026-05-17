@@ -363,7 +363,6 @@ Monolith
             |
             +-- Begin DB transaction
             +-- Validate item available_amount
-            +-- Update items.available_amount
             +-- Insert transactions RETURNING id
             +-- Insert transaction_items
             +-- Commit
