@@ -31,7 +31,7 @@ func newEchoCtx(method, target, body string) (echo.Context, *httptest.ResponseRe
 func runHandler(h echo.HandlerFunc, c echo.Context) *httptest.ResponseRecorder {
 	rec := c.Response().Writer.(*httptest.ResponseRecorder)
 	if err := h(c); err != nil {
-		echo.New().HTTPErrorHandler(err, c)
+		httputil.HTTPErrorHandler(err, c)
 	}
 	return rec
 }
@@ -168,6 +168,33 @@ func TestAuthHandler_Register(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAuthHandler_Register_UnsupportedMediaType(t *testing.T) {
+	fake := &fakeAuthClient{}
+	h := NewAuthHandler(fake)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewBufferString(`{"name":"Ahmad"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMETextPlain)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	runHandler(h.Register, c)
+
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusUnsupportedMediaType, rec.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	errBody, _ := body["error"].(map[string]any)
+	if errBody["code"] != "UNSUPPORTED_MEDIA_TYPE" {
+		t.Fatalf("error.code = %v, want %q", errBody["code"], "UNSUPPORTED_MEDIA_TYPE")
 	}
 }
 

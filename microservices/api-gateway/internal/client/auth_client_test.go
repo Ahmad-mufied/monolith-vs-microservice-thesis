@@ -16,7 +16,6 @@ import (
 type fakeAuthServiceClient struct {
 	registerFn      func(ctx context.Context, in *authv1.RegisterRequest, opts ...grpc.CallOption) (*authv1.RegisterResponse, error)
 	loginFn         func(ctx context.Context, in *authv1.LoginRequest, opts ...grpc.CallOption) (*authv1.LoginResponse, error)
-	getUserByIdFn   func(ctx context.Context, in *authv1.GetUserByIdRequest, opts ...grpc.CallOption) (*authv1.GetUserByIdResponse, error)
 	getUsersByIdsFn func(ctx context.Context, in *authv1.GetUsersByIdsRequest, opts ...grpc.CallOption) (*authv1.GetUsersByIdsResponse, error)
 }
 
@@ -26,8 +25,8 @@ func (f *fakeAuthServiceClient) Register(ctx context.Context, in *authv1.Registe
 func (f *fakeAuthServiceClient) Login(ctx context.Context, in *authv1.LoginRequest, opts ...grpc.CallOption) (*authv1.LoginResponse, error) {
 	return f.loginFn(ctx, in, opts...)
 }
-func (f *fakeAuthServiceClient) GetUserById(ctx context.Context, in *authv1.GetUserByIdRequest, opts ...grpc.CallOption) (*authv1.GetUserByIdResponse, error) {
-	return f.getUserByIdFn(ctx, in, opts...)
+func (f *fakeAuthServiceClient) GetUserById(context.Context, *authv1.GetUserByIdRequest, ...grpc.CallOption) (*authv1.GetUserByIdResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 func (f *fakeAuthServiceClient) GetUsersByIds(ctx context.Context, in *authv1.GetUsersByIdsRequest, opts ...grpc.CallOption) (*authv1.GetUsersByIdsResponse, error) {
 	return f.getUsersByIdsFn(ctx, in, opts...)

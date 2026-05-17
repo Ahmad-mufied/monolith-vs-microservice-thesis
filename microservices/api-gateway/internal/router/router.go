@@ -2,8 +2,10 @@ package router
 
 import (
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/handler"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/middleware"
 	"github.com/labstack/echo/v4"
+	echomiddleware "github.com/labstack/echo/v4/middleware"
 )
 
 // New creates and configures the Echo router with all routes.
@@ -16,6 +18,8 @@ func New(
 ) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
+	e.HTTPErrorHandler = httputil.HTTPErrorHandler
+	e.Use(echomiddleware.Recover())
 
 	// Public routes.
 	e.GET("/healthz", health.Handle)

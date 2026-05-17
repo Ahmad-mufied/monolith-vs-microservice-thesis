@@ -38,8 +38,8 @@ func (h *ItemHandler) ListItems(c echo.Context) error {
 
 func (h *ItemHandler) SyncItems(c echo.Context) error {
 	var req dto.SyncItemsRequest
-	if err := c.Bind(&req); err != nil {
-		return httputil.Error(c, &httputil.AppError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "invalid request payload"})
+	if err := httputil.Bind(c, &req); err != nil {
+		return httputil.Error(c, err)
 	}
 	if err := h.client.SyncItems(c.Request().Context(), req.Items); err != nil {
 		return httputil.Error(c, err)
