@@ -712,12 +712,24 @@ If you need to rerun only the data lifecycle without rebuilding the app stack:
 make minikube-reset-microservices-data
 make minikube-seed-microservices-smoke
 make minikube-seed-microservices-benchmark
+make minikube-prepare-microservices-enrichment-smoke
+make minikube-prepare-microservices-enrichment-benchmark
 ```
 
 These commands assume the shared PostgreSQL pod and microservices schemas are
 already ready. Use `make minikube-bootstrap-microservices-smoke` or
 `make minikube-bootstrap-microservices-benchmark` when you need the full setup
-path.
+path for login or create-transaction flows. Use
+`make minikube-bootstrap-microservices-enrichment-benchmark` when you want the
+full read-benchmark path, including enrichment preparation.
+
+For the `enriched-transactions` benchmark, run the preparation target after the
+matching base seed:
+
+```bash
+make minikube-seed-microservices-benchmark
+make minikube-prepare-microservices-enrichment-benchmark
+```
 
 Smoke dataset intent:
 
@@ -728,3 +740,6 @@ Benchmark dataset intent:
 
 - larger deterministic data for later load-test preparation,
 - same dataset shape on every rerun.
+
+If you want the full schema-to-deploy flow for read benchmarking, use
+`make minikube-bootstrap-microservices-enrichment-benchmark`.

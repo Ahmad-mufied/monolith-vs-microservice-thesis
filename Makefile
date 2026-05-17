@@ -103,13 +103,18 @@ help:
 	@echo "  make reset-monolith-data"
 	@echo "  make seed-monolith-data DATASET=smoke"
 	@echo "  make seed-monolith-data DATASET=benchmark"
+	@echo "  make prepare-monolith-enrichment-data DATASET=smoke"
+	@echo "  make prepare-monolith-enrichment-data DATASET=benchmark"
 	@echo "  make reset-microservices-data"
 	@echo "  make seed-microservices-data DATASET=smoke"
 	@echo "  make seed-microservices-data DATASET=benchmark"
+	@echo "  make prepare-microservices-enrichment-data DATASET=smoke"
+	@echo "  make prepare-microservices-enrichment-data DATASET=benchmark"
 	@echo ""
 	@echo "Minikube:"
 	@echo "  make minikube-start"
 	@echo "  make minikube-stop"
+	@echo "  make minikube-delete"
 	@echo "  make minikube-load-monolith"
 	@echo "  make minikube-load-microservices"
 	@echo "  make minikube-deploy-postgres"
@@ -121,6 +126,10 @@ help:
 	@echo "  make minikube-seed-monolith-benchmark"
 	@echo "  make minikube-bootstrap-monolith-smoke"
 	@echo "  make minikube-bootstrap-monolith-benchmark"
+	@echo "  make minikube-prepare-monolith-enrichment-smoke"
+	@echo "  make minikube-prepare-monolith-enrichment-benchmark"
+	@echo "  make minikube-bootstrap-monolith-enrichment-smoke"
+	@echo "  make minikube-bootstrap-monolith-enrichment-benchmark"
 	@echo "  make minikube-deploy-monolith"
 	@echo "  make minikube-migrate-microservices"
 	@echo "  make minikube-reset-microservices-data"
@@ -128,6 +137,10 @@ help:
 	@echo "  make minikube-seed-microservices-benchmark"
 	@echo "  make minikube-bootstrap-microservices-smoke"
 	@echo "  make minikube-bootstrap-microservices-benchmark"
+	@echo "  make minikube-prepare-microservices-enrichment-smoke"
+	@echo "  make minikube-prepare-microservices-enrichment-benchmark"
+	@echo "  make minikube-bootstrap-microservices-enrichment-smoke"
+	@echo "  make minikube-bootstrap-microservices-enrichment-benchmark"
 	@echo "  make minikube-deploy-microservices"
 	@echo "  make minikube-port-forward-monolith"
 	@echo "  make minikube-port-forward-api-gateway"
@@ -376,6 +389,14 @@ reset-monolith-data:
 		cd seed && go run ./cmd/seed-runner reset-monolith-data \
 			--database-url="$$MONO_DATABASE_URL"'
 
+.PHONY: prepare-monolith-enrichment-data
+prepare-monolith-enrichment-data:
+	@bash -ec 'set -a; source env/monolith.env; set +a; \
+		: "$${MONO_DATABASE_URL:?MONO_DATABASE_URL is required}"; \
+		cd seed && go run ./cmd/seed-runner prepare-monolith-enrichment-data \
+			--dataset="$${DATASET:-smoke}" \
+			--database-url="$$MONO_DATABASE_URL"'
+
 .PHONY: reset-microservices-data
 reset-microservices-data:
 	@bash -ec 'set -a; source env/auth-service.env; source env/item-service.env; source env/transaction-service.env; set +a; \
@@ -383,6 +404,18 @@ reset-microservices-data:
 		: "$${ITEM_DATABASE_URL:?ITEM_DATABASE_URL is required}"; \
 		: "$${TRANSACTION_DATABASE_URL:?TRANSACTION_DATABASE_URL is required}"; \
 		cd seed && go run ./cmd/seed-runner reset-microservices-data \
+			--auth-database-url="$$AUTH_DATABASE_URL" \
+			--item-database-url="$$ITEM_DATABASE_URL" \
+			--transaction-database-url="$$TRANSACTION_DATABASE_URL"'
+
+.PHONY: prepare-microservices-enrichment-data
+prepare-microservices-enrichment-data:
+	@bash -ec 'set -a; source env/auth-service.env; source env/item-service.env; source env/transaction-service.env; set +a; \
+		: "$${AUTH_DATABASE_URL:?AUTH_DATABASE_URL is required}"; \
+		: "$${ITEM_DATABASE_URL:?ITEM_DATABASE_URL is required}"; \
+		: "$${TRANSACTION_DATABASE_URL:?TRANSACTION_DATABASE_URL is required}"; \
+		cd seed && go run ./cmd/seed-runner prepare-microservices-enrichment-data \
+			--dataset="$${DATASET:-smoke}" \
 			--auth-database-url="$$AUTH_DATABASE_URL" \
 			--item-database-url="$$ITEM_DATABASE_URL" \
 			--transaction-database-url="$$TRANSACTION_DATABASE_URL"'
@@ -485,7 +518,7 @@ minikube-seed-monolith-smoke: minikube-reset-monolith-data
 minikube-seed-monolith-benchmark: minikube-reset-monolith-data
 	kubectl delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/monolith/seed-monolith-benchmark-data-job.yaml
-	kubectl wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=180s
+	kubectl wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
 
 .PHONY: minikube-bootstrap-monolith-smoke
 minikube-bootstrap-monolith-smoke:
@@ -499,11 +532,38 @@ minikube-bootstrap-monolith-benchmark:
 	$(MAKE) minikube-seed-monolith-benchmark
 	$(MAKE) minikube-deploy-monolith
 
+.PHONY: minikube-prepare-monolith-enrichment-smoke
+minikube-prepare-monolith-enrichment-smoke: minikube-load-seed create-local-secrets
+	kubectl delete job prepare-monolith-enrichment-smoke-data-job -n mono --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/monolith/prepare-monolith-enrichment-smoke-data-job.yaml
+	kubectl wait --for=condition=complete job/prepare-monolith-enrichment-smoke-data-job -n mono --timeout=180s
+
+.PHONY: minikube-prepare-monolith-enrichment-benchmark
+minikube-prepare-monolith-enrichment-benchmark: minikube-load-seed create-local-secrets
+	kubectl delete job prepare-monolith-enrichment-benchmark-data-job -n mono --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml
+	kubectl wait --for=condition=complete job/prepare-monolith-enrichment-benchmark-data-job -n mono --timeout=180s
+
+.PHONY: minikube-bootstrap-monolith-enrichment-smoke
+minikube-bootstrap-monolith-enrichment-smoke:
+	$(MAKE) minikube-migrate-monolith
+	$(MAKE) minikube-seed-monolith-smoke
+	$(MAKE) minikube-prepare-monolith-enrichment-smoke
+	$(MAKE) minikube-deploy-monolith
+
+.PHONY: minikube-bootstrap-monolith-enrichment-benchmark
+minikube-bootstrap-monolith-enrichment-benchmark:
+	$(MAKE) minikube-migrate-monolith
+	$(MAKE) minikube-seed-monolith-benchmark
+	$(MAKE) minikube-prepare-monolith-enrichment-benchmark
+	$(MAKE) minikube-deploy-monolith
+
 .PHONY: minikube-deploy-monolith
 minikube-deploy-monolith: minikube-load-monolith create-local-secrets
 	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/resource-management.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
+	kubectl rollout restart deployment/monolith -n mono
 	kubectl rollout status deployment/monolith -n mono --timeout=180s
 
 .PHONY: minikube-migrate-microservices
@@ -534,7 +594,7 @@ minikube-seed-microservices-smoke: minikube-reset-microservices-data
 minikube-seed-microservices-benchmark: minikube-reset-microservices-data
 	kubectl delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
 	kubectl apply -f $(K8S_DIR)/microservices/seed-microservices-benchmark-data-job.yaml
-	kubectl wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=180s
+	kubectl wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
 
 .PHONY: minikube-bootstrap-microservices-smoke
 minikube-bootstrap-microservices-smoke:
@@ -548,6 +608,32 @@ minikube-bootstrap-microservices-benchmark:
 	$(MAKE) minikube-seed-microservices-benchmark
 	$(MAKE) minikube-deploy-microservices
 
+.PHONY: minikube-prepare-microservices-enrichment-smoke
+minikube-prepare-microservices-enrichment-smoke: minikube-load-seed create-local-secrets-microservices
+	kubectl delete job prepare-microservices-enrichment-smoke-data-job -n msa --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/microservices/prepare-microservices-enrichment-smoke-data-job.yaml
+	kubectl wait --for=condition=complete job/prepare-microservices-enrichment-smoke-data-job -n msa --timeout=180s
+
+.PHONY: minikube-prepare-microservices-enrichment-benchmark
+minikube-prepare-microservices-enrichment-benchmark: minikube-load-seed create-local-secrets-microservices
+	kubectl delete job prepare-microservices-enrichment-benchmark-data-job -n msa --ignore-not-found
+	kubectl apply -f $(K8S_DIR)/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml
+	kubectl wait --for=condition=complete job/prepare-microservices-enrichment-benchmark-data-job -n msa --timeout=180s
+
+.PHONY: minikube-bootstrap-microservices-enrichment-smoke
+minikube-bootstrap-microservices-enrichment-smoke:
+	$(MAKE) minikube-migrate-microservices
+	$(MAKE) minikube-seed-microservices-smoke
+	$(MAKE) minikube-prepare-microservices-enrichment-smoke
+	$(MAKE) minikube-deploy-microservices
+
+.PHONY: minikube-bootstrap-microservices-enrichment-benchmark
+minikube-bootstrap-microservices-enrichment-benchmark:
+	$(MAKE) minikube-migrate-microservices
+	$(MAKE) minikube-seed-microservices-benchmark
+	$(MAKE) minikube-prepare-microservices-enrichment-benchmark
+	$(MAKE) minikube-deploy-microservices
+
 .PHONY: minikube-deploy-microservices
 minikube-deploy-microservices: minikube-load-microservices create-local-secrets-microservices
 	kubectl apply -f $(K8S_DIR)/microservices/auth-service.yaml
@@ -556,6 +642,10 @@ minikube-deploy-microservices: minikube-load-microservices create-local-secrets-
 	kubectl apply -f $(K8S_DIR)/microservices/api-gateway.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/resource-management.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/api-gateway-ingress.yaml
+	kubectl rollout restart deployment/auth-service -n msa
+	kubectl rollout restart deployment/item-service -n msa
+	kubectl rollout restart deployment/transaction-service -n msa
+	kubectl rollout restart deployment/api-gateway -n msa
 	kubectl rollout status deployment/auth-service -n msa --timeout=180s
 	kubectl rollout status deployment/item-service -n msa --timeout=180s
 	kubectl rollout status deployment/transaction-service -n msa --timeout=180s
