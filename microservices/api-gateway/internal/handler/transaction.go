@@ -44,9 +44,6 @@ func (h *TransactionHandler) CreateTransaction(c echo.Context) error {
 	}
 	var req dto.CreateTransactionRequest
 	if err := httputil.Bind(c, &req); err != nil {
-		if _, ok := err.(*echo.HTTPError); ok {
-			return err
-		}
 		return httputil.Error(c, err)
 	}
 	txID, err := h.txClient.CreateTransaction(c.Request().Context(), userID, req.Items)
