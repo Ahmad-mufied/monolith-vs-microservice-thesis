@@ -131,9 +131,17 @@ fi
 echo "Generated result files:"
 find "$RESULT_DIR" -maxdepth 1 -type f -print | sort
 
+S3_STATUS=0
 if [ -n "${S3_URI:-}" ]; then
-  aws s3 sync "$RESULT_DIR" "$S3_URI/"
-  echo "Uploaded k6 results to $S3_URI/"
+  if aws s3 sync "$RESULT_DIR" "$S3_URI/"; then
+    echo "Uploaded k6 results to $S3_URI/"
+  else
+    S3_STATUS=$?
+  fi
+fi
+
+if [ "$S3_STATUS" -ne 0 ]; then
+  echo "ERROR: S3 upload failed (aws exit code: $S3_STATUS). k6 exit code: $STATUS" >&2
 fi
 
 exit "$STATUS"
