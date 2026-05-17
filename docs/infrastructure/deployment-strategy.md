@@ -1446,7 +1446,6 @@ Recommended Kubernetes Secrets:
 ```text
 local-database namespace:
 - db-bootstrap-env
-- k6-runner-secret
 
 mono namespace:
 - monolith-env
@@ -1456,6 +1455,9 @@ msa namespace:
 - auth-service-secret
 - item-service-secret
 - transaction-service-secret
+
+benchmark namespace:
+- k6-runner-secret
 ```
 
 Secret purposes:
@@ -1547,14 +1549,27 @@ Final benchmark results must be uploaded to S3 before destroying infrastructure.
 Recommended S3 prefix:
 
 ```text
-experiments/{run_id}/{architecture}/{scenario}/{target_rps}rps/
+experiments/{run_id}/{architecture}/{scenario_name}/{target_rps}rps/{attempt}/
 ```
 
 Example:
 
 ```text
-experiments/2026-05-05T120000Z/monolith/login/1000rps/
+experiments/20260512-103000/monolith/login/1000rps/attempt-01/
+experiments/20260512-103000/monolith/login/1000rps/attempt-02/
+experiments/20260512-103000/msa/create-transaction/2500rps/attempt-01/
 ```
+
+`scenario_name` should use the k6 script basename without `.js`, for example:
+
+```text
+k6/scripts/login.js -> login
+k6/scripts/create-transaction.js -> create-transaction
+```
+
+Each k6 execution must upload to a unique attempt folder. Raw attempt output
+must stay separated during collection; aggregation should happen later during
+analysis.
 
 Expected files:
 
@@ -1563,14 +1578,37 @@ summary.json
 raw.json.gz
 metadata.json
 stdout.log
-hpa-state.yaml
+k6-options.json
+thresholds.json
 pods-state.txt
 top-pods.txt
 top-nodes.txt
 events.txt
+resource-quotas.yaml
+deployments-state.yaml
+services-state.yaml
+```
+
+When HPA is enabled, also collect:
+
+```text
+hpa-state.yaml
+hpa-describe.txt
+```
+
+When Datadog is enabled, also collect:
+
+```text
+datadog-time-window.json
 ```
 
 Do not run `terraform destroy` before verifying result files in S3.
+
+Detailed benchmark lifecycle and S3 naming policy:
+
+```text
+docs/infrastructure/benchmark-execution-lifecycle.md
+```
 
 ---
 
