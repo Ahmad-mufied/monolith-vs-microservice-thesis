@@ -109,8 +109,8 @@ func HTTPErrorHandler(err error, c echo.Context) {
 		return
 	}
 
-	httpErr, ok := err.(*echo.HTTPError)
-	if !ok {
+	var httpErr *echo.HTTPError
+	if !errors.As(err, &httpErr) {
 		_ = Error(c, &AppError{
 			Status:  http.StatusInternalServerError,
 			Code:    "INTERNAL_SERVER_ERROR",
