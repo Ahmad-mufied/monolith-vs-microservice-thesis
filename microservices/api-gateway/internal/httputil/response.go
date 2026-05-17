@@ -82,7 +82,11 @@ func Error(c echo.Context, err error) error {
 func BindError(err error) error {
 	var httpErr *echo.HTTPError
 	if errors.As(err, &httpErr) && httpErr.Code == http.StatusUnsupportedMediaType {
-		return httpErr
+		return &AppError{
+			Status:  http.StatusUnsupportedMediaType,
+			Code:    "UNSUPPORTED_MEDIA_TYPE",
+			Message: httpErrorMessage(httpErr),
+		}
 	}
 	return &AppError{
 		Status:  http.StatusBadRequest,
