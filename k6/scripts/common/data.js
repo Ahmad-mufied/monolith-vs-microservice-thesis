@@ -43,8 +43,13 @@ export function userEmail(index) {
   return `${USER_EMAIL_PREFIX}${USER_EMAIL_SEPARATOR}${leftPad(index, USER_EMAIL_PADDING)}@${USER_EMAIL_DOMAIN}`;
 }
 
+const itemIdNamespace = String(ITEM_ID_NAMESPACE).toLowerCase();
+if (!/^[0-9a-f]{4}$/.test(itemIdNamespace)) {
+  throw new Error(`Invalid ITEM_ID_NAMESPACE '${ITEM_ID_NAMESPACE}'. Expected 4 hex characters.`);
+}
+
 export function deterministicItemId(index) {
-  return `00000000-0000-7000-${ITEM_ID_NAMESPACE}-${leftPad(index, 12)}`;
+  return `00000000-0000-7000-${itemIdNamespace}-${leftPad(index, 12)}`;
 }
 
 export function deterministicTransactionId(index) {
@@ -153,11 +158,17 @@ export function itemIds() {
 
 export function randomUser() {
   const rows = users();
+  if (rows.length === 0) {
+    throw new Error("randomUser: no users available");
+  }
   return rows[randomInt(0, rows.length - 1)];
 }
 
 export function randomItemId() {
   const rows = itemIds();
+  if (rows.length === 0) {
+    throw new Error("randomItemId: no item IDs available");
+  }
   return rows[randomInt(0, rows.length - 1)];
 }
 

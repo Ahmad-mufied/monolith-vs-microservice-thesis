@@ -1446,7 +1446,6 @@ Recommended Kubernetes Secrets:
 ```text
 local-database namespace:
 - db-bootstrap-env
-- k6-runner-secret
 
 mono namespace:
 - monolith-env
@@ -1456,6 +1455,9 @@ msa namespace:
 - auth-service-secret
 - item-service-secret
 - transaction-service-secret
+
+benchmark namespace:
+- k6-runner-secret
 ```
 
 Secret purposes:

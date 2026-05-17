@@ -403,7 +403,6 @@ summary.json
 raw.json.gz
 stdout.log
 metadata.json
-metadata.partial.json
 k6-options.json
 thresholds.json
 ```

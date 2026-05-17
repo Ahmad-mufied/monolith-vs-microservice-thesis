@@ -22,24 +22,90 @@ export THRESHOLDS_PATH
 
 mkdir -p "$RESULT_DIR"
 
-cat > "$METADATA_PATH" <<EOF
-{
-  "run_id": "${RUN_ID:-local-run}",
-  "attempt": "${ATTEMPT:-attempt-01}",
-  "architecture": "${ARCHITECTURE:-unknown}",
-  "scenario_name": "${SCENARIO_NAME:-unknown}",
-  "k6_script": "k6/scripts/${K6_SCRIPT}",
-  "k6_profile": "${K6_PROFILE:-steady}",
-  "target_rps": ${TARGET_RPS:-0},
-  "duration": "${DURATION:-}",
-  "base_url": "${BASE_URL:-}",
-  "dataset": "${DATASET:-}",
-  "dataset_version": "${DATASET_VERSION:-}",
-  "git_commit": "${GIT_COMMIT:-}",
-  "image_tag": "${IMAGE_TAG:-}",
-  "timestamp_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+json_env_or() {
+  local name="$1"
+  local fallback="$2"
+  local raw="${!name:-}"
+
+  if [ -z "$raw" ]; then
+    printf '%s' "$fallback"
+    return 0
+  fi
+
+  jq -cn --arg raw "$raw" '$raw | fromjson'
 }
-EOF
+
+TARGET_RPS_VALUE="${TARGET_RPS:-0}"
+PRE_ALLOCATED_VUS_VALUE="${PRE_ALLOCATED_VUS:-0}"
+MAX_VUS_VALUE="${MAX_VUS:-0}"
+DURATION_VALUE="${TEST_DURATION:-${DURATION:-}}"
+TIMESTAMP_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+IMAGES_JSON="$(json_env_or IMAGES_JSON '[]')"
+SEED_SIZE_JSON="$(json_env_or SEED_SIZE_JSON 'null')"
+K6_CONFIGURATION_JSON="$(json_env_or K6_CONFIGURATION_JSON '{}')"
+INFRA_CONFIGURATION_JSON="$(json_env_or INFRA_CONFIGURATION_JSON '{}')"
+RESOURCES_CONFIGURATION_JSON="$(json_env_or RESOURCES_CONFIGURATION_JSON '{}')"
+APP_RESOURCE_QUOTA_JSON="$(json_env_or APP_RESOURCE_QUOTA_JSON 'null')"
+HPA_TARGET_CPU_JSON="$(json_env_or HPA_TARGET_CPU_JSON 'null')"
+
+jq -n \
+  --arg run_id "${RUN_ID:-local-run}" \
+  --arg attempt "${ATTEMPT:-attempt-01}" \
+  --arg architecture "${ARCHITECTURE:-unknown}" \
+  --arg scenario_name "${SCENARIO_NAME:-unknown}" \
+  --arg k6_script "k6/scripts/${K6_SCRIPT}" \
+  --arg k6_profile "${K6_PROFILE:-steady}" \
+  --arg duration "$DURATION_VALUE" \
+  --arg base_url "${BASE_URL:-}" \
+  --arg dataset "${DATASET:-}" \
+  --arg dataset_version "${DATASET_VERSION:-}" \
+  --arg git_commit "${GIT_COMMIT:-}" \
+  --arg image_tag "${IMAGE_TAG:-}" \
+  --arg timestamp_utc "$TIMESTAMP_UTC" \
+  --arg app_node_pool "${APP_NODE_POOL:-}" \
+  --arg testing_node_pool "${TESTING_NODE_POOL:-}" \
+  --argjson target_rps "$TARGET_RPS_VALUE" \
+  --argjson pre_allocated_vus "$PRE_ALLOCATED_VUS_VALUE" \
+  --argjson max_vus "$MAX_VUS_VALUE" \
+  --argjson images "$IMAGES_JSON" \
+  --argjson seed_size "$SEED_SIZE_JSON" \
+  --argjson k6_configuration "$K6_CONFIGURATION_JSON" \
+  --argjson infra_configuration "$INFRA_CONFIGURATION_JSON" \
+  --argjson resources_configuration "$RESOURCES_CONFIGURATION_JSON" \
+  --argjson app_resource_quota "$APP_RESOURCE_QUOTA_JSON" \
+  --argjson hpa_target_cpu "$HPA_TARGET_CPU_JSON" \
+  '{
+    run_id: $run_id,
+    attempt: $attempt,
+    architecture: $architecture,
+    scenario_name: $scenario_name,
+    k6_script: $k6_script,
+    k6_profile: $k6_profile,
+    target_rps: $target_rps,
+    duration: $duration,
+    base_url: $base_url,
+    dataset: $dataset,
+    dataset_version: $dataset_version,
+    git_commit: $git_commit,
+    image_tag: $image_tag,
+    timestamp_utc: $timestamp_utc,
+    images: $images,
+    seed_size: $seed_size,
+    k6_configuration: ($k6_configuration + {
+      profile: $k6_profile,
+      target_rps: $target_rps,
+      duration: $duration,
+      pre_allocated_vus: $pre_allocated_vus,
+      max_vus: $max_vus
+    }),
+    infra_configuration: $infra_configuration,
+    resources_configuration: $resources_configuration,
+    app_resource_quota: $app_resource_quota,
+    hpa_target_cpu: $hpa_target_cpu,
+    app_node_pool: (if $app_node_pool == "" then null else $app_node_pool end),
+    testing_node_pool: (if $testing_node_pool == "" then null else $testing_node_pool end)
+  }' > "$METADATA_PATH"
 
 set +e
 k6 run --out "json=$RAW_PATH" "$K6_ROOT/scripts/$K6_SCRIPT" > "$STDOUT_PATH" 2>&1

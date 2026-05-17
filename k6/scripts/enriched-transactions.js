@@ -13,7 +13,7 @@ import {
 } from "./common/requests.js";
 export { handleSummary } from "./common/summary.js";
 
-export const options = benchmarkOptions("enriched_transactions");
+export const options = benchmarkOptions("enriched-transactions");
 
 export function setup() {
   if (ADMIN_AUTH_TOKEN) {

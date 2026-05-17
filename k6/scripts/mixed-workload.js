@@ -17,12 +17,27 @@ import {
 } from "./common/requests.js";
 export { handleSummary } from "./common/summary.js";
 
-export const options = benchmarkOptions("mixed_workload");
+export const options = benchmarkOptions("mixed-workload");
 
 const LOGIN_WEIGHT = envInt("MIX_LOGIN_WEIGHT", 10);
 const CREATE_TRANSACTION_WEIGHT = envInt("MIX_CREATE_TRANSACTION_WEIGHT", 40);
 const OWN_TRANSACTIONS_WEIGHT = envInt("MIX_OWN_TRANSACTIONS_WEIGHT", 20);
 const ENRICHED_TRANSACTIONS_WEIGHT = envInt("MIX_ENRICHED_TRANSACTIONS_WEIGHT", 30);
+const TOTAL_WEIGHT =
+  LOGIN_WEIGHT +
+  CREATE_TRANSACTION_WEIGHT +
+  OWN_TRANSACTIONS_WEIGHT +
+  ENRICHED_TRANSACTIONS_WEIGHT;
+
+if (
+  LOGIN_WEIGHT < 0 ||
+  CREATE_TRANSACTION_WEIGHT < 0 ||
+  OWN_TRANSACTIONS_WEIGHT < 0 ||
+  ENRICHED_TRANSACTIONS_WEIGHT < 0 ||
+  TOTAL_WEIGHT <= 0
+) {
+  throw new Error("Invalid mixed-workload weights: each weight must be >= 0 and total must be > 0.");
+}
 
 export function setup() {
   const seededUsers = users();
@@ -46,6 +61,10 @@ export function setup() {
     }
   }
 
+  if (tokenPool.length === 0) {
+    throw new Error("No tokens generated for mixed-workload scenario.");
+  }
+
   return {
     tokens: tokenPool,
     itemIds: seededItems,
@@ -53,8 +72,7 @@ export function setup() {
 }
 
 export default function (data) {
-  const total = LOGIN_WEIGHT + CREATE_TRANSACTION_WEIGHT + OWN_TRANSACTIONS_WEIGHT + ENRICHED_TRANSACTIONS_WEIGHT;
-  const dice = randomInt(1, total);
+  const dice = randomInt(1, TOTAL_WEIGHT);
 
   if (dice <= LOGIN_WEIGHT) {
     const user = randomUser();

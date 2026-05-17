@@ -7,7 +7,7 @@ import {
 } from "./common/requests.js";
 export { handleSummary } from "./common/summary.js";
 
-export const options = benchmarkOptions("sync_items");
+export const options = benchmarkOptions("sync-items");
 
 export function setup() {
   const seededUsers = users();

@@ -30,8 +30,8 @@ export function trimTrailingSlash(value) {
 export const BASE_URL = trimTrailingSlash(envString("BASE_URL", "http://localhost:8080"));
 
 export const K6_PROFILE = envString("K6_PROFILE", "steady");
-export const TARGET_RPS = envInt("TARGET_RPS", 10);
-export const DURATION = envString("DURATION", "1m");
+export const TARGET_RPS = envInt("TARGET_RPS", 1000);
+export const DURATION = envString("TEST_DURATION", envString("DURATION", "1m"));
 export const TIME_UNIT = envString("TIME_UNIT", "1s");
 
 export const VUS = envInt("VUS", 1);

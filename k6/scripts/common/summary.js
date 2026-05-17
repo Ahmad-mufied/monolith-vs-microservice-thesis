@@ -13,7 +13,6 @@ import {
   MAX_VUS,
   IMAGE_TAG,
   GIT_COMMIT,
-  thresholdConfig,
 } from "./config.js";
 
 export function handleSummary(data) {
@@ -50,10 +49,23 @@ export function handleSummary(data) {
   return {
     [summaryPath]: JSON.stringify(data, null, 2),
     [metadataPartialPath]: JSON.stringify(metadata, null, 2),
-    [thresholdsPath]: JSON.stringify(thresholdConfig(), null, 2),
+    [thresholdsPath]: JSON.stringify(thresholdResults(data), null, 2),
     [optionsPath]: JSON.stringify(k6Options, null, 2),
     stdout: summaryLine(data),
   };
+}
+
+function thresholdResults(data) {
+  const results = {};
+  const metrics = data?.metrics || {};
+
+  for (const [metricName, metric] of Object.entries(metrics)) {
+    if (metric?.thresholds) {
+      results[metricName] = metric.thresholds;
+    }
+  }
+
+  return results;
 }
 
 function metricValue(data, metricName, key) {

@@ -8,7 +8,7 @@ import {
 } from "./common/requests.js";
 export { handleSummary } from "./common/summary.js";
 
-export const options = benchmarkOptions("create_transaction");
+export const options = benchmarkOptions("create-transaction");
 
 export function setup() {
   const seededUsers = users();

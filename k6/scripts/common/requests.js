@@ -48,7 +48,8 @@ export function expectJsonValue(response, selector, label) {
   return check(response, {
     [`${label}: ${selector} exists`]: (r) => {
       try {
-        return Boolean(r.json(selector));
+        const value = r.json(selector);
+        return value !== undefined && value !== null;
       } catch (_) {
         return false;
       }
@@ -71,12 +72,20 @@ export function loginRequest(email, password) {
 export function loginAndExtractToken(email, password, label = "login") {
   const response = loginRequest(email, password);
 
-  expectStatus(response, 200, label);
-  expectJsonValue(response, "data.token", label);
+  const statusOk = expectStatus(response, 200, label);
+  const tokenOk = expectJsonValue(response, "data.token", label);
+  const token = safeJson(response, "data.token", "");
+
+  if (!statusOk || !tokenOk || !token) {
+    const body = typeof response.body === "string" ? response.body : "";
+    throw new Error(
+      `${label}: login failed or token missing (status=${response.status}, body=${body})`
+    );
+  }
 
   return {
     response,
-    token: safeJson(response, "data.token", ""),
+    token,
     user: safeJson(response, "data.user", null),
   };
 }
