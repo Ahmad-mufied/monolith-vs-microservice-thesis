@@ -599,7 +599,7 @@ Owned by:
 item-service
 ```
 
-The `available_amount` value is updated by Item Service during allocation.
+The `available_amount` value is validated but not modified by Item Service.
 
 ---
 

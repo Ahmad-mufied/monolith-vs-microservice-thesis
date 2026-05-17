@@ -220,7 +220,6 @@ Benchmark 2 create transaction flow:
 POST /api/v1/transactions
 → begin DB transaction
 → validate item available_amount
-→ update item available_amount
 → insert transaction using INSERT ... RETURNING id
 → insert transaction_items
 → commit

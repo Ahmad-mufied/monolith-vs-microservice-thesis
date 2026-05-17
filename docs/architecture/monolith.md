@@ -295,7 +295,7 @@ Responsibilities:
 - update item,
 - delete item,
 - validate `available_amount`,
-- deduct `available_amount` during transaction creation.
+- validate `available_amount` during transaction creation.
 
 Main benchmark relevance:
 
@@ -660,8 +660,6 @@ Transaction Usecase
     |
     +-- Validate item available_amount
     |
-    +-- Deduct item available_amount
-    |
     +-- Insert transaction RETURNING id
     |
     +-- Insert transaction_items
@@ -681,9 +679,7 @@ Client/k6          Monolith                         mono_db
    |----------------->|                                |
    |                  | BEGIN                          |
    |                  |------------------------------->|
-   |                  | SELECT item FOR UPDATE          |
-   |                  |------------------------------->|
-   |                  | UPDATE items.available_amount   |
+   |                  | SELECT available_amount         |
    |                  |------------------------------->|
    |                  | INSERT transactions RETURNING id|
    |                  |------------------------------->|
