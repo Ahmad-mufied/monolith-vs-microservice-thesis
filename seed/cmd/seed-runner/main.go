@@ -13,7 +13,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		log.Fatalf("usage: seed-runner <reset-monolith-data|seed-monolith-data|reset-microservices-data|seed-microservices-data> [flags]")
+		log.Fatalf("usage: seed-runner <reset-monolith-data|seed-monolith-data|prepare-monolith-enrichment-data|reset-microservices-data|seed-microservices-data|prepare-microservices-enrichment-data> [flags]")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -24,10 +24,14 @@ func main() {
 		resetMonolithData(ctx, os.Args[2:])
 	case "seed-monolith-data":
 		seedMonolithData(ctx, os.Args[2:])
+	case "prepare-monolith-enrichment-data":
+		prepareMonolithEnrichmentData(ctx, os.Args[2:])
 	case "reset-microservices-data":
 		resetMicroservicesData(ctx, os.Args[2:])
 	case "seed-microservices-data":
 		seedMicroservicesData(ctx, os.Args[2:])
+	case "prepare-microservices-enrichment-data":
+		prepareMicroservicesEnrichmentData(ctx, os.Args[2:])
 	default:
 		log.Fatalf("unknown command %q", os.Args[1])
 	}
@@ -58,6 +62,20 @@ func seedMonolithData(ctx context.Context, args []string) {
 	fmt.Printf("seeded monolith dataset=%s\n", *dataset)
 }
 
+func prepareMonolithEnrichmentData(ctx context.Context, args []string) {
+	fs := flag.NewFlagSet("prepare-monolith-enrichment-data", flag.ExitOnError)
+	cfg := seed.MonolithConfig{}
+	dataset := fs.String("dataset", "smoke", "dataset mode: smoke or benchmark")
+	fs.StringVar(&cfg.DatabaseURL, "database-url", "", "monolith database url")
+	fs.Parse(args)
+
+	if err := seed.PrepareMonolithEnrichmentData(ctx, cfg, *dataset); err != nil {
+		log.Fatalf("prepare monolith enrichment data (%s): %v", *dataset, err)
+	}
+
+	fmt.Printf("prepared monolith enrichment dataset=%s\n", *dataset)
+}
+
 func resetMicroservicesData(ctx context.Context, args []string) {
 	fs := flag.NewFlagSet("reset-microservices-data", flag.ExitOnError)
 	cfg := seed.MicroservicesConfig{}
@@ -85,4 +103,20 @@ func seedMicroservicesData(ctx context.Context, args []string) {
 	}
 
 	fmt.Printf("seeded microservices dataset=%s\n", *dataset)
+}
+
+func prepareMicroservicesEnrichmentData(ctx context.Context, args []string) {
+	fs := flag.NewFlagSet("prepare-microservices-enrichment-data", flag.ExitOnError)
+	cfg := seed.MicroservicesConfig{}
+	dataset := fs.String("dataset", "smoke", "dataset mode: smoke or benchmark")
+	fs.StringVar(&cfg.AuthDatabaseURL, "auth-database-url", "", "auth database url")
+	fs.StringVar(&cfg.ItemDatabaseURL, "item-database-url", "", "item database url")
+	fs.StringVar(&cfg.TransactionDatabaseURL, "transaction-database-url", "", "transaction database url")
+	fs.Parse(args)
+
+	if err := seed.PrepareMicroservicesEnrichmentData(ctx, cfg, *dataset); err != nil {
+		log.Fatalf("prepare microservices enrichment data (%s): %v", *dataset, err)
+	}
+
+	fmt.Printf("prepared microservices enrichment dataset=%s\n", *dataset)
 }

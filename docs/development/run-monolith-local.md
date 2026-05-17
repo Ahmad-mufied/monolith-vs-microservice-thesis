@@ -615,11 +615,24 @@ changing the monolith Deployment:
 make minikube-reset-monolith-data
 make minikube-seed-monolith-smoke
 make minikube-seed-monolith-benchmark
+make minikube-prepare-monolith-enrichment-smoke
+make minikube-prepare-monolith-enrichment-benchmark
 ```
 
 These commands assume the PostgreSQL pod and monolith schema are already ready.
 Use `make minikube-bootstrap-monolith-smoke` or
-`make minikube-bootstrap-monolith-benchmark` when you need the full setup path.
+`make minikube-bootstrap-monolith-benchmark` when you need the full setup path
+for login or create-transaction flows. Use
+`make minikube-bootstrap-monolith-enrichment-benchmark` when you want the full
+read-benchmark path, including enrichment preparation.
+
+For the `enriched-transactions` benchmark, run the preparation target after the
+matching base seed:
+
+```bash
+make minikube-seed-monolith-benchmark
+make minikube-prepare-monolith-enrichment-benchmark
+```
 
 ### 10. Access Monolith
 
@@ -683,6 +696,9 @@ Choose `make minikube-bootstrap-monolith-smoke` for fast local verification.
 
 Use `make minikube-bootstrap-monolith-benchmark` when you want the same lifecycle with the larger deterministic benchmark dataset for later load testing.
 
+Use `make minikube-bootstrap-monolith-enrichment-benchmark` when you need a
+ready-to-read transaction dataset for `GET /api/v1/admin/transactions`.
+
 These bootstrap targets run:
 
 - PostgreSQL deploy,
@@ -691,6 +707,7 @@ These bootstrap targets run:
 - migration job,
 - monolith data reset,
 - monolith smoke or benchmark seed,
+- optional monolith enrichment preparation for enrichment bootstrap targets,
 - monolith deployment rollout.
 
 ## Step Verification Checklist

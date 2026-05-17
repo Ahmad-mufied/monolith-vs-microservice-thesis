@@ -141,8 +141,12 @@ After migrations:
 ```text
 seed-monolith-smoke-data-job
 seed-monolith-benchmark-data-job
+prepare-monolith-enrichment-smoke-data-job
+prepare-monolith-enrichment-benchmark-data-job
 seed-microservices-smoke-data-job
 seed-microservices-benchmark-data-job
+prepare-microservices-enrichment-smoke-data-job
+prepare-microservices-enrichment-benchmark-data-job
 ```
 
 Reset jobs should run before the selected seed job when a scenario needs clean
@@ -153,11 +157,8 @@ reset-monolith-data-job
 reset-microservices-data-job
 ```
 
-Seed jobs insert benchmark data and capture generated UUIDs with:
-
-```sql
-INSERT ... RETURNING id
-```
+Seed runner behavior, datasets, reset semantics, and retry behavior are
+documented in `seed/README.md`.
 
 ---
 

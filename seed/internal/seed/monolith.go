@@ -67,13 +67,14 @@ func SeedMonolithData(ctx context.Context, cfg MonolithConfig, mode string) erro
 			}
 
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO users (name, email, password_hash)
-				VALUES ($1, $2, $3)
-				ON CONFLICT (email) DO UPDATE
+				INSERT INTO users (id, name, email, password_hash)
+				VALUES ($1, $2, $3, $4)
+				ON CONFLICT (id) DO UPDATE
 				SET
 					name = EXCLUDED.name,
+					email = EXCLUDED.email,
 					password_hash = EXCLUDED.password_hash
-			`, user.Name, user.Email, string(hash)); err != nil {
+			`, user.ID, user.Name, user.Email, string(hash)); err != nil {
 				return err
 			}
 		}
@@ -82,6 +83,46 @@ func SeedMonolithData(ctx context.Context, cfg MonolithConfig, mode string) erro
 			if err := insertMonolithItem(ctx, tx, item); err != nil {
 				return err
 			}
+		}
+
+		return tx.Commit(ctx)
+	})
+}
+
+func PrepareMonolithEnrichmentData(ctx context.Context, cfg MonolithConfig, mode string) error {
+	if err := cfg.validate(); err != nil {
+		return err
+	}
+
+	spec, err := buildEnrichmentDatasetSpec(mode)
+	if err != nil {
+		return err
+	}
+
+	return withPool(ctx, cfg.DatabaseURL, func(pool *pgxpool.Pool) error {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(ctx)
+
+		userIDs, err := loadOrderedIDs(ctx, tx, `SELECT id::text FROM users ORDER BY email ASC, id ASC`, spec.RequiredUsers, "base users")
+		if err != nil {
+			return err
+		}
+
+		itemIDs, err := loadOrderedIDs(ctx, tx, `SELECT id::text FROM items ORDER BY name ASC, id ASC`, spec.RequiredItems, "base items")
+		if err != nil {
+			return err
+		}
+
+		transactions, err := buildEnrichmentTransactions(spec, userIDs, itemIDs)
+		if err != nil {
+			return err
+		}
+
+		if err := insertEnrichmentTransactions(ctx, tx, transactions); err != nil {
+			return err
 		}
 
 		return tx.Commit(ctx)
