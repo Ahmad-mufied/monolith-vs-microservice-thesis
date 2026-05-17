@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/client"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
@@ -86,7 +87,7 @@ func TestTransactionHandler_CreateTransaction(t *testing.T) {
 			if tt.clientFn != nil {
 				fake.createFn = tt.clientFn
 			}
-			h := NewTransactionHandler(fake, nil, nil)
+			h := NewTransactionHandler(fake, &fakeAuthClient{}, nil)
 			c, rec := newEchoCtx(http.MethodPost, "/api/v1/transactions", tt.body)
 			c.Set(middleware.UserIDContextKey, tt.userID)
 			runHandler(h.CreateTransaction, c)
@@ -297,7 +298,7 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 			wantItemDeleted: true,
 		},
 		{
-			name: "nil user entry in auth response is skipped safely",
+			name: "missing auth enrichment returns 500",
 			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
 				return rawTxs, nil
 			},
@@ -307,16 +308,42 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 			itemClientFn: func(_ context.Context, ids []string) ([]dto.ItemSummary, error) {
 				return []dto.ItemSummary{{ID: ids[0], Name: "Item A"}}, nil
 			},
-			wantStatus: http.StatusOK,
-			wantLen:    1,
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name: "missing item enrichment returns 500",
+			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+				return rawTxs, nil
+			},
+			authClientFn: func(_ context.Context, ids []string) ([]*dto.UserSummary, error) {
+				return []*dto.UserSummary{{ID: ids[0], Name: "Ahmad", Email: "a@b.com"}}, nil
+			},
+			itemClientFn: func(_ context.Context, _ []string) ([]dto.ItemSummary, error) {
+				return []dto.ItemSummary{}, nil
+			},
+			wantStatus: http.StatusInternalServerError,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			txFake := &fakeTransactionClient{getForEnrichmentFn: tt.txClientFn}
-			authFake := &fakeAuthClient{getUsersByIDs: tt.authClientFn}
-			itemFake := &fakeItemClient{getItemSummariesFn: tt.itemClientFn}
+			authFake := &fakeAuthClient{
+				getUsersByIDs: func(ctx context.Context, ids []string) ([]*dto.UserSummary, error) {
+					if tt.authClientFn == nil {
+						return nil, nil
+					}
+					return tt.authClientFn(ctx, ids)
+				},
+			}
+			itemFake := &fakeItemClient{
+				getItemSummariesFn: func(ctx context.Context, ids []string) ([]dto.ItemSummary, error) {
+					if tt.itemClientFn == nil {
+						return []dto.ItemSummary{}, nil
+					}
+					return tt.itemClientFn(ctx, ids)
+				},
+			}
 
 			h := NewTransactionHandler(txFake, authFake, itemFake)
 			c, rec := newEchoCtx(http.MethodGet, "/api/v1/admin/transactions", "")
@@ -361,5 +388,69 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 				t.Errorf("item.deleted = %v, want true", item["deleted"])
 			}
 		})
+	}
+}
+
+func TestTransactionHandler_GetAllEnriched_FanOutRunsInParallel(t *testing.T) {
+	rawTxs := []client.RawTransaction{
+		{
+			ID:        "txid-1",
+			UserID:    "uid-1",
+			Items:     []dto.TransactionItem{{ItemID: "iid-1", Amount: 2}},
+			CreatedAt: "2026-01-01T00:00:00Z",
+			UpdatedAt: "2026-01-01T00:00:00Z",
+		},
+	}
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	txFake := &fakeTransactionClient{
+		getForEnrichmentFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+			return rawTxs, nil
+		},
+	}
+	authFake := &fakeAuthClient{
+		getUsersByIDs: func(_ context.Context, ids []string) ([]*dto.UserSummary, error) {
+			started <- "auth"
+			<-release
+			return []*dto.UserSummary{{ID: ids[0], Name: "Ahmad", Email: "a@b.com"}}, nil
+		},
+	}
+	itemFake := &fakeItemClient{
+		getItemSummariesFn: func(_ context.Context, ids []string) ([]dto.ItemSummary, error) {
+			started <- "item"
+			<-release
+			return []dto.ItemSummary{{ID: ids[0], Name: "Item A"}}, nil
+		},
+	}
+
+	h := NewTransactionHandler(txFake, authFake, itemFake)
+	c, rec := newEchoCtx(http.MethodGet, "/api/v1/admin/transactions", "")
+
+	done := make(chan struct{})
+	go func() {
+		runHandler(h.GetAllEnriched, c)
+		close(done)
+	}()
+
+	for range 2 {
+		select {
+		case <-started:
+		case <-time.After(250 * time.Millisecond):
+			t.Fatal("expected auth and item enrichment calls to start in parallel")
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("handler did not finish after releasing enrichment calls")
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 }

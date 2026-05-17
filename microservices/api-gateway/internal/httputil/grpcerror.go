@@ -3,6 +3,7 @@ package httputil
 import (
 	"net/http"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -12,6 +13,7 @@ type AppError struct {
 	Status  int
 	Code    string
 	Message string
+	Details any
 }
 
 func (e *AppError) Error() string { return e.Message }
@@ -27,7 +29,7 @@ func FromGRPCError(err error) *AppError {
 		msg := st.Message()
 		switch st.Code() {
 		case codes.InvalidArgument:
-			return &AppError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: msg}
+			return &AppError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: msg, Details: grpcBadRequestDetails(st)}
 		case codes.Unauthenticated:
 			return &AppError{Status: http.StatusUnauthorized, Code: "UNAUTHORIZED", Message: msg}
 		case codes.PermissionDenied:
@@ -44,4 +46,25 @@ func FromGRPCError(err error) *AppError {
 	}
 
 	return &AppError{Status: http.StatusInternalServerError, Code: "INTERNAL_SERVER_ERROR", Message: "internal server error"}
+}
+
+// grpcBadRequestDetails extracts field-level validation details from a gRPC BadRequest payload.
+func grpcBadRequestDetails(st *status.Status) map[string]string {
+	details := make(map[string]string)
+	for _, detail := range st.Details() {
+		badRequest, ok := detail.(*errdetails.BadRequest)
+		if !ok {
+			continue
+		}
+		for _, violation := range badRequest.GetFieldViolations() {
+			if violation.GetField() == "" {
+				continue
+			}
+			details[violation.GetField()] = violation.GetDescription()
+		}
+	}
+	if len(details) == 0 {
+		return nil
+	}
+	return details
 }

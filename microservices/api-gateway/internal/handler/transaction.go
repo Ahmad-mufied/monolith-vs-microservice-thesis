@@ -9,6 +9,7 @@ import (
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/middleware"
 	"github.com/labstack/echo/v4"
+	"golang.org/x/sync/errgroup"
 )
 
 type transactionClient interface {
@@ -42,8 +43,8 @@ func (h *TransactionHandler) CreateTransaction(c echo.Context) error {
 		return httputil.Error(c, err)
 	}
 	var req dto.CreateTransactionRequest
-	if err := c.Bind(&req); err != nil {
-		return httputil.Error(c, &httputil.AppError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "invalid request payload"})
+	if err := httputil.Bind(c, &req); err != nil {
+		return httputil.Error(c, err)
 	}
 	txID, err := h.txClient.CreateTransaction(c.Request().Context(), userID, req.Items)
 	if err != nil {
@@ -110,14 +111,32 @@ func (h *TransactionHandler) GetAllEnriched(c echo.Context) error {
 	userIDs := setToSlice(userIDSet)
 	itemIDs := setToSlice(itemIDSet)
 
-	// Fan-out: call auth and item services.
-	users, err := h.authClient.GetUsersByIDs(ctx, userIDs)
-	if err != nil {
-		return httputil.Error(c, err)
-	}
+	var (
+		users         []*dto.UserSummary
+		itemSummaries []dto.ItemSummary
+	)
 
-	itemSummaries, err := h.itemClient.GetItemSummariesByIDs(ctx, itemIDs)
-	if err != nil {
+	g, enrichCtx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		result, err := h.authClient.GetUsersByIDs(enrichCtx, userIDs)
+		if err != nil {
+			return err
+		}
+		users = result
+		return nil
+	})
+
+	g.Go(func() error {
+		result, err := h.itemClient.GetItemSummariesByIDs(enrichCtx, itemIDs)
+		if err != nil {
+			return err
+		}
+		itemSummaries = result
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
 		return httputil.Error(c, err)
 	}
 
@@ -137,23 +156,23 @@ func (h *TransactionHandler) GetAllEnriched(c echo.Context) error {
 	// Assemble enriched response.
 	enriched := make([]dto.EnrichedTransaction, 0, len(rawTxs))
 	for _, tx := range rawTxs {
-		user := dto.UserSummary{}
-		if u, ok := userMap[tx.UserID]; ok {
-			user = *u
+		u, ok := userMap[tx.UserID]
+		if !ok {
+			return httputil.Error(c, enrichIntegrityError())
 		}
 
 		items := make([]dto.EnrichedTransactionItem, 0, len(tx.Items))
 		for _, it := range tx.Items {
-			summary := dto.ItemSummary{ID: it.ItemID}
-			if s, ok := itemMap[it.ItemID]; ok {
-				summary = s
+			summary, ok := itemMap[it.ItemID]
+			if !ok {
+				return httputil.Error(c, enrichIntegrityError())
 			}
 			items = append(items, dto.EnrichedTransactionItem{Item: summary, Amount: it.Amount})
 		}
 
 		enriched = append(enriched, dto.EnrichedTransaction{
 			ID:        tx.ID,
-			User:      user,
+			User:      *u,
 			Items:     items,
 			CreatedAt: tx.CreatedAt,
 			UpdatedAt: tx.UpdatedAt,
@@ -169,4 +188,12 @@ func setToSlice(m map[string]struct{}) []string {
 		s = append(s, k)
 	}
 	return s
+}
+
+func enrichIntegrityError() *httputil.AppError {
+	return &httputil.AppError{
+		Status:  http.StatusInternalServerError,
+		Code:    "INTERNAL_SERVER_ERROR",
+		Message: "failed to enrich transaction data",
+	}
 }
