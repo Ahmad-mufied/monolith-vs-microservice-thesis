@@ -57,10 +57,10 @@ export function handleSummary(data) {
 
 function thresholdResults(data) {
   const results = {};
-  const metrics = data?.metrics || {};
+  const metrics = data && data.metrics ? data.metrics : {};
 
   for (const [metricName, metric] of Object.entries(metrics)) {
-    if (metric?.thresholds) {
+    if (metric && metric.thresholds) {
       results[metricName] = metric.thresholds;
     }
   }
