@@ -17,8 +17,8 @@ import {
 } from "./config.js";
 
 const smokeUsers = [
-  { email: "smoke-user-1@example.com", password: "Password123!" },
-  { email: "smoke-user-2@example.com", password: "Password123!" },
+  { email: "smoke-user-1@example.com", password: USER_PASSWORD },
+  { email: "smoke-user-2@example.com", password: USER_PASSWORD },
 ];
 
 const smokeItemIDs = [
