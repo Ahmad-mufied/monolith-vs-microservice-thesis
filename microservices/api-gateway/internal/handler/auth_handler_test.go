@@ -31,7 +31,7 @@ func newEchoCtx(method, target, body string) (echo.Context, *httptest.ResponseRe
 func runHandler(h echo.HandlerFunc, c echo.Context) *httptest.ResponseRecorder {
 	rec := c.Response().Writer.(*httptest.ResponseRecorder)
 	if err := h(c); err != nil {
-		echo.New().HTTPErrorHandler(err, c)
+		httputil.HTTPErrorHandler(err, c)
 	}
 	return rec
 }

@@ -71,10 +71,95 @@ func Error(c echo.Context, err error) error {
 	var appErr *AppError
 	if errors.As(err, &appErr) {
 		return c.JSON(appErr.Status, errorResponse{
-			Error: errorPayload{Code: appErr.Code, Message: appErr.Message, Details: nil},
+			Error: errorPayload{Code: appErr.Code, Message: appErr.Message, Details: appErr.Details},
 		})
 	}
 	return c.JSON(http.StatusInternalServerError, errorResponse{
 		Error: errorPayload{Code: "INTERNAL_SERVER_ERROR", Message: "internal server error", Details: nil},
 	})
+}
+
+func BindError(err error) error {
+	var httpErr *echo.HTTPError
+	if errors.As(err, &httpErr) && httpErr.Code == http.StatusUnsupportedMediaType {
+		return httpErr
+	}
+	return &AppError{
+		Status:  http.StatusBadRequest,
+		Code:    "BAD_REQUEST",
+		Message: "invalid request payload",
+	}
+}
+
+func Bind(c echo.Context, dst any) error {
+	if err := c.Bind(dst); err != nil {
+		return BindError(err)
+	}
+	return nil
+}
+
+func HTTPErrorHandler(err error, c echo.Context) {
+	if c.Response().Committed {
+		return
+	}
+
+	var appErr *AppError
+	if errors.As(err, &appErr) {
+		_ = Error(c, appErr)
+		return
+	}
+
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok {
+		_ = Error(c, &AppError{
+			Status:  http.StatusInternalServerError,
+			Code:    "INTERNAL_SERVER_ERROR",
+			Message: "internal server error",
+		})
+		return
+	}
+
+	if httpErr.Code == http.StatusNotFound {
+		_ = Error(c, &AppError{
+			Status:  http.StatusNotFound,
+			Code:    "NOT_FOUND",
+			Message: "resource not found",
+		})
+		return
+	}
+
+	_ = Error(c, fromHTTPStatus(httpErr.Code, httpErrorMessage(httpErr)))
+}
+
+func fromHTTPStatus(statusCode int, message string) *AppError {
+	if message == "" {
+		message = http.StatusText(statusCode)
+	}
+
+	switch statusCode {
+	case http.StatusBadRequest:
+		return &AppError{Status: statusCode, Code: "BAD_REQUEST", Message: message}
+	case http.StatusUnauthorized:
+		return &AppError{Status: statusCode, Code: "UNAUTHORIZED", Message: message}
+	case http.StatusForbidden:
+		return &AppError{Status: statusCode, Code: "FORBIDDEN", Message: message}
+	case http.StatusMethodNotAllowed:
+		return &AppError{Status: statusCode, Code: "METHOD_NOT_ALLOWED", Message: message}
+	case http.StatusUnsupportedMediaType:
+		return &AppError{Status: statusCode, Code: "UNSUPPORTED_MEDIA_TYPE", Message: message}
+	case http.StatusConflict:
+		return &AppError{Status: statusCode, Code: "CONFLICT", Message: message}
+	default:
+		if statusCode >= http.StatusBadRequest && statusCode < http.StatusInternalServerError {
+			return &AppError{Status: statusCode, Code: "BAD_REQUEST", Message: message}
+		}
+		return &AppError{Status: http.StatusInternalServerError, Code: "INTERNAL_SERVER_ERROR", Message: "internal server error"}
+	}
+}
+
+func httpErrorMessage(err *echo.HTTPError) string {
+	if message, ok := err.Message.(string); ok {
+		return message
+	}
+	return http.StatusText(err.Code)
 }

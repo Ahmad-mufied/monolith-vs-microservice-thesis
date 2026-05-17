@@ -25,8 +25,11 @@ func NewAuthHandler(client authClient) *AuthHandler {
 
 func (h *AuthHandler) Register(c echo.Context) error {
 	var req dto.RegisterRequest
-	if err := c.Bind(&req); err != nil {
-		return httputil.Error(c, &httputil.AppError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "invalid request payload"})
+	if err := httputil.Bind(c, &req); err != nil {
+		if _, ok := err.(*echo.HTTPError); ok {
+			return err
+		}
+		return httputil.Error(c, err)
 	}
 	user, err := h.client.Register(c.Request().Context(), req.Name, req.Email, req.Password)
 	if err != nil {
@@ -40,8 +43,11 @@ func (h *AuthHandler) Register(c echo.Context) error {
 
 func (h *AuthHandler) Login(c echo.Context) error {
 	var req dto.LoginRequest
-	if err := c.Bind(&req); err != nil {
-		return httputil.Error(c, &httputil.AppError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "invalid request payload"})
+	if err := httputil.Bind(c, &req); err != nil {
+		if _, ok := err.(*echo.HTTPError); ok {
+			return err
+		}
+		return httputil.Error(c, err)
 	}
 	token, user, err := h.client.Login(c.Request().Context(), req.Email, req.Password)
 	if err != nil {
