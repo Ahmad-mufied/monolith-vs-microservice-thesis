@@ -60,10 +60,17 @@ func SeedMonolithData(ctx context.Context, cfg MonolithConfig, mode string) erro
 		}
 		defer tx.Rollback(ctx)
 
+		passwordHashes := make(map[string]string, len(ds.Users))
+
 		for _, user := range ds.Users {
-			hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), 12)
-			if err != nil {
-				return err
+			hash, ok := passwordHashes[user.Password]
+			if !ok {
+				encoded, err := bcrypt.GenerateFromPassword([]byte(user.Password), 12)
+				if err != nil {
+					return err
+				}
+				hash = string(encoded)
+				passwordHashes[user.Password] = hash
 			}
 
 			if _, err := tx.Exec(ctx, `
@@ -74,7 +81,7 @@ func SeedMonolithData(ctx context.Context, cfg MonolithConfig, mode string) erro
 					name = EXCLUDED.name,
 					email = EXCLUDED.email,
 					password_hash = EXCLUDED.password_hash
-			`, user.ID, user.Name, user.Email, string(hash)); err != nil {
+			`, user.ID, user.Name, user.Email, hash); err != nil {
 				return err
 			}
 		}

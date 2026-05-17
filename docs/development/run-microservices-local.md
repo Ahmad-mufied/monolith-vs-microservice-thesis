@@ -684,6 +684,12 @@ Use the smoke flow for fast local verification.
 
 Use the benchmark-prep flow when you want the larger deterministic dataset for later load testing.
 
+For local k6 end-to-end runs, prefer the benchmark-prep flow because the
+default k6 login/create/enriched examples align with the benchmark dataset.
+
+Use the smoke flow for fast API validation, or run `smoke.js` with
+`DATASET=smoke`.
+
 ### Access via ingress
 
 Start the Minikube tunnel:
@@ -743,3 +749,70 @@ Benchmark dataset intent:
 
 If you want the full schema-to-deploy flow for read benchmarking, use
 `make minikube-bootstrap-microservices-enrichment-benchmark`.
+
+### k6 after port-forward
+
+After `make minikube-port-forward-api-gateway`, run k6 from another terminal.
+
+If you rerun any bootstrap or deploy target, start
+`make minikube-port-forward-api-gateway` again before the next k6 command.
+Deployment rollout replaces the backing pod, so the old port-forward session
+disconnects even when the Service name stays the same.
+
+For smoke validation:
+
+```bash
+BASE_URL=http://localhost:8080 \
+K6_SCRIPT=smoke.js \
+DATASET=smoke \
+K6_PROFILE=smoke \
+ARCHITECTURE=msa \
+SCENARIO_NAME=smoke \
+VUS=1 \
+DURATION=30s \
+./k6/runner/run-k6.sh
+```
+
+For local benchmark verification, start with a low arrival rate:
+
+```bash
+BASE_URL=http://localhost:8080 \
+K6_SCRIPT=login.js \
+DATASET=benchmark \
+ARCHITECTURE=msa \
+SCENARIO_NAME=login \
+TARGET_RPS=1 \
+DURATION=10s \
+PRE_ALLOCATED_VUS=2 \
+MAX_VUS=4 \
+./k6/runner/run-k6.sh
+```
+
+The same local verification baseline works for the other benchmark scripts:
+
+```bash
+BASE_URL=http://localhost:8080 \
+K6_SCRIPT=create-transaction.js \
+DATASET=benchmark \
+ARCHITECTURE=msa \
+SCENARIO_NAME=create-transaction \
+TARGET_RPS=1 \
+DURATION=10s \
+PRE_ALLOCATED_VUS=2 \
+MAX_VUS=4 \
+TOKEN_POOL_SIZE=5 \
+./k6/runner/run-k6.sh
+```
+
+```bash
+BASE_URL=http://localhost:8080 \
+K6_SCRIPT=enriched-transactions.js \
+DATASET=benchmark \
+ARCHITECTURE=msa \
+SCENARIO_NAME=enriched-transactions \
+TARGET_RPS=1 \
+DURATION=10s \
+PRE_ALLOCATED_VUS=2 \
+MAX_VUS=4 \
+./k6/runner/run-k6.sh
+```

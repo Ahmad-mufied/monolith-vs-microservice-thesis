@@ -780,36 +780,75 @@ Benchmark results must be uploaded to S3 before infrastructure is destroyed.
 
 S3 prefix format:
 
-s3://{bucket}/experiments/{run_id}/{architecture}/{scenario}/{target_rps}rps/
+s3://{bucket}/experiments/{run_id}/{architecture}/{scenario_name}/{target_rps}rps/{attempt}/
 
-Each scenario result folder should contain:
+Each k6 execution must upload to a unique attempt folder.
+
+`scenario_name` should normally match the k6 script basename without `.js`.
+
+Examples:
+
+- `k6/scripts/login.js` -> `login`
+- `k6/scripts/create-transaction.js` -> `create-transaction`
+- `k6/scripts/enriched-transactions.js` -> `enriched-transactions`
+- `k6/scripts/mixed-workload.js` -> `mixed-workload`
+
+Required files per attempt:
 
 - summary.json
-- raw.json.gz when enabled
+- raw.json.gz
 - stdout.log
 - metadata.json
-- hpa-state.yaml
-- hpa-describe.txt
+- k6-options.json
+- thresholds.json
 - pods-state.txt
 - top-pods.txt
 - top-nodes.txt
 - events.txt
+- resource-quotas.yaml
+- deployments-state.yaml
+- services-state.yaml
+
+Required when HPA is enabled:
+
+- hpa-state.yaml
+- hpa-describe.txt
+
+Required when Datadog is enabled:
+
+- datadog-time-window.json
+
+Optional files:
+
+- summary.html
+- app-manifests.yaml
 
 metadata.json should include:
 
 - run_id
+- attempt
 - architecture
-- scenario
+- scenario_name
+- k6_script
 - target_rps
 - duration
 - base_url
 - timestamp_utc
 - git_commit when available
+- image_tag when available
+- images when available
+- seed_size
+- k6 configuration
+- infra configuration
+- resources configuration
+- datadog time window when Datadog is enabled
 - app_resource_quota
 - hpa_target_cpu
 - app_node_pool
 - testing_node_pool
 - dataset_version
+
+metadata.json is the source of truth for automated analysis and for determining whether the attempt used HPA or fixed replicas.
 
 Do not run terraform destroy before verifying that benchmark data exists in S3.
 

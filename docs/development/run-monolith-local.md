@@ -593,9 +593,20 @@ kubectl logs job/monolith-migration-job -n mono
 make minikube-deploy-monolith
 ```
 
-This target now depends on `make minikube-migrate-monolith`, so the Deployment
-rolls out only after PostgreSQL, bootstrap, and schema migration have all
-completed successfully.
+This target applies and rolls out only the monolith workload objects.
+
+Use `make minikube-bootstrap-monolith-smoke`,
+`make minikube-bootstrap-monolith-benchmark`, or
+`make minikube-bootstrap-monolith-enrichment-benchmark` when you want the full
+dependency chain:
+
+- PostgreSQL deploy,
+- password sync,
+- bootstrap job,
+- migration job,
+- reset and seed,
+- optional enrichment preparation,
+- application rollout.
 
 Check status:
 
@@ -698,6 +709,79 @@ Use `make minikube-bootstrap-monolith-benchmark` when you want the same lifecycl
 
 Use `make minikube-bootstrap-monolith-enrichment-benchmark` when you need a
 ready-to-read transaction dataset for `GET /api/v1/admin/transactions`.
+
+For local k6 end-to-end runs, prefer the benchmark bootstrap path because the
+default k6 login/create/enriched examples align with the benchmark dataset.
+
+Use the smoke bootstrap path for fast API validation, or run `smoke.js` with
+`DATASET=smoke`.
+
+### k6 after port-forward
+
+After `make minikube-port-forward-monolith`, run k6 from another terminal.
+
+If you rerun any bootstrap or deploy target, start `make minikube-port-forward-monolith`
+again before the next k6 command. Deployment rollout replaces the backing pod,
+so the old port-forward session disconnects even when the Service name stays
+the same.
+
+For smoke validation:
+
+```bash
+BASE_URL=http://localhost:8080 \
+K6_SCRIPT=smoke.js \
+DATASET=smoke \
+K6_PROFILE=smoke \
+ARCHITECTURE=monolith \
+SCENARIO_NAME=smoke \
+VUS=1 \
+DURATION=30s \
+./k6/runner/run-k6.sh
+```
+
+For local benchmark verification, start with a low arrival rate:
+
+```bash
+BASE_URL=http://localhost:8080 \
+K6_SCRIPT=login.js \
+DATASET=benchmark \
+ARCHITECTURE=monolith \
+SCENARIO_NAME=login \
+TARGET_RPS=1 \
+DURATION=10s \
+PRE_ALLOCATED_VUS=2 \
+MAX_VUS=4 \
+./k6/runner/run-k6.sh
+```
+
+The same local verification baseline works for the other benchmark scripts:
+
+```bash
+BASE_URL=http://localhost:8080 \
+K6_SCRIPT=create-transaction.js \
+DATASET=benchmark \
+ARCHITECTURE=monolith \
+SCENARIO_NAME=create-transaction \
+TARGET_RPS=1 \
+DURATION=10s \
+PRE_ALLOCATED_VUS=2 \
+MAX_VUS=4 \
+TOKEN_POOL_SIZE=5 \
+./k6/runner/run-k6.sh
+```
+
+```bash
+BASE_URL=http://localhost:8080 \
+K6_SCRIPT=enriched-transactions.js \
+DATASET=benchmark \
+ARCHITECTURE=monolith \
+SCENARIO_NAME=enriched-transactions \
+TARGET_RPS=1 \
+DURATION=10s \
+PRE_ALLOCATED_VUS=2 \
+MAX_VUS=4 \
+./k6/runner/run-k6.sh
+```
 
 These bootstrap targets run:
 

@@ -112,10 +112,17 @@ func SeedMicroservicesData(ctx context.Context, cfg MicroservicesConfig, mode st
 		}
 		defer tx.Rollback(ctx)
 
+		passwordHashes := make(map[string]string, len(ds.Users))
+
 		for _, user := range ds.Users {
-			hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), 12)
-			if err != nil {
-				return err
+			hash, ok := passwordHashes[user.Password]
+			if !ok {
+				encoded, err := bcrypt.GenerateFromPassword([]byte(user.Password), 12)
+				if err != nil {
+					return err
+				}
+				hash = string(encoded)
+				passwordHashes[user.Password] = hash
 			}
 			_, err = tx.Exec(ctx, `
 				INSERT INTO users (id, name, email, password_hash)
@@ -125,7 +132,7 @@ func SeedMicroservicesData(ctx context.Context, cfg MicroservicesConfig, mode st
 					name = EXCLUDED.name,
 					email = EXCLUDED.email,
 					password_hash = EXCLUDED.password_hash
-			`, user.ID, user.Name, user.Email, string(hash))
+			`, user.ID, user.Name, user.Email, hash)
 			if err != nil {
 				return err
 			}
