@@ -527,6 +527,7 @@ Final structure:
 
 ```text
 seed/
+├── README.md
 ├── go.mod
 ├── go.sum
 ├── Dockerfile
@@ -546,8 +547,8 @@ Rules:
 - seed is implemented as a Go application,
 - seed is separate from migration,
 - seed runs as a Kubernetes Job via Docker container,
-- seed scripts capture generated UUIDs using `INSERT ... RETURNING id`,
-- seed scripts maintain logical-to-generated ID mappings,
+- seed runner details are documented in `seed/README.md`,
+- seed data must be retry-safe for Kubernetes Job reruns,
 - seed data must be logically equivalent for monolith and microservices.
 
 ---
@@ -583,6 +584,8 @@ deployments/
     │   ├── monolith.yaml
     │   ├── ingress.yaml
     │   ├── migration-job.yaml
+    │   ├── prepare-monolith-enrichment-benchmark-data-job.yaml
+    │   ├── prepare-monolith-enrichment-smoke-data-job.yaml
     │   ├── resource-management.yaml
     │   ├── reset-monolith-data-job.yaml
     │   ├── seed-monolith-benchmark-data-job.yaml
@@ -595,6 +598,8 @@ deployments/
         ├── auth-migration-job.yaml
         ├── item-service.yaml
         ├── item-migration-job.yaml
+        ├── prepare-microservices-enrichment-benchmark-data-job.yaml
+        ├── prepare-microservices-enrichment-smoke-data-job.yaml
         ├── transaction-service.yaml
         ├── transaction-migration-job.yaml
         ├── resource-management.yaml

@@ -591,16 +591,18 @@ Seed data is centralized:
 
 ```text
 seed/
-├── datasets/
-└── scripts/
+├── README.md
+├── Dockerfile
+├── cmd/seed-runner/
+└── internal/seed/
 ```
 
 Rules:
 
 - migration is for schema only,
 - seed is for benchmark data,
-- seed scripts capture generated UUIDs with `INSERT ... RETURNING id`,
-- seed scripts maintain logical-to-generated ID mappings,
+- seed runner behavior is documented in `seed/README.md`,
+- seed data must be retry-safe for Kubernetes Job reruns,
 - data must be reset and reseeded before benchmark scenarios that mutate data.
 
 ---

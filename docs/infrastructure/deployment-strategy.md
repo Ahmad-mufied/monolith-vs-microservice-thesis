@@ -249,6 +249,9 @@ Run monolith migration
 Run monolith seed
     |
     v
+Optional: run monolith enrichment preparation for enriched-transactions
+    |
+    v
 Run monolith app
     |
     v
@@ -267,8 +270,12 @@ Or using Makefile:
 make compose-monolith-up
 make migrate-monolith
 make seed-monolith-data DATASET=benchmark
+make prepare-monolith-enrichment-data DATASET=benchmark
 make run-monolith
 ```
+
+For `login` and `create-transaction`, stop after the base seed step. Run the
+prepare command only when you are validating `GET /api/v1/admin/transactions`.
 
 Notes:
 
@@ -294,6 +301,9 @@ Run service migrations
     |
     v
 Run microservices seed
+    |
+    v
+Optional: run microservices enrichment preparation for enriched-transactions
     |
     v
 Run Auth Service
@@ -323,7 +333,11 @@ Or using Makefile:
 make compose-microservices-up
 make migrate-microservices
 make seed-microservices-data DATASET=benchmark
+make prepare-microservices-enrichment-data DATASET=benchmark
 ```
+
+For `login` and `create-transaction`, stop after the base seed step. Run the
+prepare command only when you are validating `GET /api/v1/admin/transactions`.
 
 ---
 
@@ -696,11 +710,8 @@ seed-microservices-benchmark-data-job
 
 Seed jobs should run after migration jobs and before benchmark execution.
 
-Seed scripts must capture database-generated UUIDs using:
-
-```sql
-INSERT ... RETURNING id
-```
+Seed runner behavior, datasets, reset semantics, and retry behavior are
+documented in `seed/README.md`.
 
 For mutation-heavy scenarios, reset and seed may be rerun before each scenario to restore a clean dataset.
 
@@ -970,8 +981,10 @@ For day-to-day local Kubernetes usage, prefer these entry points first:
 
 - monolith smoke: `make minikube-bootstrap-monolith-smoke`
 - monolith benchmark prep: `make minikube-bootstrap-monolith-benchmark`
+- monolith enriched read prep: `make minikube-bootstrap-monolith-enrichment-benchmark`
 - microservices smoke: `make minikube-bootstrap-microservices-smoke`
 - microservices benchmark prep: `make minikube-bootstrap-microservices-benchmark`
+- microservices enriched read prep: `make minikube-bootstrap-microservices-enrichment-benchmark`
 
 Treat the longer list below as a reference inventory.
 
@@ -991,24 +1004,39 @@ make migrate-microservices
 
 make seed-monolith-data DATASET=smoke
 make seed-monolith-data DATASET=benchmark
+make prepare-monolith-enrichment-data DATASET=smoke
+make prepare-monolith-enrichment-data DATASET=benchmark
 make seed-microservices-data DATASET=smoke
 make seed-microservices-data DATASET=benchmark
+make prepare-microservices-enrichment-data DATASET=smoke
+make prepare-microservices-enrichment-data DATASET=benchmark
 
 make reset-monolith-data
 make reset-microservices-data
 
 make minikube-start
 make minikube-load-images
+make minikube-reset-monolith-data
+make minikube-seed-monolith-smoke
+make minikube-seed-monolith-benchmark
+make minikube-prepare-monolith-enrichment-smoke
+make minikube-prepare-monolith-enrichment-benchmark
 make minikube-load-microservices
 make minikube-bootstrap-monolith-smoke
 make minikube-bootstrap-monolith-benchmark
+make minikube-bootstrap-monolith-enrichment-smoke
+make minikube-bootstrap-monolith-enrichment-benchmark
 make minikube-deploy-monolith
 make minikube-migrate-microservices
 make minikube-reset-microservices-data
 make minikube-seed-microservices-smoke
 make minikube-seed-microservices-benchmark
+make minikube-prepare-microservices-enrichment-smoke
+make minikube-prepare-microservices-enrichment-benchmark
 make minikube-bootstrap-microservices-smoke
 make minikube-bootstrap-microservices-benchmark
+make minikube-bootstrap-microservices-enrichment-smoke
+make minikube-bootstrap-microservices-enrichment-benchmark
 make minikube-deploy-microservices
 
 make create-local-postgres-secrets
@@ -1372,12 +1400,16 @@ deployments/k8s/
 │   └── db-bootstrap-job.yaml
 ├── monolith/
 │   ├── migration-job.yaml
+│   ├── prepare-monolith-enrichment-smoke-data-job.yaml
+│   ├── prepare-monolith-enrichment-benchmark-data-job.yaml
 │   ├── reset-monolith-data-job.yaml
 │   ├── seed-monolith-smoke-data-job.yaml
 │   └── seed-monolith-benchmark-data-job.yaml
 └── microservices/
     ├── auth-migration-job.yaml
     ├── item-migration-job.yaml
+    ├── prepare-microservices-enrichment-smoke-data-job.yaml
+    ├── prepare-microservices-enrichment-benchmark-data-job.yaml
     ├── transaction-migration-job.yaml
     ├── reset-microservices-data-job.yaml
     ├── seed-microservices-smoke-data-job.yaml
@@ -1396,9 +1428,13 @@ Job responsibilities:
 | `reset-monolith-data-job` | clear mutable monolith benchmark data |
 | `seed-monolith-smoke-data-job` | seed small deterministic monolith smoke data |
 | `seed-monolith-benchmark-data-job` | seed deterministic monolith benchmark data |
+| `prepare-monolith-enrichment-smoke-data-job` | prepare monolith smoke enriched-read fixtures |
+| `prepare-monolith-enrichment-benchmark-data-job` | prepare monolith benchmark enriched-read fixtures |
 | `reset-microservices-data-job` | clear mutable microservices benchmark data |
 | `seed-microservices-smoke-data-job` | seed small deterministic microservices smoke data |
 | `seed-microservices-benchmark-data-job` | seed deterministic microservices benchmark data |
+| `prepare-microservices-enrichment-smoke-data-job` | prepare microservices smoke enriched-read fixtures |
+| `prepare-microservices-enrichment-benchmark-data-job` | prepare microservices benchmark enriched-read fixtures |
 | `k6-benchmark-job` | run benchmark and upload results |
 
 ---
