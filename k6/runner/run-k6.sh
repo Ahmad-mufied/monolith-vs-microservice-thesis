@@ -118,8 +118,14 @@ if [ -f "$RAW_PATH" ]; then
   gzip -f "$RAW_PATH"
 fi
 
-if [ -f "$METADATA_PARTIAL_PATH" ] && [ "$METADATA_PARTIAL_PATH" != "$RESULT_DIR/metadata.partial.json" ]; then
-  cp "$METADATA_PARTIAL_PATH" "$RESULT_DIR/metadata.partial.json"
+if [ -f "$METADATA_PARTIAL_PATH" ]; then
+  METADATA_MERGED_PATH="$RESULT_DIR/metadata.merged.json"
+  jq -s '.[0] * .[1]' "$METADATA_PATH" "$METADATA_PARTIAL_PATH" > "$METADATA_MERGED_PATH"
+  mv "$METADATA_MERGED_PATH" "$METADATA_PATH"
+
+  if [ "$METADATA_PARTIAL_PATH" != "$RESULT_DIR/metadata.partial.json" ]; then
+    cp "$METADATA_PARTIAL_PATH" "$RESULT_DIR/metadata.partial.json"
+  fi
 fi
 
 echo "Generated result files:"
