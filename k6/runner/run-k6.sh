@@ -41,6 +41,15 @@ MAX_VUS_VALUE="${MAX_VUS:-0}"
 DURATION_VALUE="${TEST_DURATION:-${DURATION:-}}"
 TIMESTAMP_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+for value_name in TARGET_RPS_VALUE PRE_ALLOCATED_VUS_VALUE MAX_VUS_VALUE; do
+  value="${!value_name}"
+  if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: ${value_name%_VALUE} must be a non-negative integer, got: '$value'" >&2
+    exit 1
+  fi
+done
+unset value_name value
+
 IMAGES_JSON="$(json_env_or IMAGES_JSON '[]')"
 SEED_SIZE_JSON="$(json_env_or SEED_SIZE_JSON 'null')"
 K6_CONFIGURATION_JSON="$(json_env_or K6_CONFIGURATION_JSON '{}')"
@@ -142,6 +151,14 @@ fi
 
 if [ "$S3_STATUS" -ne 0 ]; then
   echo "ERROR: S3 upload failed (aws exit code: $S3_STATUS). k6 exit code: $STATUS" >&2
+fi
+
+if [ "$STATUS" -ne 0 ]; then
+  exit "$STATUS"
+fi
+
+if [ "$S3_STATUS" -ne 0 ]; then
+  exit "$S3_STATUS"
 fi
 
 exit "$STATUS"
