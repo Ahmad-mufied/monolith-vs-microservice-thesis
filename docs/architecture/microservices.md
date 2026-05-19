@@ -18,6 +18,13 @@ The purpose of this document is to define:
 - observability expectations,
 - fairness constraints.
 
+The microservices implementation should be read as the distributed counterpart
+to the monolith. The external REST contract stays the same, but the internal
+request path is split across the API Gateway and independently deployable
+business services. This creates additional network hops and stricter ownership
+boundaries, while allowing individual services to scale independently under
+different workload shapes.
+
 ---
 
 ## 2. High-Level Definition
@@ -50,6 +57,12 @@ Auth Service     Item Service     Transaction Service
  auth_db          item_db         transaction_db
 ```
 
+This high-level diagram shows the defining trade-off of the microservices
+variant: the public API still looks like one system to the client, but the
+runtime is split into separate services with separate databases. That split
+creates stronger ownership boundaries and finer-grained scaling, while also
+introducing more communication steps on the request path.
+
 Key characteristics:
 
 - multiple deployable services,
@@ -59,6 +72,11 @@ Key characteristics:
 - no direct cross-service database access,
 - independent service scaling,
 - distributed join/fan-out for enriched transaction responses.
+
+In this diagram, each business service owns its own runtime and database. The
+API Gateway is not a data owner; it translates external HTTP requests into
+internal gRPC calls and assembles responses when a public endpoint needs data
+from more than one service.
 
 ---
 
@@ -97,6 +115,12 @@ The microservices system runs on Kubernetes as multiple Deployments.
 +----------------------------------------------------------+
 ```
 
+This topology diagram makes it clear that the API Gateway is the only external
+entry point, while Auth, Item, and Transaction remain internal workloads. Each
+service scales and deploys independently, and each service talks only to the
+database it owns. That separation is central to the benchmark because it lets
+us observe whether modular scaling offsets the extra coordination cost.
+
 External request path:
 
 ```text
@@ -115,6 +139,11 @@ Internal gRPC services
 Only the API Gateway is exposed to external clients.
 
 Business services are internal services.
+
+This topology is designed to make distribution costs visible during the
+benchmark. Compared with the monolith, a request may pass through more runtime
+boundaries, more connection pools, and more tracing spans before it returns to
+the client. Those costs are expected and are part of what the thesis measures.
 
 ---
 
@@ -340,10 +369,8 @@ Responsibilities:
 - create transaction,
 - insert transaction_items,
 - get own transactions,
-- get all enriched transactions,
-- call Item Service for transaction item validation,
-- call Auth Service for user enrichment,
-- call Item Service for item enrichment.
+- get raw transactions for enrichment,
+- call Item Service for ValidateTransactionItems.
 
 Database ownership:
 
@@ -363,7 +390,8 @@ Internal gRPC methods may include:
 
 - CreateTransaction,
 - GetOwnTransactions,
-- GetAllTransactionsEnriched.
+- GetTransactionById,
+- GetTransactionsForEnrichment.
 
 ---
 
@@ -389,6 +417,12 @@ Adapter / Repository / Client
 Database / External Service
 ```
 
+This layering diagram explains how each service keeps transport, application
+logic, and data access separated even though the overall system is distributed.
+It is useful for reading the codebase because every gRPC request should follow
+the same conceptual path: transport mapping, usecase orchestration, then
+repository or outbound client interaction.
+
 Service-level structure:
 
 ```text
@@ -413,6 +447,11 @@ Rules:
 - domain must not import gRPC, PostgreSQL, Echo, or framework-specific packages,
 - SQL queries must stay in repository adapters,
 - business logic must stay in usecases or domain-level functions.
+
+This layering keeps each service independently understandable. A gRPC server
+handles transport mapping, the usecase coordinates the service-owned business
+flow, repository adapters access the service database, and gRPC client adapters
+call other services only through declared ports.
 
 ---
 
@@ -445,12 +484,23 @@ Business Services
 Service-to-service communication:
 
 ```text
+API Gateway
+    |
+    +--> Auth Service via gRPC (GetUsersByIds for enrichment)
+    |
+    +--> Item Service via gRPC (GetItemSummariesByIds for enrichment)
+
 Transaction Service
     |
-    +--> Auth Service via gRPC
-    |
-    +--> Item Service via gRPC
+    +--> Item Service via gRPC (ValidateTransactionItems only)
 ```
+
+This communication diagram is one of the most important in the document. It
+shows that the API Gateway owns external orchestration and enriched-response
+assembly, while Transaction Service owns transaction persistence and only calls
+Item Service for validation. That distinction prevents the architecture from
+quietly drifting into a shared-logic design where multiple services enrich or
+mutate the same data path.
 
 Forbidden communication:
 
@@ -471,6 +521,12 @@ Transaction Service -> Item Service via gRPC (ValidateTransactionItems only)
 API Gateway -> Auth Service via gRPC (GetUsersByIds for enrichment)
 API Gateway -> Item Service via gRPC (GetItemSummariesByIds for enrichment)
 ```
+
+The important distinction is that `Transaction Service` does not enrich
+transactions with user or item details. It returns raw transaction data from
+`transaction_db`. For enriched responses, the API Gateway performs the fan-out
+to Auth and Item services, then joins the data in memory before returning the
+REST response.
 
 ---
 
@@ -494,6 +550,12 @@ RDS PostgreSQL 18
           +-- transactions
           +-- transaction_items
 ```
+
+This database ownership diagram should be read together with the communication
+diagram above. Each business service owns exactly one database scope and is
+responsible for its own schema, migrations, and queries. Cross-service
+references are stored as UUID values, but services must not query another
+service's database directly just because the identifier is available.
 
 The API Gateway owns no database.
 
@@ -582,7 +644,7 @@ auth-service
 
 Purpose:
 
-Stores generic allocatable items.
+Stores generic items with an `available_amount` value used for transaction validation.
 
 Main columns:
 
@@ -724,6 +786,12 @@ Purpose:
 
 Evaluate authentication-related CPU work and additional network hop through API Gateway.
 
+In the microservices login flow, the API Gateway is only the external entry
+point and transport mapper. The Auth Service owns credential lookup, bcrypt
+comparison, and JWT signing. This preserves the same external behavior as the
+monolith while making the extra HTTP-to-gRPC boundary and Auth Service isolation
+visible in traces and latency metrics.
+
 Flow:
 
 ```text
@@ -742,6 +810,12 @@ Auth Service
     v
 auth_db.users
 ```
+
+This flow shows the extra boundary introduced by the distributed design. The
+request first lands at the API Gateway, then the actual authentication work is
+performed by Auth Service against `auth_db.users`. The business semantics stay
+the same as the monolith, but the runtime path includes an additional gRPC hop
+that is visible in latency and traces.
 
 ASCII sequence:
 
@@ -762,11 +836,18 @@ Client/k6        API Gateway        Auth Service             auth_db
    | 200 + token     |                    |                     |
 ```
 
+Walking through the sequence, the API Gateway behaves as a transport bridge,
+not as the owner of authentication logic. It forwards the login request,
+waits for the gRPC response, and returns the mapped REST response after Auth
+Service completes the same lookup, bcrypt, and JWT steps that the monolith
+performs locally.
+
 Expected microservices characteristic:
 
 - adds API Gateway to Auth Service gRPC call,
 - isolates authentication workload inside Auth Service,
 - Auth Service can scale independently under login-heavy workload.
+- login latency includes both authentication CPU work and the API Gateway to Auth Service hop.
 
 ---
 
@@ -786,7 +867,14 @@ I/O-bound + state mutation + inter-service communication
 
 Purpose:
 
-Evaluate write behavior and service-to-service allocation flow.
+Evaluate write behavior and service-to-service validation flow.
+
+The create transaction flow demonstrates service ownership during a write. The
+Transaction Service owns transaction persistence, but it does not own item data.
+It therefore calls Item Service through `ValidateTransactionItems` before
+writing to `transaction_db`. Item validation remains validation-only and does
+not deduct `available_amount`, keeping the benchmark focused on request path
+cost rather than distributed stock consistency.
 
 Flow:
 
@@ -812,6 +900,12 @@ Transaction Service
 transaction_db
 ```
 
+This flow shows the ownership split in the write path. Transaction Service
+owns transaction persistence, but it must ask Item Service to validate the
+requested items first because item data lives in `item_db`. The write remains
+synchronous from the client's perspective, even though the work is distributed
+across two services.
+
 ASCII sequence:
 
 ```text
@@ -836,12 +930,19 @@ Client/k6   API Gateway   Transaction Service   Item Service       item_db      
    | 201 Created|                 |                  |               |                 |
 ```
 
+The sequence shows two distinct responsibilities: Item Service confirms that
+the request is valid against current item data, and Transaction Service commits
+the transaction records. The API Gateway stays in the middle as the HTTP entry
+point, so the end-to-end latency includes transport mapping, at least one
+internal RPC, and database writes in the owning service.
+
 Expected microservices characteristic:
 
 - item validation is handled by Item Service,
 - transaction persistence is handled by Transaction Service,
 - inter-service communication adds overhead,
 - service-level scaling can target hot services independently.
+- failure handling crosses service boundaries because validation and persistence are owned by different services.
 
 This research does not deeply evaluate distributed transaction consistency, saga, or compensation mechanisms.
 
@@ -864,6 +965,13 @@ Aggregation + network-bound
 Purpose:
 
 Evaluate distributed data enrichment across service boundaries.
+
+The enriched transaction flow is the clearest architectural contrast with the
+monolith. Transaction Service returns raw transaction rows and item IDs from
+`transaction_db`. The API Gateway then collects the referenced user IDs and
+item IDs, calls Auth Service and Item Service in batches, and merges the
+returned summaries into the public REST response. This is the distributed
+join/fan-out path measured by the benchmark.
 
 Flow:
 
@@ -891,6 +999,12 @@ Transaction Service
     v
 Response
 ```
+
+This flow captures the main distributed-read pattern in the benchmark.
+Transaction Service provides the raw transaction rows, but the final enriched
+response is assembled by the API Gateway after it gathers user and item
+summaries from the owning services. The read is therefore shaped as fan-out and
+in-memory merge rather than a single database join.
 
 ASCII sequence:
 
@@ -920,12 +1034,19 @@ Client/k6   API Gateway   Transaction Svc    transaction_db    Auth Svc      aut
    | 200 data   |                |                  |              |            |           |            |
 ```
 
+The sequence makes the enrichment cost visible: one public request becomes one
+raw-transaction fetch plus two batch lookups to other services before the API
+Gateway can return a complete payload. This is the clearest place where the
+microservices design trades centralized query execution for ownership
+boundaries and explicit inter-service coordination.
+
 Expected microservices characteristic:
 
 - distributed join/fan-out,
 - additional gRPC calls,
 - higher network overhead,
 - clearer service ownership boundaries.
+- API Gateway owns response assembly for cross-service data, while each service keeps ownership of its own database.
 
 ---
 
@@ -1303,7 +1424,7 @@ Client request
 Publish event
     |
     v
-Return response before allocation is fully completed
+Return response before validation and persistence are fully completed
 ```
 
 This would make the microservices response time appear faster because part of the actual work continues after the response.
