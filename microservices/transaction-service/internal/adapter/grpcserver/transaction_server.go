@@ -6,6 +6,7 @@ import (
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/transaction-service/internal/domain"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/numconv"
 	transactionv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/transaction/v1"
 )
 
@@ -30,7 +31,7 @@ func (s *TransactionServer) CreateTransaction(ctx context.Context, req *transact
 	for _, item := range req.GetItems() {
 		items = append(items, domain.TransactionItem{
 			ItemID: item.GetItemId(),
-			Amount: item.GetAmount(),
+			Amount: int(item.GetAmount()),
 		})
 	}
 
@@ -51,7 +52,11 @@ func (s *TransactionServer) GetOwnTransactions(ctx context.Context, req *transac
 	var totalReturned int32
 	respTransactions := make([]*transactionv1.Transaction, 0, len(transactions))
 	for _, transaction := range transactions {
-		respTransactions = append(respTransactions, domainTransactionToProto(transaction))
+		protoTransaction, err := domainTransactionToProto(transaction)
+		if err != nil {
+			return nil, pkgerrors.ToGRPCStatus(pkgerrors.Internal("internal server error", err))
+		}
+		respTransactions = append(respTransactions, protoTransaction)
 		totalReturned++
 	}
 
@@ -67,8 +72,13 @@ func (s *TransactionServer) GetTransactionById(ctx context.Context, req *transac
 		return nil, pkgerrors.ToGRPCStatus(err)
 	}
 
+	protoTransaction, err := domainTransactionToProto(transaction)
+	if err != nil {
+		return nil, pkgerrors.ToGRPCStatus(pkgerrors.Internal("internal server error", err))
+	}
+
 	return &transactionv1.GetTransactionByIdResponse{
-		Transaction: domainTransactionToProto(transaction),
+		Transaction: protoTransaction,
 	}, nil
 }
 
@@ -81,7 +91,11 @@ func (s *TransactionServer) GetTransactionsForEnrichment(ctx context.Context, re
 	var totalReturned int32
 	respTransactions := make([]*transactionv1.TransactionForEnrichment, 0, len(transactions))
 	for _, transaction := range transactions {
-		respTransactions = append(respTransactions, domainTransactionForEnrichmentToProto(transaction))
+		protoTransaction, err := domainTransactionForEnrichmentToProto(transaction)
+		if err != nil {
+			return nil, pkgerrors.ToGRPCStatus(pkgerrors.Internal("internal server error", err))
+		}
+		respTransactions = append(respTransactions, protoTransaction)
 		totalReturned++
 	}
 
@@ -91,16 +105,21 @@ func (s *TransactionServer) GetTransactionsForEnrichment(ctx context.Context, re
 	}, nil
 }
 
-func domainTransactionToProto(transaction *domain.Transaction) *transactionv1.Transaction {
+func domainTransactionToProto(transaction *domain.Transaction) (*transactionv1.Transaction, error) {
 	if transaction == nil {
-		return nil
+		return nil, nil
 	}
 
 	items := make([]*transactionv1.TransactionItem, 0, len(transaction.Items))
 	for _, item := range transaction.Items {
+		amount, err := numconv.IntToInt32(item.Amount, "amount")
+		if err != nil {
+			return nil, err
+		}
+
 		items = append(items, &transactionv1.TransactionItem{
 			ItemId: item.ItemID,
-			Amount: item.Amount,
+			Amount: amount,
 		})
 	}
 
@@ -110,19 +129,24 @@ func domainTransactionToProto(transaction *domain.Transaction) *transactionv1.Tr
 		Items:     items,
 		CreatedAt: transaction.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt: transaction.UpdatedAt.UTC().Format(time.RFC3339),
-	}
+	}, nil
 }
 
-func domainTransactionForEnrichmentToProto(transaction *domain.Transaction) *transactionv1.TransactionForEnrichment {
+func domainTransactionForEnrichmentToProto(transaction *domain.Transaction) (*transactionv1.TransactionForEnrichment, error) {
 	if transaction == nil {
-		return nil
+		return nil, nil
 	}
 
 	items := make([]*transactionv1.TransactionItem, 0, len(transaction.Items))
 	for _, item := range transaction.Items {
+		amount, err := numconv.IntToInt32(item.Amount, "amount")
+		if err != nil {
+			return nil, err
+		}
+
 		items = append(items, &transactionv1.TransactionItem{
 			ItemId: item.ItemID,
-			Amount: item.Amount,
+			Amount: amount,
 		})
 	}
 
@@ -132,5 +156,5 @@ func domainTransactionForEnrichmentToProto(transaction *domain.Transaction) *tra
 		Items:     items,
 		CreatedAt: transaction.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt: transaction.UpdatedAt.UTC().Format(time.RFC3339),
-	}
+	}, nil
 }

@@ -22,7 +22,7 @@ message SyncItemInput {
   // Non-empty id means update/reactivate if exists, or insert using the provided id if it does not exist.
   string id = 1;
   string name = 2;
-  int64 available_amount = 3;
+  int32 available_amount = 3;
 }
 
 message SyncItemsResponse {}
@@ -61,7 +61,7 @@ message ValidateTransactionItemsRequest {
 
 message TransactionItemValidationInput {
   string item_id = 1;
-  int64 amount = 2;
+  int32 amount = 2;
 }
 
 message ValidateTransactionItemsResponse {}
@@ -69,7 +69,7 @@ message ValidateTransactionItemsResponse {}
 message Item {
   string id = 1;
   string name = 2;
-  int64 available_amount = 3;
+  int32 available_amount = 3;
   string created_at = 4;
   string updated_at = 5;
 }

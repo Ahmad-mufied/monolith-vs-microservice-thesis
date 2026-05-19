@@ -12,5 +12,5 @@ type Transaction struct {
 
 type TransactionItem struct {
 	ItemID string
-	Amount int64
+	Amount int
 }

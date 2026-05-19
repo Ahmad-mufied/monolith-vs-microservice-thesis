@@ -6,6 +6,7 @@ import (
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/transaction-service/internal/domain"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/numconv"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,9 +23,14 @@ func NewItemClient(client itemv1.ItemServiceClient) *ItemClient {
 func (c *ItemClient) ValidateTransactionItems(ctx context.Context, items []domain.TransactionItem) error {
 	reqItems := make([]*itemv1.TransactionItemValidationInput, 0, len(items))
 	for _, item := range items {
+		amount, err := numconv.IntToInt32(item.Amount, "amount")
+		if err != nil {
+			return pkgerrors.InvalidInput(err.Error())
+		}
+
 		reqItems = append(reqItems, &itemv1.TransactionItemValidationInput{
 			ItemId: item.ItemID,
-			Amount: item.Amount,
+			Amount: amount,
 		})
 	}
 
