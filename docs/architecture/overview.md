@@ -444,23 +444,20 @@ API Gateway
     v
 Transaction Service
     |
-    +-- Read transactions
-    |       |
-    |       v
-    |   transaction_db
+    +-- Read transactions -> transaction_db
+    |
+    v
+raw transactions
+    |
+    v
+API Gateway
     |
     +-- Collect user_ids
     +-- Collect item_ids
     |
-    +-- gRPC GetUsersByIds
-    |       |
-    |       v
-    |   Auth Service -> auth_db
+    +-- gRPC GetUsersByIds -> Auth Service -> auth_db
     |
-    +-- gRPC GetItemSummariesByIds
-    |       |
-    |       v
-    |   Item Service -> item_db
+    +-- gRPC GetItemSummariesByIds -> Item Service -> item_db
     |
     +-- In-memory enrichment
     |
