@@ -201,7 +201,7 @@ It is responsible for:
 - initializing logger,
 - initializing PostgreSQL connection pool,
 - initializing repositories,
-- initializing usecases,
+- initializing service implementations for the usecase layer,
 - initializing HTTP handlers,
 - registering routes,
 - starting the HTTP server,
@@ -219,7 +219,7 @@ General flow:
 HTTP Handler
     |
     v
-Usecase
+Usecase (implemented in service.go)
     |
     v
 Repository
@@ -233,7 +233,7 @@ Detailed layer responsibilities:
 | Layer | Responsibility |
 |---|---|
 | Handler | Parse request, call usecase, map response/error |
-| Usecase | Business flow and orchestration |
+| Usecase | Business flow and orchestration, implemented by `service.go` files |
 | Repository | SQL queries and database transaction handling |
 | Model | Domain/data model |
 | DTO | Request/response transport objects |
