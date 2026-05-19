@@ -44,8 +44,13 @@ func (c *ItemClient) SyncItems(ctx context.Context, items []dto.SyncItemInput) e
 	return nil
 }
 
-func (c *ItemClient) ListItems(ctx context.Context, limit, offset int32) ([]dto.Item, error) {
-	resp, err := c.grpc.ListItems(ctx, &itemv1.ListItemsRequest{Limit: limit, Offset: offset})
+func (c *ItemClient) ListItems(ctx context.Context, limit, offset int) ([]dto.Item, error) {
+	protoLimit, protoOffset, err := paginationToProto(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.grpc.ListItems(ctx, &itemv1.ListItemsRequest{Limit: protoLimit, Offset: protoOffset})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)
 	}

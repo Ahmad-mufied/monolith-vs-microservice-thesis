@@ -1,7 +1,9 @@
 package httputil
 
 import (
+	"math"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/labstack/echo/v4"
@@ -11,8 +13,8 @@ func TestParsePage(t *testing.T) {
 	tests := []struct {
 		name        string
 		query       string
-		wantLimit   int32
-		wantOffset  int32
+		wantLimit   int
+		wantOffset  int
 		wantErrCode string
 	}{
 		{
@@ -63,11 +65,34 @@ func TestParsePage(t *testing.T) {
 			query:       "offset=abc",
 			wantErrCode: "BAD_REQUEST",
 		},
-		{
-			name:        "offset exceeds int32",
+	}
+
+	if strconv.IntSize == 32 {
+		tests = append(tests, struct {
+			name        string
+			query       string
+			wantLimit   int
+			wantOffset  int
+			wantErrCode string
+		}{
+			name:        "offset exceeds int range on 32-bit",
 			query:       "offset=2147483648",
 			wantErrCode: "BAD_REQUEST",
-		},
+		})
+	} else {
+		bigOffset := int64(math.MaxInt32) + 1
+		tests = append(tests, struct {
+			name        string
+			query       string
+			wantLimit   int
+			wantOffset  int
+			wantErrCode string
+		}{
+			name:       "offset above int32 still parses in http layer",
+			query:      "offset=2147483648",
+			wantLimit:  50,
+			wantOffset: int(bigOffset),
+		})
 	}
 
 	for _, tt := range tests {

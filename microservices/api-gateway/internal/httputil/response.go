@@ -26,9 +26,9 @@ type listResponse struct {
 }
 
 type paginationMeta struct {
-	Limit         int32 `json:"limit"`
-	Offset        int32 `json:"offset"`
-	TotalReturned int   `json:"total_returned"`
+	Limit         int `json:"limit"`
+	Offset        int `json:"offset"`
+	TotalReturned int `json:"total_returned"`
 }
 
 type errorResponse struct {
@@ -59,7 +59,7 @@ func ID(c echo.Context, httpStatus int, message, id string) error {
 	}{ID: id})
 }
 
-func List(c echo.Context, httpStatus int, data any, limit, offset int32, totalReturned int) error {
+func List(c echo.Context, httpStatus int, data any, limit, offset, totalReturned int) error {
 	return c.JSON(httpStatus, listResponse{
 		Data: data,
 		Meta: paginationMeta{Limit: limit, Offset: offset, TotalReturned: totalReturned},

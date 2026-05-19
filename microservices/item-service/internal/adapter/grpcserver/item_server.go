@@ -2,6 +2,7 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/domain"
@@ -58,7 +59,11 @@ func (s *ItemServer) ListItems(ctx context.Context, req *itemv1.ListItemsRequest
 	var totalReturned int32
 	respItems := make([]*itemv1.Item, 0, len(items))
 	for _, item := range items {
-		respItems = append(respItems, domainItemToProto(item))
+		protoItem, err := domainItemToProto(item)
+		if err != nil {
+			return nil, pkgerrors.ToGRPCStatus(pkgerrors.Internal("internal server error", err))
+		}
+		respItems = append(respItems, protoItem)
 		totalReturned++
 	}
 
@@ -74,8 +79,13 @@ func (s *ItemServer) GetItemById(ctx context.Context, req *itemv1.GetItemByIdReq
 		return nil, pkgerrors.ToGRPCStatus(err)
 	}
 
+	protoItem, err := domainItemToProto(item)
+	if err != nil {
+		return nil, pkgerrors.ToGRPCStatus(pkgerrors.Internal("internal server error", err))
+	}
+
 	return &itemv1.GetItemByIdResponse{
-		Item: domainItemToProto(item),
+		Item: protoItem,
 	}, nil
 }
 
@@ -115,14 +125,14 @@ func (s *ItemServer) ValidateTransactionItems(ctx context.Context, req *itemv1.V
 	return &itemv1.ValidateTransactionItemsResponse{}, nil
 }
 
-func domainItemToProto(item *domain.Item) *itemv1.Item {
+func domainItemToProto(item *domain.Item) (*itemv1.Item, error) {
 	if item == nil {
-		return nil
+		return nil, errors.New("cannot convert nil item to proto")
 	}
 
 	availableAmount, err := numconv.IntToInt32(item.AvailableAmount, "available_amount")
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	return &itemv1.Item{
@@ -131,5 +141,5 @@ func domainItemToProto(item *domain.Item) *itemv1.Item {
 		AvailableAmount: availableAmount,
 		CreatedAt:       item.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:       item.UpdatedAt.UTC().Format(time.RFC3339),
-	}
+	}, nil
 }
