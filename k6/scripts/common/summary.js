@@ -69,6 +69,31 @@ function thresholdResults(data) {
   return results;
 }
 
+function parseMetricTags(metricName) {
+  const match = metricName.match(/^[^{]+\{(.+)\}$/);
+
+  if (!match) {
+    return {};
+  }
+
+  return match[1]
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .reduce((tags, entry) => {
+      const separatorIndex = entry.indexOf(":");
+
+      if (separatorIndex === -1) {
+        return tags;
+      }
+
+      const key = entry.slice(0, separatorIndex);
+      const value = entry.slice(separatorIndex + 1);
+      tags[key] = value;
+      return tags;
+    }, {});
+}
+
 function matchingMetricName(data, metricName, metricTags = null, options = {}) {
   const metrics = data && data.metrics ? data.metrics : {};
   const allowFallback = options.allowFallback !== false;
@@ -82,9 +107,9 @@ function matchingMetricName(data, metricName, metricTags = null, options = {}) {
       return false;
     }
 
-    return Object.entries(metricTags).every(
-      ([tagKey, tagValue]) => candidate.includes(`${tagKey}:${tagValue}`)
-    );
+    const candidateTags = parseMetricTags(candidate);
+
+    return Object.entries(metricTags).every(([tagKey, tagValue]) => candidateTags[tagKey] === tagValue);
   });
 
   if (matches.length > 0) {
