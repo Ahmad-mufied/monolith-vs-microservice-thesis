@@ -27,7 +27,7 @@ type SyncItemInput struct {
 }
 
 type PaginationMeta struct {
-	Limit         int32 `json:"limit"`
-	Offset        int32 `json:"offset"`
-	TotalReturned int   `json:"total_returned"`
+	Limit         int `json:"limit"`
+	Offset        int `json:"offset"`
+	TotalReturned int `json:"total_returned"`
 }

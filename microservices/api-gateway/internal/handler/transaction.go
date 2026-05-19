@@ -14,9 +14,9 @@ import (
 
 type transactionClient interface {
 	CreateTransaction(ctx context.Context, userID string, items []dto.CreateTransactionItemRequest) (string, error)
-	GetOwnTransactions(ctx context.Context, userID string, limit, offset int32) ([]dto.Transaction, error)
+	GetOwnTransactions(ctx context.Context, userID string, limit, offset int) ([]dto.Transaction, error)
 	GetTransactionByID(ctx context.Context, transactionID, userID string) (*dto.Transaction, error)
-	GetTransactionsForEnrichment(ctx context.Context, limit, offset int32) ([]client.RawTransaction, error)
+	GetTransactionsForEnrichment(ctx context.Context, limit, offset int) ([]client.RawTransaction, error)
 }
 
 type enrichAuthClient interface {

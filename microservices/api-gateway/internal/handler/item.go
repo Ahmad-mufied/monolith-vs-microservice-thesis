@@ -11,7 +11,7 @@ import (
 
 type itemClient interface {
 	SyncItems(ctx context.Context, items []dto.SyncItemInput) error
-	ListItems(ctx context.Context, limit, offset int32) ([]dto.Item, error)
+	ListItems(ctx context.Context, limit, offset int) ([]dto.Item, error)
 	GetItemByID(ctx context.Context, itemID string) (*dto.Item, error)
 	GetItemSummariesByIDs(ctx context.Context, ids []string) ([]dto.ItemSummary, error)
 }

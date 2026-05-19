@@ -15,21 +15,21 @@ import (
 
 type fakeTransactionClient struct {
 	createFn           func(ctx context.Context, userID string, items []dto.CreateTransactionItemRequest) (string, error)
-	getOwnFn           func(ctx context.Context, userID string, limit, offset int32) ([]dto.Transaction, error)
+	getOwnFn           func(ctx context.Context, userID string, limit, offset int) ([]dto.Transaction, error)
 	getByIDFn          func(ctx context.Context, transactionID, userID string) (*dto.Transaction, error)
-	getForEnrichmentFn func(ctx context.Context, limit, offset int32) ([]client.RawTransaction, error)
+	getForEnrichmentFn func(ctx context.Context, limit, offset int) ([]client.RawTransaction, error)
 }
 
 func (f *fakeTransactionClient) CreateTransaction(ctx context.Context, userID string, items []dto.CreateTransactionItemRequest) (string, error) {
 	return f.createFn(ctx, userID, items)
 }
-func (f *fakeTransactionClient) GetOwnTransactions(ctx context.Context, userID string, limit, offset int32) ([]dto.Transaction, error) {
+func (f *fakeTransactionClient) GetOwnTransactions(ctx context.Context, userID string, limit, offset int) ([]dto.Transaction, error) {
 	return f.getOwnFn(ctx, userID, limit, offset)
 }
 func (f *fakeTransactionClient) GetTransactionByID(ctx context.Context, transactionID, userID string) (*dto.Transaction, error) {
 	return f.getByIDFn(ctx, transactionID, userID)
 }
-func (f *fakeTransactionClient) GetTransactionsForEnrichment(ctx context.Context, limit, offset int32) ([]client.RawTransaction, error) {
+func (f *fakeTransactionClient) GetTransactionsForEnrichment(ctx context.Context, limit, offset int) ([]client.RawTransaction, error) {
 	return f.getForEnrichmentFn(ctx, limit, offset)
 }
 
@@ -113,14 +113,14 @@ func TestTransactionHandler_GetOwnTransactions(t *testing.T) {
 	tests := []struct {
 		name       string
 		userID     string
-		clientFn   func(ctx context.Context, userID string, limit, offset int32) ([]dto.Transaction, error)
+		clientFn   func(ctx context.Context, userID string, limit, offset int) ([]dto.Transaction, error)
 		wantStatus int
 		wantLen    int
 	}{
 		{
 			name:   "success returns list",
 			userID: "uid-1",
-			clientFn: func(_ context.Context, _ string, _, _ int32) ([]dto.Transaction, error) {
+			clientFn: func(_ context.Context, _ string, _, _ int) ([]dto.Transaction, error) {
 				return []dto.Transaction{{ID: "txid-1", UserID: "uid-1"}}, nil
 			},
 			wantStatus: http.StatusOK,
@@ -129,7 +129,7 @@ func TestTransactionHandler_GetOwnTransactions(t *testing.T) {
 		{
 			name:   "client error returns 500",
 			userID: "uid-1",
-			clientFn: func(_ context.Context, _ string, _, _ int32) ([]dto.Transaction, error) {
+			clientFn: func(_ context.Context, _ string, _, _ int) ([]dto.Transaction, error) {
 				return nil, &httputil.AppError{Status: http.StatusInternalServerError, Code: "INTERNAL_SERVER_ERROR", Message: "internal"}
 			},
 			wantStatus: http.StatusInternalServerError,
@@ -219,7 +219,7 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		txClientFn      func(ctx context.Context, limit, offset int32) ([]client.RawTransaction, error)
+		txClientFn      func(ctx context.Context, limit, offset int) ([]client.RawTransaction, error)
 		authClientFn    func(ctx context.Context, ids []string) ([]*dto.UserSummary, error)
 		itemClientFn    func(ctx context.Context, ids []string) ([]dto.ItemSummary, error)
 		wantStatus      int
@@ -230,7 +230,7 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 	}{
 		{
 			name: "success enriches transactions with user and item",
-			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+			txClientFn: func(_ context.Context, _, _ int) ([]client.RawTransaction, error) {
 				return rawTxs, nil
 			},
 			authClientFn: func(_ context.Context, ids []string) ([]*dto.UserSummary, error) {
@@ -246,7 +246,7 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 		},
 		{
 			name: "empty transactions returns empty list",
-			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+			txClientFn: func(_ context.Context, _, _ int) ([]client.RawTransaction, error) {
 				return []client.RawTransaction{}, nil
 			},
 			wantStatus: http.StatusOK,
@@ -254,14 +254,14 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 		},
 		{
 			name: "transaction client error returns 503",
-			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+			txClientFn: func(_ context.Context, _, _ int) ([]client.RawTransaction, error) {
 				return nil, &httputil.AppError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: "down"}
 			},
 			wantStatus: http.StatusServiceUnavailable,
 		},
 		{
 			name: "auth client error returns 503",
-			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+			txClientFn: func(_ context.Context, _, _ int) ([]client.RawTransaction, error) {
 				return rawTxs, nil
 			},
 			authClientFn: func(_ context.Context, _ []string) ([]*dto.UserSummary, error) {
@@ -271,7 +271,7 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 		},
 		{
 			name: "item client error returns 503",
-			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+			txClientFn: func(_ context.Context, _, _ int) ([]client.RawTransaction, error) {
 				return rawTxs, nil
 			},
 			authClientFn: func(_ context.Context, ids []string) ([]*dto.UserSummary, error) {
@@ -284,7 +284,7 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 		},
 		{
 			name: "deleted item is marked in enriched response",
-			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+			txClientFn: func(_ context.Context, _, _ int) ([]client.RawTransaction, error) {
 				return rawTxs, nil
 			},
 			authClientFn: func(_ context.Context, ids []string) ([]*dto.UserSummary, error) {
@@ -299,7 +299,7 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 		},
 		{
 			name: "missing auth enrichment returns 500",
-			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+			txClientFn: func(_ context.Context, _, _ int) ([]client.RawTransaction, error) {
 				return rawTxs, nil
 			},
 			authClientFn: func(_ context.Context, _ []string) ([]*dto.UserSummary, error) {
@@ -312,7 +312,7 @@ func TestTransactionHandler_GetAllEnriched(t *testing.T) {
 		},
 		{
 			name: "missing item enrichment returns 500",
-			txClientFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+			txClientFn: func(_ context.Context, _, _ int) ([]client.RawTransaction, error) {
 				return rawTxs, nil
 			},
 			authClientFn: func(_ context.Context, ids []string) ([]*dto.UserSummary, error) {
@@ -406,7 +406,7 @@ func TestTransactionHandler_GetAllEnriched_FanOutRunsInParallel(t *testing.T) {
 	release := make(chan struct{})
 
 	txFake := &fakeTransactionClient{
-		getForEnrichmentFn: func(_ context.Context, _, _ int32) ([]client.RawTransaction, error) {
+		getForEnrichmentFn: func(_ context.Context, _, _ int) ([]client.RawTransaction, error) {
 			return rawTxs, nil
 		},
 	}

@@ -12,7 +12,7 @@ import (
 
 type fakeItemClient struct {
 	syncItemsFn        func(ctx context.Context, items []dto.SyncItemInput) error
-	listItemsFn        func(ctx context.Context, limit, offset int32) ([]dto.Item, error)
+	listItemsFn        func(ctx context.Context, limit, offset int) ([]dto.Item, error)
 	getItemByIDFn      func(ctx context.Context, itemID string) (*dto.Item, error)
 	getItemSummariesFn func(ctx context.Context, ids []string) ([]dto.ItemSummary, error)
 }
@@ -20,7 +20,7 @@ type fakeItemClient struct {
 func (f *fakeItemClient) SyncItems(ctx context.Context, items []dto.SyncItemInput) error {
 	return f.syncItemsFn(ctx, items)
 }
-func (f *fakeItemClient) ListItems(ctx context.Context, limit, offset int32) ([]dto.Item, error) {
+func (f *fakeItemClient) ListItems(ctx context.Context, limit, offset int) ([]dto.Item, error) {
 	return f.listItemsFn(ctx, limit, offset)
 }
 func (f *fakeItemClient) GetItemByID(ctx context.Context, itemID string) (*dto.Item, error) {
@@ -34,16 +34,16 @@ func TestItemHandler_ListItems(t *testing.T) {
 	tests := []struct {
 		name       string
 		query      string
-		clientFn   func(ctx context.Context, limit, offset int32) ([]dto.Item, error)
+		clientFn   func(ctx context.Context, limit, offset int) ([]dto.Item, error)
 		wantStatus int
 		wantLen    int
-		wantLimit  int32
-		wantOffset int32
+		wantLimit  int
+		wantOffset int
 	}{
 		{
 			name:  "success with default pagination",
 			query: "",
-			clientFn: func(_ context.Context, limit, offset int32) ([]dto.Item, error) {
+			clientFn: func(_ context.Context, limit, offset int) ([]dto.Item, error) {
 				return []dto.Item{{ID: "iid-1", Name: "Item A"}}, nil
 			},
 			wantStatus: http.StatusOK,
@@ -54,7 +54,7 @@ func TestItemHandler_ListItems(t *testing.T) {
 		{
 			name:  "success with explicit pagination",
 			query: "?limit=10&offset=5",
-			clientFn: func(_ context.Context, limit, offset int32) ([]dto.Item, error) {
+			clientFn: func(_ context.Context, limit, offset int) ([]dto.Item, error) {
 				if limit != 10 || offset != 5 {
 					return nil, &httputil.AppError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "wrong pagination"}
 				}
@@ -72,7 +72,7 @@ func TestItemHandler_ListItems(t *testing.T) {
 		{
 			name:  "client error returns 503",
 			query: "",
-			clientFn: func(_ context.Context, _, _ int32) ([]dto.Item, error) {
+			clientFn: func(_ context.Context, _, _ int) ([]dto.Item, error) {
 				return nil, &httputil.AppError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: "down"}
 			},
 			wantStatus: http.StatusServiceUnavailable,

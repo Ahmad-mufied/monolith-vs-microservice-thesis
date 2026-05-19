@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
@@ -39,8 +40,13 @@ func (c *TransactionClient) CreateTransaction(ctx context.Context, userID string
 	return resp.GetTransactionId(), nil
 }
 
-func (c *TransactionClient) GetOwnTransactions(ctx context.Context, userID string, limit, offset int32) ([]dto.Transaction, error) {
-	resp, err := c.grpc.GetOwnTransactions(ctx, &transactionv1.GetOwnTransactionsRequest{UserId: userID, Limit: limit, Offset: offset})
+func (c *TransactionClient) GetOwnTransactions(ctx context.Context, userID string, limit, offset int) ([]dto.Transaction, error) {
+	protoLimit, protoOffset, err := paginationToProto(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.grpc.GetOwnTransactions(ctx, &transactionv1.GetOwnTransactionsRequest{UserId: userID, Limit: protoLimit, Offset: protoOffset})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)
 	}
@@ -69,8 +75,13 @@ type RawTransaction struct {
 	UpdatedAt string
 }
 
-func (c *TransactionClient) GetTransactionsForEnrichment(ctx context.Context, limit, offset int32) ([]RawTransaction, error) {
-	resp, err := c.grpc.GetTransactionsForEnrichment(ctx, &transactionv1.GetTransactionsForEnrichmentRequest{Limit: limit, Offset: offset})
+func (c *TransactionClient) GetTransactionsForEnrichment(ctx context.Context, limit, offset int) ([]RawTransaction, error) {
+	protoLimit, protoOffset, err := paginationToProto(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.grpc.GetTransactionsForEnrichment(ctx, &transactionv1.GetTransactionsForEnrichmentRequest{Limit: protoLimit, Offset: protoOffset})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)
 	}
@@ -106,4 +117,26 @@ func protoTransactionToDTO(tx *transactionv1.Transaction) dto.Transaction {
 		CreatedAt: tx.GetCreatedAt(),
 		UpdatedAt: tx.GetUpdatedAt(),
 	}
+}
+
+func paginationToProto(limit, offset int) (int32, int32, error) {
+	protoLimit, err := numconv.IntToInt32(limit, "limit")
+	if err != nil {
+		return 0, 0, &httputil.AppError{
+			Status:  http.StatusBadRequest,
+			Code:    "BAD_REQUEST",
+			Message: err.Error(),
+		}
+	}
+
+	protoOffset, err := numconv.IntToInt32(offset, "offset")
+	if err != nil {
+		return 0, 0, &httputil.AppError{
+			Status:  http.StatusBadRequest,
+			Code:    "BAD_REQUEST",
+			Message: err.Error(),
+		}
+	}
+
+	return protoLimit, protoOffset, nil
 }
