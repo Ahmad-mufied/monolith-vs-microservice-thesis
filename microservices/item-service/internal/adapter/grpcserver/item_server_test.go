@@ -142,6 +142,14 @@ func TestListItems(t *testing.T) {
 			},
 			wantCode: codes.InvalidArgument,
 		},
+		{
+			name: "maps nil item to internal error",
+			req:  &itemv1.ListItemsRequest{Limit: 10, Offset: 0},
+			ucFn: func(ctx context.Context, limit, offset int32) ([]*domain.Item, error) {
+				return []*domain.Item{nil}, nil
+			},
+			wantCode: codes.Internal,
+		},
 	}
 
 	if strconv.IntSize > 32 {
@@ -221,6 +229,14 @@ func TestGetItemById(t *testing.T) {
 				return nil, pkgerrors.NotFound("item not found")
 			},
 			wantCode: codes.NotFound,
+		},
+		{
+			name: "maps nil item to internal error",
+			req:  &itemv1.GetItemByIdRequest{ItemId: "01968ad4-98b1-79c8-a6f0-ec21f8f434c6"},
+			ucFn: func(ctx context.Context, itemID string) (*domain.Item, error) {
+				return nil, nil
+			},
+			wantCode: codes.Internal,
 		},
 	}
 

@@ -2,6 +2,7 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/domain"
@@ -126,7 +127,7 @@ func (s *ItemServer) ValidateTransactionItems(ctx context.Context, req *itemv1.V
 
 func domainItemToProto(item *domain.Item) (*itemv1.Item, error) {
 	if item == nil {
-		return nil, nil
+		return nil, errors.New("cannot convert nil item to proto")
 	}
 
 	availableAmount, err := numconv.IntToInt32(item.AvailableAmount, "available_amount")

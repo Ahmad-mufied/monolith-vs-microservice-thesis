@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"math"
 	"net/http/httptest"
 	"strconv"
 	"testing"
@@ -79,6 +80,7 @@ func TestParsePage(t *testing.T) {
 			wantErrCode: "BAD_REQUEST",
 		})
 	} else {
+		bigOffset := int64(math.MaxInt32) + 1
 		tests = append(tests, struct {
 			name        string
 			query       string
@@ -89,7 +91,7 @@ func TestParsePage(t *testing.T) {
 			name:       "offset above int32 still parses in http layer",
 			query:      "offset=2147483648",
 			wantLimit:  50,
-			wantOffset: 2147483648,
+			wantOffset: int(bigOffset),
 		})
 	}
 
