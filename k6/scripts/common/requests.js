@@ -21,6 +21,26 @@ export function jsonHeaders(token = "") {
   return { headers };
 }
 
+function mergeRequestParams(baseParams, extraParams = {}) {
+  const merged = { ...baseParams, ...extraParams };
+
+  if (baseParams.headers || extraParams.headers) {
+    merged.headers = {
+      ...(baseParams.headers || {}),
+      ...(extraParams.headers || {}),
+    };
+  }
+
+  if (baseParams.tags || extraParams.tags) {
+    merged.tags = {
+      ...(baseParams.tags || {}),
+      ...(extraParams.tags || {}),
+    };
+  }
+
+  return merged;
+}
+
 export function safeJson(response, selector = null, fallback = null) {
   try {
     if (selector) {
@@ -32,10 +52,10 @@ export function safeJson(response, selector = null, fallback = null) {
   }
 }
 
-export function expectStatus(response, status, label) {
+export function expectStatus(response, status, label, tags = undefined) {
   return check(response, {
     [`${label}: status is ${status}`]: (r) => r.status === status,
-  });
+  }, tags);
 }
 
 export function expectStatusIn(response, statuses, label) {
@@ -69,6 +89,20 @@ export function loginRequest(email, password) {
   );
 }
 
+export function loginSetupRequest(email, password, label = "setup login") {
+  return http.post(
+    `${BASE_URL}/api/v1/auth/login`,
+    JSON.stringify({ email, password }),
+    mergeRequestParams(jsonHeaders(), {
+      tags: {
+        request_kind: "setup_login",
+        benchmark_phase: "setup",
+        name: label,
+      },
+    })
+  );
+}
+
 export function loginAndExtractToken(email, password, label = "login") {
   const response = loginRequest(email, password);
 
@@ -77,6 +111,24 @@ export function loginAndExtractToken(email, password, label = "login") {
   const token = safeJson(response, "data.token", "");
 
   if (!statusOk || !tokenOk || !token) {
+    const body = typeof response.body === "string" ? response.body : "";
+    throw new Error(
+      `${label}: login failed or token missing (status=${response.status}, body=${body})`
+    );
+  }
+
+  return {
+    response,
+    token,
+    user: safeJson(response, "data.user", null),
+  };
+}
+
+export function loginSetupAndExtractToken(email, password, label = "setup login") {
+  const response = loginSetupRequest(email, password, label);
+  const token = safeJson(response, "data.token", "");
+
+  if (response.status !== 200 || !token) {
     const body = typeof response.body === "string" ? response.body : "";
     throw new Error(
       `${label}: login failed or token missing (status=${response.status}, body=${body})`
@@ -138,6 +190,32 @@ export function enrichedTransactionsRequest(token, limit = ENRICHED_TRANSACTION_
   return http.get(
     `${BASE_URL}/api/v1/admin/transactions?limit=${limit}&offset=${offset}`,
     jsonHeaders(token)
+  );
+}
+
+export function enrichedTransactionsWorkloadRequest(token, limit = ENRICHED_TRANSACTION_LIMIT, offset = 0) {
+  return http.get(
+    `${BASE_URL}/api/v1/admin/transactions?limit=${limit}&offset=${offset}`,
+    mergeRequestParams(jsonHeaders(token), {
+      tags: {
+        request_kind: "workload",
+        benchmark_phase: "workload",
+        name: "enriched transactions",
+      },
+    })
+  );
+}
+
+export function enrichedTransactionsSetupProbeRequest(token, limit = 1, offset = 0) {
+  return http.get(
+    `${BASE_URL}/api/v1/admin/transactions?limit=${limit}&offset=${offset}`,
+    mergeRequestParams(jsonHeaders(token), {
+      tags: {
+        request_kind: "setup_probe",
+        benchmark_phase: "setup",
+        name: "setup enriched transactions probe",
+      },
+    })
   );
 }
 

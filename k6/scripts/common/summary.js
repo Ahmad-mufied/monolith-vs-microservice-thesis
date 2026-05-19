@@ -15,11 +15,12 @@ import {
   GIT_COMMIT,
 } from "./config.js";
 
-export function handleSummary(data) {
+export function handleSummary(data, options = {}) {
   const summaryPath = __ENV.SUMMARY_PATH || "/results/summary.json";
   const metadataPartialPath = __ENV.METADATA_PARTIAL_PATH || "/results/metadata.partial.json";
   const thresholdsPath = __ENV.THRESHOLDS_PATH || "/results/thresholds.json";
   const optionsPath = __ENV.K6_OPTIONS_PATH || "/results/k6-options.json";
+  const metricTags = options.metricTags || null;
 
   const metadata = {
     run_id: RUN_ID,
@@ -51,7 +52,7 @@ export function handleSummary(data) {
     [metadataPartialPath]: JSON.stringify(metadata, null, 2),
     [thresholdsPath]: JSON.stringify(thresholdResults(data), null, 2),
     [optionsPath]: JSON.stringify(k6Options, null, 2),
-    stdout: summaryLine(data),
+    stdout: summaryLine(data, metricTags),
   };
 }
 
@@ -68,22 +69,48 @@ function thresholdResults(data) {
   return results;
 }
 
-function metricValue(data, metricName, key) {
+function matchingMetricName(data, metricName, metricTags = null) {
+  const metrics = data && data.metrics ? data.metrics : {};
+
+  if (!metricTags || Object.keys(metricTags).length === 0) {
+    return metricName;
+  }
+
+  const matches = Object.keys(metrics).filter((candidate) => {
+    if (!candidate.startsWith(`${metricName}{`)) {
+      return false;
+    }
+
+    return Object.entries(metricTags).every(
+      ([tagKey, tagValue]) => candidate.includes(`${tagKey}:${tagValue}`)
+    );
+  });
+
+  if (matches.length > 0) {
+    return matches[0];
+  }
+
+  return metricName;
+}
+
+function metricValue(data, metricName, key, metricTags = null) {
+  const resolvedMetricName = matchingMetricName(data, metricName, metricTags);
+
   try {
-    return data.metrics[metricName].values[key];
+    return data.metrics[resolvedMetricName].values[key];
   } catch (_) {
     return null;
   }
 }
 
-function summaryLine(data) {
+function summaryLine(data, metricTags = null) {
   const result = {
-    http_req_failed_rate: metricValue(data, "http_req_failed", "rate"),
-    http_req_duration_p90: metricValue(data, "http_req_duration", "p(90)"),
-    http_req_duration_p95: metricValue(data, "http_req_duration", "p(95)"),
-    http_reqs_count: metricValue(data, "http_reqs", "count"),
+    http_req_failed_rate: metricValue(data, "http_req_failed", "rate", metricTags),
+    http_req_duration_p90: metricValue(data, "http_req_duration", "p(90)", metricTags),
+    http_req_duration_p95: metricValue(data, "http_req_duration", "p(95)", metricTags),
+    http_reqs_count: metricValue(data, "http_reqs", "count", metricTags),
     iterations_count: metricValue(data, "iterations", "count"),
-    checks_rate: metricValue(data, "checks", "rate"),
+    checks_rate: metricValue(data, "checks", "rate", metricTags),
     dropped_iterations_count: metricValue(data, "dropped_iterations", "count"),
   };
 
