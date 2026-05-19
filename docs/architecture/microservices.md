@@ -467,8 +467,9 @@ Transaction Service -> item_db directly
 Allowed communication:
 
 ```text
-Transaction Service -> Auth Service via gRPC
-Transaction Service -> Item Service via gRPC
+Transaction Service -> Item Service via gRPC (ValidateTransactionItems only)
+API Gateway -> Auth Service via gRPC (GetUsersByIds for enrichment)
+API Gateway -> Item Service via gRPC (GetItemSummariesByIds for enrichment)
 ```
 
 ---

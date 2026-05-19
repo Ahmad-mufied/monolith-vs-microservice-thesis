@@ -403,7 +403,7 @@ Rules:
 
 - Transaction Service owns `transaction_db`,
 - Transaction Service owns `transactions` and `transaction_items`,
-- Transaction Service calls Item Service through gRPC for allocation,
+- Transaction Service calls Item Service through gRPC for validation-only item checks,
 - API Gateway calls Auth Service and Item Service through gRPC for enrichment,
 - Transaction Service must not access `auth_db` or `item_db` directly.
 
@@ -473,14 +473,15 @@ pkg/
 │   └── config.go
 ├── logger/
 │   └── logger.go
-├── observability/          # not yet implemented
-├── response/               # not yet implemented
 ├── errors/
 │   ├── errors.go
 │   └── errors_test.go
 ├── jwt/
 │   ├── jwt.go
 │   └── jwt_test.go
+├── numconv/
+│   ├── int32.go
+│   └── int32_test.go
 ├── postgres/
 │   └── postgres.go
 └── validator/
