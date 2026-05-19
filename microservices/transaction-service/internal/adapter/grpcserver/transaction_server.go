@@ -30,7 +30,7 @@ func (s *TransactionServer) CreateTransaction(ctx context.Context, req *transact
 	for _, item := range req.GetItems() {
 		items = append(items, domain.TransactionItem{
 			ItemID: item.GetItemId(),
-			Amount: item.GetAmount(),
+			Amount: int(item.GetAmount()),
 		})
 	}
 
@@ -100,7 +100,7 @@ func domainTransactionToProto(transaction *domain.Transaction) *transactionv1.Tr
 	for _, item := range transaction.Items {
 		items = append(items, &transactionv1.TransactionItem{
 			ItemId: item.ItemID,
-			Amount: item.Amount,
+			Amount: int32(item.Amount),
 		})
 	}
 
@@ -122,7 +122,7 @@ func domainTransactionForEnrichmentToProto(transaction *domain.Transaction) *tra
 	for _, item := range transaction.Items {
 		items = append(items, &transactionv1.TransactionItem{
 			ItemId: item.ItemID,
-			Amount: item.Amount,
+			Amount: int32(item.Amount),
 		})
 	}
 

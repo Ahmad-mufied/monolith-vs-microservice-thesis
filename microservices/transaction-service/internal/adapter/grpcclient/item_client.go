@@ -24,7 +24,7 @@ func (c *ItemClient) ValidateTransactionItems(ctx context.Context, items []domai
 	for _, item := range items {
 		reqItems = append(reqItems, &itemv1.TransactionItemValidationInput{
 			ItemId: item.ItemID,
-			Amount: item.Amount,
+			Amount: int32(item.Amount),
 		})
 	}
 

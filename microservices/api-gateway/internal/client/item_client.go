@@ -21,7 +21,7 @@ func NewItemClient(grpc itemv1.ItemServiceClient) *ItemClient {
 func (c *ItemClient) SyncItems(ctx context.Context, items []dto.SyncItemInput) error {
 	reqItems := make([]*itemv1.SyncItemInput, 0, len(items))
 	for _, item := range items {
-		in := &itemv1.SyncItemInput{Name: item.Name, AvailableAmount: item.AvailableAmount}
+		in := &itemv1.SyncItemInput{Name: item.Name, AvailableAmount: int32(item.AvailableAmount)}
 		if item.ID != nil {
 			in.Id = *item.ID
 		}
@@ -77,7 +77,7 @@ func protoItemToDTO(it *itemv1.Item) dto.Item {
 	return dto.Item{
 		ID:              it.GetId(),
 		Name:            it.GetName(),
-		AvailableAmount: it.GetAvailableAmount(),
+		AvailableAmount: int(it.GetAvailableAmount()),
 		CreatedAt:       it.GetCreatedAt(),
 		UpdatedAt:       it.GetUpdatedAt(),
 	}

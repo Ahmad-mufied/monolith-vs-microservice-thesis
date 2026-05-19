@@ -43,7 +43,7 @@ func TestTransactionServer_CreateTransaction(t *testing.T) {
 		wantCode   codes.Code
 		wantID     string
 		wantItemID string
-		wantAmount int64
+		wantAmount int
 	}{
 		{
 			name: "success request mapped correctly",

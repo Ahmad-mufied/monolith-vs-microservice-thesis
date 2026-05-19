@@ -20,7 +20,7 @@ func NewTransactionClient(grpc transactionv1.TransactionServiceClient) *Transact
 func (c *TransactionClient) CreateTransaction(ctx context.Context, userID string, items []dto.CreateTransactionItemRequest) (string, error) {
 	reqItems := make([]*transactionv1.TransactionItemInput, 0, len(items))
 	for _, it := range items {
-		reqItems = append(reqItems, &transactionv1.TransactionItemInput{ItemId: it.ItemID, Amount: it.Amount})
+		reqItems = append(reqItems, &transactionv1.TransactionItemInput{ItemId: it.ItemID, Amount: int32(it.Amount)})
 	}
 	resp, err := c.grpc.CreateTransaction(ctx, &transactionv1.CreateTransactionRequest{UserId: userID, Items: reqItems})
 	if err != nil {
@@ -68,7 +68,7 @@ func (c *TransactionClient) GetTransactionsForEnrichment(ctx context.Context, li
 	for _, tx := range resp.GetTransactions() {
 		items := make([]dto.TransactionItem, 0, len(tx.GetItems()))
 		for _, it := range tx.GetItems() {
-			items = append(items, dto.TransactionItem{ItemID: it.GetItemId(), Amount: it.GetAmount()})
+			items = append(items, dto.TransactionItem{ItemID: it.GetItemId(), Amount: int(it.GetAmount())})
 		}
 		txs = append(txs, RawTransaction{
 			ID:        tx.GetId(),
@@ -87,7 +87,7 @@ func protoTransactionToDTO(tx *transactionv1.Transaction) dto.Transaction {
 	}
 	items := make([]dto.TransactionItem, 0, len(tx.GetItems()))
 	for _, it := range tx.GetItems() {
-		items = append(items, dto.TransactionItem{ItemID: it.GetItemId(), Amount: it.GetAmount()})
+		items = append(items, dto.TransactionItem{ItemID: it.GetItemId(), Amount: int(it.GetAmount())})
 	}
 	return dto.Transaction{
 		ID:        tx.GetId(),

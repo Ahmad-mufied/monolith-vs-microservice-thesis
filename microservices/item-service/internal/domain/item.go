@@ -5,7 +5,7 @@ import "time"
 type Item struct {
 	ID              string
 	Name            string
-	AvailableAmount int64
+	AvailableAmount int
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       *time.Time
@@ -20,10 +20,10 @@ type ItemSummary struct {
 type SyncItemInput struct {
 	ID              *string
 	Name            string
-	AvailableAmount int64
+	AvailableAmount int
 }
 
 type TransactionItemValidationInput struct {
 	ItemID string
-	Amount int64
+	Amount int
 }

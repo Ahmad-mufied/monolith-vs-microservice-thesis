@@ -32,7 +32,7 @@ func (s *ItemServer) SyncItems(ctx context.Context, req *itemv1.SyncItemsRequest
 	for _, item := range req.GetItems() {
 		input := domain.SyncItemInput{
 			Name:            item.GetName(),
-			AvailableAmount: item.GetAvailableAmount(),
+			AvailableAmount: int(item.GetAvailableAmount()),
 		}
 		if item.GetId() != "" {
 			itemID := item.GetId()
@@ -103,7 +103,7 @@ func (s *ItemServer) ValidateTransactionItems(ctx context.Context, req *itemv1.V
 	for _, item := range req.GetItems() {
 		items = append(items, domain.TransactionItemValidationInput{
 			ItemID: item.GetItemId(),
-			Amount: item.GetAmount(),
+			Amount: int(item.GetAmount()),
 		})
 	}
 
@@ -122,7 +122,7 @@ func domainItemToProto(item *domain.Item) *itemv1.Item {
 	return &itemv1.Item{
 		Id:              item.ID,
 		Name:            item.Name,
-		AvailableAmount: item.AvailableAmount,
+		AvailableAmount: int32(item.AvailableAmount),
 		CreatedAt:       item.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:       item.UpdatedAt.UTC().Format(time.RFC3339),
 	}

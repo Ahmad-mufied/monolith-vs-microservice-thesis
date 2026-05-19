@@ -72,7 +72,7 @@ type SyncItemInput struct {
 	// Non-empty id means update/reactivate if exists, or insert using the provided id if it does not exist.
 	Id              string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name            string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	AvailableAmount int64  `protobuf:"varint,3,opt,name=available_amount,json=availableAmount,proto3" json:"available_amount,omitempty"`
+	AvailableAmount int32  `protobuf:"varint,3,opt,name=available_amount,json=availableAmount,proto3" json:"available_amount,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -121,7 +121,7 @@ func (x *SyncItemInput) GetName() string {
 	return ""
 }
 
-func (x *SyncItemInput) GetAvailableAmount() int64 {
+func (x *SyncItemInput) GetAvailableAmount() int32 {
 	if x != nil {
 		return x.AvailableAmount
 	}
@@ -493,7 +493,7 @@ func (x *ValidateTransactionItemsRequest) GetItems() []*TransactionItemValidatio
 type TransactionItemValidationInput struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ItemId        string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
-	Amount        int64                  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	Amount        int32                  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -535,7 +535,7 @@ func (x *TransactionItemValidationInput) GetItemId() string {
 	return ""
 }
 
-func (x *TransactionItemValidationInput) GetAmount() int64 {
+func (x *TransactionItemValidationInput) GetAmount() int32 {
 	if x != nil {
 		return x.Amount
 	}
@@ -582,7 +582,7 @@ type Item struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name            string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	AvailableAmount int64                  `protobuf:"varint,3,opt,name=available_amount,json=availableAmount,proto3" json:"available_amount,omitempty"`
+	AvailableAmount int32                  `protobuf:"varint,3,opt,name=available_amount,json=availableAmount,proto3" json:"available_amount,omitempty"`
 	CreatedAt       string                 `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt       string                 `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields   protoimpl.UnknownFields
@@ -633,7 +633,7 @@ func (x *Item) GetName() string {
 	return ""
 }
 
-func (x *Item) GetAvailableAmount() int64 {
+func (x *Item) GetAvailableAmount() int32 {
 	if x != nil {
 		return x.AvailableAmount
 	}
@@ -726,7 +726,7 @@ const file_item_v1_item_proto_rawDesc = "" +
 	"\rSyncItemInput\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12)\n" +
-	"\x10available_amount\x18\x03 \x01(\x03R\x0favailableAmount\"\x13\n" +
+	"\x10available_amount\x18\x03 \x01(\x05R\x0favailableAmount\"\x13\n" +
 	"\x11SyncItemsResponse\"@\n" +
 	"\x10ListItemsRequest\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12\x16\n" +
@@ -746,12 +746,12 @@ const file_item_v1_item_proto_rawDesc = "" +
 	"\x05items\x18\x01 \x03(\v2'.item.v1.TransactionItemValidationInputR\x05items\"Q\n" +
 	"\x1eTransactionItemValidationInput\x12\x17\n" +
 	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x16\n" +
-	"\x06amount\x18\x02 \x01(\x03R\x06amount\"\"\n" +
+	"\x06amount\x18\x02 \x01(\x05R\x06amount\"\"\n" +
 	" ValidateTransactionItemsResponse\"\x93\x01\n" +
 	"\x04Item\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12)\n" +
-	"\x10available_amount\x18\x03 \x01(\x03R\x0favailableAmount\x12\x1d\n" +
+	"\x10available_amount\x18\x03 \x01(\x05R\x0favailableAmount\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\x04 \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +

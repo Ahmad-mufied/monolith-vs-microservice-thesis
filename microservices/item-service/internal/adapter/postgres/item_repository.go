@@ -134,7 +134,7 @@ func (r *ItemRepository) ValidateTransactionItems(ctx context.Context, items []d
 	}
 
 	itemIDs := make([]string, 0, len(items))
-	requestedAmounts := make(map[string]int64, len(items))
+	requestedAmounts := make(map[string]int, len(items))
 	for _, item := range items {
 		itemIDs = append(itemIDs, item.ItemID)
 		requestedAmounts[item.ItemID] = item.Amount
@@ -152,10 +152,10 @@ WHERE deleted_at IS NULL
 	}
 	defer rows.Close()
 
-	found := make(map[string]int64, len(items))
+	found := make(map[string]int, len(items))
 	for rows.Next() {
 		var itemID string
-		var availableAmount int64
+		var availableAmount int
 		if err := rows.Scan(&itemID, &availableAmount); err != nil {
 			return pkgerrors.Internal("internal server error", fmt.Errorf("scan validated items: %w", err))
 		}
@@ -212,14 +212,14 @@ func partitionSyncItems(items []domain.SyncItemInput) (keepIDs []string, inserts
 // batchInsertItems inserts all items without a client-provided ID in one query.
 func batchInsertItems(ctx context.Context, tx pgx.Tx, items []domain.SyncItemInput) error {
 	names := make([]string, len(items))
-	amounts := make([]int64, len(items))
+	amounts := make([]int, len(items))
 	for i, item := range items {
 		names[i] = item.Name
 		amounts[i] = item.AvailableAmount
 	}
 	const query = `
 INSERT INTO items (name, available_amount)
-SELECT unnest($1::text[]), unnest($2::bigint[])`
+SELECT unnest($1::text[]), unnest($2::int[])`
 	_, err := tx.Exec(ctx, query, names, amounts)
 	return mapConflictError(err)
 }
@@ -229,7 +229,7 @@ SELECT unnest($1::text[]), unnest($2::bigint[])`
 func batchUpsertItems(ctx context.Context, tx pgx.Tx, items []domain.SyncItemInput) error {
 	ids := make([]string, len(items))
 	names := make([]string, len(items))
-	amounts := make([]int64, len(items))
+	amounts := make([]int, len(items))
 	for i, item := range items {
 		ids[i] = *item.ID
 		names[i] = item.Name
@@ -237,7 +237,7 @@ func batchUpsertItems(ctx context.Context, tx pgx.Tx, items []domain.SyncItemInp
 	}
 	const query = `
 INSERT INTO items (id, name, available_amount, deleted_at)
-SELECT unnest($1::uuid[]), unnest($2::text[]), unnest($3::bigint[]), NULL
+SELECT unnest($1::uuid[]), unnest($2::text[]), unnest($3::int[]), NULL
 ON CONFLICT (id) DO UPDATE
 SET name             = EXCLUDED.name,
     available_amount = EXCLUDED.available_amount,

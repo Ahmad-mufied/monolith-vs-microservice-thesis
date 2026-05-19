@@ -8,12 +8,12 @@ type CreateTransactionRequest struct {
 
 type CreateTransactionItemRequest struct {
 	ItemID string `json:"item_id"`
-	Amount int64  `json:"amount"`
+	Amount int    `json:"amount"`
 }
 
 type TransactionItem struct {
 	ItemID string `json:"item_id"`
-	Amount int64  `json:"amount"`
+	Amount int    `json:"amount"`
 }
 
 type Transaction struct {
@@ -26,7 +26,7 @@ type Transaction struct {
 
 type EnrichedTransactionItem struct {
 	Item   ItemSummary `json:"item"`
-	Amount int64       `json:"amount"`
+	Amount int         `json:"amount"`
 }
 
 type EnrichedTransaction struct {

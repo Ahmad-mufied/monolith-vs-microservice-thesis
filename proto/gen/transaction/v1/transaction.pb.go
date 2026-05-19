@@ -76,7 +76,7 @@ func (x *CreateTransactionRequest) GetItems() []*TransactionItemInput {
 type TransactionItemInput struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ItemId        string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
-	Amount        int64                  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	Amount        int32                  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -118,7 +118,7 @@ func (x *TransactionItemInput) GetItemId() string {
 	return ""
 }
 
-func (x *TransactionItemInput) GetAmount() int64 {
+func (x *TransactionItemInput) GetAmount() int32 {
 	if x != nil {
 		return x.Amount
 	}
@@ -560,7 +560,7 @@ func (x *Transaction) GetUpdatedAt() string {
 type TransactionItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ItemId        string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
-	Amount        int64                  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	Amount        int32                  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -602,7 +602,7 @@ func (x *TransactionItem) GetItemId() string {
 	return ""
 }
 
-func (x *TransactionItem) GetAmount() int64 {
+func (x *TransactionItem) GetAmount() int32 {
 	if x != nil {
 		return x.Amount
 	}
@@ -695,7 +695,7 @@ const file_transaction_v1_transaction_proto_rawDesc = "" +
 	"\x05items\x18\x02 \x03(\v2$.transaction.v1.TransactionItemInputR\x05items\"G\n" +
 	"\x14TransactionItemInput\x12\x17\n" +
 	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x16\n" +
-	"\x06amount\x18\x02 \x01(\x03R\x06amount\"B\n" +
+	"\x06amount\x18\x02 \x01(\x05R\x06amount\"B\n" +
 	"\x19CreateTransactionResponse\x12%\n" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\"b\n" +
 	"\x19GetOwnTransactionsRequest\x12\x17\n" +
@@ -726,7 +726,7 @@ const file_transaction_v1_transaction_proto_rawDesc = "" +
 	"updated_at\x18\x05 \x01(\tR\tupdatedAt\"B\n" +
 	"\x0fTransactionItem\x12\x17\n" +
 	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x16\n" +
-	"\x06amount\x18\x02 \x01(\x03R\x06amount\"\xb8\x01\n" +
+	"\x06amount\x18\x02 \x01(\x05R\x06amount\"\xb8\x01\n" +
 	"\x18TransactionForEnrichment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x125\n" +

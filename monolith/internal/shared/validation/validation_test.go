@@ -20,7 +20,6 @@ func TestStruct(t *testing.T) {
 	}
 
 	negative := -1
-
 	tests := []struct {
 		name        string
 		req         request
