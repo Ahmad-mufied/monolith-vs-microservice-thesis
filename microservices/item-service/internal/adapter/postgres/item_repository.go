@@ -133,12 +133,7 @@ func (r *ItemRepository) ValidateTransactionItems(ctx context.Context, items []d
 		return nil
 	}
 
-	itemIDs := make([]string, 0, len(items))
-	requestedAmounts := make(map[string]int, len(items))
-	for _, item := range items {
-		itemIDs = append(itemIDs, item.ItemID)
-		requestedAmounts[item.ItemID] = item.Amount
-	}
+	itemIDs, requestedAmounts := aggregateRequestedAmounts(items)
 
 	const query = `
 SELECT id, available_amount
@@ -176,6 +171,19 @@ WHERE deleted_at IS NULL
 	}
 
 	return nil
+}
+
+func aggregateRequestedAmounts(items []domain.TransactionItemValidationInput) ([]string, map[string]int) {
+	itemIDs := make([]string, 0, len(items))
+	requestedAmounts := make(map[string]int, len(items))
+	for _, item := range items {
+		if _, exists := requestedAmounts[item.ItemID]; !exists {
+			itemIDs = append(itemIDs, item.ItemID)
+		}
+		requestedAmounts[item.ItemID] += item.Amount
+	}
+
+	return itemIDs, requestedAmounts
 }
 
 // softDeleteOmittedItems sets deleted_at on all active items whose IDs are
