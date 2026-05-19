@@ -2,6 +2,8 @@ package grpcserver
 
 import (
 	"context"
+	"math"
+	"strconv"
 	"testing"
 	"time"
 
@@ -183,6 +185,30 @@ func TestTransactionServer_GetOwnTransactions(t *testing.T) {
 			wantCode: codes.Internal,
 		},
 	}
+	if strconv.IntSize > 32 {
+		overflow := math.MaxInt32
+		overflow++
+		tests = append(tests, struct {
+			name      string
+			req       *transactionv1.GetOwnTransactionsRequest
+			ucFn      func(ctx context.Context, userID string, limit, offset int32) ([]*domain.Transaction, error)
+			wantCode  codes.Code
+			wantTotal int32
+		}{
+			name: "overflow during proto mapping returns internal",
+			req:  &transactionv1.GetOwnTransactionsRequest{UserId: "01968ad4-98b1-79c8-a6f0-ec21f8f434c6"},
+			ucFn: func(ctx context.Context, userID string, limit, offset int32) ([]*domain.Transaction, error) {
+				return []*domain.Transaction{{
+					ID:        "01968ad4-98b1-79c8-a6f0-ec21f8f434d0",
+					UserID:    userID,
+					Items:     []domain.TransactionItem{{ItemID: "01968ad4-98b1-79c8-a6f0-ec21f8f434c7", Amount: overflow}},
+					CreatedAt: createdAt,
+					UpdatedAt: createdAt,
+				}}, nil
+			},
+			wantCode: codes.Internal,
+		})
+	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -338,6 +364,30 @@ func TestTransactionServer_GetTransactionsForEnrichment(t *testing.T) {
 			},
 			wantCode: codes.Internal,
 		},
+	}
+	if strconv.IntSize > 32 {
+		overflow := math.MaxInt32
+		overflow++
+		tests = append(tests, struct {
+			name      string
+			req       *transactionv1.GetTransactionsForEnrichmentRequest
+			ucFn      func(ctx context.Context, limit, offset int32) ([]*domain.Transaction, error)
+			wantCode  codes.Code
+			wantTotal int32
+		}{
+			name: "overflow during enrichment proto mapping returns internal",
+			req:  &transactionv1.GetTransactionsForEnrichmentRequest{Limit: 10, Offset: 0},
+			ucFn: func(ctx context.Context, limit, offset int32) ([]*domain.Transaction, error) {
+				return []*domain.Transaction{{
+					ID:        "01968ad4-98b1-79c8-a6f0-ec21f8f434d0",
+					UserID:    "01968ad4-98b1-79c8-a6f0-ec21f8f434c6",
+					Items:     []domain.TransactionItem{{ItemID: "01968ad4-98b1-79c8-a6f0-ec21f8f434c7", Amount: overflow}},
+					CreatedAt: createdAt,
+					UpdatedAt: createdAt,
+				}}, nil
+			},
+			wantCode: codes.Internal,
+		})
 	}
 
 	for _, tt := range tests {
