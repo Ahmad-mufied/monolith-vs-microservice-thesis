@@ -2,6 +2,8 @@ package grpcserver
 
 import (
 	"context"
+	"math"
+	"strconv"
 	"testing"
 	"time"
 
@@ -142,6 +144,30 @@ func TestListItems(t *testing.T) {
 		},
 	}
 
+	if strconv.IntSize > 32 {
+		tests = append(tests, struct {
+			name          string
+			req           *itemv1.ListItemsRequest
+			ucFn          func(ctx context.Context, limit, offset int32) ([]*domain.Item, error)
+			wantCode      codes.Code
+			wantTotal     int32
+			wantCreatedAt string
+		}{
+			name: "maps overflow to internal error",
+			req:  &itemv1.ListItemsRequest{Limit: 10, Offset: 0},
+			ucFn: func(ctx context.Context, limit, offset int32) ([]*domain.Item, error) {
+				return []*domain.Item{{
+					ID:              "01968ad4-98b1-79c8-a6f0-ec21f8f434c6",
+					Name:            "Laptop",
+					AvailableAmount: math.MaxInt32 + 1,
+					CreatedAt:       createdAt,
+					UpdatedAt:       updatedAt,
+				}}, nil
+			},
+			wantCode: codes.Internal,
+		})
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := &ItemServer{uc: &fakeItemUsecase{listItemsFn: tt.ucFn}}
@@ -196,6 +222,29 @@ func TestGetItemById(t *testing.T) {
 			},
 			wantCode: codes.NotFound,
 		},
+	}
+
+	if strconv.IntSize > 32 {
+		tests = append(tests, struct {
+			name     string
+			req      *itemv1.GetItemByIdRequest
+			ucFn     func(ctx context.Context, itemID string) (*domain.Item, error)
+			wantCode codes.Code
+			wantName string
+		}{
+			name: "maps overflow to internal error",
+			req:  &itemv1.GetItemByIdRequest{ItemId: "01968ad4-98b1-79c8-a6f0-ec21f8f434c6"},
+			ucFn: func(ctx context.Context, itemID string) (*domain.Item, error) {
+				return &domain.Item{
+					ID:              itemID,
+					Name:            "Laptop",
+					AvailableAmount: math.MaxInt32 + 1,
+					CreatedAt:       time.Now(),
+					UpdatedAt:       time.Now(),
+				}, nil
+			},
+			wantCode: codes.Internal,
+		})
 	}
 
 	for _, tt := range tests {
