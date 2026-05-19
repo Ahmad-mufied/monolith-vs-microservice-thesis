@@ -7,6 +7,7 @@ import (
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/domain"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/usecase"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/numconv"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
 )
 
@@ -119,10 +120,15 @@ func domainItemToProto(item *domain.Item) *itemv1.Item {
 		return nil
 	}
 
+	availableAmount, err := numconv.IntToInt32(item.AvailableAmount, "available_amount")
+	if err != nil {
+		return nil
+	}
+
 	return &itemv1.Item{
 		Id:              item.ID,
 		Name:            item.Name,
-		AvailableAmount: int32(item.AvailableAmount),
+		AvailableAmount: availableAmount,
 		CreatedAt:       item.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:       item.UpdatedAt.UTC().Format(time.RFC3339),
 	}

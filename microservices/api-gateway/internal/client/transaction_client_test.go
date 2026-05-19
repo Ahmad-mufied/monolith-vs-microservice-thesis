@@ -2,9 +2,11 @@ package client
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"testing"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	transactionv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/transaction/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -34,6 +36,7 @@ func (f *fakeTransactionServiceClient) GetTransactionsForEnrichment(ctx context.
 func TestTransactionClient_CreateTransaction(t *testing.T) {
 	tests := []struct {
 		name       string
+		items      []dto.CreateTransactionItemRequest
 		grpcResp   *transactionv1.CreateTransactionResponse
 		grpcErr    error
 		wantStatus int
@@ -41,9 +44,11 @@ func TestTransactionClient_CreateTransaction(t *testing.T) {
 	}{
 		{
 			name:     "success returns transaction id",
+			items:    []dto.CreateTransactionItemRequest{{ItemID: "iid-1", Amount: 2}},
 			grpcResp: &transactionv1.CreateTransactionResponse{TransactionId: "txid-1"},
 			wantID:   "txid-1",
 		},
+		{name: "amount overflow -> 400", items: []dto.CreateTransactionItemRequest{{ItemID: "iid-1", Amount: math.MaxInt32 + 1}}, wantStatus: http.StatusBadRequest},
 		{name: "FailedPrecondition -> 409", grpcErr: status.Error(codes.FailedPrecondition, "amount exceeded"), wantStatus: http.StatusConflict},
 		{name: "NotFound -> 404", grpcErr: status.Error(codes.NotFound, "item not found"), wantStatus: http.StatusNotFound},
 		{name: "Unavailable -> 503", grpcErr: status.Error(codes.Unavailable, "down"), wantStatus: http.StatusServiceUnavailable},
@@ -57,7 +62,7 @@ func TestTransactionClient_CreateTransaction(t *testing.T) {
 				},
 			}
 			c := NewTransactionClient(fake)
-			id, err := c.CreateTransaction(context.Background(), "uid-1", nil)
+			id, err := c.CreateTransaction(context.Background(), "uid-1", tt.items)
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)
 				return

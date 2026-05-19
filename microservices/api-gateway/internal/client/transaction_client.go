@@ -5,6 +5,7 @@ import (
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/numconv"
 	transactionv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/transaction/v1"
 )
 
@@ -20,7 +21,16 @@ func NewTransactionClient(grpc transactionv1.TransactionServiceClient) *Transact
 func (c *TransactionClient) CreateTransaction(ctx context.Context, userID string, items []dto.CreateTransactionItemRequest) (string, error) {
 	reqItems := make([]*transactionv1.TransactionItemInput, 0, len(items))
 	for _, it := range items {
-		reqItems = append(reqItems, &transactionv1.TransactionItemInput{ItemId: it.ItemID, Amount: int32(it.Amount)})
+		amount, err := numconv.IntToInt32(it.Amount, "amount")
+		if err != nil {
+			return "", &httputil.AppError{
+				Status:  400,
+				Code:    "BAD_REQUEST",
+				Message: err.Error(),
+			}
+		}
+
+		reqItems = append(reqItems, &transactionv1.TransactionItemInput{ItemId: it.ItemID, Amount: amount})
 	}
 	resp, err := c.grpc.CreateTransaction(ctx, &transactionv1.CreateTransactionRequest{UserId: userID, Items: reqItems})
 	if err != nil {

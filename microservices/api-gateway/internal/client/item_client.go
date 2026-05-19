@@ -6,6 +6,7 @@ import (
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/numconv"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
 )
 
@@ -21,7 +22,16 @@ func NewItemClient(grpc itemv1.ItemServiceClient) *ItemClient {
 func (c *ItemClient) SyncItems(ctx context.Context, items []dto.SyncItemInput) error {
 	reqItems := make([]*itemv1.SyncItemInput, 0, len(items))
 	for _, item := range items {
-		in := &itemv1.SyncItemInput{Name: item.Name, AvailableAmount: int32(item.AvailableAmount)}
+		availableAmount, err := numconv.IntToInt32(item.AvailableAmount, "available_amount")
+		if err != nil {
+			return &httputil.AppError{
+				Status:  http.StatusBadRequest,
+				Code:    "BAD_REQUEST",
+				Message: err.Error(),
+			}
+		}
+
+		in := &itemv1.SyncItemInput{Name: item.Name, AvailableAmount: availableAmount}
 		if item.ID != nil {
 			in.Id = *item.ID
 		}

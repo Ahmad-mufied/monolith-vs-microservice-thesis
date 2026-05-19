@@ -6,6 +6,7 @@ import (
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/transaction-service/internal/domain"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/numconv"
 	transactionv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/transaction/v1"
 )
 
@@ -98,9 +99,14 @@ func domainTransactionToProto(transaction *domain.Transaction) *transactionv1.Tr
 
 	items := make([]*transactionv1.TransactionItem, 0, len(transaction.Items))
 	for _, item := range transaction.Items {
+		amount, err := numconv.IntToInt32(item.Amount, "amount")
+		if err != nil {
+			return nil
+		}
+
 		items = append(items, &transactionv1.TransactionItem{
 			ItemId: item.ItemID,
-			Amount: int32(item.Amount),
+			Amount: amount,
 		})
 	}
 
@@ -120,9 +126,14 @@ func domainTransactionForEnrichmentToProto(transaction *domain.Transaction) *tra
 
 	items := make([]*transactionv1.TransactionItem, 0, len(transaction.Items))
 	for _, item := range transaction.Items {
+		amount, err := numconv.IntToInt32(item.Amount, "amount")
+		if err != nil {
+			return nil
+		}
+
 		items = append(items, &transactionv1.TransactionItem{
 			ItemId: item.ItemID,
-			Amount: int32(item.Amount),
+			Amount: amount,
 		})
 	}
 
