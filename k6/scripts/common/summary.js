@@ -69,8 +69,9 @@ function thresholdResults(data) {
   return results;
 }
 
-function matchingMetricName(data, metricName, metricTags = null) {
+function matchingMetricName(data, metricName, metricTags = null, options = {}) {
   const metrics = data && data.metrics ? data.metrics : {};
+  const allowFallback = options.allowFallback !== false;
 
   if (!metricTags || Object.keys(metricTags).length === 0) {
     return metricName;
@@ -90,11 +91,15 @@ function matchingMetricName(data, metricName, metricTags = null) {
     return matches[0];
   }
 
-  return metricName;
+  return allowFallback ? metricName : null;
 }
 
-function metricValue(data, metricName, key, metricTags = null) {
-  const resolvedMetricName = matchingMetricName(data, metricName, metricTags);
+function metricValue(data, metricName, key, metricTags = null, options = {}) {
+  const resolvedMetricName = matchingMetricName(data, metricName, metricTags, options);
+
+  if (!resolvedMetricName) {
+    return null;
+  }
 
   try {
     return data.metrics[resolvedMetricName].values[key];
@@ -108,7 +113,9 @@ function summaryLine(data, metricTags = null) {
     http_req_failed_rate: metricValue(data, "http_req_failed", "rate", metricTags),
     http_req_duration_p90: metricValue(data, "http_req_duration", "p(90)", metricTags),
     http_req_duration_p95: metricValue(data, "http_req_duration", "p(95)", metricTags),
-    http_reqs_count: metricValue(data, "http_reqs", "count", metricTags),
+    http_reqs_count: metricValue(data, "http_reqs", "count", metricTags, {
+      allowFallback: false,
+    }),
     iterations_count: metricValue(data, "iterations", "count"),
     checks_rate: metricValue(data, "checks", "rate", metricTags),
     dropped_iterations_count: metricValue(data, "dropped_iterations", "count"),
