@@ -120,7 +120,7 @@ Recommended database shape:
 CREATE TABLE items (
     id UUID PRIMARY KEY DEFAULT uuidv7(),
     name TEXT NOT NULL,
-    available_amount BIGINT NOT NULL CHECK (available_amount >= 0),
+    available_amount INT NOT NULL CHECK (available_amount >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at TIMESTAMPTZ NULL

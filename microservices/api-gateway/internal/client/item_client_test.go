@@ -2,9 +2,12 @@ package client
 
 import (
 	"context"
+	"math"
 	"net/http"
+	"strconv"
 	"testing"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
 	"google.golang.org/grpc"
@@ -39,12 +42,27 @@ func (f *fakeItemServiceClient) ValidateTransactionItems(ctx context.Context, in
 func TestItemClient_SyncItems(t *testing.T) {
 	tests := []struct {
 		name       string
+		items      []dto.SyncItemInput
 		grpcErr    error
 		wantStatus int
 	}{
-		{name: "success", grpcErr: nil},
+		{name: "success", items: []dto.SyncItemInput{{Name: "Item A", AvailableAmount: 100}}, grpcErr: nil},
 		{name: "AlreadyExists -> 409", grpcErr: status.Error(codes.AlreadyExists, "conflict"), wantStatus: http.StatusConflict},
 		{name: "Unavailable -> 503", grpcErr: status.Error(codes.Unavailable, "down"), wantStatus: http.StatusServiceUnavailable},
+	}
+	if strconv.IntSize > 32 {
+		overflow := math.MaxInt32
+		overflow++
+		tests = append(tests, struct {
+			name       string
+			items      []dto.SyncItemInput
+			grpcErr    error
+			wantStatus int
+		}{
+			name:       "available_amount overflow -> 400",
+			items:      []dto.SyncItemInput{{Name: "Item A", AvailableAmount: overflow}},
+			wantStatus: http.StatusBadRequest,
+		})
 	}
 
 	for _, tt := range tests {
@@ -55,7 +73,7 @@ func TestItemClient_SyncItems(t *testing.T) {
 				},
 			}
 			c := NewItemClient(fake)
-			err := c.SyncItems(context.Background(), nil)
+			err := c.SyncItems(context.Background(), tt.items)
 			assertClientError(t, err, tt.wantStatus)
 		})
 	}

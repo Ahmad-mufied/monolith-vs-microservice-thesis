@@ -5,7 +5,7 @@ package dto
 type Item struct {
 	ID              string `json:"id"`
 	Name            string `json:"name"`
-	AvailableAmount int64  `json:"available_amount"`
+	AvailableAmount int    `json:"available_amount"`
 	CreatedAt       string `json:"created_at"`
 	UpdatedAt       string `json:"updated_at"`
 }
@@ -23,7 +23,7 @@ type SyncItemsRequest struct {
 type SyncItemInput struct {
 	ID              *string `json:"id,omitempty"`
 	Name            string  `json:"name"`
-	AvailableAmount int64   `json:"available_amount"`
+	AvailableAmount int     `json:"available_amount"`
 }
 
 type PaginationMeta struct {
