@@ -96,6 +96,8 @@ func TestTransactionClient_CreateTransaction(t *testing.T) {
 func TestTransactionClient_GetOwnTransactions(t *testing.T) {
 	tests := []struct {
 		name       string
+		limit      int
+		offset     int
 		grpcResp   *transactionv1.GetOwnTransactionsResponse
 		grpcErr    error
 		wantStatus int
@@ -109,9 +111,29 @@ func TestTransactionClient_GetOwnTransactions(t *testing.T) {
 				},
 				TotalReturned: 1,
 			},
+			limit:   50,
+			offset:  0,
 			wantLen: 1,
 		},
-		{name: "Unavailable -> 503", grpcErr: status.Error(codes.Unavailable, "down"), wantStatus: http.StatusServiceUnavailable},
+		{name: "Unavailable -> 503", limit: 50, offset: 0, grpcErr: status.Error(codes.Unavailable, "down"), wantStatus: http.StatusServiceUnavailable},
+	}
+	if strconv.IntSize > 32 {
+		overflow := math.MaxInt32
+		overflow++
+		tests = append(tests, struct {
+			name       string
+			limit      int
+			offset     int
+			grpcResp   *transactionv1.GetOwnTransactionsResponse
+			grpcErr    error
+			wantStatus int
+			wantLen    int
+		}{
+			name:       "limit overflow -> 400",
+			limit:      overflow,
+			offset:     0,
+			wantStatus: http.StatusBadRequest,
+		})
 	}
 
 	for _, tt := range tests {
@@ -122,7 +144,7 @@ func TestTransactionClient_GetOwnTransactions(t *testing.T) {
 				},
 			}
 			c := NewTransactionClient(fake)
-			txs, err := c.GetOwnTransactions(context.Background(), "uid-1", 50, 0)
+			txs, err := c.GetOwnTransactions(context.Background(), "uid-1", tt.limit, tt.offset)
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)
 				return
@@ -179,6 +201,8 @@ func TestTransactionClient_GetTransactionByID(t *testing.T) {
 func TestTransactionClient_GetTransactionsForEnrichment(t *testing.T) {
 	tests := []struct {
 		name       string
+		limit      int
+		offset     int
 		grpcResp   *transactionv1.GetTransactionsForEnrichmentResponse
 		grpcErr    error
 		wantStatus int
@@ -192,9 +216,29 @@ func TestTransactionClient_GetTransactionsForEnrichment(t *testing.T) {
 				},
 				TotalReturned: 1,
 			},
+			limit:   50,
+			offset:  0,
 			wantLen: 1,
 		},
-		{name: "Unavailable -> 503", grpcErr: status.Error(codes.Unavailable, "down"), wantStatus: http.StatusServiceUnavailable},
+		{name: "Unavailable -> 503", limit: 50, offset: 0, grpcErr: status.Error(codes.Unavailable, "down"), wantStatus: http.StatusServiceUnavailable},
+	}
+	if strconv.IntSize > 32 {
+		overflow := math.MaxInt32
+		overflow++
+		tests = append(tests, struct {
+			name       string
+			limit      int
+			offset     int
+			grpcResp   *transactionv1.GetTransactionsForEnrichmentResponse
+			grpcErr    error
+			wantStatus int
+			wantLen    int
+		}{
+			name:       "limit overflow -> 400",
+			limit:      overflow,
+			offset:     0,
+			wantStatus: http.StatusBadRequest,
+		})
 	}
 
 	for _, tt := range tests {
@@ -205,7 +249,7 @@ func TestTransactionClient_GetTransactionsForEnrichment(t *testing.T) {
 				},
 			}
 			c := NewTransactionClient(fake)
-			txs, err := c.GetTransactionsForEnrichment(context.Background(), 50, 0)
+			txs, err := c.GetTransactionsForEnrichment(context.Background(), tt.limit, tt.offset)
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)
 				return

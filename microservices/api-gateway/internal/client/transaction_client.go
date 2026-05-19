@@ -39,8 +39,13 @@ func (c *TransactionClient) CreateTransaction(ctx context.Context, userID string
 	return resp.GetTransactionId(), nil
 }
 
-func (c *TransactionClient) GetOwnTransactions(ctx context.Context, userID string, limit, offset int32) ([]dto.Transaction, error) {
-	resp, err := c.grpc.GetOwnTransactions(ctx, &transactionv1.GetOwnTransactionsRequest{UserId: userID, Limit: limit, Offset: offset})
+func (c *TransactionClient) GetOwnTransactions(ctx context.Context, userID string, limit, offset int) ([]dto.Transaction, error) {
+	protoLimit, protoOffset, err := paginationToProto(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.grpc.GetOwnTransactions(ctx, &transactionv1.GetOwnTransactionsRequest{UserId: userID, Limit: protoLimit, Offset: protoOffset})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)
 	}
@@ -69,8 +74,13 @@ type RawTransaction struct {
 	UpdatedAt string
 }
 
-func (c *TransactionClient) GetTransactionsForEnrichment(ctx context.Context, limit, offset int32) ([]RawTransaction, error) {
-	resp, err := c.grpc.GetTransactionsForEnrichment(ctx, &transactionv1.GetTransactionsForEnrichmentRequest{Limit: limit, Offset: offset})
+func (c *TransactionClient) GetTransactionsForEnrichment(ctx context.Context, limit, offset int) ([]RawTransaction, error) {
+	protoLimit, protoOffset, err := paginationToProto(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.grpc.GetTransactionsForEnrichment(ctx, &transactionv1.GetTransactionsForEnrichmentRequest{Limit: protoLimit, Offset: protoOffset})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)
 	}

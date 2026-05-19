@@ -82,6 +82,8 @@ func TestItemClient_SyncItems(t *testing.T) {
 func TestItemClient_ListItems(t *testing.T) {
 	tests := []struct {
 		name       string
+		limit      int
+		offset     int
 		grpcResp   *itemv1.ListItemsResponse
 		grpcErr    error
 		wantStatus int
@@ -95,9 +97,29 @@ func TestItemClient_ListItems(t *testing.T) {
 				},
 				TotalReturned: 1,
 			},
+			limit:   50,
+			offset:  0,
 			wantLen: 1,
 		},
-		{name: "Unavailable -> 503", grpcErr: status.Error(codes.Unavailable, "down"), wantStatus: http.StatusServiceUnavailable},
+		{name: "Unavailable -> 503", limit: 50, offset: 0, grpcErr: status.Error(codes.Unavailable, "down"), wantStatus: http.StatusServiceUnavailable},
+	}
+	if strconv.IntSize > 32 {
+		overflow := math.MaxInt32
+		overflow++
+		tests = append(tests, struct {
+			name       string
+			limit      int
+			offset     int
+			grpcResp   *itemv1.ListItemsResponse
+			grpcErr    error
+			wantStatus int
+			wantLen    int
+		}{
+			name:       "limit overflow -> 400",
+			limit:      overflow,
+			offset:     0,
+			wantStatus: http.StatusBadRequest,
+		})
 	}
 
 	for _, tt := range tests {
@@ -108,7 +130,7 @@ func TestItemClient_ListItems(t *testing.T) {
 				},
 			}
 			c := NewItemClient(fake)
-			items, err := c.ListItems(context.Background(), 50, 0)
+			items, err := c.ListItems(context.Background(), tt.limit, tt.offset)
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)
 				return
