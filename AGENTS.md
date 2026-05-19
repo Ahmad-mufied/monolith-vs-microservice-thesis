@@ -906,10 +906,9 @@ HTTP request
 → api-gateway
 → transaction-service
 → transaction_db
-→ auth-service
-→ auth_db
-→ item-service
-→ item_db
+→ api-gateway (fan-out, parallel)
+→ auth-service → auth_db
+→ item-service → item_db
 
 k6 summary remains the primary source for external client-perceived performance.
 

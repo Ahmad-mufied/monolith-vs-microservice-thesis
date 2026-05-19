@@ -13,6 +13,13 @@ The purpose of the monolith implementation is to provide a baseline architecture
 
 This implementation is compared against the microservices implementation using the same external REST API, equivalent logical dataset, equivalent benchmark scenarios, and equivalent resource ceiling.
 
+The monolith should be read as the baseline for centralized execution. It keeps
+authentication, item validation, transaction persistence, and enriched
+transaction reads inside one runtime boundary. This makes the request path
+shorter and gives the database permission to enforce relationships across all
+main tables, but it also means scaling happens at the whole-application level
+rather than at a specific module level.
+
 ---
 
 ## 2. High-Level Definition
@@ -44,6 +51,14 @@ All modules run in the same process and share the same database.
                     +-----------+
 ```
 
+This diagram shows the core monolith idea in the most compact form: all three
+business modules live inside one deployable application and persist to one
+shared database. The boundaries between Auth, Item, and Transaction are
+organizational code boundaries, not runtime boundaries. Because of that, the
+monolith can orchestrate cross-module behavior with direct function calls and
+can rely on one database to enforce relational integrity across the full
+transaction lifecycle.
+
 Key characteristics:
 
 - one codebase section for the monolith,
@@ -55,6 +70,11 @@ Key characteristics:
 - in-process module communication,
 - SQL JOIN is allowed,
 - foreign keys across tables are allowed.
+
+In the diagrams below, the boxes inside the monolith are logical modules, not
+separate deployables. Calls between modules are ordinary function calls inside
+the same Go process. The only network boundary on the hot request path is
+between the application pod and PostgreSQL.
 
 ---
 
@@ -79,6 +99,12 @@ Amazon RDS PostgreSQL 18
     v
 mono_db
 ```
+
+This request path is intentionally linear. A client request reaches the
+monolith over HTTP, the monolith executes all relevant application logic
+locally, and PostgreSQL is the only external dependency on the hot path. That
+shape matters for the benchmark because any added latency mostly comes from
+application code and database work, not from service-to-service network hops.
 
 In Kubernetes, the monolith is deployed as one Deployment object.
 
@@ -107,9 +133,20 @@ In Kubernetes, the monolith is deployed as one Deployment object.
         +-------------+
 ```
 
+This Kubernetes view makes the scaling model explicit. When HPA increases the
+replica count, it replicates the entire application pod, not just one module.
+As a result, high load on login, item reads, or transaction writes all consume
+capacity from the same monolith replica pool.
+
 When the monolith scales out, the whole application is replicated.
 
 This means the Auth, Item, and Transaction modules are scaled together even if only one module receives most of the load.
+
+This topology is intentionally simple for the benchmark. A request enters one
+HTTP server, executes business logic in-process, and reaches one database. The
+trade-off is that the benchmark cannot observe service-level isolation inside
+the monolith; CPU, memory, latency, and HPA behavior are measured for the whole
+application pod.
 
 ---
 
@@ -228,6 +265,12 @@ Repository
 PostgreSQL
 ```
 
+This layering diagram shows how a request is intended to move through the
+monolith. The handler owns HTTP concerns, the usecase layer coordinates the
+business flow, and the repository owns SQL access. The separation helps the
+benchmark remain readable and auditable, because we can discuss runtime costs
+without mixing transport code and database code together.
+
 Detailed layer responsibilities:
 
 | Layer | Responsibility |
@@ -246,6 +289,12 @@ Rules:
 - repositories must not contain HTTP-specific logic,
 - shared packages must not contain domain-specific business logic,
 - modules may call each other through usecase-level or repository-level composition if needed, but the flow must remain clear.
+
+For benchmark interpretation, this layering matters because it keeps HTTP
+concerns, business orchestration, and SQL access separated while still running
+inside one deployable. A latency increase in the monolith therefore represents
+the combined cost of the handler, service logic, repository work, and database
+interaction in a single process.
 
 ---
 
@@ -303,7 +352,10 @@ Main benchmark relevance:
 POST /api/v1/transactions
 ```
 
-The Item module participates in the create transaction flow because the transaction must allocate item amounts.
+The Item module participates in the create transaction flow because the
+transaction must validate requested item amounts against `available_amount`.
+The current benchmark contract is validation-only: the create transaction flow
+does not deduct or mutate `available_amount`.
 
 ---
 
@@ -321,7 +373,7 @@ Responsibilities:
 - create transaction items,
 - get own transactions,
 - get all enriched transactions,
-- coordinate item allocation inside one database transaction.
+- coordinate item validation and transaction persistence inside one database transaction.
 
 Main benchmark endpoints:
 
@@ -368,6 +420,11 @@ transaction_items
   |
 items
 ```
+
+This model explains why the monolith can serve enriched transaction responses
+with a single SQL join. All entities that participate in the benchmark live in
+the same database, and the relationships between them can be expressed and
+validated directly at the database level.
 
 Foreign key relationships:
 
@@ -449,7 +506,7 @@ Used by:
 
 Purpose:
 
-Stores generic allocatable items.
+Stores generic items with an `available_amount` value used for transaction validation.
 
 Main columns:
 
@@ -467,7 +524,8 @@ Used by:
 - create transaction benchmark,
 - enriched transactions query.
 
-`available_amount` is updated when a transaction allocates an item amount.
+`available_amount` is validated during transaction creation, but the current
+benchmark contract does not deduct or mutate it.
 
 ---
 
@@ -573,6 +631,13 @@ Purpose:
 
 Evaluate authentication-related CPU work such as password comparison and JWT signing.
 
+In the monolith, the login request does not cross a service boundary after it
+enters the HTTP server. The handler calls the auth service directly, the auth
+repository reads from `mono_db.users`, and the same process performs bcrypt
+comparison and JWT signing. This makes the flow useful as a baseline for the
+microservices login path, where the same work requires an additional API
+Gateway to Auth Service gRPC hop.
+
 Flow:
 
 ```text
@@ -593,6 +658,11 @@ Auth Usecase
     v
 Response
 ```
+
+This flow emphasizes that the login benchmark is dominated by local
+application work after the request enters the monolith. The expensive part is
+not network fan-out, but credential lookup followed by bcrypt verification and
+JWT creation in the same process.
 
 Database interaction:
 
@@ -619,10 +689,16 @@ Client/k6          Monolith                  mono_db
    | 200 + token      |                         |
 ```
 
+Reading the sequence step by step, there is only one database lookup and no
+intermediate service hop. The request enters the monolith, the monolith reads
+the user row, performs the CPU-heavy security checks, signs the token, and
+returns the response directly.
+
 Expected monolith characteristic:
 
 - no network hop between API layer and auth logic,
 - all authentication logic runs in the same process.
+- database access is limited to a single `users` lookup before CPU-heavy bcrypt work.
 
 ---
 
@@ -642,7 +718,13 @@ I/O-bound + state mutation
 
 Purpose:
 
-Evaluate database write behavior and item allocation in a transactional flow.
+Evaluate database write behavior and item validation in a transactional flow.
+
+The monolith can execute item validation and transaction persistence under one
+database transaction because all required tables live in `mono_db`. The flow
+checks requested item amounts, inserts the transaction header with
+`INSERT ... RETURNING id`, inserts the transaction item rows, and commits the
+transaction. No service-to-service hop is needed to validate item data.
 
 Flow:
 
@@ -669,6 +751,11 @@ Transaction Usecase
 Response
 ```
 
+This flow shows why the monolith is the simplest write-path baseline. The same
+application layer can validate requested item amounts, open a database
+transaction, create the transaction header, create the detail rows, and commit
+the work without handing control to another service.
+
 ASCII sequence:
 
 ```text
@@ -690,10 +777,16 @@ Client/k6          Monolith                         mono_db
    | 201 Created      |                                |
 ```
 
+The sequence highlights that all write coordination stays inside one runtime
+and one database transaction. If validation or insert work fails, the
+application can roll back locally without crossing a service boundary or
+coordinating a second database owner.
+
 Expected monolith characteristic:
 
-- transaction and item allocation can be handled inside one database transaction,
+- transaction and item validation can be handled inside one database transaction,
 - no inter-service communication is required.
+- rollback behavior is local to one database transaction if validation or insert work fails.
 
 ---
 
@@ -714,6 +807,13 @@ Aggregation workload
 Purpose:
 
 Evaluate read aggregation performance using a single database.
+
+The monolith enriched read is intentionally database-centric. Because `users`,
+`items`, `transactions`, and `transaction_items` are all owned by the same
+application and database, the response can be assembled with one SQL query that
+joins the required tables. This provides the centralized-read baseline for the
+microservices version, where the same response shape is produced through raw
+transaction reads plus API Gateway fan-out to Auth and Item services.
 
 Flow:
 
@@ -741,6 +841,11 @@ Single SQL JOIN
 Response
 ```
 
+This flow captures the monolith's main read-side advantage in this benchmark:
+the enriched transaction response can be assembled where the data already lives.
+The application does not need to call another runtime to fetch user or item
+details because the database already contains the full relational picture.
+
 ASCII sequence:
 
 ```text
@@ -756,10 +861,15 @@ Client/k6          Monolith                            mono_db
    | 200 enriched data|                                   |
 ```
 
+The sequence is short because the heavy lifting happens inside one SQL query.
+The application issues a join, receives the aggregated rows, maps them into
+the REST response shape, and returns the result without additional RPC hops.
+
 Expected monolith characteristic:
 
 - enrichment can be done using SQL JOIN,
 - no distributed join or service fan-out is required.
+- the database query carries most of the enrichment cost, while application code mainly maps rows to the REST response.
 
 ---
 
@@ -973,7 +1083,6 @@ transaction.handler
 transaction.usecase
     |
     +-- item validation
-    +-- item allocation
     +-- transaction insert
     +-- transaction_items insert
     |
