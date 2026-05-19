@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
@@ -46,9 +47,22 @@ func TestItemClient_SyncItems(t *testing.T) {
 		wantStatus int
 	}{
 		{name: "success", items: []dto.SyncItemInput{{Name: "Item A", AvailableAmount: 100}}, grpcErr: nil},
-		{name: "available_amount overflow -> 400", items: []dto.SyncItemInput{{Name: "Item A", AvailableAmount: math.MaxInt32 + 1}}, wantStatus: http.StatusBadRequest},
 		{name: "AlreadyExists -> 409", grpcErr: status.Error(codes.AlreadyExists, "conflict"), wantStatus: http.StatusConflict},
 		{name: "Unavailable -> 503", grpcErr: status.Error(codes.Unavailable, "down"), wantStatus: http.StatusServiceUnavailable},
+	}
+	if strconv.IntSize > 32 {
+		overflow := math.MaxInt32
+		overflow++
+		tests = append(tests, struct {
+			name       string
+			items      []dto.SyncItemInput
+			grpcErr    error
+			wantStatus int
+		}{
+			name:       "available_amount overflow -> 400",
+			items:      []dto.SyncItemInput{{Name: "Item A", AvailableAmount: overflow}},
+			wantStatus: http.StatusBadRequest,
+		})
 	}
 
 	for _, tt := range tests {
