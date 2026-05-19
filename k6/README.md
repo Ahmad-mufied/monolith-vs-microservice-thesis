@@ -484,6 +484,17 @@ Because `PUT /api/v1/items` is a full active item synchronization endpoint, run 
 
 `enriched-transactions.js` expects transaction data to exist.
 
+The scenario now performs dedicated setup traffic before the measured workload
+starts:
+
+- setup login when an admin token is not pre-supplied,
+- setup probe to confirm enriched transaction data exists.
+
+That setup traffic is tagged separately from the measured workload. The
+scenario thresholds and summary output are scoped to workload-tagged enriched
+transaction requests so setup traffic does not pollute the primary benchmark
+artifacts.
+
 Prepare the read dataset before running this script:
 
 ```text

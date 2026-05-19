@@ -80,11 +80,24 @@ export const DATASET_VERSION = envString("DATASET_VERSION", "v1");
 export const IMAGE_TAG = envString("IMAGE_TAG", "");
 export const GIT_COMMIT = envString("GIT_COMMIT", "");
 
-export function thresholdConfig() {
+function metricTagFilter(metricTags) {
+  if (!metricTags || Object.keys(metricTags).length === 0) {
+    return "";
+  }
+
+  const parts = Object.entries(metricTags)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}:${value}`);
+
+  return `{${parts.join(",")}}`;
+}
+
+export function thresholdConfig(metricTags = null) {
+  const tagFilter = metricTagFilter(metricTags);
   const thresholds = {
-    http_req_failed: [`rate<${MAX_ERROR_RATE}`],
-    checks: [`rate>${MIN_CHECK_RATE}`],
-    http_req_duration: [
+    [`http_req_failed${tagFilter}`]: [`rate<${MAX_ERROR_RATE}`],
+    [`checks${tagFilter}`]: [`rate>${MIN_CHECK_RATE}`],
+    [`http_req_duration${tagFilter}`]: [
       `p(90)<${P90_THRESHOLD_MS}`,
       `p(95)<${P95_THRESHOLD_MS}`,
     ],
@@ -97,17 +110,17 @@ export function thresholdConfig() {
   return thresholds;
 }
 
-export function smokeOptions() {
+export function smokeOptions(metricTags = null) {
   return {
     vus: VUS,
     duration: DURATION,
-    thresholds: thresholdConfig(),
+    thresholds: thresholdConfig(metricTags),
   };
 }
 
-export function benchmarkOptions(name) {
+export function benchmarkOptions(name, metricTags = null) {
   if (K6_PROFILE === "smoke") {
-    return smokeOptions();
+    return smokeOptions(metricTags);
   }
 
   if (K6_PROFILE === "ramp" || K6_PROFILE === "hpa") {
@@ -122,7 +135,7 @@ export function benchmarkOptions(name) {
           stages: parseStages(),
         },
       },
-      thresholds: thresholdConfig(),
+      thresholds: thresholdConfig(metricTags),
     };
   }
 
@@ -137,7 +150,7 @@ export function benchmarkOptions(name) {
         maxVUs: MAX_VUS,
       },
     },
-    thresholds: thresholdConfig(),
+    thresholds: thresholdConfig(metricTags),
   };
 }
 
