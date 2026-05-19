@@ -903,6 +903,7 @@ Client/k6   API Gateway   Transaction Svc    transaction_db    Auth Svc      aut
    |            |                | SELECT tx data    |              |            |           |            |
    |            |                |----------------->|              |            |           |            |
    |            |                |<-----------------|              |            |           |            |
+   |            |<---------------|                  |              |            |           |            |
    |            | GetUsersByIds                    |              |            |           |            |
    |            |----------------------------------------------->|            |           |            |
    |            |                                                | SELECT     |           |            |
