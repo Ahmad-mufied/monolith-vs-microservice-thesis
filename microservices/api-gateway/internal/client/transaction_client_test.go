@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
@@ -48,10 +49,25 @@ func TestTransactionClient_CreateTransaction(t *testing.T) {
 			grpcResp: &transactionv1.CreateTransactionResponse{TransactionId: "txid-1"},
 			wantID:   "txid-1",
 		},
-		{name: "amount overflow -> 400", items: []dto.CreateTransactionItemRequest{{ItemID: "iid-1", Amount: math.MaxInt32 + 1}}, wantStatus: http.StatusBadRequest},
 		{name: "FailedPrecondition -> 409", grpcErr: status.Error(codes.FailedPrecondition, "amount exceeded"), wantStatus: http.StatusConflict},
 		{name: "NotFound -> 404", grpcErr: status.Error(codes.NotFound, "item not found"), wantStatus: http.StatusNotFound},
 		{name: "Unavailable -> 503", grpcErr: status.Error(codes.Unavailable, "down"), wantStatus: http.StatusServiceUnavailable},
+	}
+	if strconv.IntSize > 32 {
+		overflow := math.MaxInt32
+		overflow++
+		tests = append(tests, struct {
+			name       string
+			items      []dto.CreateTransactionItemRequest
+			grpcResp   *transactionv1.CreateTransactionResponse
+			grpcErr    error
+			wantStatus int
+			wantID     string
+		}{
+			name:       "amount overflow -> 400",
+			items:      []dto.CreateTransactionItemRequest{{ItemID: "iid-1", Amount: overflow}},
+			wantStatus: http.StatusBadRequest,
+		})
 	}
 
 	for _, tt := range tests {
