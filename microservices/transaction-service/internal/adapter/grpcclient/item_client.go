@@ -25,7 +25,7 @@ func (c *ItemClient) ValidateTransactionItems(ctx context.Context, items []domai
 	for _, item := range items {
 		amount, err := numconv.IntToInt32(item.Amount, "amount")
 		if err != nil {
-			return pkgerrors.Internal("internal server error", err)
+			return pkgerrors.InvalidInput(err.Error())
 		}
 
 		reqItems = append(reqItems, &itemv1.TransactionItemValidationInput{
