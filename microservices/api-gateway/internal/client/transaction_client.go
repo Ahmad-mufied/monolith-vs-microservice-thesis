@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
@@ -117,26 +116,4 @@ func protoTransactionToDTO(tx *transactionv1.Transaction) dto.Transaction {
 		CreatedAt: tx.GetCreatedAt(),
 		UpdatedAt: tx.GetUpdatedAt(),
 	}
-}
-
-func paginationToProto(limit, offset int) (int32, int32, error) {
-	protoLimit, err := numconv.IntToInt32(limit, "limit")
-	if err != nil {
-		return 0, 0, &httputil.AppError{
-			Status:  http.StatusBadRequest,
-			Code:    "BAD_REQUEST",
-			Message: err.Error(),
-		}
-	}
-
-	protoOffset, err := numconv.IntToInt32(offset, "offset")
-	if err != nil {
-		return 0, 0, &httputil.AppError{
-			Status:  http.StatusBadRequest,
-			Code:    "BAD_REQUEST",
-			Message: err.Error(),
-		}
-	}
-
-	return protoLimit, protoOffset, nil
 }
