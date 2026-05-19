@@ -404,7 +404,7 @@ Rules:
 - Transaction Service owns `transaction_db`,
 - Transaction Service owns `transactions` and `transaction_items`,
 - Transaction Service calls Item Service through gRPC for allocation,
-- Transaction Service calls Auth Service and Item Service through gRPC for enrichment,
+- API Gateway calls Auth Service and Item Service through gRPC for enrichment,
 - Transaction Service must not access `auth_db` or `item_db` directly.
 
 ---

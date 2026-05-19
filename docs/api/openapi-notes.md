@@ -724,8 +724,8 @@ single SQL JOIN
 Microservices implementation:
 
 ```text
-Transaction Service
--> transaction_db
+API Gateway
+-> Transaction Service -> transaction_db
 -> Auth Service GetUsersByIds
 -> Item Service GetItemSummariesByIds
 -> in-memory enrichment
@@ -848,7 +848,9 @@ TransactionItemResponse:
       type: integer
 ```
 
-The REST transaction item response does not expose `available_amount_after` in the current `openapi.yaml`, even though the database stores it for internal persistence and analysis.
+The REST transaction item response does not expose `available_amount_after`
+because the current schema does not store it and the current contract does not
+deduct `available_amount` during transaction creation.
 
 ---
 

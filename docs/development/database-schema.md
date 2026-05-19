@@ -484,7 +484,8 @@ single SQL JOIN
 Microservices:
 
 ```text
-Transaction Service
+API Gateway
+-> Transaction Service GetTransactionsForEnrichment
 -> Auth Service GetUsersByIds
 -> Item Service GetItemSummariesByIds
 -> in-memory enrichment
