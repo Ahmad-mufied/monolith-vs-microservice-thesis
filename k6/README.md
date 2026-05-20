@@ -359,6 +359,38 @@ MAX_VUS=4 \
 
 In Kubernetes, k6 should run as a Job.
 
+Recommended operating modes:
+
+- `Minikube validation mode`
+  Use the same runner script and the same k6 image shape, but keep the flow
+  lightweight: no S3 upload by default, and Kubernetes state collection stays
+  optional.
+- `EKS benchmark mode`
+  Use the benchmark Job manifests under `deployments/k8s/benchmark/` with
+  Datadog enabled, in-cluster DogStatsD, Kubernetes state collection, and S3
+  upload enabled.
+
+Recommended environment variable reference:
+
+| Variable | Purpose | Minikube validation mode | EKS benchmark mode |
+|---|---|---|---|
+| `BASE_URL` | target benchmark endpoint | Minikube ingress or service URL | in-cluster service or EKS ingress URL |
+| `K6_SCRIPT` | selected scenario script | `login.js`, `create-transaction.js`, `enriched-transactions.js` | same as Minikube |
+| `ARCHITECTURE` | benchmark architecture identity | `monolith` or `microservices` | `monolith` or `microservices` |
+| `SCENARIO_NAME` | benchmark scenario label in metadata | `login`, `create-transaction`, `enriched-transactions` | same as Minikube |
+| `TARGET_RPS` | target request rate | small validation value such as `1` | final benchmark target such as `1000`, `2500`, `5000` |
+| `TEST_DURATION` | run duration | short duration such as `10s` or `30s` | measured benchmark duration such as `5m` |
+| `PRE_ALLOCATED_VUS` | initial VU pool for arrival-rate executor | small validation value | benchmark-sized value |
+| `MAX_VUS` | maximum VU pool | small validation value | benchmark-sized value |
+| `DATADOG_ENABLED` | enable DogStatsD output and Datadog metadata | `true` when validating Datadog, otherwise `false` | `true` |
+| `DATADOG_ENV` | Datadog environment tag | `minikube` | `benchmark` or EKS-specific env |
+| `K6_STATSD_ADDR` | DogStatsD endpoint used by k6 | local or Minikube-reachable Agent endpoint | `datadog-agent.datadog.svc.cluster.local:8125` |
+| `K6_STATSD_NAMESPACE` | metric prefix in Datadog | usually `k6` | usually `k6` |
+| `K6_STATSD_ENABLE_TAGS` | include tags in DogStatsD output | usually `true` | `true` |
+| `RUN_ID` | benchmark run identity | optional validation label | required final run label |
+| `ATTEMPT` | attempt identity | optional validation label | required attempt label such as `attempt-01` |
+| `S3_URI` | upload destination for result artifacts | empty by default | required S3 prefix for final benchmark |
+
 Recommended node placement:
 
 ```yaml
@@ -379,6 +411,12 @@ The EKS k6 runner image should be built from:
 k6/runner/Dockerfile
 ```
 
+Recommended build command from the repository root:
+
+```bash
+docker build -f k6/runner/Dockerfile -t skripsi/k6-runner:latest .
+```
+
 This image includes:
 
 ```text
@@ -388,9 +426,30 @@ gzip
 jq
 curl
 aws-cli
+kubectl
 ```
 
-This allows the runner to generate result files and upload them to S3.
+This allows the runner to:
+
+- generate result files,
+- collect Kubernetes benchmark snapshots,
+- upload results to S3.
+
+Recommended EKS manifests:
+
+```text
+deployments/k8s/benchmark/namespace.yaml
+deployments/k8s/benchmark/k6-runner-rbac.yaml
+deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml
+deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml
+deployments/k8s/benchmark/k6-runner-secret.example.yaml
+```
+
+Recommended in-cluster DogStatsD endpoint:
+
+```text
+datadog-agent.datadog.svc.cluster.local:8125
+```
 
 ---
 
@@ -407,6 +466,12 @@ k6-options.json
 thresholds.json
 ```
 
+When Datadog is enabled, also produce:
+
+```text
+datadog-time-window.json
+```
+
 Recommended S3 prefix:
 
 ```text
@@ -416,6 +481,10 @@ s3://{bucket}/experiments/{run_id}/{architecture}/{scenario_name}/{target_rps}rp
 The S3 path is for navigation and overwrite prevention.
 
 `metadata.json` is the source of truth for analysis.
+
+The current runner does not collect separate Kubernetes or HPA snapshot files.
+HPA and runtime behavior are instead interpreted from Datadog telemetry,
+attempt metadata, and the benchmark scenario configuration.
 
 ---
 

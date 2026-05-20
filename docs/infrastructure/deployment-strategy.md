@@ -1398,6 +1398,12 @@ Recommended Kubernetes Jobs:
 deployments/k8s/
 ├── local/
 │   └── db-bootstrap-job.yaml
+├── benchmark/
+│   ├── namespace.yaml
+│   ├── k6-runner-rbac.yaml
+│   ├── k6-benchmark-monolith-job.yaml
+│   ├── k6-benchmark-microservices-job.yaml
+│   └── k6-runner-secret.example.yaml
 ├── monolith/
 │   ├── migration-job.yaml
 │   ├── prepare-monolith-enrichment-smoke-data-job.yaml
@@ -1435,7 +1441,8 @@ Job responsibilities:
 | `seed-microservices-benchmark-data-job` | seed deterministic microservices benchmark data |
 | `prepare-microservices-enrichment-smoke-data-job` | prepare microservices smoke enriched-read fixtures |
 | `prepare-microservices-enrichment-benchmark-data-job` | prepare microservices benchmark enriched-read fixtures |
-| `k6-benchmark-job` | run benchmark and upload results |
+| `k6-benchmark-monolith-job` | run monolith benchmark and upload results |
+| `k6-benchmark-microservices-job` | run microservices benchmark and upload results |
 
 ---
 
@@ -1470,7 +1477,7 @@ Secret purposes:
 | `auth-service-secret` | contains auth DB URL and `JWT_SECRET` |
 | `item-service-secret` | contains item DB URL |
 | `transaction-service-secret` | contains transaction DB URL and service addresses |
-| `k6-runner-secret` | contains benchmark credentials such as `AUTH_TOKEN` if needed |
+| `k6-runner-secret` | contains optional benchmark admin credentials for enriched reads |
 
 Do not store static AWS access keys in any Kubernetes Secret.
 
@@ -1580,20 +1587,6 @@ metadata.json
 stdout.log
 k6-options.json
 thresholds.json
-pods-state.txt
-top-pods.txt
-top-nodes.txt
-events.txt
-resource-quotas.yaml
-deployments-state.yaml
-services-state.yaml
-```
-
-When HPA is enabled, also collect:
-
-```text
-hpa-state.yaml
-hpa-describe.txt
 ```
 
 When Datadog is enabled, also collect:
