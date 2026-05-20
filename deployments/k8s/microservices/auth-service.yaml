@@ -12,6 +12,10 @@ spec:
     metadata:
       labels:
         app: auth-service
+        benchmark.skripsi.dev/architecture: microservices
+        tags.datadoghq.com/env: minikube
+        tags.datadoghq.com/service: auth-service
+        tags.datadoghq.com/version: local
     spec:
       terminationGracePeriodSeconds: 20
       securityContext:
@@ -32,6 +36,31 @@ spec:
           envFrom:
             - secretRef:
                 name: auth-service-secret
+          env:
+            - name: DATADOG_ENABLED
+              value: "true"
+            - name: DD_ENV
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/env']
+            - name: DD_SERVICE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/service']
+            - name: DD_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/version']
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_TRACE_AGENT_PORT
+              value: "8126"
+            - name: DD_TRACE_ENABLED
+              value: "true"
+            - name: DD_TAGS
+              value: "architecture:microservices"
           ports:
             - name: grpc
               containerPort: 50051
