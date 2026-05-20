@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: msa-resource-quota
+  namespace: msa
+spec:
+  hard:
+    requests.cpu: "4000m"
+    requests.memory: "4096Mi"
+    limits.cpu: "4000m"
+    limits.memory: "4096Mi"
