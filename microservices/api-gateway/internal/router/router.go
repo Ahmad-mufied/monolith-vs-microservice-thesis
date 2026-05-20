@@ -4,6 +4,7 @@ import (
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/handler"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/middleware"
+	echotrace "github.com/DataDog/dd-trace-go/contrib/labstack/echo.v4/v2"
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 )
@@ -15,11 +16,13 @@ func New(
 	item *handler.ItemHandler,
 	tx *handler.TransactionHandler,
 	jwtSecret string,
+	serviceName string,
 ) *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
 	e.HTTPErrorHandler = httputil.HTTPErrorHandler
 	e.Use(echomiddleware.Recover())
+	e.Use(echotrace.Middleware(echotrace.WithService(serviceName)))
 
 	// Public routes.
 	e.GET("/healthz", health.Handle)
