@@ -36,6 +36,7 @@ API_GATEWAY_PORT ?= 8080
 DATADOG_NAMESPACE ?= datadog
 DATADOG_RELEASE ?= datadog
 DATADOG_SITE ?= datadoghq.com
+DATADOG_CHART_VERSION ?= 3.134.0
 
 # =========================
 # Env Files
@@ -727,6 +728,7 @@ datadog-repo:
 .PHONY: datadog-install-minikube
 datadog-install-minikube: datadog-secret datadog-repo
 	helm upgrade --install $(DATADOG_RELEASE) datadog/datadog \
+		--version $(DATADOG_CHART_VERSION) \
 		--namespace $(DATADOG_NAMESPACE) \
 		--values $(HELM_DIR)/datadog/values-minikube.yaml \
 		--set datadog.site=$(DATADOG_SITE)
@@ -736,6 +738,7 @@ datadog-install-minikube: datadog-secret datadog-repo
 datadog-install-eks-monolith: datadog-repo
 	KUBE_CONTEXT=monolith DATADOG_NAMESPACE=$(DATADOG_NAMESPACE) DATADOG_SITE=$(DATADOG_SITE) bash scripts/create-datadog-secret.sh
 	helm upgrade --install $(DATADOG_RELEASE) datadog/datadog \
+		--version $(DATADOG_CHART_VERSION) \
 		--kube-context=monolith \
 		--namespace $(DATADOG_NAMESPACE) \
 		--values $(HELM_DIR)/datadog/values-eks-monolith.yaml \
@@ -746,6 +749,7 @@ datadog-install-eks-monolith: datadog-repo
 datadog-install-eks-msa: datadog-repo
 	KUBE_CONTEXT=msa DATADOG_NAMESPACE=$(DATADOG_NAMESPACE) DATADOG_SITE=$(DATADOG_SITE) bash scripts/create-datadog-secret.sh
 	helm upgrade --install $(DATADOG_RELEASE) datadog/datadog \
+		--version $(DATADOG_CHART_VERSION) \
 		--kube-context=msa \
 		--namespace $(DATADOG_NAMESPACE) \
 		--values $(HELM_DIR)/datadog/values-eks-msa.yaml \
