@@ -66,9 +66,6 @@ k6
 Datadog
 = internal system behavior and root-cause explanation
 
-Kubernetes snapshots
-= runtime state evidence
-
 S3 artifacts
 = reproducibility record
 ```
@@ -948,7 +945,6 @@ k6 summary
 k6 raw output
 metadata
 Datadog time window
-Kubernetes snapshots
 ```
 
 Analysis:

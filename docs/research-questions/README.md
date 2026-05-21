@@ -56,7 +56,7 @@ k6 summary and raw output
 For internal observability:
 
 ```text
-Datadog and Kubernetes snapshots
+Datadog
 ```
 
 For reproducibility:

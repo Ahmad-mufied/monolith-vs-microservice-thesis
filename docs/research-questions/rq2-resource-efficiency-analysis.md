@@ -1060,8 +1060,6 @@ Output:
 ```text
 k6 summary
 Datadog CPU/memory
-Kubernetes snapshots
-HPA state
 metadata
 ```
 
