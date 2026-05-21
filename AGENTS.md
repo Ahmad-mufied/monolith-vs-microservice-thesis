@@ -859,7 +859,7 @@ Preferred sequence:
 4. deploy architecture
 5. validate application readiness
 6. run k6 scenario
-7. export Kubernetes snapshots
+7. capture Datadog telemetry window and benchmark metadata
 8. upload results to S3
 9. reset and reseed data if the next scenario needs clean state
 10. test next scenario
