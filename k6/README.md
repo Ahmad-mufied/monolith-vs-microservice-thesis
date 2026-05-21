@@ -433,7 +433,7 @@ kubectl
 This allows the runner to:
 
 - generate result files,
-- collect Kubernetes benchmark snapshots,
+- inspect cluster state for troubleshooting or optional operator-driven checks,
 - upload results to S3.
 
 Recommended EKS manifests:
@@ -483,9 +483,11 @@ The S3 path is for navigation and overwrite prevention.
 
 `metadata.json` is the source of truth for analysis.
 
-The current runner does not collect separate Kubernetes or HPA snapshot files.
-HPA and runtime behavior are instead interpreted from Datadog telemetry,
-attempt metadata, and the benchmark scenario configuration.
+`kubectl` is included for troubleshooting and optional cluster inspection during
+benchmark operations, but the current runner does not collect separate
+Kubernetes or HPA snapshot files automatically. HPA and runtime behavior are
+instead interpreted from Datadog telemetry, attempt metadata, and the benchmark
+scenario configuration.
 
 ---
 
