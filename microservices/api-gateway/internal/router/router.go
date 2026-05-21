@@ -8,15 +8,15 @@ import (
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 )
 
-// New creates and configures the Echo router with all routes.
-func New(
+// RegisterRoutes configures middleware and routes on the provided Echo instance.
+func RegisterRoutes(
+	e *echo.Echo,
 	health *handler.HealthHandler,
 	auth *handler.AuthHandler,
 	item *handler.ItemHandler,
 	tx *handler.TransactionHandler,
 	jwtSecret string,
-) *echo.Echo {
-	e := echo.New()
+) {
 	e.HideBanner = true
 	e.HTTPErrorHandler = httputil.HTTPErrorHandler
 	e.Use(echomiddleware.Recover())
@@ -35,6 +35,4 @@ func New(
 	protected.GET("/transactions", tx.GetOwnTransactions)
 	protected.GET("/transactions/:transaction_id", tx.GetTransactionByID)
 	protected.GET("/admin/transactions", tx.GetAllEnriched)
-
-	return e
 }

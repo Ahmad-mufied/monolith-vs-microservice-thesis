@@ -193,30 +193,21 @@ k6-options.json
 thresholds.json
 ```
 
-Infrastructure snapshots are collected outside k6:
-
-```text
-pods-state.txt
-top-pods.txt
-top-nodes.txt
-events.txt
-resource-quotas.yaml
-deployments-state.yaml
-services-state.yaml
-```
-
-When HPA is enabled:
-
-```text
-hpa-state.yaml
-hpa-describe.txt
-```
-
 When Datadog is enabled:
 
 ```text
 datadog-time-window.json
 ```
+
+For real-time Datadog output, the k6 runner sends metrics through DogStatsD.
+The runner expects a k6 binary built with `xk6-output-statsd`, then enables the
+StatsD output when:
+
+```text
+DATADOG_ENABLED=true
+```
+
+The Datadog Agent must expose DogStatsD on UDP `8125`.
 
 ---
 

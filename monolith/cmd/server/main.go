@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	echotrace "github.com/DataDog/dd-trace-go/contrib/labstack/echo.v4/v2"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/auth"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/health"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/item"
@@ -19,6 +20,7 @@ import (
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/httputil"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/jwtutil"
 	authmw "github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/middleware"
+	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/observability"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/transaction"
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
@@ -32,6 +34,12 @@ func main() {
 		logger.Error("load config", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+	stopObservability, err := observability.Start(cfg.ServiceName)
+	if err != nil {
+		logger.Error("start observability", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	defer stopObservability()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -49,6 +57,7 @@ func main() {
 	e.HideBanner = true
 	e.HidePort = true
 	e.Use(echomw.Recover())
+	e = echotrace.Wrap(e, echotrace.WithService(observability.ServiceName(cfg.ServiceName)))
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
 		if c.Response().Committed {
 			return

@@ -14,6 +14,7 @@ METADATA_PATH="${METADATA_PATH:-$RESULT_DIR/metadata.json}"
 METADATA_PARTIAL_PATH="${METADATA_PARTIAL_PATH:-$RESULT_DIR/metadata.partial.json}"
 K6_OPTIONS_PATH="${K6_OPTIONS_PATH:-$RESULT_DIR/k6-options.json}"
 THRESHOLDS_PATH="${THRESHOLDS_PATH:-$RESULT_DIR/thresholds.json}"
+DATADOG_TIME_WINDOW_PATH="${DATADOG_TIME_WINDOW_PATH:-$RESULT_DIR/datadog-time-window.json}"
 
 export SUMMARY_PATH
 export METADATA_PARTIAL_PATH
@@ -40,6 +41,17 @@ PRE_ALLOCATED_VUS_VALUE="${PRE_ALLOCATED_VUS:-0}"
 MAX_VUS_VALUE="${MAX_VUS:-0}"
 DURATION_VALUE="${TEST_DURATION:-${DURATION:-}}"
 TIMESTAMP_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+TIME_WINDOW_START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+DATADOG_ENABLED_VALUE="${DATADOG_ENABLED:-false}"
+DATADOG_ENV_VALUE="${DATADOG_ENV:-${DD_ENV:-development}}"
+K6_STATSD_ADDR_VALUE="${K6_STATSD_ADDR:-127.0.0.1:8125}"
+K6_STATSD_NAMESPACE_VALUE="${K6_STATSD_NAMESPACE:-k6}"
+K6_STATSD_ENABLE_TAGS_VALUE="${K6_STATSD_ENABLE_TAGS:-true}"
+K6_STATSD_OUTPUT_TYPE_VALUE="${K6_STATSD_OUTPUT_TYPE:-output-statsd}"
+RUN_ID_VALUE="${RUN_ID:-local-run}"
+ATTEMPT_VALUE="${ATTEMPT:-attempt-01}"
+ARCHITECTURE_VALUE="${ARCHITECTURE:-unknown}"
+SCENARIO_NAME_VALUE="${SCENARIO_NAME:-unknown}"
 
 for value_name in TARGET_RPS_VALUE PRE_ALLOCATED_VUS_VALUE MAX_VUS_VALUE; do
   value="${!value_name}"
@@ -59,10 +71,10 @@ APP_RESOURCE_QUOTA_JSON="$(json_env_or APP_RESOURCE_QUOTA_JSON 'null')"
 HPA_TARGET_CPU_JSON="$(json_env_or HPA_TARGET_CPU_JSON 'null')"
 
 jq -n \
-  --arg run_id "${RUN_ID:-local-run}" \
-  --arg attempt "${ATTEMPT:-attempt-01}" \
-  --arg architecture "${ARCHITECTURE:-unknown}" \
-  --arg scenario_name "${SCENARIO_NAME:-unknown}" \
+  --arg run_id "$RUN_ID_VALUE" \
+  --arg attempt "$ATTEMPT_VALUE" \
+  --arg architecture "$ARCHITECTURE_VALUE" \
+  --arg scenario_name "$SCENARIO_NAME_VALUE" \
   --arg k6_script "k6/scripts/${K6_SCRIPT}" \
   --arg k6_profile "${K6_PROFILE:-steady}" \
   --arg duration "$DURATION_VALUE" \
@@ -74,6 +86,12 @@ jq -n \
   --arg timestamp_utc "$TIMESTAMP_UTC" \
   --arg app_node_pool "${APP_NODE_POOL:-}" \
   --arg testing_node_pool "${TESTING_NODE_POOL:-}" \
+  --arg datadog_enabled "$DATADOG_ENABLED_VALUE" \
+  --arg datadog_env "$DATADOG_ENV_VALUE" \
+  --arg datadog_time_window_start "$TIME_WINDOW_START_UTC" \
+  --arg k6_statsd_addr "$K6_STATSD_ADDR_VALUE" \
+  --arg k6_statsd_namespace "$K6_STATSD_NAMESPACE_VALUE" \
+  --arg k6_statsd_enable_tags "$K6_STATSD_ENABLE_TAGS_VALUE" \
   --argjson target_rps "$TARGET_RPS_VALUE" \
   --argjson pre_allocated_vus "$PRE_ALLOCATED_VUS_VALUE" \
   --argjson max_vus "$MAX_VUS_VALUE" \
@@ -113,13 +131,59 @@ jq -n \
     app_resource_quota: $app_resource_quota,
     hpa_target_cpu: $hpa_target_cpu,
     app_node_pool: (if $app_node_pool == "" then null else $app_node_pool end),
-    testing_node_pool: (if $testing_node_pool == "" then null else $testing_node_pool end)
+    testing_node_pool: (if $testing_node_pool == "" then null else $testing_node_pool end),
+    datadog: {
+      enabled: ($datadog_enabled == "true"),
+      env: $datadog_env,
+      time_window_start: $datadog_time_window_start,
+      time_window_end: null,
+      k6_statsd_addr: $k6_statsd_addr,
+      k6_statsd_namespace: $k6_statsd_namespace,
+      k6_statsd_enable_tags: ($k6_statsd_enable_tags == "true")
+    }
   }' > "$METADATA_PATH"
 
+K6_OUTPUT_ARGS=(--out "json=$RAW_PATH")
+K6_TAG_ARGS=(
+  --tag "run_id=$RUN_ID_VALUE"
+  --tag "attempt=$ATTEMPT_VALUE"
+  --tag "architecture=$ARCHITECTURE_VALUE"
+  --tag "benchmark_scenario=$SCENARIO_NAME_VALUE"
+)
+if [ "$DATADOG_ENABLED_VALUE" = "true" ]; then
+  export K6_STATSD_ADDR="$K6_STATSD_ADDR_VALUE"
+  export K6_STATSD_NAMESPACE="$K6_STATSD_NAMESPACE_VALUE"
+  export K6_STATSD_ENABLE_TAGS="$K6_STATSD_ENABLE_TAGS_VALUE"
+  K6_OUTPUT_ARGS+=(--out "$K6_STATSD_OUTPUT_TYPE_VALUE")
+fi
+
 set +e
-k6 run --out "json=$RAW_PATH" "$K6_ROOT/scripts/$K6_SCRIPT" > "$STDOUT_PATH" 2>&1
+k6 run "${K6_TAG_ARGS[@]}" "${K6_OUTPUT_ARGS[@]}" "$K6_ROOT/scripts/$K6_SCRIPT" > "$STDOUT_PATH" 2>&1
 STATUS=$?
 set -e
+
+TIME_WINDOW_END_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+if [ "$DATADOG_ENABLED_VALUE" = "true" ]; then
+  jq -n \
+    --arg enabled "$DATADOG_ENABLED_VALUE" \
+    --arg datadog_env "$DATADOG_ENV_VALUE" \
+    --arg window_start "$TIME_WINDOW_START_UTC" \
+    --arg window_end "$TIME_WINDOW_END_UTC" \
+    --arg k6_statsd_addr "$K6_STATSD_ADDR_VALUE" \
+    --arg k6_statsd_namespace "$K6_STATSD_NAMESPACE_VALUE" \
+    '{
+      enabled: ($enabled == "true"),
+      env: $datadog_env,
+      time_window_start: $window_start,
+      time_window_end: $window_end,
+      k6_statsd_addr: $k6_statsd_addr,
+      k6_statsd_namespace: $k6_statsd_namespace
+    }' > "$DATADOG_TIME_WINDOW_PATH"
+
+  jq --arg window_end "$TIME_WINDOW_END_UTC" '.datadog.time_window_end = $window_end' "$METADATA_PATH" > "$RESULT_DIR/metadata.datadog.json"
+  mv "$RESULT_DIR/metadata.datadog.json" "$METADATA_PATH"
+fi
 
 cat "$STDOUT_PATH"
 

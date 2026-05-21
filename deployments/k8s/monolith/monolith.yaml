@@ -12,6 +12,10 @@ spec:
     metadata:
       labels:
         app: monolith
+        benchmark.skripsi.dev/architecture: monolith
+        tags.datadoghq.com/env: development
+        tags.datadoghq.com/service: monolith
+        tags.datadoghq.com/version: local
     spec:
       terminationGracePeriodSeconds: 20
       securityContext:
@@ -32,6 +36,27 @@ spec:
           envFrom:
             - secretRef:
                 name: monolith-env
+          env:
+            - name: DD_ENV
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/env']
+            - name: DD_SERVICE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/service']
+            - name: DD_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/version']
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_TRACE_AGENT_PORT
+              value: "8126"
+            - name: DD_TAGS
+              value: "architecture:monolith"
           ports:
             - name: http
               containerPort: 8080

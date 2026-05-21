@@ -51,6 +51,13 @@ Non-sensitive values:
 APP_ENV
 APP_PORT
 SERVICE_NAME
+DATADOG_ENABLED
+DD_ENV
+DD_SERVICE
+DD_VERSION
+DD_AGENT_HOST
+DD_TRACE_AGENT_PORT
+DD_TRACE_ENABLED
 AUTH_SERVICE_ADDR
 ITEM_SERVICE_ADDR
 TRANSACTION_SERVICE_ADDR
@@ -177,6 +184,10 @@ JWT_SECRET
 DATADOG_ENABLED
 ```
 
+Datadog `DD_*` runtime configuration is applied directly in Kubernetes
+workload manifests because it is non-sensitive. The Datadog API key is stored
+separately in the Datadog Agent secret.
+
 The purpose of the DB pool and HTTP timeout variables is explained in
 `docs/development/run-monolith-local.md`, because the same keys are used for
 local Compose and local Kubernetes flows.
@@ -274,6 +285,61 @@ DATADOG_ENABLED
 
 ---
 
+## Datadog Agent Secret
+
+Secret:
+
+```text
+datadog-secret
+```
+
+Namespace:
+
+```text
+datadog
+```
+
+Keys:
+
+```text
+api-key
+app-key (optional)
+site
+```
+
+Create it from the local shell environment:
+
+```bash
+DATADOG_API_KEY=<redacted> make datadog-secret
+```
+
+Important distinction:
+
+```text
+env/datadog.minikube.env
+is a local helper file
+
+datadog-secret
+is the Kubernetes Secret consumed by the Datadog Helm chart
+```
+
+The helper file is only a source of values. The cluster never reads that file
+directly. The file must first be loaded into the shell environment, then
+`make datadog-secret` creates or updates the Kubernetes Secret.
+
+Optional app key:
+
+```bash
+DATADOG_APP_KEY=<redacted> \
+DATADOG_API_KEY=<redacted> \
+make datadog-secret
+```
+
+Do not write the Datadog API key into committed env files, manifests, Helm
+values, or documentation examples.
+
+---
+
 ## k6 Runner Secret
 
 Secret:
@@ -291,7 +357,9 @@ benchmark
 Sensitive key:
 
 ```text
-AUTH_TOKEN
+ADMIN_AUTH_TOKEN
+ADMIN_USER_EMAIL
+ADMIN_USER_PASSWORD
 ```
 
 Do not store AWS keys here.

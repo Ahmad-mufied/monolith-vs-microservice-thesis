@@ -807,22 +807,13 @@ Required files per attempt:
 - metadata.json
 - k6-options.json
 - thresholds.json
-- pods-state.txt
-- top-pods.txt
-- top-nodes.txt
-- events.txt
-- resource-quotas.yaml
-- deployments-state.yaml
-- services-state.yaml
-
-Required when HPA is enabled:
-
-- hpa-state.yaml
-- hpa-describe.txt
 
 Required when Datadog is enabled:
 
 - datadog-time-window.json
+
+HPA behavior should be analyzed from Datadog telemetry and benchmark metadata.
+Do not require separate Kubernetes snapshot files unless explicitly requested.
 
 Optional files:
 
@@ -868,7 +859,7 @@ Preferred sequence:
 4. deploy architecture
 5. validate application readiness
 6. run k6 scenario
-7. export Kubernetes snapshots
+7. capture Datadog telemetry window and benchmark metadata
 8. upload results to S3
 9. reset and reseed data if the next scenario needs clean state
 10. test next scenario

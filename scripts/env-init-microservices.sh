@@ -76,43 +76,51 @@ DATABASE_URL=${auth_database_url}
 AUTH_DATABASE_URL=${auth_database_url}
 JWT_SECRET=${jwt_secret}
 JWT_EXPIRY=24h
-BCRYPT_COST=12"
+BCRYPT_COST=12
+DATADOG_ENABLED=false"
 
 write_if_missing "env/item-service.env" "GRPC_PORT=50052
 DATABASE_URL=${item_database_url}
-ITEM_DATABASE_URL=${item_database_url}"
+ITEM_DATABASE_URL=${item_database_url}
+DATADOG_ENABLED=false"
 
 write_if_missing "env/transaction-service.env" "GRPC_PORT=50053
 DATABASE_URL=${transaction_database_url}
 TRANSACTION_DATABASE_URL=${transaction_database_url}
-ITEM_SERVICE_ADDR=localhost:50052"
+ITEM_SERVICE_ADDR=localhost:50052
+DATADOG_ENABLED=false"
 
 write_if_missing "env/api-gateway.env" "HTTP_PORT=8080
 JWT_SECRET=${jwt_secret}
 AUTH_SERVICE_ADDR=localhost:50051
 ITEM_SERVICE_ADDR=localhost:50052
-TRANSACTION_SERVICE_ADDR=localhost:50053"
+TRANSACTION_SERVICE_ADDR=localhost:50053
+DATADOG_ENABLED=false"
 
 write_if_missing "env/auth-service.compose.env" "GRPC_PORT=50051
 DATABASE_URL=${compose_auth_database_url}
 AUTH_DATABASE_URL=${compose_auth_database_url}
 JWT_SECRET=${jwt_secret}
 JWT_EXPIRY=24h
-BCRYPT_COST=12"
+BCRYPT_COST=12
+DATADOG_ENABLED=false"
 
 write_if_missing "env/item-service.compose.env" "GRPC_PORT=50052
 DATABASE_URL=${compose_item_database_url}
-ITEM_DATABASE_URL=${compose_item_database_url}"
+ITEM_DATABASE_URL=${compose_item_database_url}
+DATADOG_ENABLED=false"
 
 write_if_missing "env/transaction-service.compose.env" "GRPC_PORT=50053
 DATABASE_URL=${compose_transaction_database_url}
 TRANSACTION_DATABASE_URL=${compose_transaction_database_url}
-ITEM_SERVICE_ADDR=item-service:50052"
+ITEM_SERVICE_ADDR=item-service:50052
+DATADOG_ENABLED=false"
 
 write_if_missing "env/api-gateway.compose.env" "HTTP_PORT=8080
 JWT_SECRET=${jwt_secret}
 AUTH_SERVICE_ADDR=auth-service:50051
 ITEM_SERVICE_ADDR=item-service:50052
-TRANSACTION_SERVICE_ADDR=transaction-service:50053"
+TRANSACTION_SERVICE_ADDR=transaction-service:50053
+DATADOG_ENABLED=false"
 
 echo "local microservices env initialization complete"

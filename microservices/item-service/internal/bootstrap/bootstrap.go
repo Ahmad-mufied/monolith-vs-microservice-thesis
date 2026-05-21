@@ -13,8 +13,10 @@ import (
 	postgresadapter "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/adapter/postgres"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/config"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/usecase"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/observability"
 	pkgpostgres "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/postgres"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
+	grpctrace "github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2"
 	"google.golang.org/grpc"
 )
 
@@ -25,6 +27,12 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	serviceName := observability.ServiceName("item-service")
+	stopObservability, err := observability.Start(serviceName)
+	if err != nil {
+		return fmt.Errorf("start observability: %w", err)
+	}
+	defer stopObservability()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -39,7 +47,7 @@ func Run() error {
 	uc := usecase.NewItemUsecase(repo)
 	srv := grpcserveradapter.NewItemServer(uc)
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpcServerOptions(serviceName)...)
 	itemv1.RegisterItemServiceServer(grpcServer, srv)
 
 	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
@@ -72,5 +80,12 @@ func Run() error {
 		return nil
 	case err := <-serverErr:
 		return fmt.Errorf("serve grpc: %w", err)
+	}
+}
+
+func grpcServerOptions(serviceName string) []grpc.ServerOption {
+	return []grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(grpctrace.UnaryServerInterceptor(grpctrace.WithService(serviceName))),
+		grpc.ChainStreamInterceptor(grpctrace.StreamServerInterceptor(grpctrace.WithService(serviceName))),
 	}
 }

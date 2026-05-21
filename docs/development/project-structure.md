@@ -82,6 +82,10 @@ monolith-vs-microservice-thesis/
 ├── pkg/
 ├── seed/
 ├── deployments/
+│   ├── helm/
+│   │   └── datadog/
+│   └── k8s/
+│       └── benchmark/
 ├── infra/
 ├── k6/
 └── scripts/
@@ -113,7 +117,7 @@ Top-level folder responsibilities:
 | `seed/` | benchmark seed tool |
 | `deployments/` | Docker Compose and Kubernetes manifests |
 | `infra/` | Terraform infrastructure |
-| `k6/` | benchmark scripts and runner |
+| `k6/` | benchmark scripts, runner image, and Kubernetes state collection helper |
 | `scripts/` | operational automation scripts |
 
 ---
@@ -587,7 +591,8 @@ deployments/
     │   ├── migration-job.yaml
     │   ├── prepare-monolith-enrichment-benchmark-data-job.yaml
     │   ├── prepare-monolith-enrichment-smoke-data-job.yaml
-    │   ├── resource-management.yaml
+    │   ├── resource-management-fixed.yaml
+    │   ├── resource-management-hpa.yaml
     │   ├── reset-monolith-data-job.yaml
     │   ├── seed-monolith-benchmark-data-job.yaml
     │   └── seed-monolith-smoke-data-job.yaml
@@ -601,12 +606,13 @@ deployments/
         ├── item-migration-job.yaml
         ├── prepare-microservices-enrichment-benchmark-data-job.yaml
         ├── prepare-microservices-enrichment-smoke-data-job.yaml
-        ├── transaction-service.yaml
-        ├── transaction-migration-job.yaml
-        ├── resource-management.yaml
+        ├── resource-management-fixed.yaml
+        ├── resource-management-hpa.yaml
         ├── reset-microservices-data-job.yaml
         ├── seed-microservices-benchmark-data-job.yaml
-        └── seed-microservices-smoke-data-job.yaml
+        ├── seed-microservices-smoke-data-job.yaml
+        ├── transaction-service.yaml
+        └── transaction-migration-job.yaml
 ```
 
 Rules:
@@ -617,7 +623,8 @@ Rules:
 - seed runs via Kubernetes Job,
 - migration and seed must not run during benchmark execution,
 - API Gateway has no migration job,
-- resource management includes ResourceQuota and HPA definitions.
+- `resource-management-fixed.yaml` applies the fixed-replica benchmark mode,
+- `resource-management-hpa.yaml` applies the HPA benchmark mode.
 
 ---
 
