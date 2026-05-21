@@ -2,8 +2,10 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os/signal"
 	"syscall"
 	"time"
@@ -17,6 +19,8 @@ import (
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
 	transactionv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/transaction/v1"
 	grpctrace "github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2"
+	echotrace "github.com/DataDog/dd-trace-go/contrib/labstack/echo.v4/v2"
+	"github.com/labstack/echo/v4"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -69,7 +73,9 @@ func Run() error {
 	txH := handler.NewTransactionHandler(txClient, authClient, itemClient)
 
 	// Setup router.
-	e := router.New(healthH, authH, itemH, txH, cfg.JWTSecret, serviceName)
+	e := echotrace.Wrap(echo.New(), echotrace.WithService(serviceName))
+	defer closeEcho(e)
+	router.RegisterRoutes(e, healthH, authH, itemH, txH, cfg.JWTSecret)
 
 	// Start HTTP server.
 	serverErr := make(chan error, 1)
@@ -102,5 +108,11 @@ func grpcClientOptions(serviceName string) []grpc.DialOption {
 func closeConn(conn *grpc.ClientConn, name string) {
 	if err := conn.Close(); err != nil {
 		log.Printf("close %s service conn: %v", name, err)
+	}
+}
+
+func closeEcho(e *echo.Echo) {
+	if err := e.Close(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Printf("close api-gateway echo server: %v", err)
 	}
 }

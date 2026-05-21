@@ -57,7 +57,7 @@ func main() {
 	e.HideBanner = true
 	e.HidePort = true
 	e.Use(echomw.Recover())
-	e.Use(echotrace.Middleware(echotrace.WithService(observability.ServiceName(cfg.ServiceName))))
+	e = echotrace.Wrap(e, echotrace.WithService(observability.ServiceName(cfg.ServiceName)))
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
 		if c.Response().Committed {
 			return

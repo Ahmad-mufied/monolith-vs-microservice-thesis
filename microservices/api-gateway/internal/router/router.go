@@ -4,25 +4,22 @@ import (
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/handler"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/middleware"
-	echotrace "github.com/DataDog/dd-trace-go/contrib/labstack/echo.v4/v2"
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 )
 
-// New creates and configures the Echo router with all routes.
-func New(
+// RegisterRoutes configures middleware and routes on the provided Echo instance.
+func RegisterRoutes(
+	e *echo.Echo,
 	health *handler.HealthHandler,
 	auth *handler.AuthHandler,
 	item *handler.ItemHandler,
 	tx *handler.TransactionHandler,
 	jwtSecret string,
-	serviceName string,
-) *echo.Echo {
-	e := echo.New()
+) {
 	e.HideBanner = true
 	e.HTTPErrorHandler = httputil.HTTPErrorHandler
 	e.Use(echomiddleware.Recover())
-	e.Use(echotrace.Middleware(echotrace.WithService(serviceName)))
 
 	// Public routes.
 	e.GET("/healthz", health.Handle)
@@ -38,6 +35,4 @@ func New(
 	protected.GET("/transactions", tx.GetOwnTransactions)
 	protected.GET("/transactions/:transaction_id", tx.GetTransactionByID)
 	protected.GET("/admin/transactions", tx.GetAllEnriched)
-
-	return e
 }
