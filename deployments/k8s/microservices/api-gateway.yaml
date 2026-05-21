@@ -13,7 +13,7 @@ spec:
       labels:
         app: api-gateway
         benchmark.skripsi.dev/architecture: microservices
-        tags.datadoghq.com/env: minikube
+        tags.datadoghq.com/env: development
         tags.datadoghq.com/service: api-gateway
         tags.datadoghq.com/version: local
     spec:

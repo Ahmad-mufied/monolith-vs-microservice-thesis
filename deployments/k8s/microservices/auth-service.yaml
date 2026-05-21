@@ -13,7 +13,7 @@ spec:
       labels:
         app: auth-service
         benchmark.skripsi.dev/architecture: microservices
-        tags.datadoghq.com/env: minikube
+        tags.datadoghq.com/env: development
         tags.datadoghq.com/service: auth-service
         tags.datadoghq.com/version: local
     spec:

@@ -5,7 +5,7 @@ datadog:
   clusterName: skripsi-minikube
 
   tags:
-    - env:minikube
+    - env:development
     - project:skripsi-benchmark
 
   logs:
