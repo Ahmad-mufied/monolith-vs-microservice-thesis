@@ -370,6 +370,11 @@ Recommended operating modes:
   Datadog enabled, in-cluster DogStatsD, Kubernetes state collection, and S3
   upload enabled.
 
+For Datadog tagging, this repository uses purpose-based environment values:
+
+- `development` for local or Minikube validation runs
+- `benchmark` for final EKS benchmark runs
+
 Recommended environment variable reference:
 
 | Variable | Purpose | Minikube validation mode | EKS benchmark mode |
@@ -383,7 +388,7 @@ Recommended environment variable reference:
 | `PRE_ALLOCATED_VUS` | initial VU pool for arrival-rate executor | small validation value | benchmark-sized value |
 | `MAX_VUS` | maximum VU pool | small validation value | benchmark-sized value |
 | `DATADOG_ENABLED` | enable DogStatsD output and Datadog metadata | `true` when validating Datadog, otherwise `false` | `true` |
-| `DATADOG_ENV` | Datadog environment tag | `minikube` | `benchmark` or EKS-specific env |
+| `DATADOG_ENV` | Datadog environment tag | `development` | `benchmark` |
 | `K6_STATSD_ADDR` | DogStatsD endpoint used by k6 | local or Minikube-reachable Agent endpoint | `datadog-agent.datadog.svc.cluster.local:8125` |
 | `K6_STATSD_NAMESPACE` | metric prefix in Datadog | usually `k6` | usually `k6` |
 | `K6_STATSD_ENABLE_TAGS` | include tags in DogStatsD output | usually `true` | `true` |

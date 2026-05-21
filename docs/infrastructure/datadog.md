@@ -123,6 +123,31 @@ deployments/k8s/microservices/item-service.yaml
 deployments/k8s/microservices/transaction-service.yaml
 ```
 
+This repository uses purpose-based Datadog environment naming:
+
+- `development` for local and Minikube validation flows
+- `benchmark` for measured EKS benchmark runs
+
+Platform identity such as Minikube or EKS should be expressed through cluster
+name, Kubernetes context, run metadata, and architecture tags, not by changing
+the Datadog `env` meaning. EKS deployments must still override local image and
+version defaults, but the Datadog environment purpose should remain
+`development` locally and `benchmark` on EKS.
+
+Important integration note for the separate EKS deployment path:
+
+```text
+These tracked Kubernetes manifests represent local/Minikube defaults.
+When the EKS deployment path is integrated, deployment-specific overrides must
+replace local-only image settings and Datadog runtime identity values,
+especially:
+
+- tags.datadoghq.com/env: development -> benchmark
+- tags.datadoghq.com/version: local -> deployed image tag
+- image: local repository tag -> ECR image
+- imagePullPolicy: Never -> EKS-compatible pull policy
+```
+
 Application tracing code:
 
 ```text
@@ -411,24 +436,27 @@ Current service names:
 | Item Service | `item-service` |
 | Transaction Service | `transaction-service` |
 
-Current Minikube defaults:
+Current local development defaults:
 
 ```text
-DD_ENV=minikube
+DD_ENV=development
 DD_VERSION=local
 ```
 
-Application containers receive:
+Application containers receive these manifest-provided values:
 
 ```text
-DATADOG_ENABLED=true
 DD_ENV=<from pod label>
 DD_SERVICE=<from pod label>
 DD_VERSION=<from pod label>
 DD_AGENT_HOST=<status.hostIP>
 DD_TRACE_AGENT_PORT=8126
-DD_TRACE_ENABLED=true
 ```
+
+Datadog runtime toggles such as `DATADOG_ENABLED` and `DD_TRACE_ENABLED` are
+provided through local env files, Kubernetes Secrets, or deployment-specific
+runtime configuration. They are intentionally opt-in, so the manifests do not
+force tracing on for every environment.
 
 `DD_AGENT_HOST=status.hostIP` means each application pod sends traces to the
 Datadog Agent running on the same Kubernetes node.
@@ -601,7 +629,7 @@ Relevant environment variables:
 
 ```text
 DATADOG_ENABLED=false
-DATADOG_ENV=minikube
+DATADOG_ENV=development
 K6_STATSD_ADDR=127.0.0.1:8125
 K6_STATSD_NAMESPACE=k6
 K6_STATSD_ENABLE_TAGS=true
@@ -623,7 +651,7 @@ Example local host-run command:
 
 ```bash
 DATADOG_ENABLED=true \
-DATADOG_ENV=minikube \
+DATADOG_ENV=development \
 K6_STATSD_ADDR=127.0.0.1:8125 \
 k6/runner/run-k6.sh
 ```
@@ -679,7 +707,7 @@ Example:
 {
   "datadog": {
     "enabled": true,
-    "env": "minikube",
+    "env": "development",
     "time_window_start": "2026-05-17T10:00:00Z",
     "time_window_end": "2026-05-17T10:05:00Z",
     "k6_statsd_addr": "127.0.0.1:8125",
@@ -782,10 +810,10 @@ kubectl get pods -n mono
 kubectl describe pod -n mono -l app=monolith
 ```
 
-Confirm labels:
+Confirm local development labels:
 
 ```text
-tags.datadoghq.com/env=minikube
+tags.datadoghq.com/env=development
 tags.datadoghq.com/service=monolith
 tags.datadoghq.com/version=local
 ```
@@ -880,9 +908,12 @@ The two EKS values files differ only in `clusterName` and `tags`:
 | `clusterName` | `skripsi-monolith` | `skripsi-msa` |
 | `architecture` tag | `architecture:monolith` | `architecture:microservices` |
 
-Both clusters use `env:benchmark` as the environment tag, which aligns with
-`DD_ENV=benchmark` on application pods and `DATADOG_ENV=benchmark` in k6
-benchmark jobs.
+Both clusters use `env:benchmark` as the Datadog Agent environment tag.
+Application pods on EKS must also expose `DD_ENV=benchmark` semantics through
+their pod labels or deployment-specific overrides. The tracked application
+manifests in this branch now default to `tags.datadoghq.com/env=development`
+for the local Minikube flow, while k6 benchmark jobs should use
+`DATADOG_ENV=benchmark`.
 
 Use the repository's active EKS provisioning and deployment runbook for the
 cluster lifecycle, then apply the Datadog install commands above on each
@@ -971,7 +1002,7 @@ kubectl describe pod -n mono -l app=monolith
 kubectl describe pod -n msa -l app=api-gateway
 ```
 
-Required env:
+Required env for a traced run:
 
 ```text
 DATADOG_ENABLED=true
