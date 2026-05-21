@@ -19,7 +19,9 @@ COPY --from=builder /tmp/k6 /usr/bin/k6
 COPY k6 /work/k6
 
 RUN addgroup -g 10001 -S k6 && adduser -S -D -H -u 10001 -G k6 k6
-RUN chmod +x /work/k6/runner/run-k6.sh
+RUN chmod +x /work/k6/runner/run-k6.sh \
+  && mkdir -p /work/tmp \
+  && chown -R k6:k6 /work
 
 USER k6
 WORKDIR /work
