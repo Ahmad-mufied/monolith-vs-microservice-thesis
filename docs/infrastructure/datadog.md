@@ -148,7 +148,6 @@ Related docs:
 
 ```text
 docs/infrastructure/benchmark-execution-lifecycle.md
-docs/infrastructure/datadog-dashboard-design.md
 docs/infrastructure/secret-management.md
 docs/infrastructure/deployment-strategy.md
 docs/development/k6-workload-scenarios.md

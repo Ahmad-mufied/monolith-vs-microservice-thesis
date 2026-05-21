@@ -70,7 +70,6 @@ help:
 	@echo "  make env-init-datadog-minikube"
 	@echo "  make env-init-monolith"
 	@echo "  make env-init-microservices"
-	@echo "  make minikube-datadog-report"
 	@echo "  make fmt"
 	@echo "  make test"
 	@echo "  make lint"
@@ -184,10 +183,6 @@ env-init-monolith: env-init-base
 .PHONY: env-init-microservices
 env-init-microservices: env-init-base
 	bash scripts/env-init-microservices.sh
-
-.PHONY: minikube-datadog-report
-minikube-datadog-report:
-	bash scripts/create-minikube-datadog-report.sh
 
 # =========================
 # Go Development
