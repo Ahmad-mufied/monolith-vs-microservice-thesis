@@ -155,7 +155,8 @@ help:
 	@echo "  make minikube-deploy-microservices-hpa"
 	@echo "  make datadog-secret"
 	@echo "  make datadog-install-minikube"
-	@echo "  make datadog-install-eks"
+	@echo "  make datadog-install-eks-monolith"
+	@echo "  make datadog-install-eks-msa"
 	@echo "  make datadog-status"
 	@echo "  make datadog-uninstall"
 	@echo "  make create-local-postgres-secrets"
@@ -731,13 +732,25 @@ datadog-install-minikube: datadog-secret datadog-repo
 		--set datadog.site=$(DATADOG_SITE)
 	kubectl rollout status daemonset/$(DATADOG_RELEASE) -n $(DATADOG_NAMESPACE) --timeout=300s
 
-.PHONY: datadog-install-eks
-datadog-install-eks: datadog-secret datadog-repo
+.PHONY: datadog-install-eks-monolith
+datadog-install-eks-monolith: datadog-repo
+	KUBE_CONTEXT=monolith DATADOG_NAMESPACE=$(DATADOG_NAMESPACE) DATADOG_SITE=$(DATADOG_SITE) bash scripts/create-datadog-secret.sh
 	helm upgrade --install $(DATADOG_RELEASE) datadog/datadog \
+		--kube-context=monolith \
 		--namespace $(DATADOG_NAMESPACE) \
-		--values $(HELM_DIR)/datadog/values-eks.yaml \
+		--values $(HELM_DIR)/datadog/values-eks-monolith.yaml \
 		--set datadog.site=$(DATADOG_SITE)
-	kubectl rollout status daemonset/$(DATADOG_RELEASE) -n $(DATADOG_NAMESPACE) --timeout=300s
+	kubectl --context=monolith rollout status daemonset/$(DATADOG_RELEASE) -n $(DATADOG_NAMESPACE) --timeout=300s
+
+.PHONY: datadog-install-eks-msa
+datadog-install-eks-msa: datadog-repo
+	KUBE_CONTEXT=msa DATADOG_NAMESPACE=$(DATADOG_NAMESPACE) DATADOG_SITE=$(DATADOG_SITE) bash scripts/create-datadog-secret.sh
+	helm upgrade --install $(DATADOG_RELEASE) datadog/datadog \
+		--kube-context=msa \
+		--namespace $(DATADOG_NAMESPACE) \
+		--values $(HELM_DIR)/datadog/values-eks-msa.yaml \
+		--set datadog.site=$(DATADOG_SITE)
+	kubectl --context=msa rollout status daemonset/$(DATADOG_RELEASE) -n $(DATADOG_NAMESPACE) --timeout=300s
 
 .PHONY: datadog-status
 datadog-status:
