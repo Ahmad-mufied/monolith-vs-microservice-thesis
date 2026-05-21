@@ -87,7 +87,8 @@ Current values files:
 | Environment | Values file |
 |---|---|
 | Minikube | `deployments/helm/datadog/values-minikube.yaml` |
-| AWS EKS | `deployments/helm/datadog/values-eks.yaml` |
+| AWS EKS — monolith cluster | `deployments/helm/datadog/values-eks-monolith.yaml` |
+| AWS EKS — MSA cluster | `deployments/helm/datadog/values-eks-msa.yaml` |
 
 Current Makefile targets:
 
@@ -95,7 +96,8 @@ Current Makefile targets:
 |---|---|
 | `make datadog-secret` | Create the Kubernetes Secret used by the Datadog Helm chart |
 | `make datadog-install-minikube` | Install or upgrade Datadog on Minikube |
-| `make datadog-install-eks` | Install or upgrade Datadog on EKS |
+| `make datadog-install-eks-monolith` | Install or upgrade Datadog on the monolith EKS cluster |
+| `make datadog-install-eks-msa` | Install or upgrade Datadog on the MSA EKS cluster |
 | `make datadog-status` | Inspect Datadog pods, services, DaemonSet, and Deployment |
 | `make datadog-uninstall` | Remove the Datadog Helm release |
 
@@ -105,7 +107,8 @@ Datadog-related files:
 
 ```text
 deployments/helm/datadog/values-minikube.yaml
-deployments/helm/datadog/values-eks.yaml
+deployments/helm/datadog/values-eks-monolith.yaml
+deployments/helm/datadog/values-eks-msa.yaml
 scripts/create-datadog-secret.sh
 docs/infrastructure/datadog.md
 ```
@@ -855,28 +858,36 @@ api-gateway
 
 ## 12. AWS EKS Runbook
 
-EKS is the final benchmark target.
+EKS is the final benchmark target. The dual cluster design uses two separate
+EKS clusters — one for monolith and one for MSA — each with its own Datadog
+Helm values file and `cluster_name` tag.
 
-Install Datadog:
+Install Datadog on monolith cluster:
 
 ```bash
-DATADOG_API_KEY=<redacted> make datadog-install-eks
+DATADOG_API_KEY=<redacted> make datadog-install-eks-monolith
 ```
 
-The EKS values file is intentionally close to the Minikube values file. This
-keeps the dry-run environment and final benchmark environment similar.
+Install Datadog on MSA cluster:
 
-When Terraform is introduced, EKS-specific additions may include:
+```bash
+DATADOG_API_KEY=<redacted> make datadog-install-eks-msa
+```
 
-- IRSA or EKS Pod Identity for AWS access,
-- External Secrets for Datadog API key,
-- node selectors,
-- tolerations,
-- Datadog scheduling rules,
-- RDS integration,
-- S3 result bucket metadata,
-- cluster name override,
-- environment name override.
+The two EKS values files differ only in `clusterName` and `tags`:
+
+| Setting | Monolith cluster | MSA cluster |
+|---|---|---|
+| `clusterName` | `skripsi-monolith` | `skripsi-msa` |
+| `architecture` tag | `architecture:monolith` | `architecture:microservices` |
+
+Both clusters use `env:benchmark` as the environment tag, which aligns with
+`DD_ENV=benchmark` on application pods and `DATADOG_ENV=benchmark` in k6
+benchmark jobs.
+
+Use the repository's active EKS provisioning and deployment runbook for the
+cluster lifecycle, then apply the Datadog install commands above on each
+cluster after the workloads and secrets are ready.
 
 Important EKS rule:
 
@@ -930,8 +941,6 @@ Before running a measured benchmark:
 - k6 can still produce `raw.json.gz`.
 - `metadata.json` includes Datadog status.
 - `datadog-time-window.json` exists when Datadog is enabled.
-- HPA files are collected when HPA is enabled.
-- Kubernetes snapshots are collected after k6.
 - Results are uploaded to S3 before infrastructure destroy.
 
 ## 15. Troubleshooting
