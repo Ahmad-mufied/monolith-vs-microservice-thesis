@@ -1,7 +1,7 @@
 FROM golang:1.26.2-alpine AS builder
 
 ARG K6_BUILD_VERSION=v0.52.0
-ARG XK6_VERSION=latest
+ARG XK6_VERSION=v1.2.3
 
 RUN apk add --no-cache git
 RUN go install go.k6.io/xk6/cmd/xk6@${XK6_VERSION}
