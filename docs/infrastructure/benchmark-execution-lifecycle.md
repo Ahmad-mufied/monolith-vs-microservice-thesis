@@ -238,20 +238,6 @@ stdout.log
 metadata.json
 k6-options.json
 thresholds.json
-pods-state.txt
-top-pods.txt
-top-nodes.txt
-events.txt
-resource-quotas.yaml
-deployments-state.yaml
-services-state.yaml
-```
-
-Required when HPA is enabled:
-
-```text
-hpa-state.yaml
-hpa-describe.txt
 ```
 
 Required when Datadog is enabled:
@@ -269,13 +255,6 @@ app-manifests.yaml
 
 Additional files may be added when useful, but do not overwrite or merge raw
 attempt output during collection.
-
-Autoscaling snapshot files are required when HPA is enabled. These files include
-`hpa-state.yaml` and `hpa-describe.txt`.
-
-If the experiment is executed in fixed-replica mode without HPA, HPA snapshot
-files are not required. In that case, replica configuration, deployment state,
-and resource quota snapshots must be collected instead.
 
 Raw collection must stay separated by attempt.
 
@@ -361,7 +340,9 @@ Recommended fields:
     "enabled": true,
     "env": "benchmark",
     "time_window_start": "2026-05-12T03:30:00Z",
-    "time_window_end": "2026-05-12T03:35:00Z"
+    "time_window_end": "2026-05-12T03:35:00Z",
+    "k6_statsd_addr": "datadog-agent.datadog.svc.cluster.local:8125",
+    "k6_statsd_namespace": "k6"
   }
 }
 ```

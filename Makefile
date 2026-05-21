@@ -14,6 +14,7 @@ TRANSACTION_SERVICE_DIR := microservices/transaction-service
 
 COMPOSE_DIR := deployments/compose
 K8S_DIR := deployments/k8s
+HELM_DIR := deployments/helm
 
 # =========================
 # Images
@@ -32,6 +33,10 @@ MINIKUBE_DISK_SIZE ?= 20g
 MINIKUBE_NODE_CONTAINER ?= minikube
 MONOLITH_PORT ?= 8080
 API_GATEWAY_PORT ?= 8080
+DATADOG_NAMESPACE ?= datadog
+DATADOG_RELEASE ?= datadog
+DATADOG_SITE ?= datadoghq.com
+DATADOG_CHART_VERSION ?= 3.134.0
 
 # =========================
 # Env Files
@@ -62,6 +67,7 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  make env-init-base"
+	@echo "  make env-init-datadog-minikube"
 	@echo "  make env-init-monolith"
 	@echo "  make env-init-microservices"
 	@echo "  make fmt"
@@ -145,6 +151,14 @@ help:
 	@echo "  make minikube-port-forward-monolith"
 	@echo "  make minikube-port-forward-api-gateway"
 	@echo "  make minikube-load-images"
+	@echo "  make minikube-deploy-monolith-hpa"
+	@echo "  make minikube-deploy-microservices-hpa"
+	@echo "  make datadog-secret"
+	@echo "  make datadog-install-minikube"
+	@echo "  make datadog-install-eks-monolith"
+	@echo "  make datadog-install-eks-msa"
+	@echo "  make datadog-status"
+	@echo "  make datadog-uninstall"
 	@echo "  make create-local-postgres-secrets"
 	@echo "  make create-local-secrets"
 	@echo "  make create-local-secrets-microservices"
@@ -157,6 +171,10 @@ help:
 .PHONY: env-init-base
 env-init-base:
 	bash scripts/env-init-base.sh
+
+.PHONY: env-init-datadog-minikube
+env-init-datadog-minikube:
+	bash scripts/env-init-datadog-minikube.sh
 
 .PHONY: env-init-monolith
 env-init-monolith: env-init-base
@@ -561,7 +579,15 @@ minikube-bootstrap-monolith-enrichment-benchmark:
 .PHONY: minikube-deploy-monolith
 minikube-deploy-monolith: minikube-load-monolith create-local-secrets
 	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
-	kubectl apply -f $(K8S_DIR)/monolith/resource-management.yaml
+	kubectl apply -f $(K8S_DIR)/monolith/resource-management-fixed.yaml
+	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
+	kubectl rollout restart deployment/monolith -n mono
+	kubectl rollout status deployment/monolith -n mono --timeout=180s
+
+.PHONY: minikube-deploy-monolith-hpa
+minikube-deploy-monolith-hpa: minikube-load-monolith create-local-secrets
+	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
+	kubectl apply -f $(K8S_DIR)/monolith/resource-management-hpa.yaml
 	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
 	kubectl rollout restart deployment/monolith -n mono
 	kubectl rollout status deployment/monolith -n mono --timeout=180s
@@ -640,7 +666,24 @@ minikube-deploy-microservices: minikube-load-microservices create-local-secrets-
 	kubectl apply -f $(K8S_DIR)/microservices/item-service.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/transaction-service.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/api-gateway.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/resource-management.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/resource-management-fixed.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/api-gateway-ingress.yaml
+	kubectl rollout restart deployment/auth-service -n msa
+	kubectl rollout restart deployment/item-service -n msa
+	kubectl rollout restart deployment/transaction-service -n msa
+	kubectl rollout restart deployment/api-gateway -n msa
+	kubectl rollout status deployment/auth-service -n msa --timeout=180s
+	kubectl rollout status deployment/item-service -n msa --timeout=180s
+	kubectl rollout status deployment/transaction-service -n msa --timeout=180s
+	kubectl rollout status deployment/api-gateway -n msa --timeout=180s
+
+.PHONY: minikube-deploy-microservices-hpa
+minikube-deploy-microservices-hpa: minikube-load-microservices create-local-secrets-microservices
+	kubectl apply -f $(K8S_DIR)/microservices/auth-service.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/item-service.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/transaction-service.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/api-gateway.yaml
+	kubectl apply -f $(K8S_DIR)/microservices/resource-management-hpa.yaml
 	kubectl apply -f $(K8S_DIR)/microservices/api-gateway-ingress.yaml
 	kubectl rollout restart deployment/auth-service -n msa
 	kubectl rollout restart deployment/item-service -n msa
@@ -663,6 +706,58 @@ minikube-port-forward-api-gateway:
 minikube-status:
 	kubectl get nodes
 	kubectl get pods -A
+
+# =========================
+# Datadog
+# =========================
+
+.PHONY: datadog-secret
+datadog-secret:
+	DATADOG_NAMESPACE=$(DATADOG_NAMESPACE) DATADOG_SITE=$(DATADOG_SITE) bash scripts/create-datadog-secret.sh
+
+.PHONY: datadog-repo
+datadog-repo:
+	helm repo add datadog https://helm.datadoghq.com --force-update
+	helm repo update datadog
+
+.PHONY: datadog-install-minikube
+datadog-install-minikube: datadog-secret datadog-repo
+	helm upgrade --install $(DATADOG_RELEASE) datadog/datadog \
+		--version $(DATADOG_CHART_VERSION) \
+		--namespace $(DATADOG_NAMESPACE) \
+		--values $(HELM_DIR)/datadog/values-minikube.yaml \
+		--set datadog.site=$(DATADOG_SITE)
+	kubectl rollout status daemonset/$(DATADOG_RELEASE) -n $(DATADOG_NAMESPACE) --timeout=300s
+
+.PHONY: datadog-install-eks-monolith
+datadog-install-eks-monolith: datadog-repo
+	KUBE_CONTEXT=monolith DATADOG_NAMESPACE=$(DATADOG_NAMESPACE) DATADOG_SITE=$(DATADOG_SITE) bash scripts/create-datadog-secret.sh
+	helm upgrade --install $(DATADOG_RELEASE) datadog/datadog \
+		--version $(DATADOG_CHART_VERSION) \
+		--kube-context=monolith \
+		--namespace $(DATADOG_NAMESPACE) \
+		--values $(HELM_DIR)/datadog/values-eks-monolith.yaml \
+		--set datadog.site=$(DATADOG_SITE)
+	kubectl --context=monolith rollout status daemonset/$(DATADOG_RELEASE) -n $(DATADOG_NAMESPACE) --timeout=300s
+
+.PHONY: datadog-install-eks-msa
+datadog-install-eks-msa: datadog-repo
+	KUBE_CONTEXT=msa DATADOG_NAMESPACE=$(DATADOG_NAMESPACE) DATADOG_SITE=$(DATADOG_SITE) bash scripts/create-datadog-secret.sh
+	helm upgrade --install $(DATADOG_RELEASE) datadog/datadog \
+		--version $(DATADOG_CHART_VERSION) \
+		--kube-context=msa \
+		--namespace $(DATADOG_NAMESPACE) \
+		--values $(HELM_DIR)/datadog/values-eks-msa.yaml \
+		--set datadog.site=$(DATADOG_SITE)
+	kubectl --context=msa rollout status daemonset/$(DATADOG_RELEASE) -n $(DATADOG_NAMESPACE) --timeout=300s
+
+.PHONY: datadog-status
+datadog-status:
+	kubectl get pods,svc,daemonset,deploy -n $(DATADOG_NAMESPACE)
+
+.PHONY: datadog-uninstall
+datadog-uninstall:
+	helm uninstall $(DATADOG_RELEASE) -n $(DATADOG_NAMESPACE)
 
 # =========================
 # EKS / Terraform

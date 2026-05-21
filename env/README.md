@@ -14,6 +14,7 @@ contain local passwords or secrets.
 Generated files:
 
 - `postgres.env`
+- `datadog.minikube.env`
 - `api-gateway.env`
 - `auth-service.env`
 - `item-service.env`
@@ -38,6 +39,10 @@ make env-init-monolith
 `make env-init-base` creates the shared local PostgreSQL env:
 
 - `postgres.env`
+
+`make env-init-datadog-minikube` creates the Datadog helper env for Minikube:
+
+- `datadog.minikube.env`
 
 `make env-init-monolith` creates the monolith-specific env files:
 

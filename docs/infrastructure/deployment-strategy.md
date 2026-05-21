@@ -1237,7 +1237,7 @@ Deploy and inspect monolith:
 
 ```bash
 kubectl apply -f deployments/k8s/monolith/monolith.yaml
-kubectl apply -f deployments/k8s/monolith/resource-management.yaml
+kubectl apply -f deployments/k8s/monolith/resource-management-fixed.yaml
 kubectl apply -f deployments/k8s/monolith/ingress.yaml
 kubectl rollout status deployment/monolith -n mono --timeout=180s
 
@@ -1248,11 +1248,17 @@ kubectl logs job/monolith-migration-job -n mono
 Command notes:
 
 - `kubectl apply -f deployments/k8s/monolith/monolith.yaml`: deploys the monolith application and Service.
-- `kubectl apply -f deployments/k8s/monolith/resource-management.yaml`: applies the monolith ResourceQuota and HPA.
+- `kubectl apply -f deployments/k8s/monolith/resource-management-fixed.yaml`: applies the monolith fixed-replica ResourceQuota configuration.
 - `kubectl apply -f deployments/k8s/monolith/ingress.yaml`: applies the monolith ingress resource.
 - `kubectl rollout status deployment/monolith ...`: waits until the monolith Deployment finishes rolling out.
 - `kubectl get pods,svc,hpa,resourcequota -n mono`: gives a quick summary of monolith runtime state.
 - `kubectl logs job/monolith-migration-job -n mono`: shows migration logs if schema setup needs inspection.
+
+For HPA mode, swap the resource-management manifest:
+
+```bash
+kubectl apply -f deployments/k8s/monolith/resource-management-hpa.yaml
+```
 
 Access monolith:
 
@@ -1320,7 +1326,7 @@ kubectl apply -f deployments/k8s/microservices/auth-service.yaml
 kubectl apply -f deployments/k8s/microservices/item-service.yaml
 kubectl apply -f deployments/k8s/microservices/transaction-service.yaml
 kubectl apply -f deployments/k8s/microservices/api-gateway.yaml
-kubectl apply -f deployments/k8s/microservices/resource-management.yaml
+kubectl apply -f deployments/k8s/microservices/resource-management-fixed.yaml
 kubectl apply -f deployments/k8s/microservices/api-gateway-ingress.yaml
 
 kubectl rollout status deployment/auth-service -n msa --timeout=180s
@@ -1340,11 +1346,17 @@ Command notes:
 - `kubectl apply -f .../item-service.yaml`: deploys the item-service workload and Service.
 - `kubectl apply -f .../transaction-service.yaml`: deploys the transaction-service workload and Service.
 - `kubectl apply -f .../api-gateway.yaml`: deploys the API Gateway workload and Service.
-- `kubectl apply -f .../resource-management.yaml`: applies the shared ResourceQuota and per-service HPAs.
+- `kubectl apply -f .../resource-management-fixed.yaml`: applies the shared fixed-replica ResourceQuota configuration.
 - `kubectl apply -f .../api-gateway-ingress.yaml`: applies ingress for the API Gateway.
 - `kubectl rollout status deployment/...`: waits until each microservice Deployment is available.
 - `kubectl get pods,svc,hpa,resourcequota -n msa`: gives a quick summary of microservices runtime state.
 - `kubectl logs job/... -n msa`: shows migration logs for troubleshooting.
+
+For HPA mode, swap the resource-management manifest:
+
+```bash
+kubectl apply -f deployments/k8s/microservices/resource-management-hpa.yaml
+```
 
 Access API Gateway:
 
@@ -1398,6 +1410,12 @@ Recommended Kubernetes Jobs:
 deployments/k8s/
 ├── local/
 │   └── db-bootstrap-job.yaml
+├── benchmark/
+│   ├── namespace.yaml
+│   ├── k6-runner-rbac.yaml
+│   ├── k6-benchmark-monolith-job.yaml
+│   ├── k6-benchmark-microservices-job.yaml
+│   └── k6-runner-secret.example.yaml
 ├── monolith/
 │   ├── migration-job.yaml
 │   ├── prepare-monolith-enrichment-smoke-data-job.yaml
@@ -1435,7 +1453,8 @@ Job responsibilities:
 | `seed-microservices-benchmark-data-job` | seed deterministic microservices benchmark data |
 | `prepare-microservices-enrichment-smoke-data-job` | prepare microservices smoke enriched-read fixtures |
 | `prepare-microservices-enrichment-benchmark-data-job` | prepare microservices benchmark enriched-read fixtures |
-| `k6-benchmark-job` | run benchmark and upload results |
+| `k6-benchmark-monolith-job` | run monolith benchmark and upload results |
+| `k6-benchmark-microservices-job` | run microservices benchmark and upload results |
 
 ---
 
@@ -1470,7 +1489,7 @@ Secret purposes:
 | `auth-service-secret` | contains auth DB URL and `JWT_SECRET` |
 | `item-service-secret` | contains item DB URL |
 | `transaction-service-secret` | contains transaction DB URL and service addresses |
-| `k6-runner-secret` | contains benchmark credentials such as `AUTH_TOKEN` if needed |
+| `k6-runner-secret` | contains optional benchmark admin credentials for enriched reads |
 
 Do not store static AWS access keys in any Kubernetes Secret.
 
@@ -1580,20 +1599,6 @@ metadata.json
 stdout.log
 k6-options.json
 thresholds.json
-pods-state.txt
-top-pods.txt
-top-nodes.txt
-events.txt
-resource-quotas.yaml
-deployments-state.yaml
-services-state.yaml
-```
-
-When HPA is enabled, also collect:
-
-```text
-hpa-state.yaml
-hpa-describe.txt
 ```
 
 When Datadog is enabled, also collect:
