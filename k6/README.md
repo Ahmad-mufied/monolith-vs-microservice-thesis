@@ -379,7 +379,7 @@ Recommended environment variable reference:
 | `ARCHITECTURE` | benchmark architecture identity | `monolith` or `microservices` | `monolith` or `microservices` |
 | `SCENARIO_NAME` | benchmark scenario label in metadata | `login`, `create-transaction`, `enriched-transactions` | same as Minikube |
 | `TARGET_RPS` | target request rate | small validation value such as `1` | final benchmark target such as `1000`, `2500`, `5000` |
-| `TEST_DURATION` | run duration | short duration such as `10s` or `30s` | measured benchmark duration such as `5m` |
+| `DURATION` | run duration | short duration such as `10s` or `30s` | measured benchmark duration such as `5m` |
 | `PRE_ALLOCATED_VUS` | initial VU pool for arrival-rate executor | small validation value | benchmark-sized value |
 | `MAX_VUS` | maximum VU pool | small validation value | benchmark-sized value |
 | `DATADOG_ENABLED` | enable DogStatsD output and Datadog metadata | `true` when validating Datadog, otherwise `false` | `true` |
@@ -387,6 +387,7 @@ Recommended environment variable reference:
 | `K6_STATSD_ADDR` | DogStatsD endpoint used by k6 | local or Minikube-reachable Agent endpoint | `datadog-agent.datadog.svc.cluster.local:8125` |
 | `K6_STATSD_NAMESPACE` | metric prefix in Datadog | usually `k6` | usually `k6` |
 | `K6_STATSD_ENABLE_TAGS` | include tags in DogStatsD output | usually `true` | `true` |
+| `K6_STATSD_OUTPUT_TYPE` | k6 output adapter used for DogStatsD | usually `output-statsd` | usually `output-statsd` |
 | `RUN_ID` | benchmark run identity | optional validation label | required final run label |
 | `ATTEMPT` | attempt identity | optional validation label | required attempt label such as `attempt-01` |
 | `S3_URI` | upload destination for result artifacts | empty by default | required S3 prefix for final benchmark |
