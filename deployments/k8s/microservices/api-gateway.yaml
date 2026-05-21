@@ -37,8 +37,6 @@ spec:
             - secretRef:
                 name: api-gateway-secret
           env:
-            - name: DATADOG_ENABLED
-              value: "true"
             - name: DD_ENV
               valueFrom:
                 fieldRef:
@@ -57,8 +55,6 @@ spec:
                   fieldPath: status.hostIP
             - name: DD_TRACE_AGENT_PORT
               value: "8126"
-            - name: DD_TRACE_ENABLED
-              value: "true"
             - name: DD_TAGS
               value: "architecture:microservices"
           ports:
