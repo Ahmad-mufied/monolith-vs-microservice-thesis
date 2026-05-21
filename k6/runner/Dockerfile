@@ -6,7 +6,7 @@ ARG XK6_VERSION=v1.2.3
 RUN apk add --no-cache git
 RUN go install go.k6.io/xk6/cmd/xk6@${XK6_VERSION}
 RUN xk6 build ${K6_BUILD_VERSION} \
-  --with github.com/LeonAdato/xk6-output-statsd \
+  --with github.com/LeonAdato/xk6-output-statsd@v0.3.0 \
   --output /tmp/k6
 
 FROM alpine:3.22
