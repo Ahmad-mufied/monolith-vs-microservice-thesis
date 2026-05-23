@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type DBPoolConfig struct {
@@ -34,6 +36,7 @@ type Config struct {
 	HTTPServer     HTTPServerConfig
 	JWTSecret      string
 	JWTTokenTTL    time.Duration
+	BcryptCost     int
 	DatadogEnabled bool
 }
 
@@ -46,6 +49,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	bcryptCost, err := getEnvInt("BCRYPT_COST", bcrypt.DefaultCost)
+	if err != nil {
+		return Config{}, fmt.Errorf("BCRYPT_COST: %w", err)
+	}
 
 	cfg := Config{
 		AppEnv:         getEnv("APP_ENV", "development"),
@@ -56,6 +63,7 @@ func Load() (Config, error) {
 		HTTPServer:     httpServer,
 		JWTSecret:      os.Getenv("JWT_SECRET"),
 		JWTTokenTTL:    24 * time.Hour,
+		BcryptCost:     bcryptCost,
 		DatadogEnabled: os.Getenv("DATADOG_ENABLED") == "true",
 	}
 
@@ -64,6 +72,9 @@ func Load() (Config, error) {
 	}
 	if cfg.JWTSecret == "" {
 		return Config{}, fmt.Errorf("JWT_SECRET is required")
+	}
+	if cfg.BcryptCost < bcrypt.MinCost || cfg.BcryptCost > bcrypt.MaxCost {
+		return Config{}, fmt.Errorf("BCRYPT_COST must be between %d and %d", bcrypt.MinCost, bcrypt.MaxCost)
 	}
 
 	return cfg, nil

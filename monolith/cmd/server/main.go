@@ -76,7 +76,7 @@ func main() {
 	jwtManager := jwtutil.NewManager(cfg.JWTSecret, cfg.JWTTokenTTL)
 
 	authRepo := auth.NewPostgresRepository(pool)
-	authService := auth.NewService(authRepo, auth.BcryptHasher{}, jwtManager)
+	authService := auth.NewService(authRepo, auth.BcryptHasher{Cost: cfg.BcryptCost}, jwtManager)
 	auth.NewHandler(authService).RegisterRoutes(e)
 
 	health.NewHandler(cfg.ServiceName).Register(e)
