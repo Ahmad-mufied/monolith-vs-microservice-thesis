@@ -222,7 +222,7 @@ s3://{bucket}/experiments/{run_id}/{architecture}/{scenario_name}/{target_rps}rp
 Example:
 
 ```text
-s3://skripsi-benchmark-results/experiments/20260517-120000/msa/create-transaction/1000rps/attempt-01/
+s3://skripsi-benchmark-results/experiments/20260517-120000/microservices/create-transaction/1000rps/attempt-01/
 ```
 
 `metadata.json` is the source of truth.

@@ -245,7 +245,7 @@ IMAGE_TAG
 ```text
 K6_PROFILE
 TARGET_RPS
-DURATION
+TEST_DURATION
 TIME_UNIT
 VUS
 PRE_ALLOCATED_VUS
@@ -306,7 +306,7 @@ K6_PROFILE=smoke \
 ARCHITECTURE=monolith \
 SCENARIO_NAME=smoke \
 VUS=1 \
-DURATION=30s \
+TEST_DURATION=30s \
 ./k6/runner/run-k6.sh
 ```
 
@@ -318,7 +318,7 @@ K6_SCRIPT=login.js \
 ARCHITECTURE=monolith \
 SCENARIO_NAME=login \
 TARGET_RPS=1 \
-DURATION=10s \
+TEST_DURATION=10s \
 PRE_ALLOCATED_VUS=2 \
 MAX_VUS=4 \
 ./k6/runner/run-k6.sh
@@ -332,7 +332,7 @@ K6_SCRIPT=create-transaction.js \
 ARCHITECTURE=monolith \
 SCENARIO_NAME=create-transaction \
 TARGET_RPS=1 \
-DURATION=10s \
+TEST_DURATION=10s \
 PRE_ALLOCATED_VUS=2 \
 MAX_VUS=4 \
 TOKEN_POOL_SIZE=5 \
@@ -347,7 +347,7 @@ K6_SCRIPT=enriched-transactions.js \
 ARCHITECTURE=monolith \
 SCENARIO_NAME=enriched-transactions \
 TARGET_RPS=1 \
-DURATION=10s \
+TEST_DURATION=10s \
 PRE_ALLOCATED_VUS=2 \
 MAX_VUS=4 \
 ./k6/runner/run-k6.sh
@@ -384,7 +384,7 @@ Recommended environment variable reference:
 | `ARCHITECTURE` | benchmark architecture identity | `monolith` or `microservices` | `monolith` or `microservices` |
 | `SCENARIO_NAME` | benchmark scenario label in metadata | `login`, `create-transaction`, `enriched-transactions` | same as Minikube |
 | `TARGET_RPS` | target request rate | small validation value such as `1` | final benchmark target such as `1000`, `2500`, `5000` |
-| `DURATION` | run duration | short duration such as `10s` or `30s` | measured benchmark duration such as `5m` |
+| `TEST_DURATION` | run duration | short duration such as `10s` or `30s` | measured benchmark duration such as `5m` |
 | `PRE_ALLOCATED_VUS` | initial VU pool for arrival-rate executor | small validation value | benchmark-sized value |
 | `MAX_VUS` | maximum VU pool | small validation value | benchmark-sized value |
 | `DATADOG_ENABLED` | enable DogStatsD output and Datadog metadata | `true` when validating Datadog, otherwise `false` | `true` |
@@ -420,7 +420,7 @@ k6/runner/Dockerfile
 Recommended build command from the repository root:
 
 ```bash
-docker build -f k6/runner/Dockerfile -t skripsi/k6-runner:latest .
+docker build -f k6/runner/Dockerfile -t <account>.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/k6-runner:$IMAGE_TAG .
 ```
 
 This image includes:
