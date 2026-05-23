@@ -111,6 +111,7 @@ deployments/helm/datadog/values-eks-monolith.yaml
 deployments/helm/datadog/values-eks-msa.yaml
 scripts/create-datadog-secret.sh
 docs/infrastructure/datadog.md
+docs/infrastructure/datadog-resource-overhead.md
 ```
 
 Application manifests with Datadog tagging and runtime env:
@@ -936,11 +937,20 @@ Therefore:
 
 - do not compare Datadog-enabled attempts with Datadog-disabled attempts unless the difference is explicitly documented,
 - keep Datadog enabled consistently across monolith and microservices for a comparison group,
+- state explicitly in the methodology that every measured attempt runs on clusters
+  with the same Datadog monitoring components enabled on both architectures,
 - keep the same k6 Datadog output settings for both architectures,
 - record Datadog status in metadata,
 - record the Datadog time window for every measured attempt,
 - do not change application resource ceilings only for Datadog unless that change is documented outside the app quota comparison,
 - do not add caching, retries, queues, circuit breakers, or async behavior as part of observability.
+
+Interpretation rule:
+
+- the application resource ceilings remain the comparison baseline,
+- while Datadog overhead is treated as identical cluster-level observability
+  overhead present on both architectures, not as an asymmetric application
+  optimization.
 
 Datadog must not change benchmark semantics.
 

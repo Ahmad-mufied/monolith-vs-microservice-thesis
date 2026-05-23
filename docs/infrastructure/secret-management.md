@@ -95,6 +95,30 @@ env/*.env
 
 Only `*.example.env` files should be committed.
 
+Current repository helper flow for EKS:
+
+```text
+env-init-eks
+  -> creates local helper env files under env/
+eks-render-tfvars
+  -> renders infra/terraform/*/terraform.tfvars
+terraform-auth-check
+  -> verifies Terraform can read AWS credentials through terraform-process
+create-eks-secrets-monolith
+create-eks-secrets-microservices
+  -> create Kubernetes secrets for each cluster from env/ + Terraform outputs
+```
+
+Important distinction:
+
+- `env/*.env` helper files are the editable local source for repeatable setup
+- `terraform.tfvars` remains the Terraform input artifact and is rendered from
+  the relevant `env/terraform.*.env` files
+- `env/*.env` does not replace `terraform.tfvars`; it feeds it
+- Terraform-related helper commands should use the standard local profile
+  `terraform-process` through `TERRAFORM_AWS_PROFILE`, not the operator's
+  default shell profile implicitly
+
 ---
 
 ## DB Bootstrap Secret
@@ -180,6 +204,7 @@ HTTP_WRITE_TIMEOUT
 HTTP_IDLE_TIMEOUT
 HTTP_SHUTDOWN_TIMEOUT
 HTTP_MAX_HEADER_BYTES
+BCRYPT_COST
 JWT_SECRET
 DATADOG_ENABLED
 ```
@@ -241,6 +266,7 @@ APP_ENV
 APP_PORT
 SERVICE_NAME
 DATABASE_URL
+BCRYPT_COST
 JWT_SECRET
 DATADOG_ENABLED
 ```
