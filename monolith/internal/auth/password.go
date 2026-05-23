@@ -14,7 +14,7 @@ type BcryptHasher struct {
 }
 
 func (h BcryptHasher) cost() int {
-	if h.Cost == 0 {
+	if h.Cost < bcrypt.MinCost {
 		return bcrypt.DefaultCost
 	}
 	return h.Cost
