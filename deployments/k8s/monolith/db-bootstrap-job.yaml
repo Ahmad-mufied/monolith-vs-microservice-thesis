@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-bootstrap-job
+  namespace: benchmark
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      restartPolicy: OnFailure
+      containers:
+        - name: db-bootstrap
+          image: postgres:18
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          envFrom:
+            - secretRef:
+                name: db-bootstrap-env
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              psql "$BOOTSTRAP_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+              SELECT 'CREATE DATABASE mono_db'
+              WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'mono_db')\gexec
+              SQL

@@ -15,6 +15,16 @@ Generated files:
 
 - `postgres.env`
 - `datadog.minikube.env`
+- `aws-benchmark.env`
+- `terraform.shared.env`
+- `terraform.experiment.env`
+- `datadog.eks.env`
+- `monolith.eks.env`
+- `api-gateway.eks.env`
+- `auth-service.eks.env`
+- `item-service.eks.env`
+- `transaction-service.eks.env`
+- `k6-runner.eks.env`
 - `api-gateway.env`
 - `auth-service.env`
 - `item-service.env`
@@ -36,6 +46,12 @@ For local monolith env files, run:
 make env-init-monolith
 ```
 
+For AWS EKS helper env files, run:
+
+```bash
+make env-init-eks
+```
+
 `make env-init-base` creates the shared local PostgreSQL env:
 
 - `postgres.env`
@@ -48,6 +64,28 @@ make env-init-monolith
 
 - `monolith.env`
 - `db-bootstrap.env`
+
+`make env-init-eks` creates AWS benchmark helper env files:
+
+- `aws-benchmark.env`
+- `terraform.shared.env`
+- `terraform.experiment.env`
+- `datadog.eks.env`
+- `monolith.eks.env`
+- `api-gateway.eks.env`
+- `auth-service.eks.env`
+- `item-service.eks.env`
+- `transaction-service.eks.env`
+- `k6-runner.eks.env`
+
+These files are intended to make EKS setup repeatable:
+
+- `make eks-render-tfvars` renders Terraform `terraform.tfvars` from the
+  `env/terraform.*.env` files
+- `make create-eks-secrets-monolith` creates monolith cluster secrets from the
+  EKS env files
+- `make create-eks-secrets-microservices` creates microservices cluster
+  secrets from the EKS env files
 
 The non-compose microservices env files use `localhost` and are intended for
 `go run` from the host.

@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Full deployment flow for the MSA EKS cluster.
+# Run after terraform apply and setup-eks-contexts.sh.
+set -euo pipefail
+
+CONTEXT="msa"
+K8S="kubectl --context=$CONTEXT"
+SCALING_MODE="${SCALING_MODE:-fixed}"
+EKS_JOB_DIR="deployments/k8s/eks/microservices"
+
+echo "=== Deploying MSA cluster (context: $CONTEXT) ==="
+
+bash scripts/validate-eks-assets.sh deploy
+
+# Namespaces
+$K8S apply -f deployments/k8s/namespaces/local.yaml
+$K8S apply -f deployments/k8s/benchmark/namespace.yaml
+$K8S apply -f deployments/k8s/benchmark/k6-runner-rbac.yaml
+
+echo "Ensure the following secrets exist in the cluster:"
+echo "  benchmark/db-bootstrap-env        (BOOTSTRAP_DATABASE_URL)"
+echo "  msa/api-gateway-secret            (JWT_SECRET, service addresses)"
+echo "  msa/auth-service-secret           (DATABASE_URL, JWT_SECRET)"
+echo "  msa/item-service-secret           (DATABASE_URL)"
+echo "  msa/transaction-service-secret    (DATABASE_URL, service addresses)"
+echo "  datadog/datadog-secret            (api-key)"
+if [ -t 0 ]; then
+  read -r -p "Press Enter to continue after secrets are created..."
+else
+  echo "Non-interactive execution detected; continuing without prompt."
+fi
+
+# DB bootstrap
+$K8S delete job db-bootstrap-job -n benchmark --ignore-not-found
+$K8S apply -f deployments/k8s/microservices/db-bootstrap-job.yaml
+$K8S wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=120s
+echo "DB bootstrap complete"
+
+# Migrations (parallel)
+for svc in auth item transaction; do
+  $K8S delete job "${svc}-migration-job" -n msa --ignore-not-found
+  $K8S apply -f "${EKS_JOB_DIR}/${svc}-migration-job.yaml"
+done
+for svc in auth item transaction; do
+  $K8S wait --for=condition=complete job/"${svc}-migration-job" -n msa --timeout=180s
+done
+echo "Migrations complete"
+
+# Seed
+$K8S delete job reset-microservices-data-job -n msa --ignore-not-found
+$K8S apply -f "$EKS_JOB_DIR/reset-microservices-data-job.yaml"
+$K8S wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
+
+$K8S delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
+$K8S apply -f "$EKS_JOB_DIR/seed-microservices-benchmark-data-job.yaml"
+$K8S wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
+echo "Seed complete"
+
+# Deploy services
+for svc in auth-service item-service transaction-service api-gateway; do
+  $K8S apply -f "deployments/k8s/eks/microservices/${svc}.yaml"
+done
+for svc in auth-service item-service transaction-service api-gateway; do
+  $K8S rollout status "deployment/${svc}" -n msa --timeout=300s
+done
+
+# Resource management
+if [ "$SCALING_MODE" = "hpa" ]; then
+  bash scripts/install-metrics-server.sh "$CONTEXT"
+  $K8S apply -f deployments/k8s/microservices/resource-management-hpa.yaml
+  echo "HPA mode applied"
+else
+  for svc in api-gateway auth-service item-service transaction-service; do
+    $K8S delete hpa "$svc" -n msa --ignore-not-found
+  done
+  $K8S apply -f deployments/k8s/microservices/resource-management-fixed.yaml
+  for svc in api-gateway auth-service item-service transaction-service; do
+    $K8S scale deployment "$svc" -n msa --replicas=1
+  done
+  echo "Fixed replica mode applied"
+fi
+
+# Datadog
+DATADOG_API_KEY="${DATADOG_API_KEY:-}"
+DATADOG_CHART_VERSION="${DATADOG_CHART_VERSION:-3.134.0}"
+if [ -z "${DATADOG_SITE:-}" ] && [ -f env/datadog.eks.env ]; then
+  set -a
+  source env/datadog.eks.env
+  set +a
+fi
+if [ -n "$DATADOG_API_KEY" ]; then
+  helm repo add datadog https://helm.datadoghq.com --force-update
+  helm repo update datadog
+  KUBE_CONTEXT="$CONTEXT" DATADOG_NAMESPACE=datadog DATADOG_SITE="${DATADOG_SITE:-datadoghq.com}" bash scripts/create-datadog-secret.sh
+  helm upgrade --install datadog datadog/datadog \
+    --version "$DATADOG_CHART_VERSION" \
+    --kube-context="$CONTEXT" \
+    --namespace datadog \
+    --values deployments/helm/datadog/values-eks-msa.yaml \
+    --set datadog.site="${DATADOG_SITE:-datadoghq.com}"
+  kubectl --context="$CONTEXT" rollout status daemonset/datadog -n datadog --timeout=300s
+  echo "Datadog installed"
+fi
+
+echo ""
+echo "=== MSA cluster ready ==="
+$K8S get pods -n msa

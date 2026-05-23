@@ -106,8 +106,11 @@ HTTP_WRITE_TIMEOUT=30s
 HTTP_IDLE_TIMEOUT=60s
 HTTP_SHUTDOWN_TIMEOUT=10s
 HTTP_MAX_HEADER_BYTES=1048576
+BCRYPT_COST=10
 JWT_SECRET=${jwt_secret}
 DATADOG_ENABLED=false"
+
+write_or_update_env_value "env/monolith.env" "BCRYPT_COST" "10"
 
 write_or_update_env_value \
   "env/db-bootstrap.env" \
