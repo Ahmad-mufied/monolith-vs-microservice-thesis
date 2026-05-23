@@ -6,6 +6,7 @@ import (
 	"time"
 
 	pkgconfig "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/config"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Config struct {
@@ -22,7 +23,7 @@ func Load() (*Config, error) {
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		JWTSecret:   os.Getenv("JWT_SECRET"),
 		JWTExpiry:   pkgconfig.GetEnvDuration("JWT_EXPIRY", 24*time.Hour),
-		BcryptCost:  pkgconfig.GetEnvInt("BCRYPT_COST", 12),
+		BcryptCost:  pkgconfig.GetEnvInt("BCRYPT_COST", bcrypt.DefaultCost),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -34,8 +35,8 @@ func Load() (*Config, error) {
 	if cfg.JWTExpiry <= 0 {
 		return nil, fmt.Errorf("JWT_EXPIRY must be a positive duration")
 	}
-	if cfg.BcryptCost < 4 || cfg.BcryptCost > 31 {
-		return nil, fmt.Errorf("BCRYPT_COST must be between 4 and 31")
+	if cfg.BcryptCost < bcrypt.MinCost || cfg.BcryptCost > bcrypt.MaxCost {
+		return nil, fmt.Errorf("BCRYPT_COST must be between %d and %d", bcrypt.MinCost, bcrypt.MaxCost)
 	}
 
 	return cfg, nil

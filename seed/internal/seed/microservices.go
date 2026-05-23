@@ -117,7 +117,7 @@ func SeedMicroservicesData(ctx context.Context, cfg MicroservicesConfig, mode st
 		for _, user := range ds.Users {
 			hash, ok := passwordHashes[user.Password]
 			if !ok {
-				encoded, err := bcrypt.GenerateFromPassword([]byte(user.Password), 12)
+				encoded, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 				if err != nil {
 					return err
 				}

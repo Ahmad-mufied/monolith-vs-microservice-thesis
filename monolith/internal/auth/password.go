@@ -9,10 +9,19 @@ import (
 
 var ErrPasswordMismatch = errors.New("password mismatch")
 
-type BcryptHasher struct{}
+type BcryptHasher struct {
+	Cost int
+}
 
-func (BcryptHasher) Hash(password string) (string, error) {
-	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+func (h BcryptHasher) cost() int {
+	if h.Cost < bcrypt.MinCost {
+		return bcrypt.DefaultCost
+	}
+	return h.Cost
+}
+
+func (h BcryptHasher) Hash(password string) (string, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), h.cost())
 	if err != nil {
 		return "", fmt.Errorf("hashing password: %w", err)
 	}
