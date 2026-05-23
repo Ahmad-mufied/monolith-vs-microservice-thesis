@@ -35,8 +35,9 @@ MONOLITH_PORT ?= 8080
 API_GATEWAY_PORT ?= 8080
 DATADOG_NAMESPACE ?= datadog
 DATADOG_RELEASE ?= datadog
-DATADOG_SITE ?= datadoghq.com
+DATADOG_SITE ?= $(shell if [ -f env/datadog.eks.env ]; then grep -E '^DATADOG_SITE=' env/datadog.eks.env | head -n 1 | cut -d= -f2-; else printf '%s' 'datadoghq.com'; fi)
 DATADOG_CHART_VERSION ?= 3.134.0
+TERRAFORM_AWS_PROFILE ?= terraform-process
 
 # =========================
 # Env Files
@@ -47,6 +48,10 @@ API_GATEWAY_ENV := env/api-gateway.env
 AUTH_SERVICE_ENV := env/auth-service.env
 ITEM_SERVICE_ENV := env/item-service.env
 TRANSACTION_SERVICE_ENV := env/transaction-service.env
+AWS_BENCHMARK_ENV := env/aws-benchmark.env
+TERRAFORM_SHARED_ENV := env/terraform.shared.env
+TERRAFORM_EXPERIMENT_ENV := env/terraform.experiment.env
+DATADOG_EKS_ENV := env/datadog.eks.env
 
 # =========================
 # Tooling
@@ -70,6 +75,7 @@ help:
 	@echo "  make env-init-datadog-minikube"
 	@echo "  make env-init-monolith"
 	@echo "  make env-init-microservices"
+	@echo "  make env-init-eks"
 	@echo "  make fmt"
 	@echo "  make test"
 	@echo "  make lint"
@@ -159,6 +165,12 @@ help:
 	@echo "  make datadog-install-eks-msa"
 	@echo "  make datadog-status"
 	@echo "  make datadog-uninstall"
+	@echo "  make eks-render-tfvars"
+	@echo "  make terraform-auth-check"
+	@echo "  make terraform-recovery-check"
+	@echo "  make eks-prepare-enrichment-benchmark"
+	@echo "  make create-eks-secrets-monolith"
+	@echo "  make create-eks-secrets-microservices"
 	@echo "  make create-local-postgres-secrets"
 	@echo "  make create-local-secrets"
 	@echo "  make create-local-secrets-microservices"
@@ -183,6 +195,10 @@ env-init-monolith: env-init-base
 .PHONY: env-init-microservices
 env-init-microservices: env-init-base
 	bash scripts/env-init-microservices.sh
+
+.PHONY: env-init-eks
+env-init-eks:
+	bash scripts/env-init-eks.sh
 
 # =========================
 # Go Development
@@ -763,18 +779,163 @@ datadog-uninstall:
 # EKS / Terraform
 # =========================
 
+SCENARIO     ?= login
+TARGET_RPS   ?= 1000
+RUN_ID       ?= eks-run-001
+ATTEMPT      ?= attempt-01
+SCALING_MODE ?= fixed
+K6_PROFILE   ?= steady
+TEST_DURATION ?= 5m
+S3_BUCKET    ?= skripsi-benchmark-results
+DATADOG_ENABLED ?= true
+DATADOG_ENV ?= benchmark
+
 .PHONY: terraform-fmt
 terraform-fmt:
+	cd infra/terraform/shared && terraform fmt -recursive
 	cd infra/terraform/experiment && terraform fmt -recursive
 
-.PHONY: terraform-validate
+# =========================
+# AWS Persistent Resources (one-time setup)
+# =========================
+
+AWS_REGION    ?= ap-southeast-1
+ECR_NAMESPACE ?= skripsi
+
+.PHONY: aws-create-s3
+aws-create-s3:
+	aws s3api create-bucket \
+		--bucket $(S3_BUCKET) \
+		--region $(AWS_REGION) \
+		--create-bucket-configuration LocationConstraint=$(AWS_REGION)
+	aws s3api put-public-access-block \
+		--bucket $(S3_BUCKET) \
+		--public-access-block-configuration \
+		"BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+	@echo "S3 bucket created: $(S3_BUCKET)"
+
+.PHONY: aws-create-ecr
+aws-create-ecr:
+	@for repo in monolith api-gateway auth-service item-service transaction-service seed-runner k6-runner; do \
+		aws ecr create-repository \
+			--repository-name "$(ECR_NAMESPACE)/$$repo" \
+			--image-tag-mutability IMMUTABLE \
+			--region $(AWS_REGION) \
+			--query 'repository.repositoryUri' \
+			--output text; \
+	done
+
+.PHONY: aws-ecr-login
+aws-ecr-login:
+	$(eval ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text))
+	aws ecr get-login-password --region $(AWS_REGION) \
+		| docker login --username AWS --password-stdin \
+		  "$(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com"
+
+# =========================
+# ECR Image Build and Push
+# =========================
+
+IMAGE_TAG ?= $(shell git rev-parse --short HEAD)
+
+.PHONY: ecr-push-all
+ecr-push-all: aws-ecr-login
+	$(eval ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text))
+	$(eval ECR := $(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com)
+	docker build -t $(ECR)/$(ECR_NAMESPACE)/monolith:$(IMAGE_TAG) -f monolith/Dockerfile .
+	docker push $(ECR)/$(ECR_NAMESPACE)/monolith:$(IMAGE_TAG)
+	docker build -t $(ECR)/$(ECR_NAMESPACE)/api-gateway:$(IMAGE_TAG) -f microservices/api-gateway/Dockerfile .
+	docker push $(ECR)/$(ECR_NAMESPACE)/api-gateway:$(IMAGE_TAG)
+	docker build -t $(ECR)/$(ECR_NAMESPACE)/auth-service:$(IMAGE_TAG) -f microservices/auth-service/Dockerfile .
+	docker push $(ECR)/$(ECR_NAMESPACE)/auth-service:$(IMAGE_TAG)
+	docker build -t $(ECR)/$(ECR_NAMESPACE)/item-service:$(IMAGE_TAG) -f microservices/item-service/Dockerfile .
+	docker push $(ECR)/$(ECR_NAMESPACE)/item-service:$(IMAGE_TAG)
+	docker build -t $(ECR)/$(ECR_NAMESPACE)/transaction-service:$(IMAGE_TAG) -f microservices/transaction-service/Dockerfile .
+	docker push $(ECR)/$(ECR_NAMESPACE)/transaction-service:$(IMAGE_TAG)
+	docker build -t $(ECR)/$(ECR_NAMESPACE)/seed-runner:$(IMAGE_TAG) -f seed/Dockerfile .
+	docker push $(ECR)/$(ECR_NAMESPACE)/seed-runner:$(IMAGE_TAG)
+	docker build -t $(ECR)/$(ECR_NAMESPACE)/k6-runner:$(IMAGE_TAG) -f k6/runner/Dockerfile .
+	docker push $(ECR)/$(ECR_NAMESPACE)/k6-runner:$(IMAGE_TAG)
+	@echo "All images pushed with tag: $(IMAGE_TAG)"
+
+.PHONY: eks-update-manifests
+eks-update-manifests:
+	IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/eks-update-manifests.sh
+	bash scripts/validate-eks-assets.sh deploy
+
+.PHONY: eks-validate-manifests
+eks-validate-manifests:
+	bash scripts/validate-eks-assets.sh deploy
+
+.PHONY: eks-render-tfvars
+eks-render-tfvars:
+	bash scripts/render-eks-tfvars.sh
+
+
 terraform-validate:
-	cd infra/terraform/experiment && terraform validate
+	cd infra/terraform/shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
+	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
+
+.PHONY: terraform-auth-check
+terraform-auth-check:
+	AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) aws sts get-caller-identity >/dev/null
+	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init -input=false >/dev/null && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform plan -refresh=false -input=false -lock=false -no-color >/dev/null
+	@echo "Terraform auth check passed with AWS profile '$(TERRAFORM_AWS_PROFILE)'"
+
+.PHONY: terraform-recovery-check
+terraform-recovery-check:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-recovery-check.sh
+
+.PHONY: eks-shared-apply
+eks-shared-apply:
+	cd infra/terraform/shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform apply
+
+.PHONY: eks-shared-destroy
+eks-shared-destroy:
+	cd infra/terraform/shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform destroy
 
 .PHONY: eks-apply
 eks-apply:
-	cd infra/terraform/experiment && terraform apply
+	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform apply
 
 .PHONY: eks-destroy
 eks-destroy:
-	cd infra/terraform/experiment && terraform destroy
+	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform destroy
+
+.PHONY: eks-setup-contexts
+eks-setup-contexts:
+	bash scripts/setup-eks-contexts.sh
+
+.PHONY: eks-deploy-monolith
+eks-deploy-monolith:
+	SCALING_MODE=$(SCALING_MODE) bash scripts/deploy-monolith-cluster.sh
+
+.PHONY: eks-deploy-msa
+eks-deploy-msa:
+	SCALING_MODE=$(SCALING_MODE) bash scripts/deploy-msa-cluster.sh
+
+.PHONY: eks-prepare-enrichment-benchmark
+eks-prepare-enrichment-benchmark:
+	bash scripts/prepare-enrichment-benchmark.sh
+
+.PHONY: create-eks-secrets-monolith
+create-eks-secrets-monolith:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/create-eks-secrets-monolith.sh
+
+.PHONY: create-eks-secrets-microservices
+create-eks-secrets-microservices:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/create-eks-secrets-microservices.sh
+
+.PHONY: run-benchmark-parallel
+run-benchmark-parallel:
+	SCENARIO=$(SCENARIO) \
+	TARGET_RPS=$(TARGET_RPS) \
+	RUN_ID=$(RUN_ID) \
+	ATTEMPT=$(ATTEMPT) \
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE=$(K6_PROFILE) \
+	TEST_DURATION=$(TEST_DURATION) \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	bash scripts/run-benchmark-parallel.sh

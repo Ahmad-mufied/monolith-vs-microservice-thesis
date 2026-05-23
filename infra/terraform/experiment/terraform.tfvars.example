@@ -1,0 +1,4 @@
+aws_region          = "ap-southeast-1"
+project             = "skripsi"
+db_password         = "REPLACE_WITH_STRONG_PASSWORD"
+db_instance_class   = "db.t3.micro"
