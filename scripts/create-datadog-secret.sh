@@ -7,6 +7,13 @@ site="${DATADOG_SITE:-datadoghq.com}"
 app_key="${DATADOG_APP_KEY:-}"
 kube_context="${KUBE_CONTEXT:-}"
 
+if [[ -z "${DATADOG_API_KEY:-}" && -f env/datadog.eks.env ]]; then
+  set -a
+  source env/datadog.eks.env
+  set +a
+  site="${DATADOG_SITE:-$site}"
+fi
+
 if [[ -z "${DATADOG_API_KEY:-}" ]]; then
   echo "DATADOG_API_KEY must be set in the environment" >&2
   exit 1

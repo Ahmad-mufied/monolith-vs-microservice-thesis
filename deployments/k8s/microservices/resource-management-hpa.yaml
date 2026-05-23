@@ -21,7 +21,10 @@ spec:
     kind: Deployment
     name: api-gateway
   minReplicas: 1
-  maxReplicas: 16
+  maxReplicas: 9
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60
   metrics:
     - type: Resource
       resource:
@@ -41,7 +44,10 @@ spec:
     kind: Deployment
     name: auth-service
   minReplicas: 1
-  maxReplicas: 16
+  maxReplicas: 3
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60
   metrics:
     - type: Resource
       resource:
@@ -61,7 +67,10 @@ spec:
     kind: Deployment
     name: item-service
   minReplicas: 1
-  maxReplicas: 16
+  maxReplicas: 9
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60
   metrics:
     - type: Resource
       resource:
@@ -81,7 +90,10 @@ spec:
     kind: Deployment
     name: transaction-service
   minReplicas: 1
-  maxReplicas: 16
+  maxReplicas: 5
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60
   metrics:
     - type: Resource
       resource:
