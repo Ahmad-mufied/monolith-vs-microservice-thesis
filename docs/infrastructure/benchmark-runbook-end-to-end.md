@@ -369,7 +369,7 @@ This script runs:
 5. Deploy monolith application
 6. Install metrics-server automatically when `SCALING_MODE=hpa`
 7. Apply ResourceQuota (fixed mode: no HPA)
-8. Install Datadog (if `DATADOG_API_KEY` is set)
+8. Install Datadog (only when `DATADOG_API_KEY` is a real non-placeholder value)
 
 Verify:
 
@@ -409,7 +409,7 @@ This script runs:
 5. Deploy all 4 MSA services
 6. Install metrics-server automatically when `SCALING_MODE=hpa`
 7. Apply ResourceQuota (fixed mode: no HPA)
-8. Install Datadog (if `DATADOG_API_KEY` is set)
+8. Install Datadog (only when `DATADOG_API_KEY` is a real non-placeholder value)
 
 Verify:
 
@@ -448,6 +448,9 @@ SCALING_MODE=fixed make eks-deploy-msa
 DATADOG_API_KEY=<your_api_key> make datadog-install-eks-monolith
 DATADOG_API_KEY=<your_api_key> make datadog-install-eks-msa
 ```
+
+Placeholder values such as `replace-me`, `CHANGE_ME`, `your_api_key`, and
+`redacted` are rejected by the deploy and secret-creation scripts.
 
 Verify:
 

@@ -7,6 +7,16 @@ site="${DATADOG_SITE:-datadoghq.com}"
 app_key="${DATADOG_APP_KEY:-}"
 kube_context="${KUBE_CONTEXT:-}"
 
+has_non_placeholder_datadog_api_key() {
+  local value="${1:-}"
+  case "${value,,}" in
+    ""|"replace-me"|"change_me"|"change-me"|"your_api_key"|"redacted"|"example")
+      return 1
+      ;;
+  esac
+  return 0
+}
+
 if [[ -z "${DATADOG_API_KEY:-}" && -f env/datadog.eks.env ]]; then
   set -a
   source env/datadog.eks.env
@@ -14,8 +24,8 @@ if [[ -z "${DATADOG_API_KEY:-}" && -f env/datadog.eks.env ]]; then
   site="${DATADOG_SITE:-$site}"
 fi
 
-if [[ -z "${DATADOG_API_KEY:-}" ]]; then
-  echo "DATADOG_API_KEY must be set in the environment" >&2
+if ! has_non_placeholder_datadog_api_key "${DATADOG_API_KEY:-}"; then
+  echo "DATADOG_API_KEY must be a real non-placeholder value" >&2
   exit 1
 fi
 

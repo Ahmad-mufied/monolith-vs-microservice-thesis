@@ -17,6 +17,16 @@ IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
 
+has_non_placeholder_datadog_api_key() {
+  local value="${1:-}"
+  case "${value,,}" in
+    ""|"replace-me"|"change_me"|"change-me"|"your_api_key"|"redacted"|"example")
+      return 1
+      ;;
+  esac
+  return 0
+}
+
 echo "=== Deploying MSA cluster (context: $CONTEXT) ==="
 
 echo "Patching EKS manifests with IMAGE_TAG=$IMAGE_TAG"
@@ -99,7 +109,7 @@ if [ -z "${DATADOG_SITE:-}" ] && [ -f env/datadog.eks.env ]; then
   source env/datadog.eks.env
   set +a
 fi
-if [ -n "$DATADOG_API_KEY" ]; then
+if has_non_placeholder_datadog_api_key "$DATADOG_API_KEY"; then
   helm repo add datadog https://helm.datadoghq.com --force-update
   helm repo update datadog
   KUBE_CONTEXT="$CONTEXT" DATADOG_NAMESPACE=datadog DATADOG_SITE="${DATADOG_SITE:-datadoghq.com}" bash scripts/create-datadog-secret.sh
@@ -111,6 +121,8 @@ if [ -n "$DATADOG_API_KEY" ]; then
     --set datadog.site="${DATADOG_SITE:-datadoghq.com}"
   kubectl --context="$CONTEXT" rollout status daemonset/datadog -n datadog --timeout=300s
   echo "Datadog installed"
+elif [ -n "$DATADOG_API_KEY" ]; then
+  echo "Skipping Datadog install: DATADOG_API_KEY is still a placeholder value" >&2
 fi
 
 echo ""

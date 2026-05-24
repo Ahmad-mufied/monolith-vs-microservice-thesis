@@ -381,6 +381,9 @@ DATADOG_API_KEY=<redacted> make datadog-install-eks-monolith
 DATADOG_API_KEY=<redacted> make datadog-install-eks-msa
 ```
 
+Placeholder values such as `replace-me`, `CHANGE_ME`, `your_api_key`, and
+`redacted` are rejected by the EKS deploy and Datadog secret helper scripts.
+
 ---
 
 ## 11. Step 8 — Run Parallel Benchmark
