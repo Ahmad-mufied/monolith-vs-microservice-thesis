@@ -102,18 +102,66 @@ $rendered_manifest
 EOF
 }
 
+run_submission() {
+  local result_file="$1"
+  shift
+
+  if patch_and_apply "$@"; then
+    printf 'SUCCESS\n' >"$result_file"
+  else
+    printf 'FAILED\n' >"$result_file"
+    return 1
+  fi
+}
+
 echo "Starting both k6 jobs simultaneously..."
-patch_and_apply monolith \
+mono_submit_result_file="$(mktemp)"
+msa_submit_result_file="$(mktemp)"
+rm -f "$mono_submit_result_file" "$msa_submit_result_file"
+trap 'rm -f "$mono_submit_result_file" "$msa_submit_result_file"' EXIT
+
+run_submission "$mono_submit_result_file" monolith \
   deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml \
   "$S3_MONOLITH" \
   monolith &
+mono_submit_pid=$!
 
-patch_and_apply msa \
+run_submission "$msa_submit_result_file" msa \
   deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml \
   "$S3_MICROSERVICES" \
   microservices &
+msa_submit_pid=$!
 
-wait
+while true; do
+  if [[ -f "$mono_submit_result_file" ]]; then
+    mono_submit_result="$(<"$mono_submit_result_file")"
+    if [[ "$mono_submit_result" != "SUCCESS" ]]; then
+      echo "ERROR: monolith benchmark job submission failed" >&2
+      kill "$msa_submit_pid" 2>/dev/null || true
+      wait "$msa_submit_pid" 2>/dev/null || true
+      exit 1
+    fi
+  fi
+
+  if [[ -f "$msa_submit_result_file" ]]; then
+    msa_submit_result="$(<"$msa_submit_result_file")"
+    if [[ "$msa_submit_result" != "SUCCESS" ]]; then
+      echo "ERROR: microservices benchmark job submission failed" >&2
+      kill "$mono_submit_pid" 2>/dev/null || true
+      wait "$mono_submit_pid" 2>/dev/null || true
+      exit 1
+    fi
+  fi
+
+  if [[ -f "$mono_submit_result_file" && -f "$msa_submit_result_file" ]]; then
+    break
+  fi
+
+  sleep 1
+done
+
+wait "$mono_submit_pid"
+wait "$msa_submit_pid"
 echo "Both jobs submitted."
 
 # ─── Monitor both jobs ────────────────────────────────────────────────────────
@@ -215,8 +263,12 @@ while true; do
   fi
 
   if [ "$elapsed_seconds" -ge "$monitor_timeout_seconds" ]; then
-    MONO_STATE="TIMEOUT"
-    MICROSERVICES_STATE="TIMEOUT"
+    if [ "$MONO_STATE" = "RUNNING" ]; then
+      MONO_STATE="TIMEOUT"
+    fi
+    if [ "$MICROSERVICES_STATE" = "RUNNING" ]; then
+      MICROSERVICES_STATE="TIMEOUT"
+    fi
     break
   fi
 
