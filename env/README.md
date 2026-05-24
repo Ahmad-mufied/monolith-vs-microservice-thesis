@@ -78,6 +78,14 @@ make env-init-eks
 - `transaction-service.eks.env`
 - `k6-runner.eks.env`
 
+`k6-runner.eks.env` stores the benchmark admin credentials used by the k6
+runner secret during EKS benchmark setup.
+
+- `ADMIN_USER_EMAIL` defaults to `benchmark-user-001@example.com`
+- `ADMIN_USER_PASSWORD` is generated automatically as a strong random hex value
+- if an existing `k6-runner.eks.env` still contains the legacy weak value
+  `Password123!`, `make env-init-eks` rotates it automatically
+
 These files are intended to make EKS setup repeatable:
 
 - `make eks-render-tfvars` renders Terraform `terraform.tfvars` from the

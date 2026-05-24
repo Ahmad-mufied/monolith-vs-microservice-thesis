@@ -26,6 +26,18 @@ read_env_value() {
   grep -E "^${key}=" "$file" | head -n 1 | cut -d= -f2- || true
 }
 
+is_weak_k6_password() {
+  local value="${1:-}"
+
+  case "$value" in
+    ""|"Password123!"|"replace-me"|"CHANGE_ME"|"change-me"|"your_api_key"|"example")
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
 write_if_missing() {
   local file="$1"
   local content="$2"
@@ -131,8 +143,19 @@ GRPC_PORT=50053
 SERVICE_NAME=transaction-service
 ITEM_SERVICE_ADDR=item-service.msa.svc.cluster.local:50052"
 
-write_if_missing "env/k6-runner.eks.env" "ADMIN_USER_EMAIL=benchmark-user-001@example.com
-ADMIN_USER_PASSWORD=Password123!"
+k6_runner_email="$(read_env_value env/k6-runner.eks.env ADMIN_USER_EMAIL)"
+k6_runner_email="${k6_runner_email:-benchmark-user-001@example.com}"
+k6_runner_password="$(read_env_value env/k6-runner.eks.env ADMIN_USER_PASSWORD)"
+generated_k6_runner_password="$(random_hex 24)"
+
+write_if_missing "env/k6-runner.eks.env" "ADMIN_USER_EMAIL=${k6_runner_email}
+ADMIN_USER_PASSWORD=${generated_k6_runner_password}"
+
+if is_weak_k6_password "$k6_runner_password"; then
+  write_or_update_env_value "env/k6-runner.eks.env" "ADMIN_USER_PASSWORD" "$generated_k6_runner_password"
+fi
+
+write_or_update_env_value "env/k6-runner.eks.env" "ADMIN_USER_EMAIL" "$k6_runner_email"
 
 write_or_update_env_value "env/monolith.eks.env" "BCRYPT_COST" "10"
 write_or_update_env_value "env/auth-service.eks.env" "BCRYPT_COST" "10"

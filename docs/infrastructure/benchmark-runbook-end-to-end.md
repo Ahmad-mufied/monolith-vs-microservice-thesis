@@ -202,6 +202,7 @@ If you use the helper commands above, you do not need to run the long manual
 MONOLITH_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment output -raw monolith_rds_endpoint)
 DB_PASSWORD="<same password from terraform.tfvars>"
 JWT_SECRET="<generate: openssl rand -hex 32>"
+ADMIN_USER_PASSWORD="$(openssl rand -hex 24)"
 
 # DB bootstrap secret
 kubectl --context=monolith create namespace benchmark --dry-run=client -o yaml | kubectl --context=monolith apply -f -
@@ -237,7 +238,7 @@ kubectl --context=monolith create secret generic monolith-env \
 kubectl --context=monolith create secret generic k6-runner-secret \
   --namespace benchmark \
   --from-literal=ADMIN_USER_EMAIL="benchmark-user-001@example.com" \
-  --from-literal=ADMIN_USER_PASSWORD="Password123!" \
+  --from-literal=ADMIN_USER_PASSWORD="$ADMIN_USER_PASSWORD" \
   --dry-run=client -o yaml | kubectl --context=monolith apply -f -
 ```
 
@@ -247,6 +248,7 @@ kubectl --context=monolith create secret generic k6-runner-secret \
 MSA_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment output -raw msa_rds_endpoint)
 DB_PASSWORD="<same password>"
 JWT_SECRET="<same JWT secret>"
+ADMIN_USER_PASSWORD="$(openssl rand -hex 24)"
 GRPC_PORT_AUTH=50051
 GRPC_PORT_ITEM=50052
 GRPC_PORT_TX=50053
@@ -307,7 +309,7 @@ kubectl --context=msa create secret generic transaction-service-secret \
 kubectl --context=msa create secret generic k6-runner-secret \
   --namespace benchmark \
   --from-literal=ADMIN_USER_EMAIL="benchmark-user-001@example.com" \
-  --from-literal=ADMIN_USER_PASSWORD="Password123!" \
+  --from-literal=ADMIN_USER_PASSWORD="$ADMIN_USER_PASSWORD" \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 ```
 
