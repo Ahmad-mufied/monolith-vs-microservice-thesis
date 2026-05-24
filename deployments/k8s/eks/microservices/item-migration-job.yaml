@@ -11,6 +11,8 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+      nodeSelector:
+        node-group: app
       restartPolicy: OnFailure
       containers:
         - name: migration
