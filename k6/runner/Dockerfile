@@ -1,12 +1,13 @@
 FROM golang:1.26.2-alpine AS builder
 
-ARG K6_BUILD_VERSION=v0.52.0
+ARG K6_BUILD_VERSION=v1.7.1
 ARG XK6_VERSION=v1.2.3
+ARG XK6_OUTPUT_STATSD_VERSION=v0.2.3
 
 RUN apk add --no-cache git
 RUN go install go.k6.io/xk6/cmd/xk6@${XK6_VERSION}
 RUN xk6 build ${K6_BUILD_VERSION} \
-  --with github.com/LeonAdato/xk6-output-statsd@v0.3.0 \
+  --with github.com/LeonAdato/xk6-output-statsd@${XK6_OUTPUT_STATSD_VERSION} \
   --output /tmp/k6
 
 FROM alpine:3.22
@@ -23,5 +24,5 @@ RUN chmod +x /work/k6/runner/run-k6.sh \
   && mkdir -p /work/tmp \
   && chown -R k6:k6 /work
 
-USER k6
+USER 10001:10001
 WORKDIR /work

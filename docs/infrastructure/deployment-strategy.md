@@ -741,7 +741,6 @@ The k6 Job should:
 - export summary.json
 - export metadata.json
 - export stdout.log
-- export Kubernetes snapshots
 - upload results to S3
 ```
 
@@ -1048,7 +1047,7 @@ make deploy-microservices
 make run-k6-job
 
 make eks-apply
-make eks-destroy
+make eks-destroy-confirmed
 ```
 
 The Makefile should not hide undocumented experiment behavior.
@@ -1260,6 +1259,9 @@ For HPA mode, swap the resource-management manifest:
 kubectl apply -f deployments/k8s/monolith/resource-management-hpa.yaml
 ```
 
+This HPA manifest uses a `60s` scale-down stabilization window so replica
+counts fall back to baseline faster after benchmark traffic stops.
+
 Access monolith:
 
 ```bash
@@ -1358,6 +1360,9 @@ For HPA mode, swap the resource-management manifest:
 kubectl apply -f deployments/k8s/microservices/resource-management-hpa.yaml
 ```
 
+This HPA manifest uses a `60s` scale-down stabilization window so replica
+counts fall back to baseline faster after benchmark traffic stops.
+
 Access API Gateway:
 
 ```bash
@@ -1416,6 +1421,23 @@ deployments/k8s/
 │   ├── k6-benchmark-monolith-job.yaml
 │   ├── k6-benchmark-microservices-job.yaml
 │   └── k6-runner-secret.example.yaml
+├── eks/
+│   ├── monolith/
+│   │   ├── migration-job.yaml
+│   │   ├── reset-monolith-data-job.yaml
+│   │   ├── seed-monolith-smoke-data-job.yaml
+│   │   ├── seed-monolith-benchmark-data-job.yaml
+│   │   ├── prepare-monolith-enrichment-smoke-data-job.yaml
+│   │   └── prepare-monolith-enrichment-benchmark-data-job.yaml
+│   └── microservices/
+│       ├── auth-migration-job.yaml
+│       ├── item-migration-job.yaml
+│       ├── transaction-migration-job.yaml
+│       ├── reset-microservices-data-job.yaml
+│       ├── seed-microservices-smoke-data-job.yaml
+│       ├── seed-microservices-benchmark-data-job.yaml
+│       ├── prepare-microservices-enrichment-smoke-data-job.yaml
+│       └── prepare-microservices-enrichment-benchmark-data-job.yaml
 ├── monolith/
 │   ├── migration-job.yaml
 │   ├── prepare-monolith-enrichment-smoke-data-job.yaml
@@ -1576,7 +1598,7 @@ Example:
 ```text
 experiments/20260512-103000/monolith/login/1000rps/attempt-01/
 experiments/20260512-103000/monolith/login/1000rps/attempt-02/
-experiments/20260512-103000/msa/create-transaction/2500rps/attempt-01/
+experiments/20260512-103000/microservices/create-transaction/2500rps/attempt-01/
 ```
 
 `scenario_name` should use the k6 script basename without `.js`, for example:

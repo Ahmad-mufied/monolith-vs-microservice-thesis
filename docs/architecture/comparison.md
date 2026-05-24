@@ -712,11 +712,22 @@ Auth + Item + Transaction all replicated
 Microservices resource configuration per service:
 
 ```text
-CPU per pod       : 250m
-Memory per pod    : 256Mi
-minReplicas       : 1
-maxReplicas       : 16
-HPA target CPU    : 70%
+api-gateway         : request 100m / limit 250m / 256Mi / 384Mi
+auth-service        : request 250m / limit 1000m / 256Mi / 768Mi
+item-service        : request 100m / limit 250m / 256Mi / 384Mi
+transaction-service : request 150m / limit 500m / 256Mi / 512Mi
+minReplicas         : 1
+HPA target CPU      : 70%
+scaleDown window    : 60s
+```
+
+Role-aware maxReplicas:
+
+```text
+api-gateway         : 9
+auth-service        : 3
+item-service        : 9
+transaction-service : 5
 ```
 
 Namespace ceiling:

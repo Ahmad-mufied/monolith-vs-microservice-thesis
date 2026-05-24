@@ -130,7 +130,7 @@ DATABASE_URL=postgres://postgres:<password>@localhost:5432/auth_db?sslmode=disab
 AUTH_DATABASE_URL=postgres://postgres:<password>@localhost:5432/auth_db?sslmode=disable
 JWT_SECRET=<same-local-secret-as-api-gateway>
 JWT_EXPIRY=24h
-BCRYPT_COST=12
+BCRYPT_COST=10
 ```
 
 `DATABASE_URL` is used by the service process.
@@ -766,10 +766,10 @@ BASE_URL=http://localhost:8080 \
 K6_SCRIPT=smoke.js \
 DATASET=smoke \
 K6_PROFILE=smoke \
-ARCHITECTURE=msa \
+ARCHITECTURE=microservices \
 SCENARIO_NAME=smoke \
 VUS=1 \
-DURATION=30s \
+TEST_DURATION=30s \
 ./k6/runner/run-k6.sh
 ```
 
@@ -779,10 +779,10 @@ For local benchmark verification, start with a low arrival rate:
 BASE_URL=http://localhost:8080 \
 K6_SCRIPT=login.js \
 DATASET=benchmark \
-ARCHITECTURE=msa \
+ARCHITECTURE=microservices \
 SCENARIO_NAME=login \
 TARGET_RPS=1 \
-DURATION=10s \
+TEST_DURATION=10s \
 PRE_ALLOCATED_VUS=2 \
 MAX_VUS=4 \
 ./k6/runner/run-k6.sh
@@ -794,10 +794,10 @@ The same local verification baseline works for the other benchmark scripts:
 BASE_URL=http://localhost:8080 \
 K6_SCRIPT=create-transaction.js \
 DATASET=benchmark \
-ARCHITECTURE=msa \
+ARCHITECTURE=microservices \
 SCENARIO_NAME=create-transaction \
 TARGET_RPS=1 \
-DURATION=10s \
+TEST_DURATION=10s \
 PRE_ALLOCATED_VUS=2 \
 MAX_VUS=4 \
 TOKEN_POOL_SIZE=5 \
@@ -808,10 +808,10 @@ TOKEN_POOL_SIZE=5 \
 BASE_URL=http://localhost:8080 \
 K6_SCRIPT=enriched-transactions.js \
 DATASET=benchmark \
-ARCHITECTURE=msa \
+ARCHITECTURE=microservices \
 SCENARIO_NAME=enriched-transactions \
 TARGET_RPS=1 \
-DURATION=10s \
+TEST_DURATION=10s \
 PRE_ALLOCATED_VUS=2 \
 MAX_VUS=4 \
 ./k6/runner/run-k6.sh

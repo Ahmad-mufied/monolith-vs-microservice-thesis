@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prepare-microservices-enrichment-smoke-data-job
+  namespace: msa
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      nodeSelector:
+        node-group: app
+      restartPolicy: OnFailure
+      containers:
+        - name: prepare-enrichment
+          image: REPLACE_WITH_ECR_IMAGE
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: AUTH_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: auth-service-secret
+                  key: DATABASE_URL
+            - name: ITEM_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: item-service-secret
+                  key: DATABASE_URL
+            - name: TRANSACTION_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: transaction-service-secret
+                  key: DATABASE_URL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          command:
+            - /usr/local/bin/seed-runner
+            - prepare-microservices-enrichment-data
+            - --dataset=smoke
+            - --auth-database-url=$(AUTH_DATABASE_URL)
+            - --item-database-url=$(ITEM_DATABASE_URL)
+            - --transaction-database-url=$(TRANSACTION_DATABASE_URL)

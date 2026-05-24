@@ -44,6 +44,33 @@ write_if_missing() {
   echo "created $file"
 }
 
+write_or_update_env_value() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+
+  if [[ ! -f "$file" ]]; then
+    printf "%s=%s\n" "$key" "$value" >"$file"
+    echo "created $file"
+    return
+  fi
+
+  local current_value
+  current_value="$(read_env_value "$file" "$key")"
+  if [[ "$current_value" == "$value" ]]; then
+    echo "skip $file ($key already up to date)"
+    return
+  fi
+
+  if grep -q -E "^${key}=" "$file"; then
+    perl -0pi -e "s#^${key}=.*#${key}=${value}#m" "$file"
+  else
+    printf "%s=%s\n" "$key" "$value" >>"$file"
+  fi
+
+  echo "updated $file"
+}
+
 if [[ ! -f env/postgres.env ]]; then
   echo "missing env/postgres.env; run: make env-init-base" >&2
   exit 1
@@ -76,7 +103,7 @@ DATABASE_URL=${auth_database_url}
 AUTH_DATABASE_URL=${auth_database_url}
 JWT_SECRET=${jwt_secret}
 JWT_EXPIRY=24h
-BCRYPT_COST=12
+BCRYPT_COST=10
 DATADOG_ENABLED=false"
 
 write_if_missing "env/item-service.env" "GRPC_PORT=50052
@@ -102,7 +129,7 @@ DATABASE_URL=${compose_auth_database_url}
 AUTH_DATABASE_URL=${compose_auth_database_url}
 JWT_SECRET=${jwt_secret}
 JWT_EXPIRY=24h
-BCRYPT_COST=12
+BCRYPT_COST=10
 DATADOG_ENABLED=false"
 
 write_if_missing "env/item-service.compose.env" "GRPC_PORT=50052
@@ -122,5 +149,8 @@ AUTH_SERVICE_ADDR=auth-service:50051
 ITEM_SERVICE_ADDR=item-service:50052
 TRANSACTION_SERVICE_ADDR=transaction-service:50053
 DATADOG_ENABLED=false"
+
+write_or_update_env_value "env/auth-service.env" "BCRYPT_COST" "10"
+write_or_update_env_value "env/auth-service.compose.env" "BCRYPT_COST" "10"
 
 echo "local microservices env initialization complete"

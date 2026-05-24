@@ -111,6 +111,9 @@ Example:
 postgres://postgres_admin:<password>@<rds-endpoint>:5432/bootstrap?sslmode=require
 ```
 
+If the password contains reserved URI characters such as `@`, `:`, `/`, `?`,
+`#`, or `%`, URL-encode the password before embedding it into the URI.
+
 The job must run before migration jobs.
 
 ---
@@ -216,6 +219,9 @@ DATABASE_URL=postgres://postgres_admin:<password>@<endpoint>:5432/transaction_db
 Do not commit these values.
 
 Store them in Kubernetes Secrets.
+
+When constructing these URLs manually, URL-encode the password component first
+if it contains reserved URI characters.
 
 ---
 

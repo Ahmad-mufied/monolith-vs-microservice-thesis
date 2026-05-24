@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prepare-monolith-enrichment-benchmark-data-job
+  namespace: mono
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      nodeSelector:
+        node-group: app
+      restartPolicy: OnFailure
+      containers:
+        - name: prepare-enrichment
+          image: REPLACE_WITH_ECR_IMAGE
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: monolith-env
+                  key: DATABASE_URL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          command:
+            - /usr/local/bin/seed-runner
+            - prepare-monolith-enrichment-data
+            - --dataset=benchmark
+            - --database-url=$(DATABASE_URL)

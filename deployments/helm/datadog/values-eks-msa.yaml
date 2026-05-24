@@ -1,5 +1,12 @@
 targetSystem: linux
 
+agents:
+  tolerations:
+    - key: workload
+      operator: Equal
+      value: benchmark
+      effect: NoSchedule
+
 datadog:
   apiKeyExistingSecret: datadog-secret
   clusterName: skripsi-msa

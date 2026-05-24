@@ -752,20 +752,20 @@ during the scaling process. This should be explained as autoscaling behavior.
 | Scenario | Architecture | Target RPS | Achieved RPS | Error Rate | p95 Latency | Avg CPU | P95 CPU | Avg Memory | P95 Memory |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 | login | monolith | ... | ... | ... | ... | ... | ... | ... | ... |
-| login | msa | ... | ... | ... | ... | ... | ... | ... | ... |
+| login | microservices | ... | ... | ... | ... | ... | ... | ... | ... |
 | create-transaction | monolith | ... | ... | ... | ... | ... | ... | ... | ... |
-| create-transaction | msa | ... | ... | ... | ... | ... | ... | ... | ... |
+| create-transaction | microservices | ... | ... | ... | ... | ... | ... | ... | ... |
 
 ### 17.2 Efficiency Metrics Table
 
 | Scenario | Architecture | RPS/Core | CPU Core-sec / 1000 Req | Memory MiB / 1000 RPS | Interpretation |
 |---|---|---:|---:|---:|---|
 | login | monolith | ... | ... | ... | ... |
-| login | msa | ... | ... | ... | ... |
+| login | microservices | ... | ... | ... | ... |
 | create-transaction | monolith | ... | ... | ... | ... |
-| create-transaction | msa | ... | ... | ... | ... |
+| create-transaction | microservices | ... | ... | ... | ... |
 
-### 17.3 MSA Service-Level Breakdown
+### 17.3 Microservices Service-Level Breakdown
 
 | Scenario | Service | Avg CPU | P95 CPU | Avg Memory | P95 Memory | Avg Replicas | Max Replicas |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -779,8 +779,8 @@ during the scaling process. This should be explained as autoscaling behavior.
 | Scenario | Architecture | Component | HPA Target CPU | Min Replicas | Max Replicas | Max Observed Replicas | Notes |
 |---|---|---|---:|---:|---:|---:|---|
 | create-transaction | monolith | monolith | 70% | ... | ... | ... | ... |
-| create-transaction | msa | api-gateway | 70% | ... | ... | ... | ... |
-| create-transaction | msa | transaction-service | 70% | ... | ... | ... | ... |
+| create-transaction | microservices | api-gateway | 70% | ... | ... | ... | ... |
+| create-transaction | microservices | transaction-service | 70% | ... | ... | ... | ... |
 
 ---
 
@@ -789,11 +789,11 @@ during the scaling process. This should be explained as autoscaling behavior.
 ### 18.1 Cross-Architecture Comparison
 
 ```text
-CPU total: monolith vs MSA
-memory total: monolith vs MSA
-p95 latency: monolith vs MSA
-error rate: monolith vs MSA
-pod count: monolith vs MSA
+CPU total: monolith vs microservices
+memory total: monolith vs microservices
+p95 latency: monolith vs microservices
+error rate: monolith vs microservices
+pod count: monolith vs microservices
 ```
 
 ### 18.2 Monolith Detail
@@ -869,7 +869,7 @@ Important metadata fields:
 {
   "run_id": "20260512-103000",
   "attempt": "attempt-01",
-  "architecture": "msa",
+  "architecture": "microservices",
   "scenario_name": "create-transaction",
   "target_rps": 1000,
   "duration": "5m",
@@ -898,7 +898,7 @@ s3://{bucket}/experiments/{run_id}/{architecture}/{scenario_name}/{target_rps}rp
 Example:
 
 ```text
-s3://skripsi-benchmark-results/experiments/20260512-103000/msa/create-transaction/1000rps/attempt-01/
+s3://skripsi-benchmark-results/experiments/20260512-103000/microservices/create-transaction/1000rps/attempt-01/
 ```
 
 Raw output should remain immutable.
@@ -915,7 +915,7 @@ Example analysis files:
 performance-summary.csv
 resource-efficiency-summary.csv
 hpa-behavior-summary.csv
-msa-service-breakdown.csv
+microservices-service-breakdown.csv
 ```
 
 ---
