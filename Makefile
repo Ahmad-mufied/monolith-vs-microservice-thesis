@@ -910,11 +910,11 @@ eks-setup-contexts:
 
 .PHONY: eks-deploy-monolith
 eks-deploy-monolith:
-	SCALING_MODE=$(SCALING_MODE) bash scripts/deploy-monolith-cluster.sh
+	SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/deploy-monolith-cluster.sh
 
 .PHONY: eks-deploy-msa
 eks-deploy-msa:
-	SCALING_MODE=$(SCALING_MODE) bash scripts/deploy-msa-cluster.sh
+	SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/deploy-msa-cluster.sh
 
 .PHONY: eks-prepare-enrichment-benchmark
 eks-prepare-enrichment-benchmark:

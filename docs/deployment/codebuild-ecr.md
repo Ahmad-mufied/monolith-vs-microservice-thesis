@@ -67,16 +67,16 @@ make aws-ecr-login
 ### Step 3 — Build and push all images
 
 ```bash
-make ecr-push-all
-# Uses IMAGE_TAG=$(git rev-parse --short HEAD) by default
-# Override: make ecr-push-all IMAGE_TAG=<tag>
+IMAGE_TAG=$(git rev-parse --short HEAD)
+make ecr-push-all IMAGE_TAG=$IMAGE_TAG
+# Override explicitly, for example: IMAGE_TAG=<tag>
 ```
 
-### Step 4 — Update EKS manifests with the pushed image tag
+### Step 4 — Optional Preflight: Update EKS manifests with the pushed image tag
 
 ```bash
 make eks-update-manifests IMAGE_TAG=$IMAGE_TAG
-# Uses the same IMAGE_TAG as ecr-push-all
+# Optional manual preflight. eks-deploy-* reruns this automatically.
 ```
 
 This patches:
@@ -86,6 +86,17 @@ This patches:
 - benchmark k6 Jobs,
 - Datadog version labels,
 - benchmark `IMAGES_JSON` metadata payloads.
+
+The EKS deploy scripts now rerun the same patching step automatically before
+validation and `kubectl apply`. Manual execution remains useful when you want
+to inspect the rendered manifests before deployment. If you deploy a non-default
+tag, pass the same `IMAGE_TAG` to the deploy command.
+
+The deploy scripts still accept the shorter implicit form without `IMAGE_TAG`,
+because they derive the tag from `git rev-parse --short HEAD` at execution
+time. The explicit pinned-tag pattern is documented as the default workflow so
+the pushed image tag and the deployed manifest tag remain identical across the
+same session.
 
 ### Step 5 — Apply Terraform and deploy
 
@@ -97,8 +108,8 @@ make eks-apply
 make eks-setup-contexts
 make eks-validate-manifests
 # create cluster secrets
-make eks-deploy-monolith
-make eks-deploy-msa
+make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
+make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
 # install Datadog
 ```
 

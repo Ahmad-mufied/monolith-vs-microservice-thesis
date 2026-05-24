@@ -3,13 +3,24 @@
 # Run after terraform apply and setup-eks-contexts.sh.
 set -euo pipefail
 
+if [ -f env/aws-benchmark.env ]; then
+  set -a
+  source env/aws-benchmark.env
+  set +a
+fi
+
 CONTEXT="monolith"
 K8S="kubectl --context=$CONTEXT"
 SCALING_MODE="${SCALING_MODE:-fixed}"
 EKS_JOB_DIR="deployments/k8s/eks/monolith"
+IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
+AWS_REGION="${AWS_REGION:-ap-southeast-1}"
+ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
 
 echo "=== Deploying monolith cluster (context: $CONTEXT) ==="
 
+echo "Patching EKS manifests with IMAGE_TAG=$IMAGE_TAG"
+IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" bash scripts/eks-update-manifests.sh
 bash scripts/validate-eks-assets.sh deploy
 
 # Namespaces

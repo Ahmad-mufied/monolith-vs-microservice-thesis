@@ -83,24 +83,35 @@ make aws-create-ecr
 ### Step 1.3 — Build and Push Docker Images
 
 ```bash
-make ecr-push-all
-# Uses IMAGE_TAG=$(git rev-parse --short HEAD) by default
-# Override: make ecr-push-all IMAGE_TAG=my-tag
+IMAGE_TAG=$(git rev-parse --short HEAD)
+make ecr-push-all IMAGE_TAG=$IMAGE_TAG
+# Override explicitly, for example: IMAGE_TAG=my-tag
 ```
 
-### Step 1.4 — Update EKS Manifests with Pushed Image Tag
+### Step 1.4 — Optional Preflight: Update EKS Manifests with Pushed Image Tag
 
-Do this immediately after push, before Terraform or deployment.
+This step is now optional as a manual preflight check. The cluster deploy
+scripts automatically rerun the same manifest patching step before validation
+and `kubectl apply`.
 
 ```bash
 make eks-update-manifests IMAGE_TAG=$IMAGE_TAG
-# Uses the same IMAGE_TAG as ecr-push-all
+# Optional manual preflight. eks-deploy-* will rerun this automatically.
 ```
 
 This patches the EKS deployment manifests, EKS migration/seed jobs, benchmark
 jobs, Datadog version labels, and benchmark `IMAGES_JSON` values with the real
 ECR image URIs.
-Terraform and deployment steps must not run before this step.
+
+If you deploy a tag other than the default current Git commit, pass the same
+`IMAGE_TAG` into `make eks-deploy-monolith` / `make eks-deploy-msa` so the
+automatic patching step stamps the correct image references.
+
+The deploy scripts still support the shorter implicit form without `IMAGE_TAG`,
+because they fall back to `git rev-parse --short HEAD` at execution time. That
+shortcut is fine for quick local deploys when `HEAD` will not change during the
+session, but the runbook keeps the explicit pinned-tag pattern as the primary
+example so one experiment session cannot accidentally mix image tags.
 
 ---
 
@@ -341,7 +352,7 @@ kubectl --context=msa create secret generic k6-runner-secret \
 ### Step 5.1 — Deploy Monolith Cluster
 
 ```bash
-SCALING_MODE=fixed make eks-deploy-monolith
+SCALING_MODE=fixed make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
 ```
 
 Important:
@@ -376,8 +387,19 @@ kubectl --context=monolith get pods -n benchmark
 ### Step 5.2 — Deploy MSA Cluster
 
 ```bash
+SCALING_MODE=fixed make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
+```
+
+Quick local alternative:
+
+```bash
+SCALING_MODE=fixed make eks-deploy-monolith
 SCALING_MODE=fixed make eks-deploy-msa
 ```
+
+Use the implicit form only when you want the deploy scripts to derive
+`IMAGE_TAG` from the current `HEAD` at command execution time and you do not
+expect that commit to change during the deploy session.
 
 This script runs:
 1. Apply namespaces (msa, benchmark)

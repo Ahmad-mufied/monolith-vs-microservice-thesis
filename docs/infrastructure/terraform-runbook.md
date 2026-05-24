@@ -136,8 +136,9 @@ These resources are not managed by Terraform.
 
 ## 4. Step 1 — Build, Push, and Patch Images
 
-Do this before any Terraform apply so every EKS manifest references real ECR
-images.
+Build and push images before Terraform apply so the expected deployable tag
+already exists in ECR. Manual manifest patching is optional now because the EKS
+deploy scripts rerun it automatically before validation and apply.
 
 ```bash
 IMAGE_TAG=$(git rev-parse --short HEAD)
@@ -146,7 +147,17 @@ make ecr-push-all IMAGE_TAG=$IMAGE_TAG
 make eks-update-manifests IMAGE_TAG=$IMAGE_TAG
 ```
 
-`make eks-update-manifests` must be rerun every time `IMAGE_TAG` changes.
+`make eks-update-manifests` is still useful as a manual preflight check, but
+`make eks-deploy-monolith` and `make eks-deploy-msa` now rerun the same patch
+step automatically. If you deploy a custom tag, pass the same `IMAGE_TAG` to
+the deploy command so the manifests are stamped with the intended image tag.
+
+The deploy commands still work without an explicit `IMAGE_TAG` because the
+scripts default to `git rev-parse --short HEAD` at execution time. That implicit
+mode is acceptable for quick local deploys when `HEAD` will not change during
+the session. The runbook uses the explicit pinned `IMAGE_TAG` pattern as the
+primary example because it guarantees that build/push and deploy steps use the
+same tag even if new commits are created later in the workflow.
 
 ---
 
@@ -330,15 +341,30 @@ still point at local-only images or unresolved ECR placeholders.
 
 ```bash
 # Deploy monolith cluster (fixed replica mode by default)
-make eks-deploy-monolith
+IMAGE_TAG=$(git rev-parse --short HEAD)
+make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
 
 # Deploy MSA cluster (fixed replica mode by default)
-make eks-deploy-msa
+make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
 
 # For HPA mode:
+SCALING_MODE=hpa make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
+SCALING_MODE=hpa make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
+```
+
+Quick local alternative:
+
+```bash
+SCALING_MODE=fixed make eks-deploy-monolith
+SCALING_MODE=fixed make eks-deploy-msa
+
 SCALING_MODE=hpa make eks-deploy-monolith
 SCALING_MODE=hpa make eks-deploy-msa
 ```
+
+Use the shorter implicit form only when you intentionally want the deploy
+scripts to derive `IMAGE_TAG` from the current `HEAD` at command execution
+time.
 
 ---
 

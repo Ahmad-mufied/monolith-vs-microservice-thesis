@@ -68,14 +68,16 @@ Choose scaling mode before deploying:
 Deploy with the selected mode:
 
 ```bash
+IMAGE_TAG=$(git rev-parse --short HEAD)
+
 # Fixed replica (default)
-SCALING_MODE=fixed make eks-deploy-monolith
-SCALING_MODE=fixed make eks-deploy-msa
+SCALING_MODE=fixed make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
+SCALING_MODE=fixed make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
 
 # HPA mode
 # metrics-server is installed automatically by the deploy scripts in HPA mode
-SCALING_MODE=hpa make eks-deploy-monolith
-SCALING_MODE=hpa make eks-deploy-msa
+SCALING_MODE=hpa make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
+SCALING_MODE=hpa make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
 ```
 
 Important rule:
