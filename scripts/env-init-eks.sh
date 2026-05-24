@@ -35,6 +35,13 @@ detect_public_ip_cidr() {
   fi
 
   if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    local o1="" o2="" o3="" o4="" octet=""
+    IFS='.' read -r o1 o2 o3 o4 <<<"$ip"
+    for octet in "$o1" "$o2" "$o3" "$o4"; do
+      if ((octet < 0 || octet > 255)); then
+        return 1
+      fi
+    done
     printf "%s/32\n" "$ip"
     return
   fi
