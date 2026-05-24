@@ -879,7 +879,7 @@ terraform-validate:
 .PHONY: terraform-auth-check
 terraform-auth-check:
 	AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) aws sts get-caller-identity >/dev/null
-	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init -input=false >/dev/null && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform plan -refresh=false -input=false -lock=false -no-color >/dev/null
+	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init -input=false >/dev/null && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform plan -input=false -lock=false -no-color >/dev/null
 	@echo "Terraform auth check passed with AWS profile '$(TERRAFORM_AWS_PROFILE)'"
 
 .PHONY: terraform-recovery-check
