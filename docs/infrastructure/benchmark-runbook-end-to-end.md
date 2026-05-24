@@ -604,16 +604,17 @@ aws login
 make terraform-auth-check
 
 # Destroy both EKS clusters and RDS instances
-S3_BENCHMARK_DATA_VERIFIED=true make eks-destroy
+make eks-destroy-confirmed
 
 # Destroy VPC and IAM (only when fully done with all experiments)
 # S3 bucket and ECR repositories are NOT destroyed — they are persistent.
 make eks-shared-destroy
 ```
 
-`make eks-destroy` now enforces the S3 verification policy by requiring an
-explicit `S3_BENCHMARK_DATA_VERIFIED=true` acknowledgement before it forwards
-`terraform destroy` for the experiment stack.
+`make eks-destroy` now enforces the S3 verification policy before it forwards
+`terraform destroy` for the experiment stack. Use
+`make eks-destroy-confirmed` as the normal operator command after you verify the
+uploaded benchmark artifacts in S3.
 
 ---
 
@@ -685,7 +686,7 @@ kubectl --context=monolith run pg-test \
 | `DATADOG_API_KEY=<key> make datadog-install-eks-monolith` | Install Datadog on monolith cluster |
 | `DATADOG_API_KEY=<key> make datadog-install-eks-msa` | Install Datadog on MSA cluster |
 | `make run-benchmark-parallel SCENARIO=login TARGET_RPS=1000 RUN_ID=... S3_BUCKET=...` | Run parallel benchmark |
-| `S3_BENCHMARK_DATA_VERIFIED=true make eks-destroy` | Destroy experiment clusters and RDS after confirming benchmark artifacts are safe in S3 |
+| `make eks-destroy-confirmed` | Destroy experiment clusters and RDS after confirming benchmark artifacts are safe in S3 |
 | `make eks-shared-destroy` | Destroy VPC and IAM (keep S3 and ECR) |
 
 ---

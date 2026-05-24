@@ -1047,7 +1047,7 @@ make deploy-microservices
 make run-k6-job
 
 make eks-apply
-make eks-destroy
+make eks-destroy-confirmed
 ```
 
 The Makefile should not hide undocumented experiment behavior.

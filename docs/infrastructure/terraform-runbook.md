@@ -443,7 +443,7 @@ Do not destroy infrastructure until all expected files are present.
 
 ```bash
 # Destroy clusters and RDS only after verifying benchmark data exists in S3
-S3_BENCHMARK_DATA_VERIFIED=true make eks-destroy
+make eks-destroy-confirmed
 
 # Destroy shared resources (only when experiment is fully complete).
 # WARNING: this removes the VPC and IAM roles.
@@ -457,7 +457,11 @@ Important:
 
 - `make eks-destroy` now refuses to forward `terraform destroy` unless you
   explicitly acknowledge that benchmark artifacts have already been verified in
-  S3 by setting `S3_BENCHMARK_DATA_VERIFIED=true`.
+  S3.
+- Use `make eks-destroy-confirmed` as the normal operator command after that
+  verification step.
+- The lower-level form `S3_BENCHMARK_DATA_VERIFIED=true make eks-destroy` still
+  works if you need the explicit environment variable for scripting.
 - ECR repositories are **not** destroyed by Terraform because they are created manually.
 - S3 results bucket is **not** destroyed by Terraform. Benchmark data is safe.
 - To manually delete the S3 bucket after confirming all data is backed up:

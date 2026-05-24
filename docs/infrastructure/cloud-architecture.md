@@ -706,7 +706,7 @@ The full deployment ordering is mandatory. Steps cannot be reordered.
 ┌──────────────────────────────────────────────────────────────┐
 │  END OF EXPERIMENT SESSION                                    │
 │                                                                │
-│ 17. make eks-destroy               Destroy clusters + RDS     │
+│ 17. make eks-destroy-confirmed     Destroy clusters + RDS     │
 │ 18. make eks-shared-destroy        Destroy VPC + IAM          │
 │                                                                │
 │  Persistent resources (ECR, S3) are NOT destroyed.            │

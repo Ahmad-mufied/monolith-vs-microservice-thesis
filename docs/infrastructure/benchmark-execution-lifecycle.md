@@ -34,7 +34,7 @@ Important rules:
 - do not run migration, reset, or seed during k6 execution,
 - run reset and seed before every k6 execution,
 - upload k6 results to S3 before running the next execution or destroying infrastructure,
-- do not run `make eks-destroy` until all expected result files are present in S3.
+- do not run `make eks-destroy-confirmed` until all expected result files are present in S3.
 
 ## 3. Infrastructure Lifecycle
 
@@ -62,7 +62,7 @@ An experiment lifecycle ends with:
 ```text
 aws login
 -> make terraform-auth-check
--> make eks-destroy
+> make eks-destroy-confirmed
 ```
 
 When RDS is included in the destroy plan, all database state is removed:
@@ -92,7 +92,7 @@ aws login
 -> run k6 job
 -> upload result files to S3
 -> verify result files in S3
--> make eks-destroy after all benchmark executions are complete
+> make eks-destroy-confirmed after all benchmark executions are complete
 ```
 
 Migration and seed have different responsibilities:
@@ -416,7 +416,7 @@ Final destroy step:
 ```text
 aws login
 -> make terraform-auth-check
--> make eks-destroy
+> make eks-destroy-confirmed
 ```
 
 When RDS is part of the destroy plan, this removes all database state.
@@ -438,7 +438,7 @@ aws login
 -> seed
 -> k6
 -> upload
--> make eks-destroy after all results are safe
+> make eks-destroy-confirmed after all results are safe
 
 Rerun while infra is alive:
 reset

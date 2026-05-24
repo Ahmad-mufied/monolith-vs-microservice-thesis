@@ -904,6 +904,10 @@ eks-destroy:
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh init
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh destroy
 
+.PHONY: eks-destroy-confirmed
+eks-destroy-confirmed:
+	S3_BENCHMARK_DATA_VERIFIED=true $(MAKE) eks-destroy
+
 .PHONY: eks-setup-contexts
 eks-setup-contexts:
 	bash scripts/setup-eks-contexts.sh

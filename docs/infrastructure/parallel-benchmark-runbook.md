@@ -51,7 +51,7 @@ aws login
     ↓
 make terraform-auth-check
     ↓
-make eks-destroy (after all results verified in S3)
+make eks-destroy-confirmed (after all results verified in S3)
 ```
 
 ---
@@ -248,7 +248,7 @@ aws s3 ls s3://<bucket>/experiments/eks-run-001/ --recursive | wc -l
 make terraform-auth-check
 
 # Destroy clusters and RDS
-make eks-destroy
+make eks-destroy-confirmed
 
 # Destroy shared resources only when fully done with all experiments
 # make eks-shared-destroy
