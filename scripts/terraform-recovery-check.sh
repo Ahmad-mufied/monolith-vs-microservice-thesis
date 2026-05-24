@@ -23,7 +23,16 @@ have_state_address() {
 }
 
 list_or_empty() {
-  "$@" 2>/dev/null || true
+  local output=""
+  output="$("$@" 2>/dev/null || true)"
+
+  case "$output" in
+    ""|"None")
+      return 0
+      ;;
+  esac
+
+  printf '%s\n' "$output"
 }
 
 print_section() {
