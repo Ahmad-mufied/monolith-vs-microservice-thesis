@@ -76,6 +76,7 @@ SCALING_MODE=fixed make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
 
 # HPA mode
 # metrics-server is installed automatically by the deploy scripts in HPA mode
+# default installer pins a metrics-server release and keeps kubelet TLS verification enabled
 SCALING_MODE=hpa make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
 SCALING_MODE=hpa make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
 ```

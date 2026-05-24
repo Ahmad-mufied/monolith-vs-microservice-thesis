@@ -374,7 +374,7 @@ This script runs:
 3. Migration job → creates schema in `mono_db`
 4. Reset + seed benchmark data (100 users, 100 items)
 5. Deploy monolith application
-6. Install metrics-server automatically when `SCALING_MODE=hpa`
+6. Install metrics-server automatically when `SCALING_MODE=hpa` using the pinned default release, with insecure kubelet TLS disabled unless explicitly opted in
 7. Apply ResourceQuota (fixed mode: no HPA)
 8. Install Datadog (only when `DATADOG_API_KEY` is a real non-placeholder value)
 
@@ -414,7 +414,7 @@ This script runs:
 3. Migration jobs (auth, item, transaction) in parallel
 4. Reset + seed benchmark data
 5. Deploy all 4 MSA services
-6. Install metrics-server automatically when `SCALING_MODE=hpa`
+6. Install metrics-server automatically when `SCALING_MODE=hpa` using the pinned default release, with insecure kubelet TLS disabled unless explicitly opted in
 7. Apply ResourceQuota (fixed mode: no HPA)
 8. Install Datadog (only when `DATADOG_API_KEY` is a real non-placeholder value)
 
