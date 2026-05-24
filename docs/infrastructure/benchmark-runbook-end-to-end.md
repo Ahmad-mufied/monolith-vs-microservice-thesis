@@ -138,12 +138,30 @@ AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/shared output
 cd infra/terraform/experiment
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars:
+#   cluster_endpoint_public_access_cidrs = ["<operator-public-ip>/32"]
 #   db_password = <strong password, min 8 chars>
 ```
 
 If you used the helper flow above, `make eks-render-tfvars` also renders
 `infra/terraform/experiment/terraform.tfvars` from
 `env/terraform.experiment.env`.
+
+Before rendering experiment tfvars, replace the generated
+`CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS=REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR`
+placeholder in `env/terraform.experiment.env` with your current operator public
+IP CIDR, for example `203.0.113.10/32`. For a single laptop operator this is
+normally a `/32`. Do not use `0.0.0.0/0`.
+
+By default, `make env-init-eks` now attempts to detect the current operator
+public IP automatically and writes it with
+`CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=auto`. If you want to pin a custom
+CIDR list instead, change the source to `manual` and maintain the CIDR value
+yourself.
+
+If the experiment clusters already exist and you later move to a different
+network, update that CIDR value, rerender tfvars, and re-run the Terraform
+apply for the existing `experiment` stack so the EKS API endpoint allowlist is
+updated in place.
 
 ```bash
 make eks-apply

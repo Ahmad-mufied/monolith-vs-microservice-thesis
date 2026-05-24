@@ -222,6 +222,7 @@ cd infra/terraform/experiment
 # Copy and fill in variables
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars:
+#   cluster_endpoint_public_access_cidrs = ["<operator-public-ip>/32"]
 #   db_password         = <strong password>
 
 AWS_PROFILE=terraform-process terraform init
@@ -232,6 +233,36 @@ AWS_PROFILE=terraform-process terraform apply
 If you use the helper flow above, `make eks-render-tfvars` also renders
 `infra/terraform/experiment/terraform.tfvars` from
 `env/terraform.experiment.env`.
+
+For laptop-driven operation, set the public EKS API endpoint allowlist to the
+current operator IP before rendering tfvars:
+
+```bash
+make env-init-eks
+# Edit env/terraform.experiment.env:
+#   CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=manual          # optional for custom/static CIDRs
+#   CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS=<operator-public-ip>/32
+make eks-render-tfvars
+```
+
+The benchmark cluster module keeps the private endpoint enabled and only uses
+the public endpoint as a restricted operator entry path. Do not use
+`0.0.0.0/0`.
+
+By default, `make env-init-eks` uses `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=auto`
+and attempts to detect the current operator public IP automatically. If the
+detected IP changes later, re-running `make env-init-eks` refreshes the CIDR
+before you render tfvars again.
+
+If the clusters already exist and your operator public IP later changes, update
+`CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS`, rerender tfvars, and run
+`terraform plan` plus `terraform apply` again for the existing `experiment`
+stack. This updates the EKS endpoint access configuration in place; it does not
+mean recreating both clusters from scratch.
+
+If you need a custom static CIDR list or multiple operator networks, set
+`CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=manual` and maintain the
+comma-separated CIDR list yourself.
 
 This provisions two EKS clusters and two RDS instances in parallel.
 Expect approximately 15–20 minutes.

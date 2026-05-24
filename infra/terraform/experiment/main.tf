@@ -32,14 +32,15 @@ locals {
 module "monolith_cluster" {
   source = "../modules/benchmark-cluster"
 
-  cluster_name       = "skripsi-monolith"
-  architecture       = "monolith"
-  project            = var.project
-  vpc_id             = local.vpc_id
-  private_subnet_ids = local.private_subnet_ids
-  k6_runner_role_arn = local.k6_runner_role_arn
-  db_password        = var.db_password
-  db_instance_class  = var.db_instance_class
+  cluster_name                         = "skripsi-monolith"
+  architecture                         = "monolith"
+  project                              = var.project
+  vpc_id                               = local.vpc_id
+  private_subnet_ids                   = local.private_subnet_ids
+  k6_runner_role_arn                   = local.k6_runner_role_arn
+  cluster_endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
+  db_password                          = var.db_password
+  db_instance_class                    = var.db_instance_class
 }
 
 # ─── MSA Cluster ──────────────────────────────────────────────────────────────
@@ -47,12 +48,13 @@ module "monolith_cluster" {
 module "msa_cluster" {
   source = "../modules/benchmark-cluster"
 
-  cluster_name       = "skripsi-msa"
-  architecture       = "msa"
-  project            = var.project
-  vpc_id             = local.vpc_id
-  private_subnet_ids = local.private_subnet_ids
-  k6_runner_role_arn = local.k6_runner_role_arn
-  db_password        = var.db_password
-  db_instance_class  = var.db_instance_class
+  cluster_name                         = "skripsi-msa"
+  architecture                         = "msa"
+  project                              = var.project
+  vpc_id                               = local.vpc_id
+  private_subnet_ids                   = local.private_subnet_ids
+  k6_runner_role_arn                   = local.k6_runner_role_arn
+  cluster_endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
+  db_password                          = var.db_password
+  db_instance_class                    = var.db_instance_class
 }

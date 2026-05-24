@@ -86,6 +86,26 @@ runner secret during EKS benchmark setup.
 - if an existing `k6-runner.eks.env` still contains the legacy weak value
   `Password123!`, `make env-init-eks` rotates it automatically
 
+`terraform.experiment.env` also stores the operator CIDR allowlist used to
+restrict the public EKS Kubernetes API endpoint.
+
+- `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE` defaults to `auto` for the
+  generated helper flow
+- when the source is `auto`, `make env-init-eks` attempts to detect the current
+  public operator IP and writes it as
+  `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS=<detected-ip>/32`
+- this should be the public egress IP range that AWS sees for your laptop or
+  network; for a single operator laptop this is usually a `/32`
+- if your public IP changes later and the source remains `auto`,
+  `make env-init-eks` refreshes the CIDR automatically
+- you may provide multiple CIDRs as a comma-separated list if more than one
+  operator/network must reach the public EKS API endpoint
+- if you want to keep a custom static or multi-CIDR value, set
+  `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=manual`; `make env-init-eks`
+  will then preserve your configured CIDR list
+- `make eks-render-tfvars` rejects placeholders and world-open values such as
+  `0.0.0.0/0`
+
 These files are intended to make EKS setup repeatable:
 
 - `make eks-render-tfvars` renders Terraform `terraform.tfvars` from the

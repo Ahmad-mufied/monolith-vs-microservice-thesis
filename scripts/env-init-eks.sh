@@ -15,6 +15,35 @@ random_hex() {
   od -An -N "$bytes" -tx1 /dev/urandom | tr -d ' \n'
 }
 
+detect_public_ip_cidr() {
+  local ip=""
+
+  if command -v curl >/dev/null 2>&1; then
+    for url in \
+      "https://checkip.amazonaws.com" \
+      "https://api.ipify.org" \
+      "https://ifconfig.me/ip"; do
+      ip="$(curl -fsS --max-time 5 "$url" 2>/dev/null | tr -d '[:space:]' || true)"
+      if [[ -n "$ip" ]]; then
+        break
+      fi
+    done
+  fi
+
+  if [[ -z "$ip" ]]; then
+    return 1
+  fi
+
+  case "$ip" in
+    *:*)
+      printf "%s/128\n" "$ip"
+      ;;
+    *)
+      printf "%s/32\n" "$ip"
+      ;;
+  esac
+}
+
 read_env_value() {
   local file="$1"
   local key="$2"
@@ -85,6 +114,30 @@ db_password="$(read_env_value env/terraform.experiment.env DB_PASSWORD)"
 db_password="${db_password:-$(random_hex 24)}"
 db_instance_class="$(read_env_value env/terraform.experiment.env DB_INSTANCE_CLASS)"
 db_instance_class="${db_instance_class:-db.t3.micro}"
+cluster_endpoint_public_access_cidrs="$(read_env_value env/terraform.experiment.env CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS)"
+cluster_endpoint_public_access_cidrs="${cluster_endpoint_public_access_cidrs:-REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR}"
+cluster_endpoint_public_access_cidrs_source="$(read_env_value env/terraform.experiment.env CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE)"
+detected_public_ip_cidr="$(detect_public_ip_cidr || true)"
+
+if [[ -z "$cluster_endpoint_public_access_cidrs_source" ]]; then
+  case "$cluster_endpoint_public_access_cidrs" in
+    ""|REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR)
+      cluster_endpoint_public_access_cidrs_source="auto"
+      ;;
+    *)
+      cluster_endpoint_public_access_cidrs_source="manual"
+      ;;
+  esac
+fi
+
+if [[ "$cluster_endpoint_public_access_cidrs_source" == "auto" ]]; then
+  if [[ -n "$detected_public_ip_cidr" ]]; then
+    cluster_endpoint_public_access_cidrs="$detected_public_ip_cidr"
+  fi
+elif [[ "$cluster_endpoint_public_access_cidrs" == "REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR" && -n "$detected_public_ip_cidr" ]]; then
+  cluster_endpoint_public_access_cidrs="$detected_public_ip_cidr"
+  cluster_endpoint_public_access_cidrs_source="auto"
+fi
 
 write_if_missing "env/aws-benchmark.env" "AWS_REGION=ap-southeast-1
 S3_BUCKET=skripsi-benchmark-results
@@ -98,7 +151,9 @@ S3_RESULTS_BUCKET=skripsi-benchmark-results"
 write_if_missing "env/terraform.experiment.env" "AWS_REGION=ap-southeast-1
 PROJECT=skripsi
 DB_PASSWORD=${db_password}
-DB_INSTANCE_CLASS=${db_instance_class}"
+DB_INSTANCE_CLASS=${db_instance_class}
+CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS=${cluster_endpoint_public_access_cidrs}
+CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=${cluster_endpoint_public_access_cidrs_source}"
 
 write_if_missing "env/datadog.eks.env" "DATADOG_API_KEY=replace-me
 DATADOG_SITE=datadoghq.com"
@@ -159,5 +214,15 @@ write_or_update_env_value "env/k6-runner.eks.env" "ADMIN_USER_EMAIL" "$k6_runner
 
 write_or_update_env_value "env/monolith.eks.env" "BCRYPT_COST" "10"
 write_or_update_env_value "env/auth-service.eks.env" "BCRYPT_COST" "10"
+write_or_update_env_value "env/terraform.experiment.env" "CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS" "$cluster_endpoint_public_access_cidrs"
+write_or_update_env_value "env/terraform.experiment.env" "CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE" "$cluster_endpoint_public_access_cidrs_source"
+
+if [[ "$cluster_endpoint_public_access_cidrs_source" == "auto" ]]; then
+  if [[ -n "$detected_public_ip_cidr" ]]; then
+    echo "using detected operator public CIDR: $detected_public_ip_cidr"
+  else
+    echo "warning: could not detect operator public IP automatically; update CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS manually before make eks-render-tfvars" >&2
+  fi
+fi
 
 echo "EKS env initialization complete"

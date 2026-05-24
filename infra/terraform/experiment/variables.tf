@@ -8,6 +8,11 @@ variable "project" {
   default = "skripsi"
 }
 
+variable "cluster_endpoint_public_access_cidrs" {
+  description = "Operator public CIDR allowlist for the public EKS Kubernetes API endpoint"
+  type        = list(string)
+}
+
 variable "db_password" {
   description = "RDS master password for both clusters"
   type        = string

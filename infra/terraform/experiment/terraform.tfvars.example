@@ -1,4 +1,5 @@
 aws_region          = "ap-southeast-1"
 project             = "skripsi"
+cluster_endpoint_public_access_cidrs = ["REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR"]
 db_password         = "REPLACE_WITH_STRONG_PASSWORD"
 db_instance_class   = "db.t3.micro"
