@@ -749,25 +749,25 @@ But final RQ1 performance tables should still use k6 as the primary source.
 | Scenario | Architecture | Target RPS | Achieved RPS | p90 Latency | p95 Latency | Error Rate | Dropped Iterations | Verdict |
 |---|---|---:|---:|---:|---:|---:|---:|---|
 | login | monolith | ... | ... | ... | ... | ... | ... | ... |
-| login | msa | ... | ... | ... | ... | ... | ... | ... |
+| login | microservices | ... | ... | ... | ... | ... | ... | ... |
 | create-transaction | monolith | ... | ... | ... | ... | ... | ... | ... |
-| create-transaction | msa | ... | ... | ... | ... | ... | ... | ... |
+| create-transaction | microservices | ... | ... | ... | ... | ... | ... | ... |
 | enriched-transactions | monolith | ... | ... | ... | ... | ... | ... | ... |
-| enriched-transactions | msa | ... | ... | ... | ... | ... | ... | ... |
+| enriched-transactions | microservices | ... | ... | ... | ... | ... | ... | ... |
 
 ### 16.2 Attempt-Level Table
 
 | Scenario | Architecture | Attempt | Target RPS | Achieved RPS | p90 | p95 | Error Rate | Dropped Iterations |
 |---|---|---|---:|---:|---:|---:|---:|---:|
 | login | monolith | attempt-01 | ... | ... | ... | ... | ... | ... |
-| login | msa | attempt-01 | ... | ... | ... | ... | ... | ... |
+| login | microservices | attempt-01 | ... | ... | ... | ... | ... | ... |
 
 ### 16.3 Aggregated Table
 
 | Scenario | Architecture | Mean p95 | Median p95 | Std Dev p95 | Mean Error Rate | Mean Achieved RPS |
 |---|---|---:|---:|---:|---:|---:|
 | login | monolith | ... | ... | ... | ... | ... |
-| login | msa | ... | ... | ... | ... | ... |
+| login | microservices | ... | ... | ... | ... | ... |
 
 Recommended rule:
 
@@ -804,7 +804,7 @@ Example graph structure:
 ```text
 x-axis  = scenario
 y-axis  = p95 latency
-series  = monolith, msa
+series  = monolith, microservices
 ```
 
 ---

@@ -34,14 +34,18 @@ Important rules:
 - do not run migration, reset, or seed during k6 execution,
 - run reset and seed before every k6 execution,
 - upload k6 results to S3 before running the next execution or destroying infrastructure,
-- do not run `terraform destroy` until all expected result files are present in S3.
+- do not run `make eks-destroy-confirmed` until all expected result files are present in S3.
 
 ## 3. Infrastructure Lifecycle
 
 An experiment lifecycle starts with:
 
 ```text
-terraform apply
+build/push images
+-> patch EKS manifests with IMAGE_TAG
+-> aws login
+-> make terraform-auth-check
+-> make eks-apply
 ```
 
 This provisions the benchmark infrastructure:
@@ -49,7 +53,6 @@ This provisions the benchmark infrastructure:
 - EKS cluster,
 - node groups,
 - RDS PostgreSQL,
-- S3 result bucket,
 - IAM roles / IRSA / EKS Pod Identity,
 - networking and security groups,
 - supporting Kubernetes resources when managed by IaC.
@@ -57,7 +60,9 @@ This provisions the benchmark infrastructure:
 An experiment lifecycle ends with:
 
 ```text
-terraform destroy
+aws login
+-> make terraform-auth-check
+> make eks-destroy-confirmed
 ```
 
 When RDS is included in the destroy plan, all database state is removed:
@@ -74,19 +79,20 @@ This is intentional for a fully clean experiment lifecycle.
 Use this flow when starting from a new IaC-provisioned environment:
 
 ```text
-terraform apply
+aws login
+-> make terraform-auth-check
+-> make eks-apply
 -> create EKS and RDS
 -> run database bootstrap job
 -> run migration job
--> deploy application
 -> run reset job
 -> run seed job
+-> deploy application
 -> validate row counts and readiness
 -> run k6 job
--> collect Kubernetes snapshots
 -> upload result files to S3
 -> verify result files in S3
--> terraform destroy after all benchmark executions are complete
+> make eks-destroy-confirmed after all benchmark executions are complete
 ```
 
 Migration and seed have different responsibilities:
@@ -114,7 +120,6 @@ previous k6 execution finished
 -> run seed job
 -> validate row counts and readiness
 -> run k6 job again
--> collect Kubernetes snapshots
 -> upload result files to a different S3 prefix
 ```
 
@@ -199,7 +204,7 @@ Field meanings:
 | Field | Meaning |
 |---|---|
 | `run_id` | timestamp-like id for the experiment lifecycle or execution group |
-| `architecture` | `monolith` or `msa` |
+| `architecture` | `monolith` or `microservices` |
 | `scenario_name` | k6 scenario name, usually the script basename without `.js` |
 | `target_rps` | RPS configured for that k6 execution |
 | `attempt` | repeated execution number for the same architecture, scenario, and RPS |
@@ -209,7 +214,7 @@ Example:
 ```text
 s3://skripsi-benchmark-results/experiments/20260512-103000/monolith/login/1000rps/attempt-01/
 s3://skripsi-benchmark-results/experiments/20260512-103000/monolith/login/1000rps/attempt-02/
-s3://skripsi-benchmark-results/experiments/20260512-103000/msa/create-transaction/2500rps/attempt-01/
+s3://skripsi-benchmark-results/experiments/20260512-103000/microservices/create-transaction/2500rps/attempt-01/
 ```
 
 `target_rps` is included in the S3 path for quick navigation and overwrite
@@ -250,11 +255,12 @@ Optional files:
 
 ```text
 summary.html
-app-manifests.yaml
 ```
 
 Additional files may be added when useful, but do not overwrite or merge raw
-attempt output during collection.
+attempt output during collection. Kubernetes snapshot files are not required
+by default; the primary internal evidence comes from Datadog telemetry plus
+`metadata.json`.
 
 Raw collection must stay separated by attempt.
 
@@ -271,7 +277,7 @@ Example analysis files:
 ```text
 comparison-summary.csv
 monolith-login-1000rps-summary.csv
-msa-create-transaction-2500rps-summary.csv
+microservices-create-transaction-2500rps-summary.csv
 ```
 
 ## 10. Metadata
@@ -352,13 +358,13 @@ Recommended fields:
 `metadata.json` is also the source of truth for determining whether a benchmark
 attempt used HPA or fixed replicas.
 
-For a fixed-replica experiment without HPA, use this resources shape:
+For a fixed replica experiment without HPA, use this resources shape:
 
 ```json
 {
   "resources": {
     "app_resource_quota": "4000m CPU / 4096Mi memory",
-    "autoscaling_mode": "fixed-replica",
+    "autoscaling_mode": "fixed",
     "hpa_enabled": false,
     "replica_count": 4
   }
@@ -408,7 +414,9 @@ Destroy infrastructure only after:
 Final destroy step:
 
 ```text
-terraform destroy
+aws login
+-> make terraform-auth-check
+> make eks-destroy-confirmed
 ```
 
 When RDS is part of the destroy plan, this removes all database state.
@@ -421,14 +429,16 @@ Recommended final policy:
 
 ```text
 Fresh experiment:
-terraform apply
+aws login
+-> make terraform-auth-check
+-> make eks-apply
 -> bootstrap
 -> migration
 -> reset
 -> seed
 -> k6
 -> upload
--> terraform destroy after all results are safe
+> make eks-destroy-confirmed after all results are safe
 
 Rerun while infra is alive:
 reset

@@ -39,7 +39,7 @@ json_env_or() {
 TARGET_RPS_VALUE="${TARGET_RPS:-0}"
 PRE_ALLOCATED_VUS_VALUE="${PRE_ALLOCATED_VUS:-0}"
 MAX_VUS_VALUE="${MAX_VUS:-0}"
-DURATION_VALUE="${TEST_DURATION:-${DURATION:-}}"
+TEST_DURATION_VALUE="${TEST_DURATION:-1m}"
 TIMESTAMP_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 TIME_WINDOW_START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 DATADOG_ENABLED_VALUE="${DATADOG_ENABLED:-false}"
@@ -77,7 +77,7 @@ jq -n \
   --arg scenario_name "$SCENARIO_NAME_VALUE" \
   --arg k6_script "k6/scripts/${K6_SCRIPT}" \
   --arg k6_profile "${K6_PROFILE:-steady}" \
-  --arg duration "$DURATION_VALUE" \
+  --arg duration "$TEST_DURATION_VALUE" \
   --arg base_url "${BASE_URL:-}" \
   --arg dataset "${DATASET:-}" \
   --arg dataset_version "${DATASET_VERSION:-}" \

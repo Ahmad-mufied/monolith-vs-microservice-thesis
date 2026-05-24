@@ -31,7 +31,7 @@ export const BASE_URL = trimTrailingSlash(envString("BASE_URL", "http://localhos
 
 export const K6_PROFILE = envString("K6_PROFILE", "steady");
 export const TARGET_RPS = envInt("TARGET_RPS", 1000);
-export const DURATION = envString("TEST_DURATION", envString("DURATION", "1m"));
+export const TEST_DURATION = envString("TEST_DURATION", "1m");
 export const TIME_UNIT = envString("TIME_UNIT", "1s");
 
 export const VUS = envInt("VUS", 1);
@@ -113,7 +113,7 @@ export function thresholdConfig(metricTags = null) {
 export function smokeOptions(metricTags = null) {
   return {
     vus: VUS,
-    duration: DURATION,
+    duration: TEST_DURATION,
     thresholds: thresholdConfig(metricTags),
   };
 }
@@ -145,7 +145,7 @@ export function benchmarkOptions(name, metricTags = null) {
         executor: "constant-arrival-rate",
         rate: TARGET_RPS,
         timeUnit: TIME_UNIT,
-        duration: DURATION,
+        duration: TEST_DURATION,
         preAllocatedVUs: PRE_ALLOCATED_VUS,
         maxVUs: MAX_VUS,
       },
@@ -179,7 +179,7 @@ function parseStages() {
 
   return [
     { target: TARGET_RPS, duration: envString("RAMP_UP_DURATION", "1m") },
-    { target: TARGET_RPS, duration: DURATION },
+    { target: TARGET_RPS, duration: TEST_DURATION },
     { target: 0, duration: envString("RAMP_DOWN_DURATION", "30s") },
   ];
 }

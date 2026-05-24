@@ -8,7 +8,7 @@ import {
   BASE_URL,
   K6_PROFILE,
   TARGET_RPS,
-  DURATION,
+  TEST_DURATION,
   PRE_ALLOCATED_VUS,
   MAX_VUS,
   IMAGE_TAG,
@@ -32,7 +32,7 @@ export function handleSummary(data, options = {}) {
     base_url: BASE_URL,
     k6_profile: K6_PROFILE,
     target_rps: TARGET_RPS,
-    duration: DURATION,
+    duration: TEST_DURATION,
     pre_allocated_vus: PRE_ALLOCATED_VUS,
     max_vus: MAX_VUS,
     image_tag: IMAGE_TAG,
@@ -42,7 +42,7 @@ export function handleSummary(data, options = {}) {
   const k6Options = {
     profile: K6_PROFILE,
     target_rps: TARGET_RPS,
-    duration: DURATION,
+    duration: TEST_DURATION,
     pre_allocated_vus: PRE_ALLOCATED_VUS,
     max_vus: MAX_VUS,
   };

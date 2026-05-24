@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k6-runner
+  namespace: benchmark
+# S3 access is granted via EKS Pod Identity (IAM role association in Terraform).
+# No Kubernetes API permissions are needed — HPA and resource behavior is
+# observed via Datadog, not via kubectl snapshot collection.

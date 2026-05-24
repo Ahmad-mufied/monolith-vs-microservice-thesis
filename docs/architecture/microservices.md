@@ -1066,10 +1066,11 @@ Services with HPA:
 Per-service resource configuration:
 
 ```text
-CPU per pod       : 250m
-Memory per pod    : 256Mi
+api-gateway       : request 100m / limit 250m / 256Mi / 384Mi
+auth-service      : request 250m / limit 1000m / 256Mi / 768Mi
+item-service      : request 100m / limit 250m / 256Mi / 384Mi
+transaction-service: request 150m / limit 500m / 256Mi / 512Mi
 minReplicas       : 1
-maxReplicas       : 16
 HPA target CPU    : 70%
 ```
 
@@ -1080,13 +1081,18 @@ CPU max           : 4000m
 Memory max        : 4096Mi
 ```
 
-Reason for maxReplicas 16:
+Role-aware maxReplicas:
 
 ```text
-4000m / 250m = 16 pods
+api-gateway         : 9
+auth-service        : 3
+item-service        : 9
+transaction-service : 5
 ```
 
-This allows one focused service to scale up under targeted load, while the namespace ResourceQuota prevents the total microservices resource usage from exceeding the monolith resource ceiling.
+This allows one focused service to scale up under targeted load while the
+namespace ResourceQuota still prevents the total microservices resource usage
+from exceeding the monolith resource ceiling.
 
 Example login-heavy scaling:
 
@@ -1102,7 +1108,8 @@ API Gateway scales out
 Auth Service scales out
     |
     v
-Item Service and Transaction Service may remain near minReplicas
+Item Service and Transaction Service may remain near minReplicas while
+`auth-service` consumes more of the shared headroom during login-heavy load
 ```
 
 ASCII example:

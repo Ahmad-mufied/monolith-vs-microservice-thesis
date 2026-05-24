@@ -107,7 +107,7 @@ Top-level folder responsibilities:
 | `buf.yaml` | buf module configuration for proto |
 | `buf.gen.yaml` | buf code generation configuration |
 | `.github/` | GitHub Actions CI workflows |
-| `buildspec/` | AWS CodeBuild specifications |
+| `buildspec/` | legacy CodeBuild specifications (not active path) |
 | `env/` | environment configuration files |
 | `docs/` | project documentation |
 | `monolith/` | monolithic implementation |

@@ -61,7 +61,7 @@ fi
 auth_jwt_expiry="$(read_env_value env/auth-service.env JWT_EXPIRY)"
 auth_jwt_expiry="${auth_jwt_expiry:-24h}"
 auth_bcrypt_cost="$(read_env_value env/auth-service.env BCRYPT_COST)"
-auth_bcrypt_cost="${auth_bcrypt_cost:-12}"
+auth_bcrypt_cost="${auth_bcrypt_cost:-10}"
 
 item_grpc_port="$(read_env_value env/item-service.env GRPC_PORT)"
 item_grpc_port="${item_grpc_port:-50052}"

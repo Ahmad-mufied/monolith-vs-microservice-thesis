@@ -540,20 +540,26 @@ Microservices:
 ```text
 Namespace CPU ceiling    : 4000m
 Namespace memory ceiling : 4096Mi
-CPU per pod              : 250m
-Memory per pod           : 256Mi
+api-gateway              : request 100m / limit 250m / 256Mi / 384Mi
+auth-service             : request 250m / limit 1000m / 256Mi / 768Mi
+item-service             : request 100m / limit 250m / 256Mi / 384Mi
+transaction-service      : request 150m / limit 500m / 256Mi / 512Mi
 minReplicas per service  : 1
-maxReplicas per service  : 16
 HPA target CPU           : 70%
 ```
 
-Reason for MSA maxReplicas 16:
+Role-aware HPA maxReplicas:
 
 ```text
-4000m total CPU quota / 250m per pod = 16 pods
+api-gateway         : 9
+auth-service        : 3
+item-service        : 9
+transaction-service : 5
 ```
 
-This allows a focused service to scale up under targeted load while the namespace ResourceQuota prevents the total microservices resource budget from exceeding the monolith resource budget.
+This keeps fairness at the shared namespace ceiling while allowing
+hotspot services, especially `auth-service`, to consume more of the
+remaining headroom in HPA mode.
 
 ---
 
