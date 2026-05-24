@@ -266,7 +266,9 @@ the public endpoint as a restricted operator entry path. Do not use
 By default, `make env-init-eks` uses `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=auto`
 and attempts to detect the current operator public IP automatically. If the
 detected IP changes later, re-running `make env-init-eks` refreshes the CIDR
-before you render tfvars again.
+before you render tfvars again. If the autodetect helper receives a malformed
+non-IP response, it now fails instead of writing an invalid CIDR value into the
+env file.
 
 If the clusters already exist and your operator public IP later changes, update
 `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS`, rerender tfvars, and run
@@ -293,6 +295,10 @@ AWS_PROFILE=terraform-process terraform output
 `experiment` reads `vpc_id`, `private_subnet_ids`, and `k6_runner_role_arn`
 from the local shared state file at `../shared/terraform.tfstate`.
 Apply `shared` first, then `experiment`, from the same laptop.
+
+The `terraform-auth-check`, `eks-apply`, and `eks-destroy` Makefile targets now
+pass `TERRAFORM_AWS_PROFILE` explicitly into the Terraform wrapper script, so a
+non-default profile selection is preserved consistently across those flows.
 
 ---
 
@@ -436,9 +442,8 @@ Do not destroy infrastructure until all expected files are present.
 ## 13. Step 10 — Destroy Infrastructure
 
 ```bash
-# Destroy clusters and RDS
-cd infra/terraform/experiment
-AWS_PROFILE=terraform-process terraform destroy
+# Destroy clusters and RDS only after verifying benchmark data exists in S3
+S3_BENCHMARK_DATA_VERIFIED=true make eks-destroy
 
 # Destroy shared resources (only when experiment is fully complete).
 # WARNING: this removes the VPC and IAM roles.
@@ -450,6 +455,9 @@ AWS_PROFILE=terraform-process terraform destroy
 
 Important:
 
+- `make eks-destroy` now refuses to forward `terraform destroy` unless you
+  explicitly acknowledge that benchmark artifacts have already been verified in
+  S3 by setting `S3_BENCHMARK_DATA_VERIFIED=true`.
 - ECR repositories are **not** destroyed by Terraform because they are created manually.
 - S3 results bucket is **not** destroyed by Terraform. Benchmark data is safe.
 - To manually delete the S3 bucket after confirming all data is backed up:

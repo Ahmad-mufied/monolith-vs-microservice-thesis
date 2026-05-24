@@ -172,6 +172,9 @@ public IP automatically and writes it with
 CIDR list instead, change the source to `manual` and maintain the CIDR value
 yourself.
 
+If the autodetect helper receives a malformed non-IP response, it now fails
+instead of writing an invalid CIDR value into `env/terraform.experiment.env`.
+
 If the experiment clusters already exist and you later move to a different
 network, update that CIDR value, rerender tfvars, and re-run the Terraform
 apply for the existing `experiment` stack so the EKS API endpoint allowlist is
@@ -601,12 +604,16 @@ aws login
 make terraform-auth-check
 
 # Destroy both EKS clusters and RDS instances
-make eks-destroy
+S3_BENCHMARK_DATA_VERIFIED=true make eks-destroy
 
 # Destroy VPC and IAM (only when fully done with all experiments)
 # S3 bucket and ECR repositories are NOT destroyed — they are persistent.
 make eks-shared-destroy
 ```
+
+`make eks-destroy` now enforces the S3 verification policy by requiring an
+explicit `S3_BENCHMARK_DATA_VERIFIED=true` acknowledgement before it forwards
+`terraform destroy` for the experiment stack.
 
 ---
 
@@ -678,7 +685,7 @@ kubectl --context=monolith run pg-test \
 | `DATADOG_API_KEY=<key> make datadog-install-eks-monolith` | Install Datadog on monolith cluster |
 | `DATADOG_API_KEY=<key> make datadog-install-eks-msa` | Install Datadog on MSA cluster |
 | `make run-benchmark-parallel SCENARIO=login TARGET_RPS=1000 RUN_ID=... S3_BUCKET=...` | Run parallel benchmark |
-| `make eks-destroy` | Destroy experiment clusters and RDS |
+| `S3_BENCHMARK_DATA_VERIFIED=true make eks-destroy` | Destroy experiment clusters and RDS after confirming benchmark artifacts are safe in S3 |
 | `make eks-shared-destroy` | Destroy VPC and IAM (keep S3 and ECR) |
 
 ---

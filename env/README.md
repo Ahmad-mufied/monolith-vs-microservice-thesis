@@ -96,6 +96,8 @@ restrict the public EKS Kubernetes API endpoint.
   `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS=<detected-ip>/32`
 - this should be the public egress IP range that AWS sees for your laptop or
   network; for a single operator laptop this is usually a `/32`
+- if the autodetect helper receives a malformed non-IP response, it now fails
+  without writing a CIDR value so you can retry or set the value manually
 - if your public IP changes later and the source remains `auto`,
   `make env-init-eks` refreshes the CIDR automatically
 - you may provide multiple CIDRs as a comma-separated list if more than one
