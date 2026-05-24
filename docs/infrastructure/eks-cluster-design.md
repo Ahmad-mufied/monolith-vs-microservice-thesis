@@ -21,13 +21,13 @@ AWS ap-southeast-1
 │   └── Public subnets:  10.0.101.0/24, 10.0.102.0/24
 │
 ├── Cluster A: skripsi-monolith
-│   ├── app-nodes      (2× t3.xlarge)  → mono namespace
+│   ├── app-nodes      (2× c8i.2xlarge)  → mono namespace
 │   ├── testing-nodes  (1× t3.large)   → benchmark namespace
 │   └── RDS A: skripsi-monolith-postgres
 │       └── mono_db
 │
 ├── Cluster B: skripsi-msa
-│   ├── app-nodes      (2× t3.xlarge)  → msa namespace
+│   ├── app-nodes      (2× c8i.2xlarge)  → msa namespace
 │   ├── testing-nodes  (1× t3.large)   → benchmark namespace
 │   └── RDS B: skripsi-msa-postgres
 │       ├── auth_db
@@ -66,11 +66,12 @@ Each cluster has two node groups:
 ### app-nodes
 
 ```text
-instance type : t3.xlarge (4 vCPU, 16 GiB)
+instance type : c8i.2xlarge (8 vCPU, 16 GiB)
 count         : 2
 label         : node-group=app
 taint         : none
-purpose       : application pods (monolith or MSA services)
+purpose       : application pods (monolith or MSA services) on the stronger
+                x86 benchmark baseline
 ```
 
 ### testing-nodes
@@ -173,21 +174,22 @@ to target the correct cluster.
 
 ## 9. Cost Estimate
 
-Approximate cost per hour in ap-southeast-1:
+Cost must be recalculated against the live AWS Pricing Calculator before each
+measured run because the app-node baseline is now `c8i.2xlarge` instead of the
+older `t3.xlarge`.
 
 | Component | Per cluster | Two clusters |
 |---|---|---|
 | EKS control plane | $0.10 | $0.20 |
-| app-nodes (2× t3.xlarge) | $0.33 | $0.66 |
+| app-nodes (2× c8i.2xlarge) | recalculate live | recalculate live |
 | testing-nodes (1× t3.large) | $0.08 | $0.16 |
 | RDS db.t3.medium | $0.07 | $0.14 |
-| **Total** | **~$0.58** | **~$1.16** |
-
-With a $100 budget: approximately 86 hours of runtime.
+| **Total** | **recalculate live** | **recalculate live** |
 
 A typical benchmark session (provision + deploy + 3 scenarios × 2 RPS
-levels + destroy) takes approximately 3–4 hours, leaving budget for
-multiple experiment runs.
+levels + destroy) still takes approximately 3–4 hours, but the cost budget
+must be recomputed for the new `c8i.2xlarge` baseline before running the
+final measured series.
 
 ---
 

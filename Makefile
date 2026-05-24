@@ -878,7 +878,9 @@ terraform-validate:
 
 .PHONY: terraform-auth-check
 terraform-auth-check:
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh init -input=false >/dev/null
+	@echo "Running terraform init for experiment auth check with AWS profile '$(TERRAFORM_AWS_PROFILE)'..."
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh init -input=false
+	@echo "Running terraform plan for experiment auth check with AWS profile '$(TERRAFORM_AWS_PROFILE)'..."
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh plan -input=false -lock=false -no-color >/dev/null
 	@echo "Terraform auth check passed with AWS profile '$(TERRAFORM_AWS_PROFILE)'"
 
