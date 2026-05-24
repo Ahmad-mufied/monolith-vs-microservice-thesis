@@ -233,6 +233,7 @@ If you use the helper commands above, you do not need to run the long manual
 ```bash
 MONOLITH_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment output -raw monolith_rds_endpoint)
 DB_PASSWORD="<same password from env/terraform.experiment.env>"
+DB_PASSWORD_URI_ENCODED=$(printf '%s' "$DB_PASSWORD" | jq -sRr @uri)
 JWT_SECRET="<generate: openssl rand -hex 32>"
 ADMIN_USER_PASSWORD="$(openssl rand -hex 24)"
 
@@ -240,7 +241,7 @@ ADMIN_USER_PASSWORD="$(openssl rand -hex 24)"
 kubectl --context=monolith create namespace benchmark --dry-run=client -o yaml | kubectl --context=monolith apply -f -
 kubectl --context=monolith create secret generic db-bootstrap-env \
   --namespace benchmark \
-  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD}@${MONOLITH_RDS}:5432/bootstrap?sslmode=require" \
+  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD_URI_ENCODED}@${MONOLITH_RDS}:5432/bootstrap?sslmode=require" \
   --dry-run=client -o yaml | kubectl --context=monolith apply -f -
 
 # Monolith app secret
@@ -250,7 +251,7 @@ kubectl --context=monolith create secret generic monolith-env \
   --from-literal=APP_ENV=production \
   --from-literal=APP_PORT=8080 \
   --from-literal=SERVICE_NAME=monolith \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD}@${MONOLITH_RDS}:5432/mono_db?sslmode=require" \
+  --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD_URI_ENCODED}@${MONOLITH_RDS}:5432/mono_db?sslmode=require" \
   --from-literal=JWT_SECRET="$JWT_SECRET" \
   --from-literal=DB_POOL_MAX_CONNS=25 \
   --from-literal=DB_POOL_MIN_CONNS=2 \
@@ -279,6 +280,7 @@ kubectl --context=monolith create secret generic k6-runner-secret \
 ```bash
 MSA_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment output -raw msa_rds_endpoint)
 DB_PASSWORD="<same password>"
+DB_PASSWORD_URI_ENCODED=$(printf '%s' "$DB_PASSWORD" | jq -sRr @uri)
 JWT_SECRET="<same JWT secret>"
 ADMIN_USER_PASSWORD="$(openssl rand -hex 24)"
 GRPC_PORT_AUTH=50051
@@ -289,7 +291,7 @@ GRPC_PORT_TX=50053
 kubectl --context=msa create namespace benchmark --dry-run=client -o yaml | kubectl --context=msa apply -f -
 kubectl --context=msa create secret generic db-bootstrap-env \
   --namespace benchmark \
-  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD}@${MSA_RDS}:5432/bootstrap?sslmode=require" \
+  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD_URI_ENCODED}@${MSA_RDS}:5432/bootstrap?sslmode=require" \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
 # Create msa namespace
@@ -313,7 +315,7 @@ kubectl --context=msa create secret generic auth-service-secret \
   --from-literal=APP_ENV=production \
   --from-literal=GRPC_PORT="$GRPC_PORT_AUTH" \
   --from-literal=SERVICE_NAME=auth-service \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD}@${MSA_RDS}:5432/auth_db?sslmode=require" \
+  --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD_URI_ENCODED}@${MSA_RDS}:5432/auth_db?sslmode=require" \
   --from-literal=BCRYPT_COST=10 \
   --from-literal=JWT_SECRET="$JWT_SECRET" \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
@@ -324,7 +326,7 @@ kubectl --context=msa create secret generic item-service-secret \
   --from-literal=APP_ENV=production \
   --from-literal=GRPC_PORT="$GRPC_PORT_ITEM" \
   --from-literal=SERVICE_NAME=item-service \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD}@${MSA_RDS}:5432/item_db?sslmode=require" \
+  --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD_URI_ENCODED}@${MSA_RDS}:5432/item_db?sslmode=require" \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
 # Transaction Service secret
@@ -333,7 +335,7 @@ kubectl --context=msa create secret generic transaction-service-secret \
   --from-literal=APP_ENV=production \
   --from-literal=GRPC_PORT="$GRPC_PORT_TX" \
   --from-literal=SERVICE_NAME=transaction-service \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD}@${MSA_RDS}:5432/transaction_db?sslmode=require" \
+  --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD_URI_ENCODED}@${MSA_RDS}:5432/transaction_db?sslmode=require" \
   --from-literal=ITEM_SERVICE_ADDR="item-service.msa.svc.cluster.local:${GRPC_PORT_ITEM}" \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
@@ -344,6 +346,11 @@ kubectl --context=msa create secret generic k6-runner-secret \
   --from-literal=ADMIN_USER_PASSWORD="$ADMIN_USER_PASSWORD" \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 ```
+
+If `DB_PASSWORD` contains reserved URI characters such as `@`, `:`, `/`, `?`,
+`#`, or `%`, URL-encode it before embedding it into PostgreSQL URIs. The
+`make create-eks-secrets-monolith` and `make create-eks-secrets-microservices`
+helpers now perform this encoding automatically.
 
 ---
 

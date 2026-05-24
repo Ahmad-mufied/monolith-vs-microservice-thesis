@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+url_encode() {
+  local string="$1"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "jq is required to URL-encode database credentials" >&2
+    exit 1
+  fi
+
+  printf '%s' "$string" | jq -sRr @uri
+}
+
 required_files=(
   env/api-gateway.eks.env
   env/auth-service.eks.env
@@ -62,6 +73,7 @@ terraform_with_profile() {
 }
 
 MSA_RDS="$(terraform_with_profile -chdir=infra/terraform/experiment output -raw msa_rds_endpoint)"
+encoded_db_password="$(url_encode "$db_password")"
 K8S="kubectl --context=msa"
 
 $K8S create namespace benchmark --dry-run=client -o yaml | $K8S apply -f -
@@ -69,7 +81,7 @@ $K8S create namespace msa --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic db-bootstrap-env \
   --namespace benchmark \
-  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${db_password}@${MSA_RDS}:5432/bootstrap?sslmode=require" \
+  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MSA_RDS}:5432/bootstrap?sslmode=require" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic api-gateway-secret \
@@ -88,7 +100,7 @@ $K8S create secret generic auth-service-secret \
   --from-literal=APP_ENV="${auth_service_app_env:-production}" \
   --from-literal=GRPC_PORT="${auth_service_grpc_port:-50051}" \
   --from-literal=SERVICE_NAME="${auth_service_name:-auth-service}" \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${db_password}@${MSA_RDS}:5432/auth_db?sslmode=require" \
+  --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MSA_RDS}:5432/auth_db?sslmode=require" \
   --from-literal=BCRYPT_COST="${auth_service_bcrypt_cost:-10}" \
   --from-literal=JWT_SECRET="$auth_service_jwt_secret" \
   --dry-run=client -o yaml | $K8S apply -f -
@@ -98,7 +110,7 @@ $K8S create secret generic item-service-secret \
   --from-literal=APP_ENV="${item_service_app_env:-production}" \
   --from-literal=GRPC_PORT="${item_service_grpc_port:-50052}" \
   --from-literal=SERVICE_NAME="${item_service_name:-item-service}" \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${db_password}@${MSA_RDS}:5432/item_db?sslmode=require" \
+  --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MSA_RDS}:5432/item_db?sslmode=require" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic transaction-service-secret \
@@ -106,7 +118,7 @@ $K8S create secret generic transaction-service-secret \
   --from-literal=APP_ENV="${transaction_service_app_env:-production}" \
   --from-literal=GRPC_PORT="${transaction_service_grpc_port:-50053}" \
   --from-literal=SERVICE_NAME="${transaction_service_name:-transaction-service}" \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${db_password}@${MSA_RDS}:5432/transaction_db?sslmode=require" \
+  --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MSA_RDS}:5432/transaction_db?sslmode=require" \
   --from-literal=ITEM_SERVICE_ADDR="${transaction_service_item_service_addr:-item-service.msa.svc.cluster.local:50052}" \
   --dry-run=client -o yaml | $K8S apply -f -
 

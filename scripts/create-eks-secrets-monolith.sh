@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+url_encode() {
+  local string="$1"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "jq is required to URL-encode database credentials" >&2
+    exit 1
+  fi
+
+  printf '%s' "$string" | jq -sRr @uri
+}
+
 required_files=(
   env/monolith.eks.env
   env/terraform.experiment.env
@@ -31,6 +42,7 @@ terraform_with_profile() {
 }
 
 MONOLITH_RDS="$(terraform_with_profile -chdir=infra/terraform/experiment output -raw monolith_rds_endpoint)"
+encoded_db_password="$(url_encode "$DB_PASSWORD")"
 K8S="kubectl --context=monolith"
 
 $K8S create namespace benchmark --dry-run=client -o yaml | $K8S apply -f -
@@ -38,7 +50,7 @@ $K8S create namespace mono --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic db-bootstrap-env \
   --namespace benchmark \
-  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD}@${MONOLITH_RDS}:5432/bootstrap?sslmode=require" \
+  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MONOLITH_RDS}:5432/bootstrap?sslmode=require" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic monolith-env \
@@ -46,7 +58,7 @@ $K8S create secret generic monolith-env \
   --from-literal=APP_ENV="${APP_ENV:-production}" \
   --from-literal=APP_PORT="${APP_PORT:-8080}" \
   --from-literal=SERVICE_NAME="${SERVICE_NAME:-monolith}" \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD}@${MONOLITH_RDS}:5432/mono_db?sslmode=require" \
+  --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MONOLITH_RDS}:5432/mono_db?sslmode=require" \
   --from-literal=JWT_SECRET="$JWT_SECRET" \
   --from-literal=DB_POOL_MAX_CONNS="${DB_POOL_MAX_CONNS:-25}" \
   --from-literal=DB_POOL_MIN_CONNS="${DB_POOL_MIN_CONNS:-2}" \
