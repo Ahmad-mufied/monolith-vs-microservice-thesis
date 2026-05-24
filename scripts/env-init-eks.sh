@@ -34,14 +34,17 @@ detect_public_ip_cidr() {
     return 1
   fi
 
-  case "$ip" in
-    *:*)
-      printf "%s/128\n" "$ip"
-      ;;
-    *)
-      printf "%s/32\n" "$ip"
-      ;;
-  esac
+  if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    printf "%s/32\n" "$ip"
+    return
+  fi
+
+  if [[ "$ip" == *:* && "$ip" =~ ^[0-9A-Fa-f:]+$ ]]; then
+    printf "%s/128\n" "$ip"
+    return
+  fi
+
+  return 1
 }
 
 read_env_value() {

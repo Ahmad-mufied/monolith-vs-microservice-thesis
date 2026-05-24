@@ -24,7 +24,25 @@ have_state_address() {
 
 list_or_empty() {
   local output=""
-  output="$("$@" 2>/dev/null || true)"
+  local rc=0
+
+  set +e
+  output="$("$@" 2>&1)"
+  rc=$?
+  set -e
+
+  if [[ $rc -ne 0 ]]; then
+    case "$output" in
+      *ResourceNotFoundException*|*DBInstanceNotFound*|*NotFound*)
+        return 0
+        ;;
+      *)
+        echo "ERROR: command failed: $*" >&2
+        echo "$output" >&2
+        return "$rc"
+        ;;
+    esac
+  fi
 
   case "$output" in
     ""|"None")
