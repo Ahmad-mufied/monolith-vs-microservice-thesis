@@ -139,12 +139,15 @@ cd infra/terraform/experiment
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars:
 #   cluster_endpoint_public_access_cidrs = ["<operator-public-ip>/32"]
-#   db_password = <strong password, min 8 chars>
 ```
 
 If you used the helper flow above, `make eks-render-tfvars` also renders
 `infra/terraform/experiment/terraform.tfvars` from
 `env/terraform.experiment.env`.
+
+`DB_PASSWORD` remains in `env/terraform.experiment.env` and is passed to the
+experiment Terraform stack at runtime through `TF_VAR_db_password`; it is not
+written into `infra/terraform/experiment/terraform.tfvars`.
 
 Before rendering experiment tfvars, replace the generated
 `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS=REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR`
@@ -218,7 +221,7 @@ If you use the helper commands above, you do not need to run the long manual
 
 ```bash
 MONOLITH_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment output -raw monolith_rds_endpoint)
-DB_PASSWORD="<same password from terraform.tfvars>"
+DB_PASSWORD="<same password from env/terraform.experiment.env>"
 JWT_SECRET="<generate: openssl rand -hex 32>"
 ADMIN_USER_PASSWORD="$(openssl rand -hex 24)"
 

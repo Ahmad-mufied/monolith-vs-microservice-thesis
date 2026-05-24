@@ -20,7 +20,6 @@ source env/terraform.experiment.env
 set +a
 
 : "${S3_RESULTS_BUCKET:?S3_RESULTS_BUCKET must be set in env/terraform.shared.env}"
-: "${DB_PASSWORD:?DB_PASSWORD must be set in env/terraform.experiment.env}"
 : "${CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS:?CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS must be set in env/terraform.experiment.env}"
 
 shared_aws_region="${AWS_REGION:-ap-southeast-1}"
@@ -80,7 +79,6 @@ cat > infra/terraform/experiment/terraform.tfvars <<EOF
 aws_region  = "${experiment_aws_region}"
 project     = "${experiment_project}"
 cluster_endpoint_public_access_cidrs = ${cluster_endpoint_public_access_cidrs_hcl}
-db_password = "${DB_PASSWORD}"
 db_instance_class = "${experiment_db_instance_class}"
 EOF
 

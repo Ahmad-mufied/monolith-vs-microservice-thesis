@@ -223,16 +223,19 @@ cd infra/terraform/experiment
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars:
 #   cluster_endpoint_public_access_cidrs = ["<operator-public-ip>/32"]
-#   db_password         = <strong password>
 
-AWS_PROFILE=terraform-process terraform init
-AWS_PROFILE=terraform-process terraform plan
-AWS_PROFILE=terraform-process terraform apply
+AWS_PROFILE=terraform-process bash ../../../scripts/terraform-experiment.sh init
+AWS_PROFILE=terraform-process bash ../../../scripts/terraform-experiment.sh plan
+AWS_PROFILE=terraform-process bash ../../../scripts/terraform-experiment.sh apply
 ```
 
 If you use the helper flow above, `make eks-render-tfvars` also renders
 `infra/terraform/experiment/terraform.tfvars` from
 `env/terraform.experiment.env`.
+
+`DB_PASSWORD` stays in `env/terraform.experiment.env` and is injected into
+Terraform at runtime through `TF_VAR_db_password`. It is no longer rendered
+into `infra/terraform/experiment/terraform.tfvars`.
 
 For laptop-driven operation, set the public EKS API endpoint allowlist to the
 current operator IP before rendering tfvars:

@@ -878,7 +878,8 @@ terraform-validate:
 
 .PHONY: terraform-auth-check
 terraform-auth-check:
-	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init -input=false >/dev/null && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform plan -input=false -lock=false -no-color >/dev/null
+	bash scripts/terraform-experiment.sh init -input=false >/dev/null
+	bash scripts/terraform-experiment.sh plan -input=false -lock=false -no-color >/dev/null
 	@echo "Terraform auth check passed with AWS profile '$(TERRAFORM_AWS_PROFILE)'"
 
 .PHONY: terraform-recovery-check
@@ -895,11 +896,13 @@ eks-shared-destroy:
 
 .PHONY: eks-apply
 eks-apply:
-	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform apply
+	bash scripts/terraform-experiment.sh init
+	bash scripts/terraform-experiment.sh apply
 
 .PHONY: eks-destroy
 eks-destroy:
-	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform destroy
+	bash scripts/terraform-experiment.sh init
+	bash scripts/terraform-experiment.sh destroy
 
 .PHONY: eks-setup-contexts
 eks-setup-contexts:

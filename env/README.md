@@ -109,7 +109,11 @@ restrict the public EKS Kubernetes API endpoint.
 These files are intended to make EKS setup repeatable:
 
 - `make eks-render-tfvars` renders Terraform `terraform.tfvars` from the
-  `env/terraform.*.env` files
+  `env/terraform.*.env` files without writing `DB_PASSWORD` into
+  `infra/terraform/experiment/terraform.tfvars`
+- `bash scripts/terraform-experiment.sh ...` and the Makefile Terraform targets
+  source `env/terraform.experiment.env` and inject `TF_VAR_db_password` at
+  runtime for the experiment stack
 - `make create-eks-secrets-monolith` creates monolith cluster secrets from the
   EKS env files
 - `make create-eks-secrets-microservices` creates microservices cluster
