@@ -94,7 +94,7 @@ patch_and_apply() {
 
   if grep -Eq 'REPLACE_WITH_ECR_IMAGE|replace-me' <<<"$rendered_manifest"; then
     echo "ERROR: benchmark manifest still contains unresolved placeholders after patching: $manifest" >&2
-    exit 1
+    return 1
   fi
 
   kubectl --context="$context" apply -f - <<EOF
