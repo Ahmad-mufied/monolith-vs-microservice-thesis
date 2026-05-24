@@ -460,7 +460,7 @@ Important:
 
 ---
 
-## 12. Variable Reference
+## 14. Variable Reference
 
 ### shared/terraform.tfvars
 
@@ -479,7 +479,7 @@ Important:
 
 ---
 
-## 13. Troubleshooting
+## 15. Troubleshooting
 
 **EKS nodes not ready:**
 ```bash

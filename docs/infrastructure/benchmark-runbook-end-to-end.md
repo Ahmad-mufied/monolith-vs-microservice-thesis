@@ -492,7 +492,7 @@ aws s3 ls s3://skripsi-benchmark-results/experiments/smoke-$(date +%Y%m%d)/ --re
 ```
 
 Expected files per architecture:
-```
+```text
 .../monolith/login/.../summary.json
 .../monolith/login/.../metadata.json
 .../microservices/login/.../summary.json

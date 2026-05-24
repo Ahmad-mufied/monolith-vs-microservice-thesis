@@ -358,7 +358,7 @@ Recommended fields:
 `metadata.json` is also the source of truth for determining whether a benchmark
 attempt used HPA or fixed replicas.
 
-For a fixed-replica experiment without HPA, use this resources shape:
+For a fixed replica experiment without HPA, use this resources shape:
 
 ```json
 {
@@ -431,7 +431,7 @@ Recommended final policy:
 Fresh experiment:
 aws login
 -> make terraform-auth-check
--> terraform apply
+-> make eks-apply
 -> bootstrap
 -> migration
 -> reset

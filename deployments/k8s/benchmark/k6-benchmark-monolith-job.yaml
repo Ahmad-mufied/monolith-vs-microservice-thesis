@@ -79,7 +79,7 @@ spec:
             - name: K6_STATSD_ENABLE_TAGS
               value: "true"
             - name: S3_URI
-              value: s3://replace-me/experiments/eks-run-001/monolith/login/1000rps/attempt-01
+              value: s3://replace-me/experiments/eks-run-001/monolith/login/1000rps/attempt-01/
             - name: IMAGE_TAG
               value: "05209db-bcryptfix2"
             - name: APP_NODE_POOL

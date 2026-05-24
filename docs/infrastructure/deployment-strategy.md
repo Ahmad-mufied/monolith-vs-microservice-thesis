@@ -1420,6 +1420,7 @@ deployments/k8s/
 │   ├── k6-runner-rbac.yaml
 │   ├── k6-benchmark-monolith-job.yaml
 │   ├── k6-benchmark-microservices-job.yaml
+│   └── k6-runner-secret.example.yaml
 ├── eks/
 │   ├── monolith/
 │   │   ├── migration-job.yaml
@@ -1437,7 +1438,6 @@ deployments/k8s/
 │       ├── seed-microservices-benchmark-data-job.yaml
 │       ├── prepare-microservices-enrichment-smoke-data-job.yaml
 │       └── prepare-microservices-enrichment-benchmark-data-job.yaml
-│   └── k6-runner-secret.example.yaml
 ├── monolith/
 │   ├── migration-job.yaml
 │   ├── prepare-monolith-enrichment-smoke-data-job.yaml
