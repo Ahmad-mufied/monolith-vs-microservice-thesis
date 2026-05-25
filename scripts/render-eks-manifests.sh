@@ -9,6 +9,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-$(mktemp -d)}"
 MANIFEST_ROOT="$OUTPUT_DIR"
 
 mkdir -p "$OUTPUT_DIR/deployments/k8s"
+rm -rf "$OUTPUT_DIR/deployments/k8s/eks" "$OUTPUT_DIR/deployments/k8s/benchmark"
 cp -R deployments/k8s/eks "$OUTPUT_DIR/deployments/k8s/"
 cp -R deployments/k8s/benchmark "$OUTPUT_DIR/deployments/k8s/"
 
