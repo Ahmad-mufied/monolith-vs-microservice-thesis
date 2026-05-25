@@ -3,6 +3,12 @@
 # Both jobs start within seconds of each other for aligned Datadog time-series.
 set -euo pipefail
 
+if [ -f env/aws-benchmark.env ]; then
+  set -a
+  source env/aws-benchmark.env
+  set +a
+fi
+
 SCENARIO="${SCENARIO:?SCENARIO is required (login|create-transaction|enriched-transactions|mixed-workload)}"
 TARGET_RPS="${TARGET_RPS:?TARGET_RPS is required}"
 RUN_ID="${RUN_ID:?RUN_ID is required}"
@@ -13,11 +19,23 @@ TEST_DURATION="${TEST_DURATION:-5m}"
 S3_BUCKET="${S3_BUCKET:?S3_BUCKET is required}"
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
 DATADOG_ENV="${DATADOG_ENV:-benchmark}"
+IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
+AWS_REGION="${AWS_REGION:-ap-southeast-1}"
+ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
+RENDER_ROOT="$(mktemp -d)"
 
 MONOLITH_NAMESPACE="benchmark"
 MSA_NAMESPACE="benchmark"
 MONOLITH_JOB="k6-benchmark-monolith"
 MICROSERVICES_JOB="k6-benchmark-microservices"
+MONOLITH_MANIFEST=""
+MICROSERVICES_MANIFEST=""
+
+cleanup() {
+  rm -rf "$RENDER_ROOT"
+  rm -f "${mono_submit_result_file:-}" "${msa_submit_result_file:-}"
+}
+trap cleanup EXIT
 
 S3_MONOLITH="s3://${S3_BUCKET}/experiments/${RUN_ID}/monolith/${SCENARIO}/${TARGET_RPS}rps/${ATTEMPT}"
 S3_MICROSERVICES="s3://${S3_BUCKET}/experiments/${RUN_ID}/microservices/${SCENARIO}/${TARGET_RPS}rps/${ATTEMPT}"
@@ -30,12 +48,18 @@ echo "  attempt      : $ATTEMPT"
 echo "  scaling_mode : $SCALING_MODE"
 echo "  k6_profile   : $K6_PROFILE"
 echo "  duration     : $TEST_DURATION"
+echo "  image_tag    : $IMAGE_TAG"
 echo ""
 
 # ─── Validate contexts ────────────────────────────────────────────────────────
 
 kubectl --context=monolith get nodes > /dev/null 2>&1 || { echo "ERROR: monolith context not available"; exit 1; }
 kubectl --context=msa get nodes > /dev/null 2>&1 || { echo "ERROR: msa context not available"; exit 1; }
+
+IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+MONOLITH_MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml"
+MICROSERVICES_MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml"
+bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 
 # ─── Clean up previous jobs ───────────────────────────────────────────────────
 
@@ -118,16 +142,15 @@ echo "Starting both k6 jobs simultaneously..."
 mono_submit_result_file="$(mktemp)"
 msa_submit_result_file="$(mktemp)"
 rm -f "$mono_submit_result_file" "$msa_submit_result_file"
-trap 'rm -f "$mono_submit_result_file" "$msa_submit_result_file"' EXIT
 
 run_submission "$mono_submit_result_file" monolith \
-  deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml \
+  "$MONOLITH_MANIFEST" \
   "$S3_MONOLITH" \
   monolith &
 mono_submit_pid=$!
 
 run_submission "$msa_submit_result_file" msa \
-  deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml \
+  "$MICROSERVICES_MANIFEST" \
   "$S3_MICROSERVICES" \
   microservices &
 msa_submit_pid=$!

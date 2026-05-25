@@ -2,6 +2,10 @@
 set -euo pipefail
 
 MODE="${1:-deploy}"
+MANIFEST_ROOT="${2:-.}"
+
+EKS_DIR="${MANIFEST_ROOT}/deployments/k8s/eks"
+BENCHMARK_DIR="${MANIFEST_ROOT}/deployments/k8s/benchmark"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -9,21 +13,21 @@ fail() {
 }
 
 check_no_local_images() {
-  if rg -n ':local|imagePullPolicy:\s+Never' deployments/k8s/eks deployments/k8s/benchmark > /tmp/eks-asset-local-check.txt; then
+  if rg -n ':local|imagePullPolicy:\s+Never' "$EKS_DIR" "$BENCHMARK_DIR" > /tmp/eks-asset-local-check.txt; then
     cat /tmp/eks-asset-local-check.txt >&2
     fail "EKS manifests still contain local-only images or imagePullPolicy Never"
   fi
 }
 
 check_no_unpatched_ecr_placeholders() {
-  if rg -n 'REPLACE_WITH_ECR_IMAGE|replace-me\.dkr\.ecr' deployments/k8s/eks deployments/k8s/benchmark > /tmp/eks-asset-ecr-check.txt; then
+  if rg -n 'REPLACE_WITH_ECR_IMAGE|replace-me\.dkr\.ecr' "$EKS_DIR" "$BENCHMARK_DIR" > /tmp/eks-asset-ecr-check.txt; then
     cat /tmp/eks-asset-ecr-check.txt >&2
     fail "EKS manifests still contain unresolved ECR placeholders"
   fi
 }
 
 check_benchmark_runtime_placeholders() {
-  if rg -n 's3://replace-me|value:\s+eks-run-001|value:\s+attempt-01|value:\s+login\.js|value:\s+login$' deployments/k8s/benchmark > /tmp/eks-asset-benchmark-check.txt; then
+  if rg -n 's3://replace-me|value:\s+eks-run-001|value:\s+attempt-01|value:\s+login\.js|value:\s+login$' "$BENCHMARK_DIR" > /tmp/eks-asset-benchmark-check.txt; then
     cat /tmp/eks-asset-benchmark-check.txt >&2
     fail "Benchmark manifests still contain runtime placeholder values; rerun the benchmark launcher with real inputs"
   fi

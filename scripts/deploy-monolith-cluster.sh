@@ -16,6 +16,13 @@ EKS_JOB_DIR="deployments/k8s/eks/monolith"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
+RENDER_ROOT="$(mktemp -d)"
+RENDERED_EKS_JOB_DIR=""
+
+cleanup() {
+  rm -rf "$RENDER_ROOT"
+}
+trap cleanup EXIT
 
 has_non_placeholder_datadog_api_key() {
   local value="${1:-}"
@@ -29,9 +36,10 @@ has_non_placeholder_datadog_api_key() {
 
 echo "=== Deploying monolith cluster (context: $CONTEXT) ==="
 
-echo "Patching EKS manifests with IMAGE_TAG=$IMAGE_TAG"
-IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" bash scripts/eks-update-manifests.sh
-bash scripts/validate-eks-assets.sh deploy
+echo "Rendering EKS manifests with IMAGE_TAG=$IMAGE_TAG"
+IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+RENDERED_EKS_JOB_DIR="$RENDER_ROOT/$EKS_JOB_DIR"
+bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 
 # Namespaces
 $K8S apply -f deployments/k8s/namespaces/local.yaml
@@ -57,22 +65,22 @@ echo "DB bootstrap complete"
 
 # Migration
 $K8S delete job monolith-migration-job -n mono --ignore-not-found
-$K8S apply -f "$EKS_JOB_DIR/migration-job.yaml"
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/migration-job.yaml"
 $K8S wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 echo "Migration complete"
 
 # Seed
 $K8S delete job reset-monolith-data-job -n mono --ignore-not-found
-$K8S apply -f "$EKS_JOB_DIR/reset-monolith-data-job.yaml"
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/reset-monolith-data-job.yaml"
 $K8S wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=120s
 
 $K8S delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
-$K8S apply -f "$EKS_JOB_DIR/seed-monolith-benchmark-data-job.yaml"
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/seed-monolith-benchmark-data-job.yaml"
 $K8S wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
 echo "Seed complete"
 
 # Deploy application
-$K8S apply -f deployments/k8s/eks/monolith/monolith.yaml
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/monolith.yaml"
 $K8S rollout status deployment/monolith -n mono --timeout=300s
 
 # Resource management

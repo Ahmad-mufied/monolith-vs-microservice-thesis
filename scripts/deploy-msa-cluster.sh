@@ -16,6 +16,13 @@ EKS_JOB_DIR="deployments/k8s/eks/microservices"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
+RENDER_ROOT="$(mktemp -d)"
+RENDERED_EKS_JOB_DIR=""
+
+cleanup() {
+  rm -rf "$RENDER_ROOT"
+}
+trap cleanup EXIT
 
 has_non_placeholder_datadog_api_key() {
   local value="${1:-}"
@@ -29,9 +36,10 @@ has_non_placeholder_datadog_api_key() {
 
 echo "=== Deploying MSA cluster (context: $CONTEXT) ==="
 
-echo "Patching EKS manifests with IMAGE_TAG=$IMAGE_TAG"
-IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" bash scripts/eks-update-manifests.sh
-bash scripts/validate-eks-assets.sh deploy
+echo "Rendering EKS manifests with IMAGE_TAG=$IMAGE_TAG"
+IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+RENDERED_EKS_JOB_DIR="$RENDER_ROOT/$EKS_JOB_DIR"
+bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 
 # Namespaces
 $K8S apply -f deployments/k8s/namespaces/local.yaml
@@ -60,7 +68,7 @@ echo "DB bootstrap complete"
 # Migrations (parallel)
 for svc in auth item transaction; do
   $K8S delete job "${svc}-migration-job" -n msa --ignore-not-found
-  $K8S apply -f "${EKS_JOB_DIR}/${svc}-migration-job.yaml"
+  $K8S apply -f "${RENDERED_EKS_JOB_DIR}/${svc}-migration-job.yaml"
 done
 for svc in auth item transaction; do
   $K8S wait --for=condition=complete job/"${svc}-migration-job" -n msa --timeout=180s
@@ -69,17 +77,17 @@ echo "Migrations complete"
 
 # Seed
 $K8S delete job reset-microservices-data-job -n msa --ignore-not-found
-$K8S apply -f "$EKS_JOB_DIR/reset-microservices-data-job.yaml"
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/reset-microservices-data-job.yaml"
 $K8S wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
 
 $K8S delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-$K8S apply -f "$EKS_JOB_DIR/seed-microservices-benchmark-data-job.yaml"
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/seed-microservices-benchmark-data-job.yaml"
 $K8S wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
 echo "Seed complete"
 
 # Deploy services
 for svc in auth-service item-service transaction-service api-gateway; do
-  $K8S apply -f "deployments/k8s/eks/microservices/${svc}.yaml"
+  $K8S apply -f "${RENDERED_EKS_JOB_DIR}/${svc}.yaml"
 done
 for svc in auth-service item-service transaction-service api-gateway; do
   $K8S rollout status "deployment/${svc}" -n msa --timeout=300s
