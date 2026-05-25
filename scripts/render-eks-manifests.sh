@@ -10,6 +10,10 @@ if [[ -z "${OUTPUT_DIR+x}" ]]; then
   OUTPUT_DIR="$(mktemp -d)"
   output_dir_owned="true"
 fi
+[[ -n "${OUTPUT_DIR:-}" ]] || {
+  echo "OUTPUT_DIR must not be empty" >&2
+  exit 1
+}
 MANIFEST_ROOT="$OUTPUT_DIR"
 
 cleanup() {
