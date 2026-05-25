@@ -16,12 +16,24 @@ sequenceDiagram
   M->>U: login(email, password)
   U->>R: find user by email
   R->>DB: SELECT user by email
-  DB-->>R: user row with password hash
-  R-->>U: user
-  U->>U: bcrypt password comparison
-  U->>U: sign JWT
-  U-->>M: token and user summary
-  M-->>K6: 200 LoginResponse
+  alt user not found
+    DB-->>R: no user row
+    R-->>U: invalid credentials
+    U-->>M: unauthorized error
+    M-->>K6: 401 ErrorResponse
+  else user found
+    DB-->>R: user row with password hash
+    R-->>U: user
+    U->>U: bcrypt password comparison
+    alt password mismatch
+      U-->>M: unauthorized error
+      M-->>K6: 401 ErrorResponse
+    else password matches
+      U->>U: sign JWT
+      U-->>M: token and user summary
+      M-->>K6: 200 LoginResponse
+    end
+  end
 ```
 
 ## Microservices
@@ -40,12 +52,25 @@ sequenceDiagram
   AS->>UC: login(email, password)
   UC->>R: find user by email
   R->>DB: SELECT user by email
-  DB-->>R: user row with password hash
-  R-->>UC: user
-  UC->>UC: bcrypt password comparison
-  UC->>UC: sign JWT
-  UC-->>AS: token and user summary
-  AS-->>GW: LoginResponse
-  GW-->>K6: 200 LoginResponse
+  alt user not found
+    DB-->>R: no user row
+    R-->>UC: invalid credentials
+    UC-->>AS: unauthorized error
+    AS-->>GW: unauthorized error
+    GW-->>K6: 401 ErrorResponse
+  else user found
+    DB-->>R: user row with password hash
+    R-->>UC: user
+    UC->>UC: bcrypt password comparison
+    alt password mismatch
+      UC-->>AS: unauthorized error
+      AS-->>GW: unauthorized error
+      GW-->>K6: 401 ErrorResponse
+    else password matches
+      UC->>UC: sign JWT
+      UC-->>AS: token and user summary
+      AS-->>GW: LoginResponse
+      GW-->>K6: 200 LoginResponse
+    end
+  end
 ```
-
