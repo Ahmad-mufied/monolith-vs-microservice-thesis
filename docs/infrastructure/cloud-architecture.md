@@ -681,7 +681,7 @@ The full deployment ordering is mandatory. Steps cannot be reordered.
 │  PER EXPERIMENT SESSION                                       │
 │                                                                │
 │  3. make ecr-push-all              Build & push all images    │
-│  4. make eks-update-manifests      Optional manifest preflight│
+│  4. make eks-render-manifests      Optional manifest preflight│
 │  5. make terraform-auth-check      Verify TF auth bridge      │
 │  6. make eks-shared-apply          Provision VPC + IAM        │
 │  7. make eks-apply                 Provision both clusters    │
@@ -719,10 +719,11 @@ time clusters exist, all images are already in ECR, so a deployment
 failure is unambiguous: it cannot be an image problem.
 
 The reason image stamping remains tied to the pushed `IMAGE_TAG` is that the
-manifests must point to the same tag that was just published to ECR. The EKS
-deploy scripts now rerun `eks-update-manifests` automatically before validation
-and apply, which removes the operator footgun of forgetting the manual patch
-step while keeping the rendered manifests aligned with the intended tag.
+rendered manifests must point to the same tag that was just published to ECR.
+The EKS deploy scripts now rerun `eks-render-manifests` automatically before
+validation and apply, which removes the operator footgun of forgetting the
+manual render step while keeping the rendered manifests aligned with the
+intended tag.
 
 The reason `terraform-auth-check` runs before Terraform apply is to verify the
 bridge between interactive `aws login` sessions and Terraform-compatible
