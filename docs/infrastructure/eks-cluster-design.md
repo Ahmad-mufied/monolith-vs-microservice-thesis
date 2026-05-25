@@ -21,13 +21,13 @@ AWS ap-southeast-1
 │   └── Public subnets:  10.0.101.0/24, 10.0.102.0/24
 │
 ├── Cluster A: skripsi-monolith
-│   ├── app-nodes      (2× c8i.2xlarge)  → mono namespace
+│   ├── app-nodes      (2× c8i.xlarge)   → mono namespace
 │   ├── testing-nodes  (1× t3.large)   → benchmark namespace
 │   └── RDS A: skripsi-monolith-postgres
 │       └── mono_db
 │
 ├── Cluster B: skripsi-msa
-│   ├── app-nodes      (2× c8i.2xlarge)  → msa namespace
+│   ├── app-nodes      (2× c8i.xlarge)   → msa namespace
 │   ├── testing-nodes  (1× t3.large)   → benchmark namespace
 │   └── RDS B: skripsi-msa-postgres
 │       ├── auth_db
@@ -66,7 +66,7 @@ Each cluster has two node groups:
 ### app-nodes
 
 ```text
-instance type : c8i.2xlarge (8 vCPU, 16 GiB)
+instance type : c8i.xlarge (4 vCPU, 8 GiB)
 count         : 2
 label         : node-group=app
 taint         : none
@@ -175,20 +175,20 @@ to target the correct cluster.
 ## 9. Cost Estimate
 
 Cost must be recalculated against the live AWS Pricing Calculator before each
-measured run because the app-node baseline is now `c8i.2xlarge` instead of the
+measured run because the app-node baseline is now `c8i.xlarge` instead of the
 older `t3.xlarge`.
 
 | Component | Per cluster | Two clusters |
 |---|---|---|
 | EKS control plane | $0.10 | $0.20 |
-| app-nodes (2× c8i.2xlarge) | recalculate live | recalculate live |
+| app-nodes (2× c8i.xlarge) | recalculate live | recalculate live |
 | testing-nodes (1× t3.large) | $0.08 | $0.16 |
 | RDS db.t3.medium | $0.07 | $0.14 |
 | **Total** | **recalculate live** | **recalculate live** |
 
 A typical benchmark session (provision + deploy + 3 scenarios × 2 RPS
 levels + destroy) still takes approximately 3–4 hours, but the cost budget
-must be recomputed for the new `c8i.2xlarge` baseline before running the
+must be recomputed for the new `c8i.xlarge` baseline before running the
 final measured series.
 
 ---

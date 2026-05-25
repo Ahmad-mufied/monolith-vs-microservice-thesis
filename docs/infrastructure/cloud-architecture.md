@@ -66,7 +66,7 @@ two completely independent RDS instances run side by side.
 │  │                                                                  │   │
 │  │  ┌──── Cluster A: skripsi-monolith ────┐                        │   │
 │  │  │                                      │                        │   │
-│  │  │  app-nodes      (2× c8i.2xlarge)     │                        │   │
+│  │  │  app-nodes      (2× c8i.xlarge)      │                        │   │
 │  │  │     └─ namespace: mono               │                        │   │
 │  │  │           └─ monolith pods           │                        │   │
 │  │  │                                      │                        │   │
@@ -86,7 +86,7 @@ two completely independent RDS instances run side by side.
 │  │                                                                  │   │
 │  │  ┌──── Cluster B: skripsi-msa ────┐                              │   │
 │  │  │                                 │                              │   │
-│  │  │  app-nodes      (2× c8i.2xlarge)│                              │   │
+│  │  │  app-nodes      (2× c8i.xlarge) │                              │   │
 │  │  │     └─ namespace: msa           │                              │   │
 │  │  │           ├─ api-gateway        │                              │   │
 │  │  │           ├─ auth-service       │                              │   │
@@ -267,9 +267,9 @@ Each cluster has two node groups:
 ```text
 app-nodes            testing-nodes
 ──────────────       ─────────────
-2× c8i.2xlarge      1× t3.large
-8 vCPU each         2 vCPU
-16 GiB each         8 GiB
+2× c8i.xlarge       1× t3.large
+4 vCPU each         2 vCPU
+8 GiB each          8 GiB
 labels:            labels:
   node-group=app     node-group=testing
 no taints          taint:
@@ -759,13 +759,13 @@ contract.
 ## 13. Cost Profile
 
 Approximate cost planning must be refreshed against the live AWS Pricing
-Calculator because the app-node baseline is now `c8i.2xlarge`. The previous
+Calculator because the app-node baseline is now `c8i.xlarge`. The previous
 illustrative `t3.xlarge` totals are no longer valid for budgeting.
 
 | Component | Per cluster | Two clusters |
 |---|---|---|
 | EKS control plane | $0.10 | $0.20 |
-| app-nodes (2× c8i.2xlarge) | recalculate live | recalculate live |
+| app-nodes (2× c8i.xlarge) | recalculate live | recalculate live |
 | testing-nodes (1× t3.large) | ~$0.08 | ~$0.16 |
 | RDS (db.t3.medium) | ~$0.07 | ~$0.14 |
 | **Total active** | **recalculate live** | **recalculate live** |
@@ -780,7 +780,7 @@ NAT gateway       : ~$0.045/hour while VPC exists
 
 A typical experiment session — provision, run all scenarios at multiple
 RPS levels, destroy — still takes 3–4 hours, but the live hourly total must
-be recomputed for the new `c8i.2xlarge` baseline before final budgeting.
+be recomputed for the new `c8i.xlarge` baseline before final budgeting.
 
 ---
 
