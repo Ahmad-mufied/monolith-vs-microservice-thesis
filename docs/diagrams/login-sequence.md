@@ -1,0 +1,76 @@
+# Login Sequence Diagram
+
+This sequence diagram shows Benchmark 1, `POST /api/v1/auth/login`.
+
+## Monolith
+
+```mermaid
+sequenceDiagram
+  participant K6 as Client / k6
+  participant M as Monolith
+  participant U as Auth usecase
+  participant R as User repository
+  participant DB as mono_db
+
+  K6->>M: POST /api/v1/auth/login
+  M->>U: login(email, password)
+  U->>R: find user by email
+  R->>DB: SELECT user by email
+  alt user not found
+    DB-->>R: no user row
+    R-->>U: invalid credentials
+    U-->>M: unauthorized error
+    M-->>K6: 401 ErrorResponse
+  else user found
+    DB-->>R: user row with password hash
+    R-->>U: user
+    U->>U: bcrypt password comparison
+    alt password mismatch
+      U-->>M: unauthorized error
+      M-->>K6: 401 ErrorResponse
+    else password matches
+      U->>U: sign JWT
+      U-->>M: token and user summary
+      M-->>K6: 200 LoginResponse
+    end
+  end
+```
+
+## Microservices
+
+```mermaid
+sequenceDiagram
+  participant K6 as Client / k6
+  participant GW as API Gateway
+  participant AS as Auth Service
+  participant UC as Auth usecase
+  participant R as User repository
+  participant DB as auth_db
+
+  K6->>GW: POST /api/v1/auth/login
+  GW->>AS: gRPC Login
+  AS->>UC: login(email, password)
+  UC->>R: find user by email
+  R->>DB: SELECT user by email
+  alt user not found
+    DB-->>R: no user row
+    R-->>UC: invalid credentials
+    UC-->>AS: unauthorized error
+    AS-->>GW: unauthorized error
+    GW-->>K6: 401 ErrorResponse
+  else user found
+    DB-->>R: user row with password hash
+    R-->>UC: user
+    UC->>UC: bcrypt password comparison
+    alt password mismatch
+      UC-->>AS: unauthorized error
+      AS-->>GW: unauthorized error
+      GW-->>K6: 401 ErrorResponse
+    else password matches
+      UC->>UC: sign JWT
+      UC-->>AS: token and user summary
+      AS-->>GW: LoginResponse
+      GW-->>K6: 200 LoginResponse
+    end
+  end
+```
