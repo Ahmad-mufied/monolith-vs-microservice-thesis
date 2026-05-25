@@ -364,6 +364,11 @@ helpers now perform this encoding automatically.
 
 ```bash
 SCALING_MODE=fixed make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
+```
+
+Alternative when you want both clusters deployed together:
+
+```bash
 make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG
 ```
 
@@ -400,15 +405,19 @@ kubectl --context=monolith get pods -n benchmark
 
 ```bash
 SCALING_MODE=fixed make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
+```
+
+Alternative when you want both clusters deployed together:
+
+```bash
 make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG
 ```
 
-Quick local alternative:
+Quick local alternative for per-cluster deploys:
 
 ```bash
 SCALING_MODE=fixed make eks-deploy-monolith
 SCALING_MODE=fixed make eks-deploy-msa
-make eks-deploy-all-fixed
 ```
 
 Use the implicit form only when you want the deploy scripts to derive
