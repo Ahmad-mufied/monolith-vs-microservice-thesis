@@ -28,7 +28,7 @@ provisioning to result verification and teardown.
 ```text
 build/push images
     ↓
-patch EKS manifests with IMAGE_TAG
+render EKS manifests with IMAGE_TAG
     ↓
 terraform apply (shared + experiment)
     ↓
@@ -73,13 +73,19 @@ IMAGE_TAG=$(git rev-parse --short HEAD)
 # Fixed replica (default)
 SCALING_MODE=fixed make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
 SCALING_MODE=fixed make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
+make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG
 
 # HPA mode
 # metrics-server is installed automatically by the deploy scripts in HPA mode
 # default installer pins a metrics-server release and keeps kubelet TLS verification enabled
 SCALING_MODE=hpa make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
 SCALING_MODE=hpa make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
+make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG
 ```
+
+The source manifests in the repository stay unchanged. Each deploy or benchmark
+run now renders runtime-specific EKS manifests into a temporary directory and
+applies those rendered files.
 
 Important rule:
 

@@ -165,12 +165,16 @@ help:
 	@echo "  make datadog-install-eks-msa"
 	@echo "  make datadog-status"
 	@echo "  make datadog-uninstall"
+	@echo "  make eks-render-manifests"
 	@echo "  make eks-render-tfvars"
 	@echo "  make terraform-auth-check"
 	@echo "  make terraform-recovery-check"
 	@echo "  make eks-prepare-enrichment-benchmark"
 	@echo "  make create-eks-secrets-monolith"
 	@echo "  make create-eks-secrets-microservices"
+	@echo "  make eks-deploy-all"
+	@echo "  make eks-deploy-all-fixed"
+	@echo "  make eks-deploy-all-hpa"
 	@echo "  make create-local-postgres-secrets"
 	@echo "  make create-local-secrets"
 	@echo "  make create-local-secrets-microservices"
@@ -858,14 +862,17 @@ ecr-push-all: aws-ecr-login
 	docker push $(ECR)/$(ECR_NAMESPACE)/k6-runner:$(IMAGE_TAG)
 	@echo "All images pushed with tag: $(IMAGE_TAG)"
 
-.PHONY: eks-update-manifests
-eks-update-manifests:
-	IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/eks-update-manifests.sh
-	bash scripts/validate-eks-assets.sh deploy
+.PHONY: eks-render-manifests eks-update-manifests
+eks-render-manifests eks-update-manifests:
+	$(eval RENDER_DIR := $(shell mktemp -d))
+	@echo "Rendering EKS manifests to $(RENDER_DIR)"
+	@IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) OUTPUT_DIR="$(RENDER_DIR)" bash scripts/render-eks-manifests.sh >/dev/null
+	@bash scripts/validate-eks-assets.sh deploy "$(RENDER_DIR)"
+	@echo "Rendered manifests ready at $(RENDER_DIR)"
 
 .PHONY: eks-validate-manifests
 eks-validate-manifests:
-	bash scripts/validate-eks-assets.sh deploy
+	$(MAKE) eks-render-manifests IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE)
 
 .PHONY: eks-render-tfvars
 eks-render-tfvars:
@@ -921,6 +928,18 @@ eks-deploy-monolith:
 .PHONY: eks-deploy-msa
 eks-deploy-msa:
 	SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/deploy-msa-cluster.sh
+
+.PHONY: eks-deploy-all
+eks-deploy-all:
+	SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/deploy-all-eks-clusters.sh
+
+.PHONY: eks-deploy-all-fixed
+eks-deploy-all-fixed:
+	SCALING_MODE=fixed $(MAKE) eks-deploy-all IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE)
+
+.PHONY: eks-deploy-all-hpa
+eks-deploy-all-hpa:
+	SCALING_MODE=hpa $(MAKE) eks-deploy-all IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE)
 
 .PHONY: eks-prepare-enrichment-benchmark
 eks-prepare-enrichment-benchmark:

@@ -134,23 +134,25 @@ These resources are not managed by Terraform.
 
 ---
 
-## 4. Step 1 — Build, Push, and Patch Images
+## 4. Step 1 — Build, Push, and Render Images
 
 Build and push images before Terraform apply so the expected deployable tag
-already exists in ECR. Manual manifest patching is optional now because the EKS
+already exists in ECR. Manual manifest rendering is optional now because the EKS
 deploy scripts rerun it automatically before validation and apply.
 
 ```bash
 IMAGE_TAG=$(git rev-parse --short HEAD)
 
 make ecr-push-all IMAGE_TAG=$IMAGE_TAG
-make eks-update-manifests IMAGE_TAG=$IMAGE_TAG
+make eks-render-manifests IMAGE_TAG=$IMAGE_TAG
 ```
 
-`make eks-update-manifests` is still useful as a manual preflight check, but
-`make eks-deploy-monolith` and `make eks-deploy-msa` now rerun the same patch
-step automatically. If you deploy a custom tag, pass the same `IMAGE_TAG` to
-the deploy command so the manifests are stamped with the intended image tag.
+`make eks-render-manifests` is still useful as a manual preflight check, but
+`make eks-deploy-monolith` and `make eks-deploy-msa` now rerun the same render
+step automatically. The repository manifests remain unchanged; the rendered
+manifests are written to a temporary directory for validation or apply. If you
+deploy a custom tag, pass the same `IMAGE_TAG` to the deploy command so the
+rendered manifests use the intended image tag.
 
 The deploy commands still work without an explicit `IMAGE_TAG` because the
 scripts default to `git rev-parse --short HEAD` at execution time. That implicit
@@ -352,10 +354,12 @@ make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
 
 # Deploy MSA cluster (fixed replica mode by default)
 make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
+make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG
 
 # For HPA mode:
 SCALING_MODE=hpa make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
 SCALING_MODE=hpa make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
+make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG
 ```
 
 Quick local alternative:
@@ -363,9 +367,11 @@ Quick local alternative:
 ```bash
 SCALING_MODE=fixed make eks-deploy-monolith
 SCALING_MODE=fixed make eks-deploy-msa
+make eks-deploy-all-fixed
 
 SCALING_MODE=hpa make eks-deploy-monolith
 SCALING_MODE=hpa make eks-deploy-msa
+make eks-deploy-all-hpa
 ```
 
 Use the shorter implicit form only when you intentionally want the deploy

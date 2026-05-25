@@ -42,7 +42,7 @@ An experiment lifecycle starts with:
 
 ```text
 build/push images
--> patch EKS manifests with IMAGE_TAG
+-> render EKS manifests with IMAGE_TAG
 -> aws login
 -> make terraform-auth-check
 -> make eks-apply

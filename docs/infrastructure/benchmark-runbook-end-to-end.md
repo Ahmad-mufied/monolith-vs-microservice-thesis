@@ -91,21 +91,22 @@ make ecr-push-all IMAGE_TAG=$IMAGE_TAG
 ### Step 1.4 — Optional Preflight: Update EKS Manifests with Pushed Image Tag
 
 This step is now optional as a manual preflight check. The cluster deploy
-scripts automatically rerun the same manifest patching step before validation
+scripts automatically rerun the same manifest rendering step before validation
 and `kubectl apply`.
 
 ```bash
-make eks-update-manifests IMAGE_TAG=$IMAGE_TAG
+make eks-render-manifests IMAGE_TAG=$IMAGE_TAG
 # Optional manual preflight. eks-deploy-* will rerun this automatically.
 ```
 
-This patches the EKS deployment manifests, EKS migration/seed jobs, benchmark
+This renders EKS deployment manifests, EKS migration/seed jobs, benchmark
 jobs, Datadog version labels, and benchmark `IMAGES_JSON` values with the real
-ECR image URIs.
+ECR image URIs into a temporary directory. Repository manifests remain
+unchanged.
 
 If you deploy a tag other than the default current Git commit, pass the same
 `IMAGE_TAG` into `make eks-deploy-monolith` / `make eks-deploy-msa` so the
-automatic patching step stamps the correct image references.
+automatic render step uses the correct image references.
 
 The deploy scripts still support the shorter implicit form without `IMAGE_TAG`,
 because they fall back to `git rev-parse --short HEAD` at execution time. That
@@ -363,6 +364,7 @@ helpers now perform this encoding automatically.
 
 ```bash
 SCALING_MODE=fixed make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
+make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG
 ```
 
 Important:
@@ -398,6 +400,7 @@ kubectl --context=monolith get pods -n benchmark
 
 ```bash
 SCALING_MODE=fixed make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
+make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG
 ```
 
 Quick local alternative:
@@ -405,11 +408,19 @@ Quick local alternative:
 ```bash
 SCALING_MODE=fixed make eks-deploy-monolith
 SCALING_MODE=fixed make eks-deploy-msa
+make eks-deploy-all-fixed
 ```
 
 Use the implicit form only when you want the deploy scripts to derive
 `IMAGE_TAG` from the current `HEAD` at command execution time and you do not
 expect that commit to change during the deploy session.
+
+When both architectures should move together, prefer:
+
+```bash
+make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG
+make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG
+```
 
 This script runs:
 1. Apply namespaces (msa, benchmark)
@@ -675,7 +686,7 @@ kubectl --context=monolith run pg-test \
 | `make aws-create-s3` | Create S3 results bucket (one-time) |
 | `make aws-create-ecr` | Create ECR repositories (one-time) |
 | `make ecr-push-all` | Build and push all Docker images to ECR |
-| `make eks-update-manifests` | Patch EKS manifests with ECR image URIs |
+| `make eks-render-manifests` | Render EKS manifests with ECR image URIs into a temp directory |
 | `make terraform-auth-check` | Verify Terraform-compatible AWS auth before plan/apply/destroy |
 | `make eks-shared-apply` | Apply shared Terraform (VPC + IAM) |
 | `make eks-apply` | Apply experiment Terraform (2 EKS + 2 RDS) |
