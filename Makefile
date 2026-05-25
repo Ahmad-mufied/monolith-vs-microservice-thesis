@@ -872,7 +872,11 @@ eks-render-manifests eks-update-manifests:
 
 .PHONY: eks-validate-manifests
 eks-validate-manifests:
-	$(MAKE) eks-render-manifests IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE)
+	@RENDER_DIR="$$(mktemp -d)"; \
+	trap 'rm -rf "$$RENDER_DIR"' EXIT; \
+	echo "Validating rendered EKS manifests in $$RENDER_DIR"; \
+	IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) OUTPUT_DIR="$$RENDER_DIR" bash scripts/render-eks-manifests.sh >/dev/null; \
+	bash scripts/validate-eks-assets.sh deploy "$$RENDER_DIR"
 
 .PHONY: eks-render-tfvars
 eks-render-tfvars:
