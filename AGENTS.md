@@ -128,12 +128,12 @@ For request validation decisions:
 
 For benchmark decisions:
 
-- docs/experiment/research-design.md
-- docs/experiment/workload-scenarios.md
-- docs/experiment/resource-configuration.md
-- docs/experiment/hpa-resourcequota.md
-- docs/experiment/data-collection.md
-- docs/experiment/test-execution-procedure.md
+- docs/development/k6-workload-scenarios.md
+- docs/experiment/scaling-mode-strategy.md
+- docs/infrastructure/benchmark-execution-lifecycle.md
+- docs/infrastructure/benchmark-runbook-end-to-end.md
+- docs/infrastructure/parallel-benchmark-runbook.md
+- docs/research-questions/README.md
 
 ## Code Architecture
 
@@ -382,19 +382,13 @@ format: uuid
 
 Examples must use UUID strings, not labels such as USR-001, ITM-001, or TX-001.
 
-Response format:
+Success response bodies must follow `openapi.yaml`. In the current OpenAPI
+contract, success responses are represented by HTTP status code plus concise
+body and do not use a top-level `status: success` wrapper.
 
-Success:
-
-{
-  "status": "success",
-  "data": {}
-}
-
-Error:
+Error response format:
 
 {
-  "status": "error",
   "error": {
     "code": "BAD_REQUEST",
     "message": "Invalid request payload",
@@ -402,11 +396,44 @@ Error:
   }
 }
 
+Error responses do not use a top-level `status: error` wrapper.
+
 Main benchmark endpoints:
 
 1. POST /api/v1/auth/login
 2. POST /api/v1/transactions
 3. GET /api/v1/admin/transactions
+
+Optional benchmark endpoint:
+
+4. PUT /api/v1/items
+
+Authentication rules:
+
+- POST /api/v1/auth/register is public.
+- POST /api/v1/auth/login is public.
+- Item, transaction, and admin endpoints require Bearer JWT unless
+  `openapi.yaml` says otherwise.
+
+Response shape rules:
+
+- POST /api/v1/auth/register returns message and user summary.
+- POST /api/v1/auth/login returns message, token, and user summary.
+- POST /api/v1/transactions returns message and generated id.
+- PUT /api/v1/items returns message only.
+- List GET responses return data and pagination meta.
+
+Pagination query parameters:
+
+- limit: integer, minimum 1, maximum 100, default 50.
+- offset: integer, minimum 0, default 0.
+
+Soft delete rules from the OpenAPI contract:
+
+- Items use soft delete because PUT /api/v1/items synchronizes the active item
+  list.
+- Public GET item endpoints return active items only.
+- Users and transactions do not use soft delete in the current API contract.
 
 ## gRPC Contract Rules
 
@@ -917,49 +944,58 @@ Architecture:
 - docs/architecture/monolith.md
 - docs/architecture/microservices.md
 - docs/architecture/comparison.md
+- docs/diagrams/README.md
+- docs/diagrams/cloud-architecture.md
+- docs/diagrams/architecture-comparison.md
+- docs/diagrams/benchmark-lifecycle.md
+- docs/diagrams/login-sequence.md
+- docs/diagrams/create-transaction-sequence.md
+- docs/diagrams/enriched-transactions-sequence.md
 
 API:
 
+- openapi.yaml
 - docs/api/openapi-notes.md
 - docs/api/grpc-contracts.md
-- docs/api/error-handling.md
 
 Development:
 
 - docs/development/project-structure.md
-- docs/development/coding-guidelines.md
-- docs/development/local-development.md
+- docs/development/local-deployment.md
+- docs/development/run-monolith-local.md
+- docs/development/run-microservices-local.md
 - docs/development/database-schema.md
 - docs/development/database-migration.md
 - docs/development/validation-strategy.md
+- docs/development/k6-workload-scenarios.md
 
 Experiment:
 
-- docs/experiment/research-design.md
-- docs/experiment/workload-scenarios.md
-- docs/experiment/resource-configuration.md
-- docs/experiment/hpa-resourcequota.md
-- docs/experiment/data-collection.md
-- docs/experiment/test-execution-procedure.md
-- docs/experiment/result-analysis-template.md
+- docs/experiment/scaling-mode-strategy.md
+
+Deployment:
+
+- docs/deployment/codebuild-ecr.md
 
 Infrastructure:
 
-- docs/infrastructure/aws-eks.md
-- docs/infrastructure/node-pool-design.md
+- docs/infrastructure/cloud-architecture.md
+- docs/infrastructure/eks-cluster-design.md
+- docs/infrastructure/terraform-runbook.md
+- docs/infrastructure/benchmark-execution-lifecycle.md
+- docs/infrastructure/benchmark-runbook-end-to-end.md
+- docs/infrastructure/parallel-benchmark-runbook.md
 - docs/infrastructure/rds-postgres.md
-- docs/infrastructure/s3-result-storage.md
 - docs/infrastructure/datadog.md
-- docs/infrastructure/terraform.md
-- docs/infrastructure/cost-control.md
+- docs/infrastructure/datadog-resource-overhead.md
+- docs/infrastructure/secret-management.md
+- docs/infrastructure/deployment-strategy.md
 
-Thesis:
+Research questions:
 
-- docs/thesis/bab-1-notes.md
-- docs/thesis/bab-2-literature-review.md
-- docs/thesis/bab-3-method.md
-- docs/thesis/terminology.md
-- docs/thesis/journal-findings.md
+- docs/research-questions/README.md
+- docs/research-questions/rq1-performance-analysis.md
+- docs/research-questions/rq2-resource-efficiency-analysis.md
 
 When behavior changes, update the relevant docs in the same change.
 
