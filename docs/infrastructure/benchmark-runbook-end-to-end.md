@@ -203,7 +203,7 @@ kubectl --context=monolith get nodes
 kubectl --context=msa get nodes
 ```
 
-Expected: 3 nodes per cluster (2 app-nodes + 1 testing-node), all Ready.
+Expected: 3 nodes per cluster (2 app-nodes of type `c8i.xlarge` + 1 testing-node), all Ready.
 
 
 ---
