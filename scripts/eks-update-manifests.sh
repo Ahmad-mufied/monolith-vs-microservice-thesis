@@ -4,6 +4,7 @@ set -euo pipefail
 IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG is required}"
 AWS_REGION="${AWS_REGION:?AWS_REGION is required}"
 ECR_NAMESPACE="${ECR_NAMESPACE:?ECR_NAMESPACE is required}"
+MANIFEST_ROOT="${MANIFEST_ROOT:-.}"
 
 ACCOUNT_ID="${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
 ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
@@ -32,34 +33,34 @@ patch_value_line() {
 }
 
 patch_app_manifests() {
-  patch_image_file "deployments/k8s/eks/monolith/monolith.yaml" "monolith"
-  patch_datadog_version "deployments/k8s/eks/monolith/monolith.yaml"
+  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/monolith.yaml" "monolith"
+  patch_datadog_version "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/monolith.yaml"
 
-  patch_image_file "deployments/k8s/eks/microservices/api-gateway.yaml" "api-gateway"
-  patch_datadog_version "deployments/k8s/eks/microservices/api-gateway.yaml"
+  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/api-gateway.yaml" "api-gateway"
+  patch_datadog_version "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/api-gateway.yaml"
 
-  patch_image_file "deployments/k8s/eks/microservices/auth-service.yaml" "auth-service"
-  patch_datadog_version "deployments/k8s/eks/microservices/auth-service.yaml"
+  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/auth-service.yaml" "auth-service"
+  patch_datadog_version "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/auth-service.yaml"
 
-  patch_image_file "deployments/k8s/eks/microservices/item-service.yaml" "item-service"
-  patch_datadog_version "deployments/k8s/eks/microservices/item-service.yaml"
+  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/item-service.yaml" "item-service"
+  patch_datadog_version "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/item-service.yaml"
 
-  patch_image_file "deployments/k8s/eks/microservices/transaction-service.yaml" "transaction-service"
-  patch_datadog_version "deployments/k8s/eks/microservices/transaction-service.yaml"
+  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/transaction-service.yaml" "transaction-service"
+  patch_datadog_version "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/transaction-service.yaml"
 }
 
 patch_job_manifests() {
   local seed_files=(
-    deployments/k8s/eks/monolith/reset-monolith-data-job.yaml
-    deployments/k8s/eks/monolith/seed-monolith-smoke-data-job.yaml
-    deployments/k8s/eks/monolith/seed-monolith-benchmark-data-job.yaml
-    deployments/k8s/eks/monolith/prepare-monolith-enrichment-smoke-data-job.yaml
-    deployments/k8s/eks/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml
-    deployments/k8s/eks/microservices/reset-microservices-data-job.yaml
-    deployments/k8s/eks/microservices/seed-microservices-smoke-data-job.yaml
-    deployments/k8s/eks/microservices/seed-microservices-benchmark-data-job.yaml
-    deployments/k8s/eks/microservices/prepare-microservices-enrichment-smoke-data-job.yaml
-    deployments/k8s/eks/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml
+    "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/reset-monolith-data-job.yaml"
+    "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/seed-monolith-smoke-data-job.yaml"
+    "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/seed-monolith-benchmark-data-job.yaml"
+    "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/prepare-monolith-enrichment-smoke-data-job.yaml"
+    "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml"
+    "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/reset-microservices-data-job.yaml"
+    "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/seed-microservices-smoke-data-job.yaml"
+    "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/seed-microservices-benchmark-data-job.yaml"
+    "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/prepare-microservices-enrichment-smoke-data-job.yaml"
+    "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml"
   )
 
   local file
@@ -67,15 +68,15 @@ patch_job_manifests() {
     patch_image_file "$file" "seed-runner"
   done
 
-  patch_image_file "deployments/k8s/eks/monolith/migration-job.yaml" "monolith"
-  patch_image_file "deployments/k8s/eks/microservices/auth-migration-job.yaml" "auth-service"
-  patch_image_file "deployments/k8s/eks/microservices/item-migration-job.yaml" "item-service"
-  patch_image_file "deployments/k8s/eks/microservices/transaction-migration-job.yaml" "transaction-service"
+  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/migration-job.yaml" "monolith"
+  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/auth-migration-job.yaml" "auth-service"
+  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/item-migration-job.yaml" "item-service"
+  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/transaction-migration-job.yaml" "transaction-service"
 }
 
 patch_benchmark_manifests() {
-  local monolith_manifest="deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml"
-  local microservices_manifest="deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml"
+  local monolith_manifest="${MANIFEST_ROOT}/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml"
+  local microservices_manifest="${MANIFEST_ROOT}/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml"
 
   patch_image_file "$monolith_manifest" "k6-runner"
   patch_image_file "$microservices_manifest" "k6-runner"

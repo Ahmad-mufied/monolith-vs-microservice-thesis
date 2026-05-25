@@ -72,14 +72,14 @@ make ecr-push-all IMAGE_TAG=$IMAGE_TAG
 # Override explicitly, for example: IMAGE_TAG=<tag>
 ```
 
-### Step 4 — Optional Preflight: Update EKS manifests with the pushed image tag
+### Step 4 — Optional Preflight: Render EKS manifests with the pushed image tag
 
 ```bash
-make eks-update-manifests IMAGE_TAG=$IMAGE_TAG
+make eks-render-manifests IMAGE_TAG=$IMAGE_TAG
 # Optional manual preflight. eks-deploy-* reruns this automatically.
 ```
 
-This patches:
+This renders:
 
 - EKS application Deployments,
 - EKS migration / reset / seed / prepare Jobs,
@@ -87,7 +87,7 @@ This patches:
 - Datadog version labels,
 - benchmark `IMAGES_JSON` metadata payloads.
 
-The EKS deploy scripts now rerun the same patching step automatically before
+The EKS deploy scripts now rerun the same rendering step automatically before
 validation and `kubectl apply`. Manual execution remains useful when you want
 to inspect the rendered manifests before deployment. If you deploy a non-default
 tag, pass the same `IMAGE_TAG` to the deploy command.
