@@ -4,13 +4,18 @@ set -euo pipefail
 MODE="${1:-deploy}"
 MANIFEST_ROOT="${2:-.}"
 
-EKS_DIR="${MANIFEST_ROOT}/deployments/k8s/eks"
-BENCHMARK_DIR="${MANIFEST_ROOT}/deployments/k8s/benchmark"
-
 fail() {
   echo "ERROR: $*" >&2
   exit 1
 }
+
+[[ -n "$MANIFEST_ROOT" ]] || fail "MANIFEST_ROOT must not be empty"
+
+EKS_DIR="${MANIFEST_ROOT}/deployments/k8s/eks"
+BENCHMARK_DIR="${MANIFEST_ROOT}/deployments/k8s/benchmark"
+
+[[ -d "$EKS_DIR" ]] || fail "EKS manifest directory not found: $EKS_DIR"
+[[ -d "$BENCHMARK_DIR" ]] || fail "Benchmark manifest directory not found: $BENCHMARK_DIR"
 
 check_no_local_images() {
   if rg -n ':local|imagePullPolicy:\s+Never' "$EKS_DIR" "$BENCHMARK_DIR" > /tmp/eks-asset-local-check.txt; then
