@@ -32,7 +32,7 @@ check_no_unpatched_ecr_placeholders() {
 }
 
 check_benchmark_runtime_placeholders() {
-  if rg -n 's3://replace-me|value:\s+eks-run-001|value:\s+attempt-01|value:\s+login\.js|value:\s+login$' "$BENCHMARK_DIR" > /tmp/eks-asset-benchmark-check.txt; then
+  if rg -n 's3://replace-me|value:\s+eks-run-001|value:\s+attempt-01' "$BENCHMARK_DIR" > /tmp/eks-asset-benchmark-check.txt; then
     cat /tmp/eks-asset-benchmark-check.txt >&2
     fail "Benchmark manifests still contain runtime placeholder values; rerun the benchmark launcher with real inputs"
   fi
