@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
+  set -a
+  source env/image-tag.eks.env
+  set +a
+fi
+
 SCALING_MODE="${SCALING_MODE:-fixed}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
