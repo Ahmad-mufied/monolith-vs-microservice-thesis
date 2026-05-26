@@ -204,7 +204,7 @@ kubectl --context=monolith get nodes
 kubectl --context=msa get nodes
 ```
 
-Expected: 3 nodes per cluster (2 app-nodes of type `c8i.xlarge` + 1 testing-node), all Ready.
+Expected: 3 nodes per cluster (2 app-nodes of type `c8i.2xlarge` + 1 testing-node), all Ready.
 
 
 ---
@@ -715,7 +715,7 @@ kubectl --context=monolith run pg-test \
 
 | Goal | `SCALING_MODE` | `K6_PROFILE` | Manifest applied |
 |---|---|---|---|
-| RQ1 clean comparison | `fixed` | `steady` | `resource-management-fixed.yaml` |
-| RQ2 + HPA behavior | `hpa` | `hpa` | `resource-management-hpa.yaml` |
+| RQ1 clean comparison | `fixed` | `steady` | `overlays/fixed` |
+| RQ2 + HPA behavior | `hpa` | `hpa` | `overlays/hpa` |
 
 See `docs/experiment/scaling-mode-strategy.md` for full details.

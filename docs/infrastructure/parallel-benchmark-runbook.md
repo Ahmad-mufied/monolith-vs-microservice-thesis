@@ -119,7 +119,7 @@ Expected checks:
 
 - fixed mode:
   - no HPA objects in `mono` or `msa`
-  - monolith deployment at `1`
+  - monolith deployment at `2`
   - each MSA deployment at `1`
 - HPA mode:
   - HPA objects present
@@ -290,12 +290,12 @@ Example for fixed mode:
 {
   "autoscaling_mode": "fixed",
   "hpa_enabled": false,
-  "namespace_resource_quota": { "cpu": "4000m", "memory": "4096Mi" },
+  "namespace_resource_quota": { "cpu": "15800m", "memory": "27648Mi" },
   "services": {
-    "api-gateway": { "cpu_request": "100m", "cpu_limit": "250m", "replica_count": 1 },
-    "auth-service": { "cpu_request": "250m", "cpu_limit": "1000m", "replica_count": 1 },
-    "item-service": { "cpu_request": "100m", "cpu_limit": "250m", "replica_count": 1 },
-    "transaction-service": { "cpu_request": "150m", "cpu_limit": "500m", "replica_count": 1 }
+    "api-gateway": { "cpu_request": "500m", "cpu_limit": "2000m", "memory_request": "864Mi", "memory_limit": "3456Mi", "replica_count": 1 },
+    "auth-service": { "cpu_request": "1500m", "cpu_limit": "4000m", "memory_request": "2592Mi", "memory_limit": "6912Mi", "replica_count": 1 },
+    "item-service": { "cpu_request": "1000m", "cpu_limit": "3000m", "memory_request": "1728Mi", "memory_limit": "5184Mi", "replica_count": 1 },
+    "transaction-service": { "cpu_request": "2000m", "cpu_limit": "6800m", "memory_request": "3456Mi", "memory_limit": "12096Mi", "replica_count": 1 }
   }
 }
 ```
@@ -306,12 +306,12 @@ Example for HPA mode:
 {
   "autoscaling_mode": "hpa",
   "hpa_enabled": true,
-  "namespace_resource_quota": { "cpu": "4000m", "memory": "4096Mi" },
+  "namespace_resource_quota": { "cpu": "15800m", "memory": "27648Mi" },
   "services": {
-    "api-gateway": { "min_replicas": 1, "max_replicas": 9, "target_cpu_utilization": 70 },
-    "auth-service": { "min_replicas": 1, "max_replicas": 3, "target_cpu_utilization": 70 },
-    "item-service": { "min_replicas": 1, "max_replicas": 9, "target_cpu_utilization": 70 },
-    "transaction-service": { "min_replicas": 1, "max_replicas": 5, "target_cpu_utilization": 70 }
+    "api-gateway": { "cpu_request": "250m", "cpu_limit": "500m", "memory_request": "432Mi", "memory_limit": "864Mi", "min_replicas": 1, "max_replicas": 4, "target_cpu_utilization": 70 },
+    "auth-service": { "cpu_request": "500m", "cpu_limit": "1000m", "memory_request": "864Mi", "memory_limit": "1728Mi", "min_replicas": 1, "max_replicas": 4, "target_cpu_utilization": 70 },
+    "item-service": { "cpu_request": "250m", "cpu_limit": "500m", "memory_request": "432Mi", "memory_limit": "864Mi", "min_replicas": 1, "max_replicas": 6, "target_cpu_utilization": 70 },
+    "transaction-service": { "cpu_request": "850m", "cpu_limit": "1700m", "memory_request": "1512Mi", "memory_limit": "3024Mi", "min_replicas": 1, "max_replicas": 4, "target_cpu_utilization": 70 }
   }
 }
 ```

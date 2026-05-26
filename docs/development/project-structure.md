@@ -597,6 +597,18 @@ deployments/
     │   ├── seed-monolith-benchmark-data-job.yaml
     │   └── seed-monolith-smoke-data-job.yaml
     │
+    ├── eks/
+    │   ├── monolith/
+    │   │   ├── base/
+    │   │   └── overlays/
+    │   │       ├── fixed/
+    │   │       └── hpa/
+    │   └── microservices/
+    │       ├── base/
+    │       └── overlays/
+    │           ├── fixed/
+    │           └── hpa/
+    │
     └── microservices/
         ├── api-gateway.yaml
         ├── api-gateway-ingress.yaml
@@ -623,8 +635,8 @@ Rules:
 - seed runs via Kubernetes Job,
 - migration and seed must not run during benchmark execution,
 - API Gateway has no migration job,
-- `resource-management-fixed.yaml` applies the fixed-replica benchmark mode,
-- `resource-management-hpa.yaml` applies the HPA benchmark mode.
+- EKS app deployment mode is selected via `deployments/k8s/eks/*/overlays/fixed` and `overlays/hpa`,
+- the legacy `resource-management-*.yaml` files remain as generic namespace/HPA references outside the EKS overlay flow.
 
 ---
 

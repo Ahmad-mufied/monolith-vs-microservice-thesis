@@ -1,26 +1,14 @@
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: mono-resource-quota
-  namespace: mono
-spec:
-  hard:
-    requests.cpu: "15800m"
-    requests.memory: "27648Mi"
-    limits.cpu: "15800m"
-    limits.memory: "27648Mi"
----
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: monolith
-  namespace: mono
+  name: transaction-service
+  namespace: msa
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: monolith
-  minReplicas: 2
+    name: transaction-service
+  minReplicas: 1
   maxReplicas: 4
   behavior:
     scaleDown:

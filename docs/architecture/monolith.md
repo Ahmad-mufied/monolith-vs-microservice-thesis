@@ -880,13 +880,13 @@ The monolith scales as a whole application.
 Resource configuration:
 
 ```text
-CPU per pod       : 1000m
-Memory per pod    : 1024Mi
-minReplicas       : 1
+fixed mode        : 2 pods, each 3950m request / 7900m limit and 6912Mi request / 13824Mi limit
+hpa mode          : 2 to 4 pods, each 1975m request / 3950m limit and 3456Mi request / 6912Mi limit
+minReplicas       : 2
 maxReplicas       : 4
 HPA target CPU    : 70%
-Total CPU ceiling : 4000m
-Memory ceiling    : 4096Mi
+Total CPU ceiling : 15800m
+Memory ceiling    : 27648Mi
 ```
 
 Scaling behavior:

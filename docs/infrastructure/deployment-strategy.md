@@ -1235,8 +1235,7 @@ need the benchmark dataset instead of the smoke dataset.
 Deploy and inspect monolith:
 
 ```bash
-kubectl apply -f deployments/k8s/monolith/monolith.yaml
-kubectl apply -f deployments/k8s/monolith/resource-management-fixed.yaml
+kubectl apply -k deployments/k8s/eks/monolith/overlays/fixed
 kubectl apply -f deployments/k8s/monolith/ingress.yaml
 kubectl rollout status deployment/monolith -n mono --timeout=180s
 
@@ -1246,8 +1245,7 @@ kubectl logs job/monolith-migration-job -n mono
 
 Command notes:
 
-- `kubectl apply -f deployments/k8s/monolith/monolith.yaml`: deploys the monolith application and Service.
-- `kubectl apply -f deployments/k8s/monolith/resource-management-fixed.yaml`: applies the monolith fixed-replica ResourceQuota configuration.
+- `kubectl apply -k deployments/k8s/eks/monolith/overlays/fixed`: renders and applies the monolith fixed-mode Deployment, Service, and ResourceQuota from the EKS Kustomize overlay.
 - `kubectl apply -f deployments/k8s/monolith/ingress.yaml`: applies the monolith ingress resource.
 - `kubectl rollout status deployment/monolith ...`: waits until the monolith Deployment finishes rolling out.
 - `kubectl get pods,svc,hpa,resourcequota -n mono`: gives a quick summary of monolith runtime state.
@@ -1256,7 +1254,7 @@ Command notes:
 For HPA mode, swap the resource-management manifest:
 
 ```bash
-kubectl apply -f deployments/k8s/monolith/resource-management-hpa.yaml
+kubectl apply -k deployments/k8s/eks/monolith/overlays/hpa
 ```
 
 This HPA manifest uses a `60s` scale-down stabilization window so replica
@@ -1324,11 +1322,7 @@ you need the benchmark dataset instead of the smoke dataset.
 Deploy and inspect microservices:
 
 ```bash
-kubectl apply -f deployments/k8s/microservices/auth-service.yaml
-kubectl apply -f deployments/k8s/microservices/item-service.yaml
-kubectl apply -f deployments/k8s/microservices/transaction-service.yaml
-kubectl apply -f deployments/k8s/microservices/api-gateway.yaml
-kubectl apply -f deployments/k8s/microservices/resource-management-fixed.yaml
+kubectl apply -k deployments/k8s/eks/microservices/overlays/fixed
 kubectl apply -f deployments/k8s/microservices/api-gateway-ingress.yaml
 
 kubectl rollout status deployment/auth-service -n msa --timeout=180s
@@ -1344,11 +1338,7 @@ kubectl logs job/transaction-migration-job -n msa
 
 Command notes:
 
-- `kubectl apply -f .../auth-service.yaml`: deploys the auth-service workload and Service.
-- `kubectl apply -f .../item-service.yaml`: deploys the item-service workload and Service.
-- `kubectl apply -f .../transaction-service.yaml`: deploys the transaction-service workload and Service.
-- `kubectl apply -f .../api-gateway.yaml`: deploys the API Gateway workload and Service.
-- `kubectl apply -f .../resource-management-fixed.yaml`: applies the shared fixed-replica ResourceQuota configuration.
+- `kubectl apply -k deployments/k8s/eks/microservices/overlays/fixed`: renders and applies the fixed-mode microservices Deployments, Services, and shared ResourceQuota from the EKS Kustomize overlay.
 - `kubectl apply -f .../api-gateway-ingress.yaml`: applies ingress for the API Gateway.
 - `kubectl rollout status deployment/...`: waits until each microservice Deployment is available.
 - `kubectl get pods,svc,hpa,resourcequota -n msa`: gives a quick summary of microservices runtime state.
@@ -1357,7 +1347,7 @@ Command notes:
 For HPA mode, swap the resource-management manifest:
 
 ```bash
-kubectl apply -f deployments/k8s/microservices/resource-management-hpa.yaml
+kubectl apply -k deployments/k8s/eks/microservices/overlays/hpa
 ```
 
 This HPA manifest uses a `60s` scale-down stabilization window so replica

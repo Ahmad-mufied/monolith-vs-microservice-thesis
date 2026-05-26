@@ -93,9 +93,9 @@ spec:
             - name: INFRA_CONFIGURATION_JSON
               value: '{"provider":"aws","region":"ap-southeast-1","eks_cluster":"skripsi-msa","app_node_pool":"app-nodes","testing_node_pool":"testing-nodes","postgres_version":"18"}'
             - name: RESOURCES_CONFIGURATION_JSON
-              value: '{"autoscaling_mode":"fixed","hpa_enabled":false,"replica_count_per_service":{"api-gateway":1,"auth-service":1,"item-service":1,"transaction-service":1}}'
+              value: '{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"services":{"api-gateway":{"cpu_request":"500m","cpu_limit":"2000m","memory_request":"864Mi","memory_limit":"3456Mi","replica_count":1},"auth-service":{"cpu_request":"1500m","cpu_limit":"4000m","memory_request":"2592Mi","memory_limit":"6912Mi","replica_count":1},"item-service":{"cpu_request":"1000m","cpu_limit":"3000m","memory_request":"1728Mi","memory_limit":"5184Mi","replica_count":1},"transaction-service":{"cpu_request":"2000m","cpu_limit":"6800m","memory_request":"3456Mi","memory_limit":"12096Mi","replica_count":1}}}'
             - name: APP_RESOURCE_QUOTA_JSON
-              value: '{"cpu":"4000m","memory":"4096Mi"}'
+              value: '{"cpu":"15800m","memory":"27648Mi"}'
             - name: HPA_TARGET_CPU_JSON
               value: '70'
             - name: ADMIN_AUTH_TOKEN

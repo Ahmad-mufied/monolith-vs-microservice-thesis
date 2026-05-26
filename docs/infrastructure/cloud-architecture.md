@@ -66,7 +66,7 @@ two completely independent RDS instances run side by side.
 │  │                                                                  │   │
 │  │  ┌──── Cluster A: skripsi-monolith ────┐                        │   │
 │  │  │                                      │                        │   │
-│  │  │  app-nodes      (2× c8i.xlarge)      │                        │   │
+│  │  │  app-nodes      (2× c8i.2xlarge)     │                        │   │
 │  │  │     └─ namespace: mono               │                        │   │
 │  │  │           └─ monolith pods           │                        │   │
 │  │  │                                      │                        │   │
@@ -86,7 +86,7 @@ two completely independent RDS instances run side by side.
 │  │                                                                  │   │
 │  │  ┌──── Cluster B: skripsi-msa ────┐                              │   │
 │  │  │                                 │                              │   │
-│  │  │  app-nodes      (2× c8i.xlarge) │                              │   │
+│  │  │  app-nodes      (2× c8i.2xlarge) │                              │   │
 │  │  │     └─ namespace: msa           │                              │   │
 │  │  │           ├─ api-gateway        │                              │   │
 │  │  │           ├─ auth-service       │                              │   │
@@ -267,9 +267,9 @@ Each cluster has two node groups:
 ```text
 app-nodes            testing-nodes
 ──────────────       ─────────────
-2× c8i.xlarge       1× t3.large
-4 vCPU each         2 vCPU
-8 GiB each          8 GiB
+2× c8i.2xlarge      1× t3.large
+8 vCPU each         2 vCPU
+16 GiB each         8 GiB
 labels:            labels:
   node-group=app     node-group=testing
 no taints          taint:
@@ -349,10 +349,10 @@ Both clusters enforce the same resource ceiling via Kubernetes
 ```text
 mono namespace                  msa namespace
 ─────────────                   ─────────────
-requests.cpu    : 4000m         requests.cpu    : 4000m
-requests.memory : 4096Mi        requests.memory : 4096Mi
-limits.cpu      : 4000m         limits.cpu      : 4000m
-limits.memory   : 4096Mi        limits.memory   : 4096Mi
+requests.cpu    : 15800m        requests.cpu    : 15800m
+requests.memory : 27648Mi       requests.memory : 27648Mi
+limits.cpu      : 15800m        limits.cpu      : 15800m
+limits.memory   : 27648Mi       limits.memory   : 27648Mi
 ```
 
 Two scaling modes are supported. The choice depends on the research
@@ -364,7 +364,7 @@ Used for clean RQ1 comparisons. No autoscaling, replicas stay at the
 configured count throughout the benchmark.
 
 ```text
-Monolith: 1 pod × 1000m CPU = 1000m active
+Monolith: 2 pods with fixed role-neutral budget inside one deployment
 MSA:      4 pods with role-aware requests/limits (one pod per service)
 ```
 
@@ -384,16 +384,17 @@ maxReplicas    : 4     maxReplicas    : role-aware
 target CPU     : 70%   target CPU     : 70%
 ```
 
-In HPA mode, the MSA profile now uses shared headroom rather than rigid equal
-250m slices:
+In HPA mode, the MSA profile uses role-aware per-service budgets under the same
+shared architecture ceiling:
 
-- `api-gateway`: request `100m`, limit `250m`, maxReplicas `9`
-- `auth-service`: request `250m`, limit `1000m`, maxReplicas `3`
-- `item-service`: request `100m`, limit `250m`, maxReplicas `9`
-- `transaction-service`: request `150m`, limit `500m`, maxReplicas `5`
+- `api-gateway`: request `250m`, limit `500m`, maxReplicas `4`
+- `auth-service`: request `500m`, limit `1000m`, maxReplicas `4`
+- `item-service`: request `250m`, limit `500m`, maxReplicas `6`
+- `transaction-service`: request `850m`, limit `1700m`, maxReplicas `4`
 
-This keeps fairness at the same `4000m CPU / 4096Mi memory` namespace ceiling
-while allowing hotspot services such as `auth-service` to consume more of the
+This keeps fairness at the same `15800m CPU / 27648Mi memory` namespace ceiling
+while allowing hotspot services such as `auth-service` and
+`transaction-service` to consume more of the
 remaining headroom.
 
 All HPA objects set `behavior.scaleDown.stabilizationWindowSeconds: 60` so
@@ -738,10 +739,10 @@ avoids storing static keys in repository files.
 The cloud architecture supports two distinct scaling configurations to
 serve different parts of the research:
 
-| Goal | `SCALING_MODE` | `K6_PROFILE` | Manifest |
+| Goal | `SCALING_MODE` | `K6_PROFILE` | Deployment mode source |
 |---|---|---|---|
-| RQ1 + RQ2 core (clean) | `fixed` | `steady` | `resource-management-fixed.yaml` |
-| RQ1 + RQ2 with HPA narrative | `hpa` | `hpa` | `resource-management-hpa.yaml` |
+| RQ1 + RQ2 core (clean) | `fixed` | `steady` | `overlays/fixed` |
+| RQ1 + RQ2 with HPA narrative | `hpa` | `hpa` | `overlays/hpa` |
 
 In fixed mode, the cluster runs with one pod per workload unit. CPU and
 memory are observable via Datadog and answer RQ2 cleanly. Latency, RPS,
@@ -760,13 +761,13 @@ contract.
 ## 13. Cost Profile
 
 Approximate cost planning must be refreshed against the live AWS Pricing
-Calculator because the app-node baseline is now `c8i.xlarge`. The previous
+Calculator because the app-node baseline is now `c8i.2xlarge`. The previous
 illustrative `t3.xlarge` totals are no longer valid for budgeting.
 
 | Component | Per cluster | Two clusters |
 |---|---|---|
 | EKS control plane | $0.10 | $0.20 |
-| app-nodes (2× c8i.xlarge) | recalculate live | recalculate live |
+| app-nodes (2× c8i.2xlarge) | recalculate live | recalculate live |
 | testing-nodes (1× t3.large) | ~$0.08 | ~$0.16 |
 | RDS (db.t3.medium) | ~$0.07 | ~$0.14 |
 | **Total active** | **recalculate live** | **recalculate live** |
@@ -781,7 +782,7 @@ NAT gateway       : ~$0.045/hour while VPC exists
 
 A typical experiment session — provision, run all scenarios at multiple
 RPS levels, destroy — still takes 3–4 hours, but the live hourly total must
-be recomputed for the new `c8i.xlarge` baseline before final budgeting.
+be recomputed for the new `c8i.2xlarge` baseline before final budgeting.
 
 ---
 

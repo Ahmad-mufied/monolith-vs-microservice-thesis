@@ -42,6 +42,18 @@ fixed universal constant. Actual Datadog usage may vary slightly with:
 - log volume,
 - benchmark intensity.
 
+Important interpretation note:
+
+- this document captures a measured snapshot taken under the benchmark
+  configuration active on `2026-05-23`,
+- at that time, the application resource ceiling documented in the benchmark
+  manifests was `4000m CPU / 4096Mi memory` per architecture,
+- the current repository methodology later moved to a final measured ceiling
+  of `15800m CPU / 27648Mi memory` per architecture,
+- therefore the Datadog usage measurements in this document remain valid as a
+  historical overhead snapshot, while the final fairness baseline is now
+  documented in `docs/experiment/application-ceiling-methodology.md`.
+
 ## Datadog Components per Cluster
 
 Each benchmark cluster currently runs the same Datadog topology:
@@ -210,16 +222,17 @@ Therefore:
 
 ## Fairness Interpretation
 
-This repository compares applications under equal application ceilings:
+This repository compares applications under equal application ceilings. For the
+specific measurement window captured in this document, the active ceiling was
+still the older exploratory `4000m CPU / 4096Mi memory` baseline. The current
+final methodology now uses:
 
 - monolith application ceiling:
-  - `4000m CPU`
-  - `4096Mi memory`
+  - `15800m CPU`
+  - `27648Mi memory`
 - microservices application ceiling:
-  - `4000m CPU`
-  - `4096Mi memory`
-
-Those ceilings remain the application comparison baseline.
+  - `15800m CPU`
+  - `27648Mi memory`
 
 Datadog overhead should be interpreted separately as:
 

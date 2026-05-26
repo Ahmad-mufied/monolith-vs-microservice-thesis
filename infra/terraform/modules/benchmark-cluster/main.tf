@@ -42,7 +42,7 @@ module "eks" {
   eks_managed_node_groups = {
     app_nodes = {
       name           = "app-nodes"
-      instance_types = ["c8i.xlarge"]
+      instance_types = ["c8i.2xlarge"]
       min_size       = 2
       max_size       = 2
       desired_size   = 2

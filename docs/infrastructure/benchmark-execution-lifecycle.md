@@ -334,12 +334,12 @@ Recommended fields:
   },
 
   "resources": {
-    "app_resource_quota": "4000m CPU / 4096Mi memory",
+    "app_resource_quota": "15800m CPU / 27648Mi memory",
     "autoscaling_mode": "hpa",
     "hpa_enabled": true,
     "hpa_target_cpu": "70%",
     "min_replicas": 1,
-    "max_replicas": 16
+    "max_replicas": 7
   },
 
   "datadog": {
@@ -363,10 +363,10 @@ For a fixed replica experiment without HPA, use this resources shape:
 ```json
 {
   "resources": {
-    "app_resource_quota": "4000m CPU / 4096Mi memory",
+    "app_resource_quota": "15800m CPU / 27648Mi memory",
     "autoscaling_mode": "fixed",
     "hpa_enabled": false,
-    "replica_count": 4
+    "replica_count": 2
   }
 }
 ```

@@ -93,9 +93,9 @@ spec:
             - name: INFRA_CONFIGURATION_JSON
               value: '{"provider":"aws","region":"ap-southeast-1","eks_cluster":"skripsi-monolith","app_node_pool":"app-nodes","testing_node_pool":"testing-nodes","postgres_version":"18"}'
             - name: RESOURCES_CONFIGURATION_JSON
-              value: '{"autoscaling_mode":"fixed","hpa_enabled":false,"replica_count":1}'
+              value: '{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"cpu_request":"3950m","cpu_limit":"7900m","memory_request":"6912Mi","memory_limit":"13824Mi","replica_count":2}'
             - name: APP_RESOURCE_QUOTA_JSON
-              value: '{"cpu":"4000m","memory":"4096Mi"}'
+              value: '{"cpu":"15800m","memory":"27648Mi"}'
             - name: HPA_TARGET_CPU_JSON
               value: '70'
             - name: ADMIN_AUTH_TOKEN

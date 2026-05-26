@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: msa
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: api-gateway
+          resources:
+            requests:
+              cpu: 500m
+              memory: 864Mi
+            limits:
+              cpu: 2000m
+              memory: 3456Mi

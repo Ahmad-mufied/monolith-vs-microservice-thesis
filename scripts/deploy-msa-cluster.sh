@@ -18,6 +18,7 @@ AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
 RENDER_ROOT="$(mktemp -d)"
 RENDERED_EKS_JOB_DIR=""
+RENDERED_MSA_OVERLAY_DIR=""
 
 cleanup() {
   rm -rf "$RENDER_ROOT"
@@ -39,6 +40,7 @@ echo "=== Deploying MSA cluster (context: $CONTEXT) ==="
 echo "Rendering EKS manifests with IMAGE_TAG=$IMAGE_TAG"
 IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
 RENDERED_EKS_JOB_DIR="$RENDER_ROOT/$EKS_JOB_DIR"
+RENDERED_MSA_OVERLAY_DIR="$RENDERED_EKS_JOB_DIR/overlays/$SCALING_MODE"
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 
 # Namespaces
@@ -65,10 +67,25 @@ $K8S apply -f deployments/k8s/microservices/db-bootstrap-job.yaml
 $K8S wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=120s
 echo "DB bootstrap complete"
 
+prepare_existing_workloads_for_redeploy() {
+  local svc
+  for svc in api-gateway auth-service item-service transaction-service; do
+    $K8S delete hpa "$svc" -n msa --ignore-not-found
+  done
+  for svc in api-gateway auth-service item-service transaction-service; do
+    if $K8S get deployment "$svc" -n msa >/dev/null 2>&1; then
+      $K8S scale deployment "$svc" -n msa --replicas=0
+      $K8S rollout status "deployment/${svc}" -n msa --timeout=300s || true
+    fi
+  done
+}
+
+prepare_existing_workloads_for_redeploy
+
 # Migrations (parallel)
 for svc in auth item transaction; do
   $K8S delete job "${svc}-migration-job" -n msa --ignore-not-found
-  $K8S apply -f "${RENDERED_EKS_JOB_DIR}/${svc}-migration-job.yaml"
+  $K8S apply --validate=false -f "${RENDERED_EKS_JOB_DIR}/${svc}-migration-job.yaml"
 done
 for svc in auth item transaction; do
   $K8S wait --for=condition=complete job/"${svc}-migration-job" -n msa --timeout=180s
@@ -77,42 +94,36 @@ echo "Migrations complete"
 
 # Seed
 $K8S delete job reset-microservices-data-job -n msa --ignore-not-found
-$K8S apply -f "$RENDERED_EKS_JOB_DIR/reset-microservices-data-job.yaml"
+$K8S apply --validate=false -f "$RENDERED_EKS_JOB_DIR/reset-microservices-data-job.yaml"
 $K8S wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
 
 $K8S delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-$K8S apply -f "$RENDERED_EKS_JOB_DIR/seed-microservices-benchmark-data-job.yaml"
+$K8S apply --validate=false -f "$RENDERED_EKS_JOB_DIR/seed-microservices-benchmark-data-job.yaml"
 $K8S wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
 echo "Seed complete"
 
 # Deploy services
-for svc in auth-service item-service transaction-service api-gateway; do
-  $K8S apply -f "${RENDERED_EKS_JOB_DIR}/${svc}.yaml"
-done
-for svc in auth-service item-service transaction-service api-gateway; do
-  $K8S rollout status "deployment/${svc}" -n msa --timeout=300s
-done
+$K8S apply --validate=false -k "$RENDERED_MSA_OVERLAY_DIR"
 
 # Resource management
 if [ "$SCALING_MODE" = "hpa" ]; then
   bash scripts/install-metrics-server.sh "$CONTEXT"
-  $K8S apply -f deployments/k8s/microservices/resource-management-hpa.yaml
   echo "HPA mode applied"
 else
   for svc in api-gateway auth-service item-service transaction-service; do
     $K8S delete hpa "$svc" -n msa --ignore-not-found
   done
-  $K8S apply -f deployments/k8s/microservices/resource-management-fixed.yaml
-  for svc in api-gateway auth-service item-service transaction-service; do
-    $K8S scale deployment "$svc" -n msa --replicas=1
-  done
   echo "Fixed replica mode applied"
 fi
+
+for svc in auth-service item-service transaction-service api-gateway; do
+  $K8S rollout status "deployment/${svc}" -n msa --timeout=300s
+done
 
 # Datadog
 DATADOG_API_KEY="${DATADOG_API_KEY:-}"
 DATADOG_CHART_VERSION="${DATADOG_CHART_VERSION:-3.134.0}"
-if [ -z "${DATADOG_SITE:-}" ] && [ -f env/datadog.eks.env ]; then
+if [ -f env/datadog.eks.env ]; then
   set -a
   source env/datadog.eks.env
   set +a

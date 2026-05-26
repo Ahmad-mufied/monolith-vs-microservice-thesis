@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monolith
+  namespace: mono
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: monolith
+          resources:
+            requests:
+              cpu: 3950m
+              memory: 6912Mi
+            limits:
+              cpu: 7900m
+              memory: 13824Mi
