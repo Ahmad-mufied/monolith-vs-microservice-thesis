@@ -74,20 +74,20 @@ resources_configuration_json() {
 
   if [ "$architecture" = "monolith" ]; then
     if [ "$scaling_mode" = "hpa" ]; then
-      printf '%s' '{"autoscaling_mode":"hpa","hpa_enabled":true,"min_replicas":1,"max_replicas":4,"target_cpu_utilization":70}'
+      printf '%s' '{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"cpu_request":"1975m","cpu_limit":"3950m","memory_request":"3456Mi","memory_limit":"6912Mi","min_replicas":2,"max_replicas":4,"target_cpu_utilization":70}'
       return 0
     fi
 
-    printf '%s' '{"autoscaling_mode":"fixed","hpa_enabled":false,"replica_count":1}'
+    printf '%s' '{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"cpu_request":"3950m","cpu_limit":"7900m","memory_request":"6912Mi","memory_limit":"13824Mi","replica_count":2}'
     return 0
   fi
 
   if [ "$scaling_mode" = "hpa" ]; then
-    printf '%s' '{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"4000m","memory":"4096Mi"},"services":{"api-gateway":{"cpu_request":"100m","cpu_limit":"250m","memory_request":"256Mi","memory_limit":"384Mi","min_replicas":1,"max_replicas":9,"target_cpu_utilization":70},"auth-service":{"cpu_request":"250m","cpu_limit":"1000m","memory_request":"256Mi","memory_limit":"768Mi","min_replicas":1,"max_replicas":3,"target_cpu_utilization":70},"item-service":{"cpu_request":"100m","cpu_limit":"250m","memory_request":"256Mi","memory_limit":"384Mi","min_replicas":1,"max_replicas":9,"target_cpu_utilization":70},"transaction-service":{"cpu_request":"150m","cpu_limit":"500m","memory_request":"256Mi","memory_limit":"512Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":70}}}'
+    printf '%s' '{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"services":{"api-gateway":{"cpu_request":"250m","cpu_limit":"500m","memory_request":"432Mi","memory_limit":"864Mi","min_replicas":1,"max_replicas":4,"target_cpu_utilization":70},"auth-service":{"cpu_request":"500m","cpu_limit":"1000m","memory_request":"864Mi","memory_limit":"1728Mi","min_replicas":1,"max_replicas":4,"target_cpu_utilization":70},"item-service":{"cpu_request":"250m","cpu_limit":"500m","memory_request":"432Mi","memory_limit":"864Mi","min_replicas":1,"max_replicas":6,"target_cpu_utilization":70},"transaction-service":{"cpu_request":"850m","cpu_limit":"1700m","memory_request":"1512Mi","memory_limit":"3024Mi","min_replicas":1,"max_replicas":4,"target_cpu_utilization":70}}}'
     return 0
   fi
 
-  printf '%s' '{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"4000m","memory":"4096Mi"},"services":{"api-gateway":{"cpu_request":"100m","cpu_limit":"250m","memory_request":"256Mi","memory_limit":"384Mi","replica_count":1},"auth-service":{"cpu_request":"250m","cpu_limit":"1000m","memory_request":"256Mi","memory_limit":"768Mi","replica_count":1},"item-service":{"cpu_request":"100m","cpu_limit":"250m","memory_request":"256Mi","memory_limit":"384Mi","replica_count":1},"transaction-service":{"cpu_request":"150m","cpu_limit":"500m","memory_request":"256Mi","memory_limit":"512Mi","replica_count":1}}}'
+  printf '%s' '{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"services":{"api-gateway":{"cpu_request":"500m","cpu_limit":"2000m","memory_request":"864Mi","memory_limit":"3456Mi","replica_count":1},"auth-service":{"cpu_request":"1500m","cpu_limit":"4000m","memory_request":"2592Mi","memory_limit":"6912Mi","replica_count":1},"item-service":{"cpu_request":"1000m","cpu_limit":"3000m","memory_request":"1728Mi","memory_limit":"5184Mi","replica_count":1},"transaction-service":{"cpu_request":"2000m","cpu_limit":"6800m","memory_request":"3456Mi","memory_limit":"12096Mi","replica_count":1}}}'
 }
 
 patch_and_apply() {

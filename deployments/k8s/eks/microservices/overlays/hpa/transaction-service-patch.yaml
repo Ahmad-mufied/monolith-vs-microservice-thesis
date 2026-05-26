@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transaction-service
+  namespace: msa
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: transaction-service
+          resources:
+            requests:
+              cpu: 850m
+              memory: 1512Mi
+            limits:
+              cpu: 1700m
+              memory: 3024Mi

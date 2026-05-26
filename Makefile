@@ -513,7 +513,7 @@ minikube-load-microservices: minikube-load-seed docker-build-microservices
 .PHONY: minikube-deploy-postgres
 minikube-deploy-postgres: create-local-postgres-secrets
 	kubectl apply -f $(K8S_DIR)/namespaces/local.yaml
-	kubectl apply -f $(K8S_DIR)/local/postgres.yaml
+	kubectl apply -f $(K8S_DIR)/local/shared/postgres.yaml
 	kubectl wait --for=condition=ready pod/postgres-0 -n local-database --timeout=180s
 	$(MAKE) minikube-sync-postgres-password
 
@@ -531,31 +531,31 @@ minikube-sync-postgres-password:
 .PHONY: minikube-db-bootstrap
 minikube-db-bootstrap: minikube-deploy-postgres
 	kubectl delete job db-bootstrap-job -n local-database --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/local/db-bootstrap-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/shared/db-bootstrap-job.yaml
 	kubectl wait --for=condition=complete job/db-bootstrap-job -n local-database --timeout=180s
 
 .PHONY: minikube-migrate-monolith
 minikube-migrate-monolith: minikube-load-monolith create-local-secrets minikube-db-bootstrap
 	kubectl delete job monolith-migration-job -n mono --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/monolith/migration-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/migration-job.yaml
 	kubectl wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 
 .PHONY: minikube-reset-monolith-data
 minikube-reset-monolith-data: minikube-load-seed create-local-secrets
 	kubectl delete job reset-monolith-data-job -n mono --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/monolith/reset-monolith-data-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/reset-monolith-data-job.yaml
 	kubectl wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=180s
 
 .PHONY: minikube-seed-monolith-smoke
 minikube-seed-monolith-smoke: minikube-reset-monolith-data
 	kubectl delete job seed-monolith-smoke-data-job -n mono --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/monolith/seed-monolith-smoke-data-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/seed-monolith-smoke-data-job.yaml
 	kubectl wait --for=condition=complete job/seed-monolith-smoke-data-job -n mono --timeout=180s
 
 .PHONY: minikube-seed-monolith-benchmark
 minikube-seed-monolith-benchmark: minikube-reset-monolith-data
 	kubectl delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/monolith/seed-monolith-benchmark-data-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/seed-monolith-benchmark-data-job.yaml
 	kubectl wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
 
 .PHONY: minikube-bootstrap-monolith-smoke
@@ -573,13 +573,13 @@ minikube-bootstrap-monolith-benchmark:
 .PHONY: minikube-prepare-monolith-enrichment-smoke
 minikube-prepare-monolith-enrichment-smoke: minikube-load-seed create-local-secrets
 	kubectl delete job prepare-monolith-enrichment-smoke-data-job -n mono --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/monolith/prepare-monolith-enrichment-smoke-data-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/prepare-monolith-enrichment-smoke-data-job.yaml
 	kubectl wait --for=condition=complete job/prepare-monolith-enrichment-smoke-data-job -n mono --timeout=180s
 
 .PHONY: minikube-prepare-monolith-enrichment-benchmark
 minikube-prepare-monolith-enrichment-benchmark: minikube-load-seed create-local-secrets
 	kubectl delete job prepare-monolith-enrichment-benchmark-data-job -n mono --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml
 	kubectl wait --for=condition=complete job/prepare-monolith-enrichment-benchmark-data-job -n mono --timeout=180s
 
 .PHONY: minikube-bootstrap-monolith-enrichment-smoke
@@ -598,48 +598,48 @@ minikube-bootstrap-monolith-enrichment-benchmark:
 
 .PHONY: minikube-deploy-monolith
 minikube-deploy-monolith: minikube-load-monolith create-local-secrets
-	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
-	kubectl apply -f $(K8S_DIR)/monolith/resource-management-fixed.yaml
-	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/monolith.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/resource-management-fixed.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/ingress.yaml
 	kubectl rollout restart deployment/monolith -n mono
 	kubectl rollout status deployment/monolith -n mono --timeout=180s
 
 .PHONY: minikube-deploy-monolith-hpa
 minikube-deploy-monolith-hpa: minikube-load-monolith create-local-secrets
-	kubectl apply -f $(K8S_DIR)/monolith/monolith.yaml
-	kubectl apply -f $(K8S_DIR)/monolith/resource-management-hpa.yaml
-	kubectl apply -f $(K8S_DIR)/monolith/ingress.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/monolith.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/resource-management-hpa.yaml
+	kubectl apply -f $(K8S_DIR)/local/monolith/ingress.yaml
 	kubectl rollout restart deployment/monolith -n mono
 	kubectl rollout status deployment/monolith -n mono --timeout=180s
 
 .PHONY: minikube-migrate-microservices
 minikube-migrate-microservices: minikube-load-microservices create-local-secrets-microservices minikube-db-bootstrap
 	kubectl delete job auth-migration-job -n msa --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/microservices/auth-migration-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/auth-migration-job.yaml
 	kubectl wait --for=condition=complete job/auth-migration-job -n msa --timeout=180s
 	kubectl delete job item-migration-job -n msa --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/microservices/item-migration-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/item-migration-job.yaml
 	kubectl wait --for=condition=complete job/item-migration-job -n msa --timeout=180s
 	kubectl delete job transaction-migration-job -n msa --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/microservices/transaction-migration-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/transaction-migration-job.yaml
 	kubectl wait --for=condition=complete job/transaction-migration-job -n msa --timeout=180s
 
 .PHONY: minikube-reset-microservices-data
 minikube-reset-microservices-data: minikube-load-seed create-local-secrets-microservices
 	kubectl delete job reset-microservices-data-job -n msa --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/microservices/reset-microservices-data-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/reset-microservices-data-job.yaml
 	kubectl wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=180s
 
 .PHONY: minikube-seed-microservices-smoke
 minikube-seed-microservices-smoke: minikube-reset-microservices-data
 	kubectl delete job seed-microservices-smoke-data-job -n msa --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/microservices/seed-microservices-smoke-data-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/seed-microservices-smoke-data-job.yaml
 	kubectl wait --for=condition=complete job/seed-microservices-smoke-data-job -n msa --timeout=180s
 
 .PHONY: minikube-seed-microservices-benchmark
 minikube-seed-microservices-benchmark: minikube-reset-microservices-data
 	kubectl delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/microservices/seed-microservices-benchmark-data-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/seed-microservices-benchmark-data-job.yaml
 	kubectl wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
 
 .PHONY: minikube-bootstrap-microservices-smoke
@@ -657,13 +657,13 @@ minikube-bootstrap-microservices-benchmark:
 .PHONY: minikube-prepare-microservices-enrichment-smoke
 minikube-prepare-microservices-enrichment-smoke: minikube-load-seed create-local-secrets-microservices
 	kubectl delete job prepare-microservices-enrichment-smoke-data-job -n msa --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/microservices/prepare-microservices-enrichment-smoke-data-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/prepare-microservices-enrichment-smoke-data-job.yaml
 	kubectl wait --for=condition=complete job/prepare-microservices-enrichment-smoke-data-job -n msa --timeout=180s
 
 .PHONY: minikube-prepare-microservices-enrichment-benchmark
 minikube-prepare-microservices-enrichment-benchmark: minikube-load-seed create-local-secrets-microservices
 	kubectl delete job prepare-microservices-enrichment-benchmark-data-job -n msa --ignore-not-found
-	kubectl apply -f $(K8S_DIR)/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml
 	kubectl wait --for=condition=complete job/prepare-microservices-enrichment-benchmark-data-job -n msa --timeout=180s
 
 .PHONY: minikube-bootstrap-microservices-enrichment-smoke
@@ -682,12 +682,12 @@ minikube-bootstrap-microservices-enrichment-benchmark:
 
 .PHONY: minikube-deploy-microservices
 minikube-deploy-microservices: minikube-load-microservices create-local-secrets-microservices
-	kubectl apply -f $(K8S_DIR)/microservices/auth-service.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/item-service.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/transaction-service.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/api-gateway.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/resource-management-fixed.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/api-gateway-ingress.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/auth-service.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/item-service.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/transaction-service.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/api-gateway.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/resource-management-fixed.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/api-gateway-ingress.yaml
 	kubectl rollout restart deployment/auth-service -n msa
 	kubectl rollout restart deployment/item-service -n msa
 	kubectl rollout restart deployment/transaction-service -n msa
@@ -699,12 +699,12 @@ minikube-deploy-microservices: minikube-load-microservices create-local-secrets-
 
 .PHONY: minikube-deploy-microservices-hpa
 minikube-deploy-microservices-hpa: minikube-load-microservices create-local-secrets-microservices
-	kubectl apply -f $(K8S_DIR)/microservices/auth-service.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/item-service.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/transaction-service.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/api-gateway.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/resource-management-hpa.yaml
-	kubectl apply -f $(K8S_DIR)/microservices/api-gateway-ingress.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/auth-service.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/item-service.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/transaction-service.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/api-gateway.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/resource-management-hpa.yaml
+	kubectl apply -f $(K8S_DIR)/local/microservices/api-gateway-ingress.yaml
 	kubectl rollout restart deployment/auth-service -n msa
 	kubectl rollout restart deployment/item-service -n msa
 	kubectl rollout restart deployment/transaction-service -n msa

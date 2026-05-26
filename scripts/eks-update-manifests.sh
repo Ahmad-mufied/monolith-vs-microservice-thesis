@@ -18,6 +18,15 @@ patch_image_file() {
   perl -0pi -e "s{image:\\s*REPLACE_WITH_ECR_IMAGE}{image: ${image}}g; s{image:\\s*\\S+/\\Q${ECR_NAMESPACE}/${repo}\\E:[^\\s]+}{image: ${image}}g" "$file"
 }
 
+patch_kustomize_image() {
+  local file="$1"
+  local placeholder_name="$2"
+  local repo="$3"
+  local new_name="${ECR_BASE}/${repo}"
+
+  perl -0pi -e "s{(-\\s+name:\\s+\\Q${placeholder_name}\\E\\n\\s+newName:\\s+).*?(\\n\\s+newTag:\\s+).*?\$}{\${1}${new_name}\${2}${IMAGE_TAG}}mg" "$file"
+}
+
 patch_datadog_version() {
   local file="$1"
 
@@ -33,20 +42,26 @@ patch_value_line() {
 }
 
 patch_app_manifests() {
-  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/monolith.yaml" "monolith"
-  patch_datadog_version "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/monolith.yaml"
+  local monolith_base="${MANIFEST_ROOT}/deployments/k8s/eks/monolith/base/monolith.yaml"
+  local msa_base="${MANIFEST_ROOT}/deployments/k8s/eks/microservices/base"
 
-  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/api-gateway.yaml" "api-gateway"
-  patch_datadog_version "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/api-gateway.yaml"
+  patch_datadog_version "$monolith_base"
+  patch_datadog_version "${msa_base}/api-gateway.yaml"
+  patch_datadog_version "${msa_base}/auth-service.yaml"
+  patch_datadog_version "${msa_base}/item-service.yaml"
+  patch_datadog_version "${msa_base}/transaction-service.yaml"
 
-  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/auth-service.yaml" "auth-service"
-  patch_datadog_version "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/auth-service.yaml"
+  patch_kustomize_image "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/overlays/fixed/kustomization.yaml" "REPLACE_WITH_MONOLITH_ECR_IMAGE" "monolith"
+  patch_kustomize_image "${MANIFEST_ROOT}/deployments/k8s/eks/monolith/overlays/hpa/kustomization.yaml" "REPLACE_WITH_MONOLITH_ECR_IMAGE" "monolith"
 
-  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/item-service.yaml" "item-service"
-  patch_datadog_version "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/item-service.yaml"
-
-  patch_image_file "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/transaction-service.yaml" "transaction-service"
-  patch_datadog_version "${MANIFEST_ROOT}/deployments/k8s/eks/microservices/transaction-service.yaml"
+  local msa_overlay
+  for msa_overlay in fixed hpa; do
+    local kustomization="${MANIFEST_ROOT}/deployments/k8s/eks/microservices/overlays/${msa_overlay}/kustomization.yaml"
+    patch_kustomize_image "$kustomization" "REPLACE_WITH_API_GATEWAY_ECR_IMAGE" "api-gateway"
+    patch_kustomize_image "$kustomization" "REPLACE_WITH_AUTH_SERVICE_ECR_IMAGE" "auth-service"
+    patch_kustomize_image "$kustomization" "REPLACE_WITH_ITEM_SERVICE_ECR_IMAGE" "item-service"
+    patch_kustomize_image "$kustomization" "REPLACE_WITH_TRANSACTION_SERVICE_ECR_IMAGE" "transaction-service"
+  done
 }
 
 patch_job_manifests() {

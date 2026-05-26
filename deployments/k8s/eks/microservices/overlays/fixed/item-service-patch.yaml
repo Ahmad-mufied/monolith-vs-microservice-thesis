@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: item-service
+  namespace: msa
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: item-service
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 1728Mi
+            limits:
+              cpu: 3000m
+              memory: 5184Mi

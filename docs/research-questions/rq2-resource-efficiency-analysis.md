@@ -223,42 +223,47 @@ Correct fairness principle:
 The total maximum resource ceiling per architecture must be equivalent.
 ```
 
+Important scope note:
+
+```text
+The concrete numerical examples in this section must always be interpreted
+relative to the active benchmark configuration. Older drafts in this document
+used a 4000m CPU / 4096Mi memory ceiling. The current repository configuration
+uses a 15800m CPU / 27648Mi memory ceiling per architecture.
+```
+
 Incorrect design:
 
 ```text
-monolith = 4000m CPU
+monolith = 16000m CPU
 
-api-gateway = 4000m CPU
-auth-service = 4000m CPU
-item-service = 4000m CPU
-transaction-service = 4000m CPU
+api-gateway = 16000m CPU
+auth-service = 16000m CPU
+item-service = 16000m CPU
+transaction-service = 16000m CPU
 
-total MSA = 16000m CPU
+total MSA = 64000m CPU
 ```
 
 Correct design:
 
 ```text
-monolith total ceiling = 4000m CPU
+monolith total ceiling = 15800m CPU
 
-api-gateway = 1000m CPU
-auth-service = 1000m CPU
-item-service = 1000m CPU
-transaction-service = 1000m CPU
-
-total MSA ceiling = 4000m CPU
+api-gateway + auth-service + item-service + transaction-service
+  = total MSA ceiling 15800m CPU
 ```
 
 Example table:
 
 | Architecture | Component | Replica | CPU Limit per Pod | Memory Limit per Pod | Total CPU | Total Memory |
 |---|---:|---:|---:|---:|---:|---:|
-| Monolith | monolith | 4 | 1000m | 1024Mi | 4000m | 4096Mi |
-| MSA | api-gateway | 2 | 500m | 512Mi | 1000m | 1024Mi |
-| MSA | auth-service | 2 | 500m | 512Mi | 1000m | 1024Mi |
-| MSA | item-service | 2 | 500m | 512Mi | 1000m | 1024Mi |
-| MSA | transaction-service | 2 | 500m | 512Mi | 1000m | 1024Mi |
-| **MSA Total** | - | - | - | - | **4000m** | **4096Mi** |
+| Monolith | monolith | 4 | 3950m | 6912Mi | 15800m | 27648Mi |
+| MSA | api-gateway | 4 | 500m | 864Mi | 2000m | 3456Mi |
+| MSA | auth-service | 4 | 1000m | 1728Mi | 4000m | 6912Mi |
+| MSA | item-service | 6 | 500m | 864Mi | 3000m | 5184Mi |
+| MSA | transaction-service | 4 | 1700m | 3024Mi | 6800m | 12096Mi |
+| **MSA Total** | - | - | - | - | **15800m** | **27648Mi** |
 
 Recommended Chapter 3 explanation:
 
@@ -512,18 +517,18 @@ Maximum CPU ceiling = max_replicas x CPU limit per pod
 Example monolith:
 
 ```text
-4 replicas x 1000m CPU = 4000m CPU
+4 replicas x 3950m CPU = 15800m CPU
 ```
 
 Example MSA:
 
 ```text
-api-gateway          2 x 500m = 1000m
-auth-service         2 x 500m = 1000m
-item-service         2 x 500m = 1000m
-transaction-service  2 x 500m = 1000m
+api-gateway          4 x 500m = 2000m
+auth-service         4 x 1000m = 4000m
+item-service         6 x 500m = 3000m
+transaction-service  4 x 1700m = 6800m
 
-total MSA max CPU = 4000m
+total MSA max CPU = 15800m
 ```
 
 ### 12.2 Actual Resource Usage
@@ -874,7 +879,7 @@ Important metadata fields:
   "target_rps": 1000,
   "duration": "5m",
   "dataset_version": "v1",
-  "resource_ceiling": "4000m CPU / 4096Mi memory",
+  "resource_ceiling": "15800m CPU / 27648Mi memory",
   "hpa_enabled": true,
   "hpa_target_cpu": "70%",
   "datadog": {

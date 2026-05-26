@@ -26,7 +26,7 @@ spec:
         node-group: app
       containers:
         - name: api-gateway
-          image: REPLACE_WITH_ECR_IMAGE
+          image: REPLACE_WITH_API_GATEWAY_ECR_IMAGE
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false

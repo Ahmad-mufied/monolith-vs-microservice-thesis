@@ -1066,10 +1066,17 @@ Services with HPA:
 Per-service resource configuration:
 
 ```text
-api-gateway       : request 100m / limit 250m / 256Mi / 384Mi
-auth-service      : request 250m / limit 1000m / 256Mi / 768Mi
-item-service      : request 100m / limit 250m / 256Mi / 384Mi
-transaction-service: request 150m / limit 500m / 256Mi / 512Mi
+fixed mode:
+  api-gateway        : request 500m / limit 2000m / 864Mi / 3456Mi
+  auth-service       : request 1500m / limit 4000m / 2592Mi / 6912Mi
+  item-service       : request 1000m / limit 3000m / 1728Mi / 5184Mi
+  transaction-service: request 2000m / limit 6800m / 3456Mi / 12096Mi
+
+hpa mode:
+  api-gateway        : request 250m / limit 500m / 432Mi / 864Mi
+  auth-service       : request 500m / limit 1000m / 864Mi / 1728Mi
+  item-service       : request 250m / limit 500m / 432Mi / 864Mi
+  transaction-service: request 850m / limit 1700m / 1512Mi / 3024Mi
 minReplicas       : 1
 HPA target CPU    : 70%
 ```
@@ -1077,22 +1084,26 @@ HPA target CPU    : 70%
 Namespace resource ceiling:
 
 ```text
-CPU max           : 4000m
-Memory max        : 4096Mi
+CPU max           : 15800m
+Memory max        : 27648Mi
 ```
 
 Role-aware maxReplicas:
 
 ```text
-api-gateway         : 9
-auth-service        : 3
-item-service        : 9
-transaction-service : 5
+api-gateway         : 4
+auth-service        : 4
+item-service        : 6
+transaction-service : 4
 ```
 
 This allows one focused service to scale up under targeted load while the
 namespace ResourceQuota still prevents the total microservices resource usage
 from exceeding the monolith resource ceiling.
+
+The methodology for deciding why these per-service budgets are role-aware
+instead of equal-split is documented in
+`docs/experiment/resource-configuration.md`.
 
 Example login-heavy scaling:
 
@@ -1142,8 +1153,8 @@ The MSA namespace uses ResourceQuota to keep the total application resource budg
 
 ```text
 Namespace: msa
-CPU max   : 4000m
-Memory max: 4096Mi
+CPU max   : 15800m
+Memory max: 27648Mi
 ```
 
 Important consequence:

@@ -165,7 +165,7 @@ transaction_db
 In the current local Minikube flow, this secret is mounted by:
 
 ```text
-deployments/k8s/local/db-bootstrap-job.yaml
+deployments/k8s/local/shared/db-bootstrap-job.yaml
 ```
 
 ---
@@ -220,8 +220,8 @@ local Compose and local Kubernetes flows.
 In the current local Minikube flow, this secret is mounted by:
 
 ```text
-deployments/k8s/monolith/migration-job.yaml
-deployments/k8s/monolith/monolith.yaml
+deployments/k8s/local/monolith/migration-job.yaml
+deployments/k8s/local/monolith/monolith.yaml
 ```
 
 ### API Gateway
@@ -427,7 +427,7 @@ kubectl create secret generic postgres-local-env \
 
 Purpose:
 
-- used by `deployments/k8s/local/postgres.yaml`,
+- used by `deployments/k8s/local/shared/postgres.yaml`,
 - provides `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` to the local
   PostgreSQL StatefulSet.
 
