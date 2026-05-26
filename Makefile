@@ -165,6 +165,7 @@ help:
 	@echo "  make datadog-install-eks-msa"
 	@echo "  make datadog-status"
 	@echo "  make datadog-uninstall"
+	@echo "  make ecr-check-tag"
 	@echo "  make eks-render-manifests"
 	@echo "  make eks-render-tfvars"
 	@echo "  make terraform-auth-check"
@@ -836,6 +837,34 @@ aws-ecr-login:
 		| docker login --username AWS --password-stdin \
 		  "$(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com"
 
+.PHONY: ecr-check-tag
+ecr-check-tag:
+	@set -euo pipefail; \
+	if [ -z "$(IMAGE_TAG)" ]; then \
+		echo "IMAGE_TAG must not be empty" >&2; \
+		exit 1; \
+	fi; \
+	missing=0; \
+	for repo in monolith api-gateway auth-service item-service transaction-service seed-runner k6-runner; do \
+		if aws ecr describe-images \
+			--region "$(AWS_REGION)" \
+			--repository-name "$(ECR_NAMESPACE)/$$repo" \
+			--image-ids imageTag="$(IMAGE_TAG)" \
+			--query 'imageDetails[0].[imageDigest,imagePushedAt]' \
+			--output text >/tmp/ecr-check-tag.txt 2>/dev/null; then \
+			printf 'FOUND   %-20s %s\n' "$$repo" "$$(tr '\t' ' ' </tmp/ecr-check-tag.txt)"; \
+			:; \
+		else \
+			printf 'MISSING %-20s %s:%s\n' "$$repo" "$(ECR_NAMESPACE)/$$repo" "$(IMAGE_TAG)"; \
+			missing=1; \
+		fi; \
+	done; \
+	rm -f /tmp/ecr-check-tag.txt; \
+	if [ "$$missing" -ne 0 ]; then \
+		echo "One or more required ECR images are missing for IMAGE_TAG=$(IMAGE_TAG)" >&2; \
+		exit 1; \
+	fi
+
 # =========================
 # ECR Image Build and Push
 # =========================
@@ -936,6 +965,7 @@ eks-deploy-msa:
 
 .PHONY: eks-deploy-all
 eks-deploy-all:
+	$(MAKE) ecr-check-tag IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE)
 	SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/deploy-all-eks-clusters.sh
 
 .PHONY: eks-deploy-all-fixed
