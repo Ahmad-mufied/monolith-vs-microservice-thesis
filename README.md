@@ -48,10 +48,16 @@ skripsi-monolith  -> mono namespace, benchmark namespace, RDS mono_db
 skripsi-msa       -> msa namespace, benchmark namespace, RDS auth_db/item_db/transaction_db
 ```
 
-Both clusters use the same application resource ceiling:
+Both clusters use the same measured application resource ceiling:
 
-- CPU: `4000m`
-- memory: `4096Mi`
+- CPU: `15800m`
+- memory: `27648Mi`
+
+This ceiling is not set equal to raw physical node capacity. It is derived
+from allocatable application-node capacity and then rounded down after
+considering always-on cluster overhead. See
+[`docs/experiment/application-ceiling-methodology.md`](docs/experiment/application-ceiling-methodology.md)
+for the full methodology and the final fixed/HPA split.
 
 Application pods run on `app-nodes`; k6 runner jobs run on `testing-nodes`.
 
@@ -93,7 +99,7 @@ Architecture and benchmark diagrams are available in
 ├── proto/                    # gRPC contracts and generated Go code
 ├── pkg/                      # shared technical utilities
 ├── seed/                     # benchmark seed/reset tooling
-├── deployments/              # Docker Compose, Kubernetes, Helm manifests
+├── deployments/              # Docker Compose plus local, benchmark, EKS, and Helm manifests
 ├── infra/terraform/          # AWS shared and experiment Terraform stacks
 ├── k6/                       # k6 scripts, runner image, benchmark data
 ├── env/                      # generated local/EKS env files
@@ -101,6 +107,12 @@ Architecture and benchmark diagrams are available in
 ├── scripts/                  # operator and automation scripts
 └── docs/                     # architecture, development, infrastructure, experiment docs
 ```
+
+Kubernetes manifests are separated by environment purpose:
+
+- `deployments/k8s/local/` for Minikube and local Kubernetes workflows
+- `deployments/k8s/benchmark/` for benchmark-only jobs and bootstrap assets
+- `deployments/k8s/eks/` for EKS deployment source-of-truth manifests
 
 ## Source of Truth
 
