@@ -4,6 +4,8 @@ metadata:
   name: monolith
   namespace: mono
 spec:
+  strategy:
+    type: Recreate
   replicas: 2
   template:
     spec:
