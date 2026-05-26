@@ -35,6 +35,17 @@ has_non_placeholder_datadog_api_key() {
   return 0
 }
 
+require_secret() {
+  local namespace="$1"
+  local secret_name="$2"
+  local description="$3"
+
+  if ! kubectl --context="$CONTEXT" get secret "$secret_name" -n "$namespace" >/dev/null 2>&1; then
+    echo "Missing required secret: ${namespace}/${secret_name} (${description})" >&2
+    exit 1
+  fi
+}
+
 echo "=== Deploying monolith cluster (context: $CONTEXT) ==="
 
 echo "Rendering EKS manifests with IMAGE_TAG=$IMAGE_TAG"
@@ -48,16 +59,11 @@ $K8S apply -f deployments/k8s/namespaces/local.yaml
 $K8S apply -f deployments/k8s/benchmark/namespace.yaml
 $K8S apply -f deployments/k8s/benchmark/k6-runner-rbac.yaml
 
-# Secrets (operator must create these before running this script)
-echo "Ensure the following secrets exist in the cluster:"
-echo "  benchmark/db-bootstrap-env  (BOOTSTRAP_DATABASE_URL)"
-echo "  mono/monolith-env           (DATABASE_URL, JWT_SECRET, ...)"
-echo "  datadog/datadog-secret      (api-key)"
-if [ -t 0 ]; then
-  read -r -p "Press Enter to continue after secrets are created..."
-else
-  echo "Non-interactive execution detected; continuing without prompt."
-fi
+# Required secrets
+echo "Verifying required secrets..."
+require_secret benchmark db-bootstrap-env "BOOTSTRAP_DATABASE_URL"
+require_secret mono monolith-env "DATABASE_URL, JWT_SECRET, and application config"
+echo "Required secrets are present."
 
 # DB bootstrap
 $K8S delete job db-bootstrap-job -n benchmark --ignore-not-found
