@@ -127,9 +127,13 @@ done
 DATADOG_API_KEY="${DATADOG_API_KEY:-}"
 DATADOG_CHART_VERSION="${DATADOG_CHART_VERSION:-3.134.0}"
 if [ -f env/datadog.eks.env ]; then
+  DATADOG_SITE_OVERRIDE="${DATADOG_SITE:-}"
   set -a
   source env/datadog.eks.env
   set +a
+  if [ -n "$DATADOG_SITE_OVERRIDE" ]; then
+    DATADOG_SITE="$DATADOG_SITE_OVERRIDE"
+  fi
 fi
 if has_non_placeholder_datadog_api_key "$DATADOG_API_KEY"; then
   helm repo add datadog https://helm.datadoghq.com --force-update
