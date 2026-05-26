@@ -338,8 +338,8 @@ Recommended fields:
     "autoscaling_mode": "hpa",
     "hpa_enabled": true,
     "hpa_target_cpu": "70%",
-    "min_replicas": 1,
-    "max_replicas": 7
+    "min_replicas": 2,
+    "max_replicas": 4
   },
 
   "datadog": {
@@ -357,6 +357,10 @@ Recommended fields:
 
 `metadata.json` is also the source of truth for determining whether a benchmark
 attempt used HPA or fixed replicas.
+
+For microservices HPA attempts, `resources` should record the service-specific
+replica and resource envelopes under a nested `services` object rather than a
+single top-level `min_replicas` / `max_replicas` pair.
 
 For a fixed replica experiment without HPA, use this resources shape:
 
