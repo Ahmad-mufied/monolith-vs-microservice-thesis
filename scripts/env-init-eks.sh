@@ -151,8 +151,7 @@ fi
 
 write_if_missing "env/aws-benchmark.env" "AWS_REGION=ap-southeast-1
 S3_BUCKET=skripsi-benchmark-results
-ECR_NAMESPACE=skripsi
-DATADOG_SITE=datadoghq.com"
+ECR_NAMESPACE=skripsi"
 
 write_if_missing "env/terraform.shared.env" "AWS_REGION=ap-southeast-1
 PROJECT=skripsi

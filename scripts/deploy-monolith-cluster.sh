@@ -3,6 +3,11 @@
 # Run after terraform apply and setup-eks-contexts.sh.
 set -euo pipefail
 
+DATADOG_SITE_EXPLICIT_OVERRIDE=""
+if [ "${DATADOG_SITE+x}" = "x" ]; then
+  DATADOG_SITE_EXPLICIT_OVERRIDE="$DATADOG_SITE"
+fi
+
 if [ -f env/aws-benchmark.env ]; then
   set -a
   source env/aws-benchmark.env
@@ -118,13 +123,12 @@ $K8S rollout status deployment/monolith -n mono --timeout=300s
 DATADOG_API_KEY="${DATADOG_API_KEY:-}"
 DATADOG_CHART_VERSION="${DATADOG_CHART_VERSION:-3.134.0}"
 if [ -f env/datadog.eks.env ]; then
-  DATADOG_SITE_OVERRIDE="${DATADOG_SITE:-}"
   set -a
   source env/datadog.eks.env
   set +a
-  if [ -n "$DATADOG_SITE_OVERRIDE" ]; then
-    DATADOG_SITE="$DATADOG_SITE_OVERRIDE"
-  fi
+fi
+if [ -n "$DATADOG_SITE_EXPLICIT_OVERRIDE" ]; then
+  DATADOG_SITE="$DATADOG_SITE_EXPLICIT_OVERRIDE"
 fi
 if has_non_placeholder_datadog_api_key "$DATADOG_API_KEY"; then
   helm repo add datadog https://helm.datadoghq.com --force-update
