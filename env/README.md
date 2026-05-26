@@ -78,6 +78,14 @@ make env-init-eks
 - `transaction-service.eks.env`
 - `k6-runner.eks.env`
 
+`aws-benchmark.env` stores shared benchmark and AWS helper values such as
+`AWS_REGION`, `S3_BUCKET`, and `ECR_NAMESPACE`.
+
+`datadog.eks.env` stores Datadog-specific EKS values, including:
+
+- `DATADOG_API_KEY`
+- `DATADOG_SITE`
+
 `k6-runner.eks.env` stores the benchmark admin credentials used by the k6
 runner secret during EKS benchmark setup.
 
