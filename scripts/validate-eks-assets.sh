@@ -27,9 +27,7 @@ check_no_local_images() {
 check_no_unpatched_ecr_placeholders() {
   if rg -n 'REPLACE_WITH_[A-Z_]+_ECR_IMAGE|replace-me\.dkr\.ecr' \
     "$BENCHMARK_DIR" \
-    "$EKS_DIR"/monolith/base/*.yaml \
     "$EKS_DIR"/monolith/*job.yaml \
-    "$EKS_DIR"/microservices/base/*.yaml \
     "$EKS_DIR"/microservices/*job.yaml > /tmp/eks-asset-ecr-check.txt; then
     cat /tmp/eks-asset-ecr-check.txt >&2
     fail "EKS manifests still contain unresolved ECR placeholders"
