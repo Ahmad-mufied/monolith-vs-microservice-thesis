@@ -52,6 +52,7 @@ AWS_BENCHMARK_ENV := env/aws-benchmark.env
 TERRAFORM_SHARED_ENV := env/terraform.shared.env
 TERRAFORM_EXPERIMENT_ENV := env/terraform.experiment.env
 DATADOG_EKS_ENV := env/datadog.eks.env
+EKS_IMAGE_TAG_ENV := env/image-tag.eks.env
 
 # =========================
 # Tooling
@@ -166,6 +167,9 @@ help:
 	@echo "  make datadog-status"
 	@echo "  make datadog-uninstall"
 	@echo "  make ecr-check-tag"
+	@echo "  make eks-show-image-tag"
+	@echo "  make eks-pin-image-tag IMAGE_TAG=<tag>"
+	@echo "  make eks-unpin-image-tag"
 	@echo "  make eks-render-manifests"
 	@echo "  make eks-render-tfvars"
 	@echo "  make terraform-auth-check"
@@ -869,7 +873,30 @@ ecr-check-tag:
 # ECR Image Build and Push
 # =========================
 
-IMAGE_TAG ?= $(shell git rev-parse --short HEAD)
+IMAGE_TAG ?= $(shell if [ -f $(EKS_IMAGE_TAG_ENV) ]; then grep -E '^IMAGE_TAG=' $(EKS_IMAGE_TAG_ENV) | head -n 1 | cut -d= -f2-; else git rev-parse --short HEAD; fi)
+
+.PHONY: eks-show-image-tag
+eks-show-image-tag:
+	@echo "IMAGE_TAG=$(IMAGE_TAG)"
+	@if [ -f $(EKS_IMAGE_TAG_ENV) ]; then \
+		echo "source=$(EKS_IMAGE_TAG_ENV)"; \
+	else \
+		echo "source=git rev-parse --short HEAD"; \
+	fi
+
+.PHONY: eks-pin-image-tag
+eks-pin-image-tag:
+	@if [ -z "$(IMAGE_TAG)" ]; then \
+		echo "IMAGE_TAG is required" >&2; \
+		exit 1; \
+	fi
+	@printf 'IMAGE_TAG=%s\n' "$(IMAGE_TAG)" > $(EKS_IMAGE_TAG_ENV)
+	@echo "Pinned EKS deploy IMAGE_TAG=$(IMAGE_TAG) in $(EKS_IMAGE_TAG_ENV)"
+
+.PHONY: eks-unpin-image-tag
+eks-unpin-image-tag:
+	rm -f $(EKS_IMAGE_TAG_ENV)
+	@echo "Removed pinned EKS deploy image tag file $(EKS_IMAGE_TAG_ENV)"
 
 .PHONY: ecr-push-all
 ecr-push-all: aws-ecr-login

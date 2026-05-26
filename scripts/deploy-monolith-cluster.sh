@@ -14,6 +14,12 @@ if [ -f env/aws-benchmark.env ]; then
   set +a
 fi
 
+if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
+  set -a
+  source env/image-tag.eks.env
+  set +a
+fi
+
 CONTEXT="monolith"
 K8S="kubectl --context=$CONTEXT"
 SCALING_MODE="${SCALING_MODE:-fixed}"

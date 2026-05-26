@@ -86,6 +86,14 @@ make env-init-eks
 - `DATADOG_API_KEY`
 - `DATADOG_SITE`
 
+Optional file:
+
+- `image-tag.eks.env`
+
+When present, `image-tag.eks.env` pins the default EKS deployment `IMAGE_TAG`
+for Make targets and deploy scripts. This is useful when you want to keep
+deploying an existing ECR image tag across unrelated local commits.
+
 `k6-runner.eks.env` stores the benchmark admin credentials used by the k6
 runner secret during EKS benchmark setup.
 

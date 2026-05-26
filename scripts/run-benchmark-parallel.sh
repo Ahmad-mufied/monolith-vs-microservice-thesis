@@ -9,6 +9,12 @@ if [ -f env/aws-benchmark.env ]; then
   set +a
 fi
 
+if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
+  set -a
+  source env/image-tag.eks.env
+  set +a
+fi
+
 SCENARIO="${SCENARIO:?SCENARIO is required (login|create-transaction|enriched-transactions|mixed-workload)}"
 TARGET_RPS="${TARGET_RPS:?TARGET_RPS is required}"
 RUN_ID="${RUN_ID:?RUN_ID is required}"
