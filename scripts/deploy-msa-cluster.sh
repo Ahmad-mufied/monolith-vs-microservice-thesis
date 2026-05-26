@@ -75,7 +75,10 @@ prepare_existing_workloads_for_redeploy() {
   for svc in api-gateway auth-service item-service transaction-service; do
     if $K8S get deployment "$svc" -n msa >/dev/null 2>&1; then
       $K8S scale deployment "$svc" -n msa --replicas=0
-      $K8S rollout status "deployment/${svc}" -n msa --timeout=300s || true
+      if ! $K8S rollout status "deployment/${svc}" -n msa --timeout=300s; then
+        echo "Failed to scale down ${svc} before redeploy; aborting before migrations/reset/seed." >&2
+        exit 1
+      fi
     fi
   done
 }
