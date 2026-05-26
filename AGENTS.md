@@ -726,40 +726,41 @@ Use IAM roles, IRSA, EKS Pod Identity, Kubernetes Secrets, or external secret ma
 
 Application CPU ceiling:
 
-- monolith: 4000m
-- microservices namespace: 4000m
+- monolith: 15800m
+- microservices namespace: 15800m
 
 Application memory ceiling:
 
-- monolith: 4096Mi
-- microservices namespace: 4096Mi
+- monolith: 27648Mi
+- microservices namespace: 27648Mi
 
 Monolith pod:
 
-- CPU: 1000m
-- memory: 1024Mi
-- minReplicas: 1
+- fixed mode: 2 pods, each 3950m request / 7900m limit and 6912Mi request / 13824Mi limit
+- hpa mode: 2 to 4 pods, each 1975m request / 3950m limit and 3456Mi request / 6912Mi limit
 - maxReplicas: 4
 - HPA target CPU utilization: 70%
 
 Microservices pod per service:
 
-- CPU: 250m
-- memory: 256Mi
-- minReplicas: 1
-- maxReplicas: 16
+- fixed mode:
+  api-gateway: 500m request / 2000m limit and 864Mi request / 3456Mi limit
+  auth-service: 1500m request / 4000m limit and 2592Mi request / 6912Mi limit
+  item-service: 1000m request / 3000m limit and 1728Mi request / 5184Mi limit
+  transaction-service: 2000m request / 6800m limit and 3456Mi request / 12096Mi limit
+- hpa mode:
+  api-gateway: 250m request / 500m limit and 432Mi request / 864Mi limit, maxReplicas 4
+  auth-service: 500m request / 1000m limit and 864Mi request / 1728Mi limit, maxReplicas 4
+  item-service: 250m request / 500m limit and 432Mi request / 864Mi limit, maxReplicas 6
+  transaction-service: 850m request / 1700m limit and 1512Mi request / 3024Mi limit, maxReplicas 4
 - HPA target CPU utilization: 70%
 
 Microservices namespace ResourceQuota:
 
-- CPU max: 4000m
-- memory max: 4096Mi
+- CPU max: 15800m
+- memory max: 27648Mi
 
-Reason for maxReplicas 16:
-
-4000m / 250m = 16 pods
-
-This allows a focused service to scale up under targeted load while ResourceQuota prevents the total microservices resource budget from exceeding the monolith resource budget.
+This allows a focused service to scale up under targeted load while keeping the total microservices resource budget aligned with the monolith architecture ceiling.
 
 Do not add KEDA, Prometheus Adapter custom metrics, VPA, Cluster Autoscaler, or Karpenter unless explicitly requested.
 

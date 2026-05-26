@@ -578,53 +578,84 @@ deployments/
 │       └── 001-create-databases.sql
 │
 └── k8s/
+    ├── benchmark/
+    │   ├── k6-benchmark-monolith-job.yaml
+    │   ├── k6-benchmark-microservices-job.yaml
+    │   ├── k6-runner-rbac.yaml
+    │   ├── k6-runner-secret.example.yaml
+    │   ├── namespace.yaml
+    │   ├── monolith/
+    │   │   └── db-bootstrap-job.yaml
+    │   └── microservices/
+    │       └── db-bootstrap-job.yaml
+    │
+    ├── eks/
+    │   └── ...
+    │
     ├── local/
-    │   ├── postgres.yaml
-    │   └── db-bootstrap-job.yaml
+    │   ├── shared/
+    │   │   ├── postgres.yaml
+    │   │   └── db-bootstrap-job.yaml
+    │   │
+    │   ├── monolith/
+    │   │   ├── monolith.yaml
+    │   │   ├── ingress.yaml
+    │   │   ├── migration-job.yaml
+    │   │   ├── prepare-monolith-enrichment-benchmark-data-job.yaml
+    │   │   ├── prepare-monolith-enrichment-smoke-data-job.yaml
+    │   │   ├── resource-management-fixed.yaml
+    │   │   ├── resource-management-hpa.yaml
+    │   │   ├── reset-monolith-data-job.yaml
+    │   │   ├── seed-monolith-benchmark-data-job.yaml
+    │   │   └── seed-monolith-smoke-data-job.yaml
+    │   │
+    │   └── microservices/
+    │       ├── api-gateway.yaml
+    │       ├── api-gateway-ingress.yaml
+    │       ├── auth-service.yaml
+    │       ├── auth-migration-job.yaml
+    │       ├── item-service.yaml
+    │       ├── item-migration-job.yaml
+    │       ├── prepare-microservices-enrichment-benchmark-data-job.yaml
+    │       ├── prepare-microservices-enrichment-smoke-data-job.yaml
+    │       ├── resource-management-fixed.yaml
+    │       ├── resource-management-hpa.yaml
+    │       ├── reset-microservices-data-job.yaml
+    │       ├── seed-microservices-benchmark-data-job.yaml
+    │       ├── seed-microservices-smoke-data-job.yaml
+    │       ├── transaction-service.yaml
+    │       └── transaction-migration-job.yaml
     │
     ├── namespaces/
     │   └── local.yaml
     │
-    ├── monolith/
-    │   ├── monolith.yaml
-    │   ├── ingress.yaml
-    │   ├── migration-job.yaml
-    │   ├── prepare-monolith-enrichment-benchmark-data-job.yaml
-    │   ├── prepare-monolith-enrichment-smoke-data-job.yaml
-    │   ├── resource-management-fixed.yaml
-    │   ├── resource-management-hpa.yaml
-    │   ├── reset-monolith-data-job.yaml
-    │   ├── seed-monolith-benchmark-data-job.yaml
-    │   └── seed-monolith-smoke-data-job.yaml
+    ├── eks/
+    │   ├── monolith/
+    │   │   ├── base/
+    │   │   └── overlays/
+    │   │       ├── fixed/
+    │   │       └── hpa/
+    │   └── microservices/
+    │       ├── base/
+    │       └── overlays/
+    │           ├── fixed/
+    │           └── hpa/
     │
-    └── microservices/
-        ├── api-gateway.yaml
-        ├── api-gateway-ingress.yaml
-        ├── auth-service.yaml
-        ├── auth-migration-job.yaml
-        ├── item-service.yaml
-        ├── item-migration-job.yaml
-        ├── prepare-microservices-enrichment-benchmark-data-job.yaml
-        ├── prepare-microservices-enrichment-smoke-data-job.yaml
-        ├── resource-management-fixed.yaml
-        ├── resource-management-hpa.yaml
-        ├── reset-microservices-data-job.yaml
-        ├── seed-microservices-benchmark-data-job.yaml
-        ├── seed-microservices-smoke-data-job.yaml
-        ├── transaction-service.yaml
-        └── transaction-migration-job.yaml
 ```
 
 Rules:
 
 - `compose/` is used for local development,
-- `k8s/local/` is used for local Kubernetes development,
+- `k8s/local/shared/` contains local-only shared infrastructure manifests,
+- `k8s/local/monolith/` contains local Minikube monolith workload manifests,
+- `k8s/local/microservices/` contains local Minikube microservices workload manifests,
+- `k8s/eks/` remains the EKS-specific source of truth,
 - migration runs via Kubernetes Job,
 - seed runs via Kubernetes Job,
 - migration and seed must not run during benchmark execution,
 - API Gateway has no migration job,
-- `resource-management-fixed.yaml` applies the fixed-replica benchmark mode,
-- `resource-management-hpa.yaml` applies the HPA benchmark mode.
+- EKS app deployment mode is selected via `deployments/k8s/eks/*/overlays/fixed` and `overlays/hpa`,
+- the legacy `resource-management-*.yaml` files remain as generic namespace/HPA references outside the EKS overlay flow.
 
 ---
 

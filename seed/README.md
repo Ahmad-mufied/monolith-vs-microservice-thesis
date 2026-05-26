@@ -174,21 +174,21 @@ Local Minikube uses `skripsi/seed-runner:local`.
 Monolith jobs:
 
 ```text
-deployments/k8s/monolith/reset-monolith-data-job.yaml
-deployments/k8s/monolith/seed-monolith-smoke-data-job.yaml
-deployments/k8s/monolith/seed-monolith-benchmark-data-job.yaml
-deployments/k8s/monolith/prepare-monolith-enrichment-smoke-data-job.yaml
-deployments/k8s/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml
+deployments/k8s/local/monolith/reset-monolith-data-job.yaml
+deployments/k8s/local/monolith/seed-monolith-smoke-data-job.yaml
+deployments/k8s/local/monolith/seed-monolith-benchmark-data-job.yaml
+deployments/k8s/local/monolith/prepare-monolith-enrichment-smoke-data-job.yaml
+deployments/k8s/local/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml
 ```
 
 Microservices jobs:
 
 ```text
-deployments/k8s/microservices/reset-microservices-data-job.yaml
-deployments/k8s/microservices/seed-microservices-smoke-data-job.yaml
-deployments/k8s/microservices/seed-microservices-benchmark-data-job.yaml
-deployments/k8s/microservices/prepare-microservices-enrichment-smoke-data-job.yaml
-deployments/k8s/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml
+deployments/k8s/local/microservices/reset-microservices-data-job.yaml
+deployments/k8s/local/microservices/seed-microservices-smoke-data-job.yaml
+deployments/k8s/local/microservices/seed-microservices-benchmark-data-job.yaml
+deployments/k8s/local/microservices/prepare-microservices-enrichment-smoke-data-job.yaml
+deployments/k8s/local/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml
 ```
 
 No EKS-specific enrichment manifest is added in this branch. EKS should follow

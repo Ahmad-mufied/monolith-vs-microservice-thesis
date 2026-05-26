@@ -526,11 +526,10 @@ The application resource ceiling is designed to keep the comparison fair.
 Monolith:
 
 ```text
-CPU ceiling      : 4000m
-Memory ceiling   : 4096Mi
-CPU per pod      : 1000m
-Memory per pod   : 1024Mi
-minReplicas      : 1
+CPU ceiling      : 15800m
+Memory ceiling   : 27648Mi
+fixed            : 2 pods x (3950m request / 7900m limit, 6912Mi request / 13824Mi limit)
+hpa              : 2 to 4 pods x (1975m request / 3950m limit, 3456Mi request / 6912Mi limit)
 maxReplicas      : 4
 HPA target CPU   : 70%
 ```
@@ -538,12 +537,16 @@ HPA target CPU   : 70%
 Microservices:
 
 ```text
-Namespace CPU ceiling    : 4000m
-Namespace memory ceiling : 4096Mi
-api-gateway              : request 100m / limit 250m / 256Mi / 384Mi
-auth-service             : request 250m / limit 1000m / 256Mi / 768Mi
-item-service             : request 100m / limit 250m / 256Mi / 384Mi
-transaction-service      : request 150m / limit 500m / 256Mi / 512Mi
+Namespace CPU ceiling    : 15800m
+Namespace memory ceiling : 27648Mi
+fixed api-gateway        : request 500m / limit 2000m / 864Mi / 3456Mi
+fixed auth-service       : request 1500m / limit 4000m / 2592Mi / 6912Mi
+fixed item-service       : request 1000m / limit 3000m / 1728Mi / 5184Mi
+fixed transaction-service: request 2000m / limit 6800m / 3456Mi / 12096Mi
+hpa api-gateway          : request 250m / limit 500m / 432Mi / 864Mi
+hpa auth-service         : request 500m / limit 1000m / 864Mi / 1728Mi
+hpa item-service         : request 250m / limit 500m / 432Mi / 864Mi
+hpa transaction-service  : request 850m / limit 1700m / 1512Mi / 3024Mi
 minReplicas per service  : 1
 HPA target CPU           : 70%
 ```
@@ -551,10 +554,10 @@ HPA target CPU           : 70%
 Role-aware HPA maxReplicas:
 
 ```text
-api-gateway         : 9
-auth-service        : 3
-item-service        : 9
-transaction-service : 5
+api-gateway         : 4
+auth-service        : 4
+item-service        : 6
+transaction-service : 4
 ```
 
 This keeps fairness at the shared namespace ceiling while allowing

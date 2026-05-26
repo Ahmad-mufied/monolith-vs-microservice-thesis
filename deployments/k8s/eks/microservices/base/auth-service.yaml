@@ -26,7 +26,7 @@ spec:
         node-group: app
       containers:
         - name: auth-service
-          image: REPLACE_WITH_ECR_IMAGE
+          image: REPLACE_WITH_AUTH_SERVICE_ECR_IMAGE
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false

@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - resourcequota.yaml
+patches:
+  - path: api-gateway-patch.yaml
+  - path: auth-service-patch.yaml
+  - path: item-service-patch.yaml
+  - path: transaction-service-patch.yaml
+images:
+  - name: REPLACE_WITH_API_GATEWAY_ECR_IMAGE
+    newName: replace-me.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/api-gateway
+    newTag: latest
+  - name: REPLACE_WITH_AUTH_SERVICE_ECR_IMAGE
+    newName: replace-me.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/auth-service
+    newTag: latest
+  - name: REPLACE_WITH_ITEM_SERVICE_ECR_IMAGE
+    newName: replace-me.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/item-service
+    newTag: latest
+  - name: REPLACE_WITH_TRANSACTION_SERVICE_ECR_IMAGE
+    newName: replace-me.dkr.ecr.ap-southeast-1.amazonaws.com/skripsi/transaction-service
+    newTag: latest

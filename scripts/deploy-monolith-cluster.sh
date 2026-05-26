@@ -18,6 +18,7 @@ AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
 RENDER_ROOT="$(mktemp -d)"
 RENDERED_EKS_JOB_DIR=""
+RENDERED_MONOLITH_OVERLAY_DIR=""
 
 cleanup() {
   rm -rf "$RENDER_ROOT"
@@ -39,6 +40,7 @@ echo "=== Deploying monolith cluster (context: $CONTEXT) ==="
 echo "Rendering EKS manifests with IMAGE_TAG=$IMAGE_TAG"
 IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
 RENDERED_EKS_JOB_DIR="$RENDER_ROOT/$EKS_JOB_DIR"
+RENDERED_MONOLITH_OVERLAY_DIR="$RENDERED_EKS_JOB_DIR/overlays/$SCALING_MODE"
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 
 # Namespaces
@@ -59,9 +61,22 @@ fi
 
 # DB bootstrap
 $K8S delete job db-bootstrap-job -n benchmark --ignore-not-found
-$K8S apply -f deployments/k8s/monolith/db-bootstrap-job.yaml
+$K8S apply -f deployments/k8s/benchmark/monolith/db-bootstrap-job.yaml
 $K8S wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=120s
 echo "DB bootstrap complete"
+
+prepare_existing_workload_for_redeploy() {
+  $K8S delete hpa monolith -n mono --ignore-not-found
+  if $K8S get deployment monolith -n mono >/dev/null 2>&1; then
+    $K8S scale deployment monolith -n mono --replicas=0
+    if ! $K8S rollout status deployment/monolith -n mono --timeout=300s; then
+      echo "Failed to scale down monolith before redeploy; aborting before migration/reset/seed." >&2
+      exit 1
+    fi
+  fi
+}
+
+prepare_existing_workload_for_redeploy
 
 # Migration
 $K8S delete job monolith-migration-job -n mono --ignore-not-found
@@ -80,28 +95,30 @@ $K8S wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono 
 echo "Seed complete"
 
 # Deploy application
-$K8S apply -f "$RENDERED_EKS_JOB_DIR/monolith.yaml"
-$K8S rollout status deployment/monolith -n mono --timeout=300s
+$K8S apply -k "$RENDERED_MONOLITH_OVERLAY_DIR"
 
 # Resource management
 if [ "$SCALING_MODE" = "hpa" ]; then
   bash scripts/install-metrics-server.sh "$CONTEXT"
-  $K8S apply -f deployments/k8s/monolith/resource-management-hpa.yaml
   echo "HPA mode applied"
 else
   $K8S delete hpa monolith -n mono --ignore-not-found
-  $K8S apply -f deployments/k8s/monolith/resource-management-fixed.yaml
-  $K8S scale deployment monolith -n mono --replicas=1
   echo "Fixed replica mode applied"
 fi
+
+$K8S rollout status deployment/monolith -n mono --timeout=300s
 
 # Datadog
 DATADOG_API_KEY="${DATADOG_API_KEY:-}"
 DATADOG_CHART_VERSION="${DATADOG_CHART_VERSION:-3.134.0}"
-if [ -z "${DATADOG_SITE:-}" ] && [ -f env/datadog.eks.env ]; then
+if [ -f env/datadog.eks.env ]; then
+  DATADOG_SITE_OVERRIDE="${DATADOG_SITE:-}"
   set -a
   source env/datadog.eks.env
   set +a
+  if [ -n "$DATADOG_SITE_OVERRIDE" ]; then
+    DATADOG_SITE="$DATADOG_SITE_OVERRIDE"
+  fi
 fi
 if has_non_placeholder_datadog_api_key "$DATADOG_API_KEY"; then
   helm repo add datadog https://helm.datadoghq.com --force-update
