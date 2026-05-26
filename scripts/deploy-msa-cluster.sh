@@ -88,7 +88,7 @@ prepare_existing_workloads_for_redeploy
 # Migrations (parallel)
 for svc in auth item transaction; do
   $K8S delete job "${svc}-migration-job" -n msa --ignore-not-found
-  $K8S apply --validate=false -f "${RENDERED_EKS_JOB_DIR}/${svc}-migration-job.yaml"
+  $K8S apply -f "${RENDERED_EKS_JOB_DIR}/${svc}-migration-job.yaml"
 done
 for svc in auth item transaction; do
   $K8S wait --for=condition=complete job/"${svc}-migration-job" -n msa --timeout=180s
@@ -97,16 +97,16 @@ echo "Migrations complete"
 
 # Seed
 $K8S delete job reset-microservices-data-job -n msa --ignore-not-found
-$K8S apply --validate=false -f "$RENDERED_EKS_JOB_DIR/reset-microservices-data-job.yaml"
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/reset-microservices-data-job.yaml"
 $K8S wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
 
 $K8S delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-$K8S apply --validate=false -f "$RENDERED_EKS_JOB_DIR/seed-microservices-benchmark-data-job.yaml"
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/seed-microservices-benchmark-data-job.yaml"
 $K8S wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
 echo "Seed complete"
 
 # Deploy services
-$K8S apply --validate=false -k "$RENDERED_MSA_OVERLAY_DIR"
+$K8S apply -k "$RENDERED_MSA_OVERLAY_DIR"
 
 # Resource management
 if [ "$SCALING_MODE" = "hpa" ]; then

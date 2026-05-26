@@ -80,22 +80,22 @@ prepare_existing_workload_for_redeploy
 
 # Migration
 $K8S delete job monolith-migration-job -n mono --ignore-not-found
-$K8S apply --validate=false -f "$RENDERED_EKS_JOB_DIR/migration-job.yaml"
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/migration-job.yaml"
 $K8S wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 echo "Migration complete"
 
 # Seed
 $K8S delete job reset-monolith-data-job -n mono --ignore-not-found
-$K8S apply --validate=false -f "$RENDERED_EKS_JOB_DIR/reset-monolith-data-job.yaml"
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/reset-monolith-data-job.yaml"
 $K8S wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=120s
 
 $K8S delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
-$K8S apply --validate=false -f "$RENDERED_EKS_JOB_DIR/seed-monolith-benchmark-data-job.yaml"
+$K8S apply -f "$RENDERED_EKS_JOB_DIR/seed-monolith-benchmark-data-job.yaml"
 $K8S wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
 echo "Seed complete"
 
 # Deploy application
-$K8S apply --validate=false -k "$RENDERED_MONOLITH_OVERLAY_DIR"
+$K8S apply -k "$RENDERED_MONOLITH_OVERLAY_DIR"
 
 # Resource management
 if [ "$SCALING_MODE" = "hpa" ]; then
