@@ -69,7 +69,10 @@ prepare_existing_workload_for_redeploy() {
   $K8S delete hpa monolith -n mono --ignore-not-found
   if $K8S get deployment monolith -n mono >/dev/null 2>&1; then
     $K8S scale deployment monolith -n mono --replicas=0
-    $K8S rollout status deployment/monolith -n mono --timeout=300s || true
+    if ! $K8S rollout status deployment/monolith -n mono --timeout=300s; then
+      echo "Failed to scale down monolith before redeploy; aborting before migration/reset/seed." >&2
+      exit 1
+    fi
   fi
 }
 
