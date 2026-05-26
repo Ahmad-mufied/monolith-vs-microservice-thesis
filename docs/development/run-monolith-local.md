@@ -49,9 +49,11 @@ deployments/
 │   └── initdb/001-create-databases.sql
 └── k8s/
     ├── namespaces/local.yaml
-    ├── local/postgres.yaml
-    ├── local/db-bootstrap-job.yaml
-    └── monolith/
+    ├── local/
+    │   └── shared/
+    │       ├── postgres.yaml
+    │       └── db-bootstrap-job.yaml
+    └── local/monolith/
         ├── migration-job.yaml
         ├── monolith.yaml
         └── ingress.yaml
@@ -87,10 +89,10 @@ during local validation.
 
 | Manifest | Hardened scope | Notes |
 |---|---|---|
-| `deployments/k8s/local/db-bootstrap-job.yaml` | Pod + container securityContext | One-shot job; uses read-only root filesystem. |
-| `deployments/k8s/monolith/migration-job.yaml` | Pod + container securityContext | One-shot migration execution; uses read-only root filesystem. |
-| `deployments/k8s/monolith/monolith.yaml` | Pod + container securityContext | Long-running app workload; hardened runtime defaults. |
-| `deployments/k8s/local/postgres.yaml` | Pod + container securityContext | Uses explicit UID/GID/fsGroup and seccomp; `readOnlyRootFilesystem` remains `false` due to PostgreSQL runtime write needs. |
+| `deployments/k8s/local/shared/db-bootstrap-job.yaml` | Pod + container securityContext | One-shot job; uses read-only root filesystem. |
+| `deployments/k8s/local/monolith/migration-job.yaml` | Pod + container securityContext | One-shot migration execution; uses read-only root filesystem. |
+| `deployments/k8s/local/monolith/monolith.yaml` | Pod + container securityContext | Long-running app workload; hardened runtime defaults. |
+| `deployments/k8s/local/shared/postgres.yaml` | Pod + container securityContext | Uses explicit UID/GID/fsGroup and seccomp; `readOnlyRootFilesystem` remains `false` due to PostgreSQL runtime write needs. |
 
 ### Why this matters for local runs
 
@@ -1262,8 +1264,8 @@ kubectl delete hpa monolith -n mono --ignore-not-found
 Redeploy commands:
 
 ```bash
-kubectl apply -f deployments/k8s/monolith/monolith.yaml
-kubectl apply -f deployments/k8s/monolith/ingress.yaml
+kubectl apply -f deployments/k8s/local/monolith/monolith.yaml
+kubectl apply -f deployments/k8s/local/monolith/ingress.yaml
 kubectl rollout status deployment/monolith -n mono
 ```
 

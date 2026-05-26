@@ -401,7 +401,7 @@ It makes DB Bootstrap Job, migration Job, and seed Job behavior easier to valida
 Example local-only database manifest:
 
 ```text
-deployments/k8s/local/postgres.yaml
+deployments/k8s/local/shared/postgres.yaml
 ```
 
 Do not treat Minikube PostgreSQL as equivalent to Amazon RDS.
@@ -1157,13 +1157,13 @@ Command notes:
 Deploy PostgreSQL and wait until Ready:
 
 ```bash
-kubectl apply -f deployments/k8s/local/postgres.yaml
+kubectl apply -f deployments/k8s/local/shared/postgres.yaml
 kubectl wait --for=condition=ready pod/postgres-0 -n local-database --timeout=180s
 ```
 
 Command notes:
 
-- `kubectl apply -f deployments/k8s/local/postgres.yaml`: deploys the local PostgreSQL Service and StatefulSet.
+- `kubectl apply -f deployments/k8s/local/shared/postgres.yaml`: deploys the local PostgreSQL Service and StatefulSet.
 - `kubectl wait --for=condition=ready ...`: blocks until the PostgreSQL pod is ready to accept connections.
 
 Synchronize the in-cluster `postgres` password:
@@ -1181,7 +1181,7 @@ Run DB bootstrap:
 
 ```bash
 kubectl delete job db-bootstrap-job -n local-database --ignore-not-found
-kubectl apply -f deployments/k8s/local/db-bootstrap-job.yaml
+kubectl apply -f deployments/k8s/local/shared/db-bootstrap-job.yaml
 kubectl wait --for=condition=complete job/db-bootstrap-job -n local-database --timeout=180s
 kubectl logs job/db-bootstrap-job -n local-database
 ```
@@ -1189,7 +1189,7 @@ kubectl logs job/db-bootstrap-job -n local-database
 Command notes:
 
 - `kubectl delete job db-bootstrap-job ...`: removes any old bootstrap job object before rerunning it.
-- `kubectl apply -f deployments/k8s/local/db-bootstrap-job.yaml`: starts the job that creates the internal application databases.
+- `kubectl apply -f deployments/k8s/local/shared/db-bootstrap-job.yaml`: starts the job that creates the internal application databases.
 - `kubectl wait --for=condition=complete ...`: waits until the bootstrap job finishes successfully.
 - `kubectl logs job/db-bootstrap-job ...`: prints bootstrap logs for verification or debugging.
 
@@ -1209,22 +1209,22 @@ Run migration, reset, and seed jobs:
 
 ```bash
 kubectl delete job monolith-migration-job -n mono --ignore-not-found
-kubectl apply -f deployments/k8s/monolith/migration-job.yaml
+kubectl apply -f deployments/k8s/local/monolith/migration-job.yaml
 kubectl wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 
 kubectl delete job reset-monolith-data-job -n mono --ignore-not-found
-kubectl apply -f deployments/k8s/monolith/reset-monolith-data-job.yaml
+kubectl apply -f deployments/k8s/local/monolith/reset-monolith-data-job.yaml
 kubectl wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=180s
 
 kubectl delete job seed-monolith-smoke-data-job -n mono --ignore-not-found
-kubectl apply -f deployments/k8s/monolith/seed-monolith-smoke-data-job.yaml
+kubectl apply -f deployments/k8s/local/monolith/seed-monolith-smoke-data-job.yaml
 kubectl wait --for=condition=complete job/seed-monolith-smoke-data-job -n mono --timeout=180s
 ```
 
 Command notes:
 
 - `kubectl delete job monolith-migration-job ...`: removes the old migration job object so it can be rerun cleanly.
-- `kubectl apply -f deployments/k8s/monolith/migration-job.yaml`: starts the monolith schema migration job.
+- `kubectl apply -f deployments/k8s/local/monolith/migration-job.yaml`: starts the monolith schema migration job.
 - `kubectl wait --for=condition=complete job/monolith-migration-job ...`: waits until schema migration completes.
 - `kubectl delete/apply/wait reset-monolith-data-job ...`: reruns the monolith data reset job.
 - `kubectl delete/apply/wait seed-monolith-smoke-data-job ...`: reruns the monolith smoke dataset seed job.
@@ -1235,8 +1235,9 @@ need the benchmark dataset instead of the smoke dataset.
 Deploy and inspect monolith:
 
 ```bash
-kubectl apply -k deployments/k8s/eks/monolith/overlays/fixed
-kubectl apply -f deployments/k8s/monolith/ingress.yaml
+kubectl apply -f deployments/k8s/local/monolith/monolith.yaml
+kubectl apply -f deployments/k8s/local/monolith/resource-management-fixed.yaml
+kubectl apply -f deployments/k8s/local/monolith/ingress.yaml
 kubectl rollout status deployment/monolith -n mono --timeout=180s
 
 kubectl get pods,svc,hpa,resourcequota -n mono
@@ -1245,8 +1246,9 @@ kubectl logs job/monolith-migration-job -n mono
 
 Command notes:
 
-- `kubectl apply -k deployments/k8s/eks/monolith/overlays/fixed`: renders and applies the monolith fixed-mode Deployment, Service, and ResourceQuota from the EKS Kustomize overlay.
-- `kubectl apply -f deployments/k8s/monolith/ingress.yaml`: applies the monolith ingress resource.
+- `kubectl apply -f deployments/k8s/local/monolith/monolith.yaml`: deploys the monolith application and Service.
+- `kubectl apply -f deployments/k8s/local/monolith/resource-management-fixed.yaml`: applies the monolith fixed-replica ResourceQuota configuration.
+- `kubectl apply -f deployments/k8s/local/monolith/ingress.yaml`: applies the monolith ingress resource.
 - `kubectl rollout status deployment/monolith ...`: waits until the monolith Deployment finishes rolling out.
 - `kubectl get pods,svc,hpa,resourcequota -n mono`: gives a quick summary of monolith runtime state.
 - `kubectl logs job/monolith-migration-job -n mono`: shows migration logs if schema setup needs inspection.
@@ -1254,7 +1256,7 @@ Command notes:
 For HPA mode, swap the resource-management manifest:
 
 ```bash
-kubectl apply -k deployments/k8s/eks/monolith/overlays/hpa
+kubectl apply -f deployments/k8s/local/monolith/resource-management-hpa.yaml
 ```
 
 This HPA manifest uses a `60s` scale-down stabilization window so replica
@@ -1288,23 +1290,23 @@ Run migration, reset, and seed jobs:
 
 ```bash
 kubectl delete job auth-migration-job -n msa --ignore-not-found
-kubectl apply -f deployments/k8s/microservices/auth-migration-job.yaml
+kubectl apply -f deployments/k8s/local/microservices/auth-migration-job.yaml
 kubectl wait --for=condition=complete job/auth-migration-job -n msa --timeout=180s
 
 kubectl delete job item-migration-job -n msa --ignore-not-found
-kubectl apply -f deployments/k8s/microservices/item-migration-job.yaml
+kubectl apply -f deployments/k8s/local/microservices/item-migration-job.yaml
 kubectl wait --for=condition=complete job/item-migration-job -n msa --timeout=180s
 
 kubectl delete job transaction-migration-job -n msa --ignore-not-found
-kubectl apply -f deployments/k8s/microservices/transaction-migration-job.yaml
+kubectl apply -f deployments/k8s/local/microservices/transaction-migration-job.yaml
 kubectl wait --for=condition=complete job/transaction-migration-job -n msa --timeout=180s
 
 kubectl delete job reset-microservices-data-job -n msa --ignore-not-found
-kubectl apply -f deployments/k8s/microservices/reset-microservices-data-job.yaml
+kubectl apply -f deployments/k8s/local/microservices/reset-microservices-data-job.yaml
 kubectl wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=180s
 
 kubectl delete job seed-microservices-smoke-data-job -n msa --ignore-not-found
-kubectl apply -f deployments/k8s/microservices/seed-microservices-smoke-data-job.yaml
+kubectl apply -f deployments/k8s/local/microservices/seed-microservices-smoke-data-job.yaml
 kubectl wait --for=condition=complete job/seed-microservices-smoke-data-job -n msa --timeout=180s
 ```
 
@@ -1322,8 +1324,12 @@ you need the benchmark dataset instead of the smoke dataset.
 Deploy and inspect microservices:
 
 ```bash
-kubectl apply -k deployments/k8s/eks/microservices/overlays/fixed
-kubectl apply -f deployments/k8s/microservices/api-gateway-ingress.yaml
+kubectl apply -f deployments/k8s/local/microservices/auth-service.yaml
+kubectl apply -f deployments/k8s/local/microservices/item-service.yaml
+kubectl apply -f deployments/k8s/local/microservices/transaction-service.yaml
+kubectl apply -f deployments/k8s/local/microservices/api-gateway.yaml
+kubectl apply -f deployments/k8s/local/microservices/resource-management-fixed.yaml
+kubectl apply -f deployments/k8s/local/microservices/api-gateway-ingress.yaml
 
 kubectl rollout status deployment/auth-service -n msa --timeout=180s
 kubectl rollout status deployment/item-service -n msa --timeout=180s
@@ -1338,8 +1344,12 @@ kubectl logs job/transaction-migration-job -n msa
 
 Command notes:
 
-- `kubectl apply -k deployments/k8s/eks/microservices/overlays/fixed`: renders and applies the fixed-mode microservices Deployments, Services, and shared ResourceQuota from the EKS Kustomize overlay.
-- `kubectl apply -f .../api-gateway-ingress.yaml`: applies ingress for the API Gateway.
+- `kubectl apply -f deployments/k8s/local/microservices/auth-service.yaml`: deploys the Auth Service and its Service resource.
+- `kubectl apply -f deployments/k8s/local/microservices/item-service.yaml`: deploys the Item Service and its Service resource.
+- `kubectl apply -f deployments/k8s/local/microservices/transaction-service.yaml`: deploys the Transaction Service and its Service resource.
+- `kubectl apply -f deployments/k8s/local/microservices/api-gateway.yaml`: deploys the API Gateway and its Service resource.
+- `kubectl apply -f deployments/k8s/local/microservices/resource-management-fixed.yaml`: applies the fixed-replica microservices ResourceQuota and HPA-disabled resource configuration.
+- `kubectl apply -f deployments/k8s/local/microservices/api-gateway-ingress.yaml`: applies ingress for the API Gateway.
 - `kubectl rollout status deployment/...`: waits until each microservice Deployment is available.
 - `kubectl get pods,svc,hpa,resourcequota -n msa`: gives a quick summary of microservices runtime state.
 - `kubectl logs job/... -n msa`: shows migration logs for troubleshooting.
@@ -1347,7 +1357,7 @@ Command notes:
 For HPA mode, swap the resource-management manifest:
 
 ```bash
-kubectl apply -k deployments/k8s/eks/microservices/overlays/hpa
+kubectl apply -f deployments/k8s/local/microservices/resource-management-hpa.yaml
 ```
 
 This HPA manifest uses a `60s` scale-down stabilization window so replica
@@ -1404,13 +1414,18 @@ Recommended Kubernetes Jobs:
 ```text
 deployments/k8s/
 ├── local/
-│   └── db-bootstrap-job.yaml
+│   └── shared/
+│       └── db-bootstrap-job.yaml
 ├── benchmark/
 │   ├── namespace.yaml
 │   ├── k6-runner-rbac.yaml
 │   ├── k6-benchmark-monolith-job.yaml
 │   ├── k6-benchmark-microservices-job.yaml
 │   └── k6-runner-secret.example.yaml
+│   ├── monolith/
+│   │   └── db-bootstrap-job.yaml
+│   └── microservices/
+│       └── db-bootstrap-job.yaml
 ├── eks/
 │   ├── monolith/
 │   │   ├── migration-job.yaml

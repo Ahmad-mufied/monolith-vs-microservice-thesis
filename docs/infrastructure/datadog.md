@@ -117,11 +117,11 @@ docs/infrastructure/datadog-resource-overhead.md
 Application manifests with Datadog tagging and runtime env:
 
 ```text
-deployments/k8s/monolith/monolith.yaml
-deployments/k8s/microservices/api-gateway.yaml
-deployments/k8s/microservices/auth-service.yaml
-deployments/k8s/microservices/item-service.yaml
-deployments/k8s/microservices/transaction-service.yaml
+deployments/k8s/local/monolith/monolith.yaml
+deployments/k8s/local/microservices/api-gateway.yaml
+deployments/k8s/local/microservices/auth-service.yaml
+deployments/k8s/local/microservices/item-service.yaml
+deployments/k8s/local/microservices/transaction-service.yaml
 ```
 
 This repository uses purpose-based Datadog environment naming:

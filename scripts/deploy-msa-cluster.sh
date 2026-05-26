@@ -63,7 +63,7 @@ fi
 
 # DB bootstrap
 $K8S delete job db-bootstrap-job -n benchmark --ignore-not-found
-$K8S apply -f deployments/k8s/microservices/db-bootstrap-job.yaml
+$K8S apply -f deployments/k8s/benchmark/microservices/db-bootstrap-job.yaml
 $K8S wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=120s
 echo "DB bootstrap complete"
 
