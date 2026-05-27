@@ -468,6 +468,7 @@ summary.json
 raw.json.gz
 stdout.log
 metadata.json
+result-status.json
 k6-options.json
 thresholds.json
 ```
@@ -487,6 +488,10 @@ s3://{bucket}/experiments/{run_id}/{architecture}/{scenario_name}/{target_rps}rp
 The S3 path is for navigation and overwrite prevention.
 
 `metadata.json` is the source of truth for analysis.
+
+`thresholds.json` is the primary source for `PASS` vs `OVERLOAD`, while
+`result-status.json` records k6 exit code, S3 upload state, and artifact
+presence for orchestration-level classification.
 
 `kubectl` is included for troubleshooting and optional cluster inspection during
 benchmark operations, but the current runner does not collect separate

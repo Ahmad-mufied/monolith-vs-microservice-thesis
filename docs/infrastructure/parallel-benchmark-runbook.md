@@ -156,6 +156,13 @@ make run-benchmark-parallel \
   S3_BUCKET=<bucket>
 ```
 
+Interpret the runner outcome as follows:
+
+- `PASS`: valid run, thresholds passed
+- `OVERLOAD`: valid run, thresholds failed, useful for ceiling discovery
+- `INVALID`: rerun required after infra/config/runtime issue is fixed
+- `TIMEOUT`: rerun required after timeout cause is understood
+
 Do not start this step immediately after an HPA run unless the stack has been
 redeployed back to fixed mode and validated.
 
@@ -237,9 +244,47 @@ experiments/eks-run-001/microservices/create-transaction/1000rps/attempt-01/summ
 ...
 ```
 
+Also verify that each attempt folder includes:
+
+- `summary.json`
+- `thresholds.json`
+- `result-status.json`
+- `metadata.json`
+- `stdout.log`
+
 ---
 
-## 10. Datadog Time Window Alignment
+## 10. Final Result Interpretation
+
+`make run-benchmark-parallel` exits with:
+
+- `0` only when both architectures finish with `PASS`
+- non-zero when either architecture finishes with `OVERLOAD`, `INVALID`, or `TIMEOUT`
+
+This means a non-zero exit does not always mean the benchmark was invalid.
+
+Use the final printed summary plus these artifacts to interpret the run:
+
+- `thresholds.json`: primary source for `PASS` vs `OVERLOAD`
+- `result-status.json`: k6 exit code, S3 upload status, and artifact presence
+- `stdout.log`: diagnostic context when classification is `INVALID`
+
+The final summary also prints a run-level `Report generator source`, for
+example:
+
+```text
+s3://<bucket>/experiments/<run_id>
+```
+
+Use that URI directly as the S3 input for downstream reporting tools such as
+`k6-report-generator`.
+
+Treat `OVERLOAD` as valid evidence for capacity discovery. Treat `INVALID` and
+`TIMEOUT` as rerun-required states.
+
+---
+
+## 11. Datadog Time Window Alignment
 
 After each parallel run, verify that both `datadog-time-window.json` files
 have timestamps within 30 seconds of each other:
@@ -254,7 +299,7 @@ perfectly aligned. This is acceptable for analysis but should be noted.
 
 ---
 
-## 11. Destroy Infrastructure
+## 12. Destroy Infrastructure
 
 Only destroy after all planned runs are complete and all S3 results are
 verified.

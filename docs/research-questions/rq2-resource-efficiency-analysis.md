@@ -854,6 +854,7 @@ summary.json
 raw.json.gz
 stdout.log
 metadata.json
+result-status.json
 k6-options.json
 thresholds.json
 ```
@@ -867,6 +868,12 @@ datadog-time-window.json
 HPA behavior is analyzed from Datadog telemetry plus benchmark metadata. Do not
 assume separate Kubernetes snapshot files are present unless a run explicitly
 collects them.
+
+Interpretation note:
+
+- `thresholds.json` distinguishes valid `PASS` vs `OVERLOAD` outcomes
+- `result-status.json` helps identify `INVALID` runs caused by runtime or
+  artifact-delivery failures
 
 Important metadata fields:
 

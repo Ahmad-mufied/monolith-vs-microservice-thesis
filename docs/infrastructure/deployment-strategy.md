@@ -1624,6 +1624,7 @@ summary.json
 raw.json.gz
 metadata.json
 stdout.log
+result-status.json
 k6-options.json
 thresholds.json
 ```

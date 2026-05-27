@@ -522,6 +522,14 @@ Expected files per architecture:
 .../microservices/login/.../metadata.json
 ```
 
+Interpret smoke runner results the same way as measured runs:
+
+- `PASS`: smoke validation succeeded
+- `OVERLOAD`: the benchmark path worked, but the chosen target exceeded the
+  configured thresholds
+- `INVALID`: infra/config/runtime failure; fix before continuing
+- `TIMEOUT`: orchestration timeout; inspect before continuing
+
 ---
 
 ## Phase 6 — Measured Benchmark
@@ -541,6 +549,18 @@ make run-benchmark-parallel \
   ATTEMPT=attempt-01 \
   S3_BUCKET=skripsi-benchmark-results
 ```
+
+Interpret the final `run-benchmark-parallel` result carefully:
+
+- `PASS` means the benchmark completed and all thresholds passed
+- `OVERLOAD` means the benchmark completed and produced valid artifacts, but
+  one or more thresholds failed
+- `INVALID` means the run should not be used for analysis until rerun
+- `TIMEOUT` means the orchestration did not complete within the expected window
+
+The command still exits non-zero for `OVERLOAD`, `INVALID`, and `TIMEOUT`, so
+review the printed per-architecture summary before deciding whether the run is
+usable for thesis analysis.
 
 ### Scenario 2: Create Transaction
 
