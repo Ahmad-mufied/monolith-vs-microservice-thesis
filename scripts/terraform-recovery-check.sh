@@ -22,6 +22,23 @@ have_state_address() {
   grep -Fqx "$address" <<<"$state_list"
 }
 
+state_show_or_empty() {
+  local address="$1"
+  terraform_with_profile -chdir="$tf_experiment_dir" state show -no-color "$address" 2>/dev/null || true
+}
+
+value_from_state_show() {
+  local state_show="$1"
+  local key="$2"
+  awk -v key="$key" '
+    $1 == key && $2 == "=" {
+      gsub(/"/, "", $3)
+      print $3
+      exit
+    }
+  ' <<<"$state_show"
+}
+
 list_or_empty() {
   local output=""
   local rc=0
@@ -63,6 +80,59 @@ print_status() {
   local status="$1"
   local message="$2"
   printf '[%s] %s\n' "$status" "$message"
+}
+
+check_nodegroup_state() {
+  local cluster_name="$1"
+  local address="$2"
+  local label="$3"
+  local state_show=""
+  local state_id=""
+  local nodegroup_name=""
+  local status=""
+
+  if ! have_state_address "$experiment_state_list" "$address"; then
+    return
+  fi
+
+  state_show="$(state_show_or_empty "$address")"
+  state_id="$(value_from_state_show "$state_show" "id")"
+  nodegroup_name="${state_id#*:}"
+
+  if [[ -z "$nodegroup_name" || "$nodegroup_name" == "$state_id" ]]; then
+    nodegroup_name="$(value_from_state_show "$state_show" "node_group_name")"
+  fi
+
+  if [[ -z "$nodegroup_name" ]]; then
+    print_status "REVIEW" "State has $label node group for $cluster_name but the node group name could not be read"
+    return
+  fi
+
+  status="$(list_or_empty aws_with_profile eks describe-nodegroup \
+    --region "$aws_region" \
+    --cluster-name "$cluster_name" \
+    --nodegroup-name "$nodegroup_name" \
+    --query 'nodegroup.status' \
+    --output text)"
+
+  if [[ -z "$status" || "$status" == "None" ]]; then
+    print_status "STALE_IN_STATE" "State expects $label node group for $cluster_name but AWS is missing it: $nodegroup_name"
+    return
+  fi
+
+  if grep -Fq '(tainted)' <<<"$state_show"; then
+    if [[ "$status" == "ACTIVE" ]]; then
+      print_status "REVIEW" "Terraform state marks active $label node group as tainted: $cluster_name/$nodegroup_name"
+      printf '  suggested: AWS_PROFILE=%s terraform -chdir=%s untaint %q\n' \
+        "$terraform_aws_profile" "$tf_experiment_dir" "$address"
+    else
+      print_status "IN_PROGRESS" "Terraform state marks $label node group as tainted and AWS is not active yet: $cluster_name/$nodegroup_name ($status)"
+    fi
+  elif [[ "$status" == "ACTIVE" ]]; then
+    print_status "OK" "$label node group active for $cluster_name: $nodegroup_name"
+  else
+    print_status "IN_PROGRESS" "$label node group present but not active for $cluster_name: $nodegroup_name ($status)"
+  fi
 }
 
 echo "Terraform recovery check"
@@ -197,6 +267,9 @@ check_cluster() {
       print_status "STALE_IN_STATE" "State expects node groups for $cluster_name but AWS returned none"
     fi
   fi
+
+  check_nodegroup_state "$cluster_name" "$nodegroup_app_address" "app"
+  check_nodegroup_state "$cluster_name" "$nodegroup_testing_address" "testing"
 }
 
 check_rds() {
@@ -241,3 +314,4 @@ printf '   AWS_PROFILE=%s terraform -chdir=%s plan -input=false -lock=false\n' "
 echo "2. If any resource is [STALE_IN_STATE], review the suggested terraform state rm commands before applying them."
 echo "3. If AWS has resources that state does not track, import them explicitly instead of recreating blindly."
 echo "4. If resources are [IN_PROGRESS], wait for AWS to finish before retrying apply/destroy."
+echo "5. If a node group is [REVIEW] because it is active in AWS but tainted in state, review the suggested untaint command, run it, then plan again."

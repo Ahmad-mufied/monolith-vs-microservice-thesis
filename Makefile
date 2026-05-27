@@ -956,6 +956,14 @@ terraform-auth-check:
 terraform-recovery-check:
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-recovery-check.sh
 
+.PHONY: terraform-recovery-fix-tainted-nodegroups
+terraform-recovery-fix-tainted-nodegroups:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-recovery-fix-tainted-nodegroups.sh
+
+.PHONY: terraform-recovery-fix-tainted-nodegroups-apply
+terraform-recovery-fix-tainted-nodegroups-apply:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-recovery-fix-tainted-nodegroups.sh --apply
+
 .PHONY: eks-shared-apply
 eks-shared-apply:
 	cd infra/terraform/shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform apply
