@@ -79,8 +79,8 @@ check_and_fix() {
   local state_show=""
   local state_id=""
   local nodegroup_name=""
-  local aws_result=""
   local nodegroup_status=""
+  local health_issues_json=""
   local health_issue_count=""
 
   state_show="$(state_show_or_empty "$address")"
@@ -105,19 +105,34 @@ check_and_fix() {
     return
   fi
 
-  aws_result="$(aws_with_profile eks describe-nodegroup \
+  nodegroup_status="$(aws_with_profile eks describe-nodegroup \
     --region "$aws_region" \
     --cluster-name "$cluster_name" \
     --nodegroup-name "$nodegroup_name" \
-    --query '[nodegroup.status, length(nodegroup.health.issues)]' \
+    --query 'nodegroup.status' \
     --output text 2>/dev/null || true)"
 
-  if [[ -z "$aws_result" || "$aws_result" == "None" ]]; then
+  if [[ -z "$nodegroup_status" || "$nodegroup_status" == "None" ]]; then
     print_status "REVIEW" "$label node group is tainted, but AWS did not return it: $cluster_name/$nodegroup_name"
     return
   fi
 
-  read -r nodegroup_status health_issue_count <<<"$aws_result"
+  health_issues_json="$(aws_with_profile eks describe-nodegroup \
+    --region "$aws_region" \
+    --cluster-name "$cluster_name" \
+    --nodegroup-name "$nodegroup_name" \
+    --query 'nodegroup.health.issues' \
+    --output json 2>/dev/null || true)"
+
+  case "$health_issues_json" in
+    ""|"null"|"None"|"[]")
+      health_issue_count="0"
+      ;;
+    *)
+      health_issue_count="1+"
+      ;;
+  esac
+
   if [[ "$nodegroup_status" != "ACTIVE" || "$health_issue_count" != "0" ]]; then
     print_status "SKIP" "$label node group is tainted but not safe to untaint yet: $cluster_name/$nodegroup_name status=$nodegroup_status health_issues=$health_issue_count"
     return
