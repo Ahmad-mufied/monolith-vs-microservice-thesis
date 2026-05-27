@@ -174,6 +174,8 @@ help:
 	@echo "  make eks-render-tfvars"
 	@echo "  make terraform-auth-check"
 	@echo "  make terraform-recovery-check"
+	@echo "  make terraform-recovery-fix-tainted-nodegroups      # dry-run safe untaint suggestions"
+	@echo "  make terraform-recovery-fix-tainted-nodegroups-apply # untaint active healthy node groups"
 	@echo "  make eks-prepare-enrichment-benchmark"
 	@echo "  make create-eks-secrets-monolith"
 	@echo "  make create-eks-secrets-microservices"
