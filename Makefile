@@ -174,6 +174,8 @@ help:
 	@echo "  make eks-render-tfvars"
 	@echo "  make terraform-auth-check"
 	@echo "  make terraform-recovery-check"
+	@echo "  make terraform-recovery-fix-tainted-nodegroups      # dry-run safe untaint suggestions"
+	@echo "  make terraform-recovery-fix-tainted-nodegroups-apply # untaint active healthy node groups"
 	@echo "  make eks-prepare-enrichment-benchmark"
 	@echo "  make create-eks-secrets-monolith"
 	@echo "  make create-eks-secrets-microservices"
@@ -955,6 +957,14 @@ terraform-auth-check:
 .PHONY: terraform-recovery-check
 terraform-recovery-check:
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-recovery-check.sh
+
+.PHONY: terraform-recovery-fix-tainted-nodegroups
+terraform-recovery-fix-tainted-nodegroups:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-recovery-fix-tainted-nodegroups.sh
+
+.PHONY: terraform-recovery-fix-tainted-nodegroups-apply
+terraform-recovery-fix-tainted-nodegroups-apply:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-recovery-fix-tainted-nodegroups.sh --apply
 
 .PHONY: eks-shared-apply
 eks-shared-apply:
