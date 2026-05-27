@@ -45,6 +45,7 @@ trap cleanup EXIT
 
 S3_MONOLITH="s3://${S3_BUCKET}/experiments/${RUN_ID}/monolith/${SCENARIO}/${TARGET_RPS}rps/${ATTEMPT}"
 S3_MICROSERVICES="s3://${S3_BUCKET}/experiments/${RUN_ID}/microservices/${SCENARIO}/${TARGET_RPS}rps/${ATTEMPT}"
+S3_RUN_URI="s3://${S3_BUCKET}/experiments/${RUN_ID}"
 
 echo "=== Parallel Benchmark Run ==="
 echo "  scenario     : $SCENARIO"
@@ -55,6 +56,7 @@ echo "  scaling_mode : $SCALING_MODE"
 echo "  k6_profile   : $K6_PROFILE"
 echo "  duration     : $TEST_DURATION"
 echo "  image_tag    : $IMAGE_TAG"
+echo "  report_s3_uri: $S3_RUN_URI"
 echo ""
 
 # ─── Validate contexts ────────────────────────────────────────────────────────
@@ -309,6 +311,7 @@ echo "=== Results ==="
 echo "  monolith job : $MONO_STATE"
 echo "  microservices job : $MICROSERVICES_STATE"
 echo ""
+echo "  report S3 URI : $S3_RUN_URI"
 echo "  monolith S3  : $S3_MONOLITH"
 echo "  microservices S3 : $S3_MICROSERVICES"
 
@@ -322,3 +325,5 @@ fi
 
 echo ""
 echo "Both jobs completed successfully."
+echo "Report generator source:"
+echo "  $S3_RUN_URI"
