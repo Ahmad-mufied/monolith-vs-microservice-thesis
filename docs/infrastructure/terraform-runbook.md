@@ -77,6 +77,206 @@ Expected status classes:
 - `REVIEW`
 - `BLOCKED`
 
+### Interrupted Terraform Apply or Destroy Recovery
+
+Use this flow when `make eks-apply`, `make eks-destroy`, or a direct Terraform
+operation is interrupted by laptop shutdown, sleep, lost network, expired AWS
+session, or a closed terminal.
+
+Do not immediately rerun `make eks-apply` and approve a replacement plan. First
+reconcile Terraform state with live AWS resources.
+
+1. Restore AWS auth.
+
+```bash
+aws login
+make terraform-auth-check
+```
+
+If this fails with an AWS auth error, fix credentials first. Do not edit
+Terraform state while credentials are stale.
+
+2. Run the recovery audit.
+
+```bash
+make terraform-recovery-check
+```
+
+Interpret the result:
+
+- `OK` means the resource exists in AWS and matches the expected ready state.
+- `IN_PROGRESS` means AWS is still creating, updating, or deleting the
+  resource. Wait and rerun the recovery check.
+- `STALE_IN_STATE` means Terraform state still tracks a resource that AWS no
+  longer has. Review the suggested `terraform state rm` command before using
+  it.
+- `REVIEW` means the script found a case that needs operator judgment before
+  another apply.
+- `BLOCKED` means a preflight requirement failed, usually AWS auth or missing
+  Terraform directories.
+
+3. If a node group is active in AWS but tainted in Terraform state, untaint it.
+
+This happens when Terraform was disconnected during node group creation. AWS
+may finish provisioning successfully, but Terraform can still mark the resource
+as tainted because it did not observe a clean completion.
+
+The recovery script prints the exact command. Example:
+
+```bash
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment untaint 'module.msa_cluster.module.eks.module.eks_managed_node_group["app_nodes"].aws_eks_node_group.this[0]'
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment untaint 'module.msa_cluster.module.eks.module.eks_managed_node_group["testing_nodes"].aws_eks_node_group.this[0]'
+```
+
+The repository also includes a focused helper for this specific recovery case.
+It is dry-run by default:
+
+```bash
+make terraform-recovery-fix-tainted-nodegroups
+```
+
+If the dry-run reports that the tainted node group is active and healthy in AWS,
+apply the safe untaint operation with:
+
+```bash
+make terraform-recovery-fix-tainted-nodegroups-apply
+```
+
+Only use `untaint` after confirming the AWS node group is `ACTIVE`. Do not
+untaint a node group that is still creating, deleting, degraded, or missing.
+The helper enforces this guardrail by only untainting node groups that are
+`ACTIVE` and have zero EKS node group health issues.
+
+4. If the recovery script reports `IN_PROGRESS`, wait for AWS to settle.
+
+Useful AWS checks:
+
+```bash
+AWS_PROFILE=terraform-process aws eks describe-cluster \
+  --region ap-southeast-1 \
+  --name skripsi-msa \
+  --query 'cluster.status' \
+  --output text
+
+AWS_PROFILE=terraform-process aws eks list-nodegroups \
+  --region ap-southeast-1 \
+  --cluster-name skripsi-msa \
+  --output text
+
+AWS_PROFILE=terraform-process aws eks describe-nodegroup \
+  --region ap-southeast-1 \
+  --cluster-name skripsi-msa \
+  --nodegroup-name <node-group-name> \
+  --query '{status:nodegroup.status,health:nodegroup.health,scaling:nodegroup.scalingConfig,resources:nodegroup.resources}' \
+  --output json
+```
+
+If a node group exists but fails to become active, inspect the backing Auto
+Scaling Group activities. This usually exposes quota or capacity errors that
+Terraform output hides.
+
+```bash
+AWS_PROFILE=terraform-process aws autoscaling describe-scaling-activities \
+  --region ap-southeast-1 \
+  --auto-scaling-group-name <asg-name> \
+  --max-items 10 \
+  --output table
+```
+
+5. Plan through the repository wrapper.
+
+The experiment stack needs `DB_PASSWORD`, which is injected by
+`scripts/terraform-experiment.sh` from `env/terraform.experiment.env`. A direct
+`terraform -chdir=infra/terraform/experiment plan` can fail with `No value for
+required variable "db_password"`.
+
+Use:
+
+```bash
+TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-experiment.sh plan -input=false -lock=false -no-color
+```
+
+Expected recovery outcomes:
+
+- `No changes`: state and AWS are synchronized.
+- Only missing add-ons or small known resources are planned: review and apply.
+- Any `destroy`, `replace`, or unexpected large create action appears: stop and
+  inspect before approving.
+
+6. Apply only after reviewing the plan.
+
+If the reviewed plan is small and expected:
+
+```bash
+TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-experiment.sh apply
+```
+
+For recovery automation where the plan is already reviewed and contains only
+expected actions, `-auto-approve` is acceptable, but avoid it while diagnosing
+unknown drift.
+
+7. Confirm the final state.
+
+```bash
+make terraform-recovery-check
+TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-experiment.sh plan -input=false -lock=false -no-color
+```
+
+Healthy final result:
+
+- recovery check reports all critical resources as `OK`
+- plan reports `No changes`
+- no node group is still marked tainted
+- no unexpected destroy or replacement remains
+
+Do not run `terraform state rm` or import commands as the first response to an
+interruption. Use them only when live AWS and Terraform state clearly disagree:
+
+- use `state rm` when state tracks a resource that AWS no longer has
+- use `import` when AWS has a resource that state does not track and you intend
+  Terraform to manage it
+- use `untaint` when the same resource exists, is healthy in AWS, and Terraform
+  only wants to replace it because the state is tainted
+
+### Recovery Case Matrix
+
+Interrupted Terraform does not always fail in the same way. Use this matrix to
+classify the recovery path before changing state.
+
+| Case | Common signal | Solve mode | How to solve |
+| --- | --- | --- | --- |
+| AWS auth expired | `ExpiredTokenException`, `UnrecognizedClientException`, `AccessDenied`, or recovery check `BLOCKED` | Manual | Run `aws login`, then `make terraform-auth-check`, then rerun `make terraform-recovery-check`. Do not edit state while auth is stale. |
+| Resource still being created or deleted | recovery check reports `IN_PROGRESS`; EKS/RDS/add-on is not ready yet | Manual wait + inspect | Wait and rerun `make terraform-recovery-check`. If node groups stay stuck, inspect ASG scaling activities with `aws autoscaling describe-scaling-activities`. |
+| Node group is tainted but healthy in AWS | recovery check reports `REVIEW` and says the active node group is tainted | Script available | Run `make terraform-recovery-fix-tainted-nodegroups` for dry-run. If it reports the node group is `ACTIVE` with zero health issues, run `make terraform-recovery-fix-tainted-nodegroups-apply`, then run the wrapper plan. |
+| Terraform state tracks a resource missing in AWS | recovery check reports `STALE_IN_STATE` | Manual review | Confirm the resource is truly gone in AWS. If Terraform should forget it, run the suggested `terraform state rm` command, then plan through `scripts/terraform-experiment.sh`. |
+| AWS has a resource but Terraform state does not track it | AWS CLI shows the resource, but `terraform state list` has no matching address | Manual import | Do not recreate blindly. Import the resource into the correct Terraform address, then plan. Import IDs are resource-specific, so verify the module address and provider import format first. |
+| Terraform state lock remains after crash | `Error acquiring the state lock` | Manual review | Confirm no Terraform process is still running. Retry once. If the lock is truly stale, run `terraform force-unlock <LOCK_ID>` for the affected stack. Do not force-unlock while another apply/destroy is running. |
+| Plan wants to replace or destroy large resources | plan shows `-/+`, `must be replaced`, or unexpected `destroy` | Manual review | Stop before approving. Check whether the resource is tainted, whether config changed, and whether AWS live state is healthy. Use `untaint` only for healthy tainted resources; otherwise reconcile the real drift. |
+| Direct experiment plan asks for `db_password` | `No value for required variable "db_password"` | Use wrapper | Run `TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-experiment.sh plan -input=false -lock=false -no-color`. The wrapper injects `TF_VAR_db_password` from `env/terraform.experiment.env`. |
+| Node group fails because of quota or capacity | ASG scaling activity shows `VcpuLimitExceeded`, insufficient capacity, launch failure, or subnet/IP issue | Manual infra fix | Fix the AWS-side blocker first: quota, instance type, subnet capacity, or launch settings. Then rerun recovery check and plan. Do not edit Terraform state to hide a real AWS provisioning failure. |
+
+Current helper coverage:
+
+- `make terraform-recovery-check`: read-only audit for shared VPC, shared IAM
+  role, clusters, node groups, Pod Identity associations, EKS add-ons, and RDS.
+- `make terraform-recovery-fix-tainted-nodegroups`: dry-run helper for the
+  safe tainted-node-group case only.
+- `make terraform-recovery-fix-tainted-nodegroups-apply`: runs `untaint` only
+  for tainted node groups that are `ACTIVE` in AWS and have zero node group
+  health issues.
+
+Cases that intentionally remain manual:
+
+- `terraform state rm`
+- `terraform import`
+- `terraform force-unlock`
+- approving a plan with `destroy` or replacement actions
+- quota/capacity remediation
+
+Those actions can remove state, adopt existing AWS resources, or change
+cost-heavy infrastructure, so they require operator review and a clean plan
+afterward.
+
 Use this after:
 
 - laptop sleep or shutdown during `terraform apply`
