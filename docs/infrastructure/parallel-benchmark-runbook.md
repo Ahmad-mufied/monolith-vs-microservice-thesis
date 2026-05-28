@@ -250,6 +250,8 @@ Default suite behavior:
 - `K6_PROFILE` defaults to `steady` for fixed mode and `hpa` for HPA mode
 - `INTER_CASE_DELAY` defaults to `0` for backward-compatible smoke and
   calibration runs
+- `AUTO_DESTROY_CONFIRMED` defaults to `false` and only triggers
+  `make eks-destroy-confirmed` after `_suite/summary.json` is uploaded
 
 Recommended repeat-attempt workflow:
 
@@ -265,6 +267,24 @@ make run-benchmark-suite \
 With the same `EXPERIMENT_NAME`, the suite resolves to the same `RUN_ID`, so
 rerunning the command with `ATTEMPT` left blank will auto-increment from
 `attempt-01` to `attempt-02`, `attempt-03`, and so on.
+
+Optional unattended cleanup workflow:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  EXPERIMENT_NAME=rq1-final \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=120 \
+  AUTO_DESTROY_CONFIRMED=true \
+  RPS_LEVELS="1000 2500 5000"
+```
+
+This is intended for long unattended runs. After the suite finishes and uploads
+`_suite/summary.json`, it immediately runs `make eks-destroy-confirmed`. If the
+suite exits early before it reaches summary upload, automatic destroy does not
+run. To avoid hard-to-trace timestamp-only unattended runs, this mode requires
+either `EXPERIMENT_NAME` or `RUN_ID`.
 
 Manual overrides remain supported:
 
