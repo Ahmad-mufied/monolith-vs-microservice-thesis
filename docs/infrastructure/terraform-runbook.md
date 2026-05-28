@@ -717,6 +717,10 @@ Important:
 
 ## 15. Troubleshooting
 
+For a broader operator command cheat sheet that covers deployment, job,
+Datadog, and AWS CLI debugging, see
+`docs/infrastructure/eks-debug-command-reference.md`.
+
 **EKS nodes not ready:**
 ```bash
 kubectl --context=monolith describe nodes
