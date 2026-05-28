@@ -28,6 +28,46 @@ cleanup() {
   rm -rf "$SUITE_WORKDIR"
 }
 trap cleanup EXIT
+: > "$SUITE_CASES_JSONL"
+
+validate_matrix_inputs() {
+  case "$SCALING_MODE" in
+    fixed|hpa) ;;
+    *)
+      echo "ERROR: unsupported SCALING_MODE '$SCALING_MODE' (expected: fixed|hpa)" >&2
+      return 1
+      ;;
+  esac
+
+  if [ -z "${SCENARIOS//[[:space:]]/}" ]; then
+    echo "ERROR: SCENARIOS must contain at least one scenario" >&2
+    return 1
+  fi
+
+  for scenario in $SCENARIOS; do
+    case "$scenario" in
+      login|create-transaction|enriched-transactions|mixed-workload) ;;
+      *)
+        echo "ERROR: unsupported scenario '$scenario' (expected: login|create-transaction|enriched-transactions|mixed-workload)" >&2
+        return 1
+        ;;
+    esac
+  done
+
+  if [ -z "${RPS_LEVELS//[[:space:]]/}" ]; then
+    echo "ERROR: RPS_LEVELS must contain at least one positive integer" >&2
+    return 1
+  fi
+
+  for target_rps in $RPS_LEVELS; do
+    if ! [[ "$target_rps" =~ ^[1-9][0-9]*$ ]]; then
+      echo "ERROR: invalid RPS_LEVELS value '$target_rps' (expected: positive integer)" >&2
+      return 1
+    fi
+  done
+}
+
+validate_matrix_inputs
 
 if [ -z "$K6_PROFILE" ]; then
   if [ "$SCALING_MODE" = "hpa" ]; then
