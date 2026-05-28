@@ -37,6 +37,7 @@ MAX_INTER_CASE_DELAY=86400
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
 DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 K6_PROFILE="${K6_PROFILE:-}"
+EXPERIMENT_NAME="${EXPERIMENT_NAME:-}"
 RUN_ID="${RUN_ID:-}"
 ATTEMPT="${ATTEMPT:-}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
@@ -83,8 +84,16 @@ integer_greater_than() {
   [[ "$left" > "$right" ]]
 }
 
+sanitize_experiment_name() {
+  local value="$1"
+
+  value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')"
+  printf '%s' "$value"
+}
+
 validate_matrix_inputs() {
   local normalized_inter_case_delay
+  local sanitized_experiment_name
 
   case "$SCALING_MODE" in
     fixed|hpa) ;;
@@ -131,10 +140,21 @@ validate_matrix_inputs() {
     echo "ERROR: invalid INTER_CASE_DELAY value '$INTER_CASE_DELAY' (maximum: ${MAX_INTER_CASE_DELAY} seconds)" >&2
     return 1
   fi
+
+  if [ -n "$EXPERIMENT_NAME" ]; then
+    sanitized_experiment_name="$(sanitize_experiment_name "$EXPERIMENT_NAME")"
+    if [ -z "$sanitized_experiment_name" ]; then
+      echo "ERROR: EXPERIMENT_NAME '$EXPERIMENT_NAME' does not contain any usable slug characters" >&2
+      return 1
+    fi
+  fi
 }
 
 validate_matrix_inputs
 INTER_CASE_DELAY="$(normalize_nonnegative_integer "$INTER_CASE_DELAY")"
+if [ -n "$EXPERIMENT_NAME" ]; then
+  EXPERIMENT_NAME="$(sanitize_experiment_name "$EXPERIMENT_NAME")"
+fi
 
 if [ -z "$K6_PROFILE" ]; then
   if [ "$SCALING_MODE" = "hpa" ]; then
@@ -145,7 +165,11 @@ if [ -z "$K6_PROFILE" ]; then
 fi
 
 if [ -z "$RUN_ID" ]; then
-  RUN_ID="eks-suite-${SCALING_MODE}-$(date +%Y%m%d-%H%M)"
+  if [ -n "$EXPERIMENT_NAME" ]; then
+    RUN_ID="eks-${SCALING_MODE}-${EXPERIMENT_NAME}"
+  else
+    RUN_ID="eks-${SCALING_MODE}-$(date +%Y%m%d-%H%M)"
+  fi
 fi
 
 S3_RUN_URI="s3://${S3_BUCKET}/experiments/${RUN_ID}"
@@ -279,6 +303,7 @@ upload_suite_manifest() {
 
   resource_configuration_json="$(suite_resource_configuration_json "$SCALING_MODE")"
   jq -n \
+    --arg experiment_name "$EXPERIMENT_NAME" \
     --arg run_id "$RUN_ID" \
     --arg attempt "$ATTEMPT" \
     --arg scaling_mode "$SCALING_MODE" \
@@ -291,6 +316,7 @@ upload_suite_manifest() {
     --argjson scenarios "$(words_json_array "$SCENARIOS")" \
     --argjson rps_levels "$(words_json_array "$RPS_LEVELS")" \
     '{
+      experiment_name: (if $experiment_name == "" then null else $experiment_name end),
       run_id: $run_id,
       attempt: $attempt,
       scaling_mode: $scaling_mode,
@@ -339,6 +365,7 @@ upload_suite_summary() {
   finished_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   resource_configuration_json="$(suite_resource_configuration_json "$SCALING_MODE")"
   jq -s \
+    --arg experiment_name "$EXPERIMENT_NAME" \
     --arg run_id "$RUN_ID" \
     --arg attempt "$ATTEMPT" \
     --arg scaling_mode "$SCALING_MODE" \
@@ -351,6 +378,7 @@ upload_suite_summary() {
     --arg finished_at_utc "$finished_at_utc" \
     --argjson resource_configuration "$resource_configuration_json" \
     '{
+      experiment_name: (if $experiment_name == "" then null else $experiment_name end),
       run_id: $run_id,
       attempt: $attempt,
       scaling_mode: $scaling_mode,
@@ -393,6 +421,9 @@ if [ -z "$ATTEMPT" ]; then
 fi
 
 echo "=== Benchmark Suite ==="
+if [ -n "$EXPERIMENT_NAME" ]; then
+  echo "  experiment   : $EXPERIMENT_NAME"
+fi
 echo "  run_id       : $RUN_ID"
 echo "  attempt      : $ATTEMPT"
 echo "  scaling_mode : $SCALING_MODE"
@@ -456,6 +487,9 @@ done
 
 echo ""
 echo "=== Benchmark Suite Complete ==="
+if [ -n "$EXPERIMENT_NAME" ]; then
+  echo "  experiment   : $EXPERIMENT_NAME"
+fi
 echo "  run_id       : $RUN_ID"
 echo "  attempt      : $ATTEMPT"
 echo "  report_s3_uri: $S3_RUN_URI"

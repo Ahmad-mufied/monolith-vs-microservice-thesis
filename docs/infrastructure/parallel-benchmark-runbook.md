@@ -243,11 +243,28 @@ Default suite behavior:
 
 - `SCENARIOS` defaults to `login create-transaction enriched-transactions`
 - `RPS_LEVELS` defaults to `1000 2500 5000 7500 10000`
-- `RUN_ID` is auto-generated as `eks-suite-{mode}-{yyyymmdd}-{HHMM}`
+- `RUN_ID` stays highest-precedence when set manually
+- `EXPERIMENT_NAME`, when provided and `RUN_ID` is blank, generates a stable `RUN_ID` as `eks-{mode}-{experiment_name}`
+- `RUN_ID` falls back to `eks-{mode}-{yyyymmdd}-{HHMM}` only when both `RUN_ID` and `EXPERIMENT_NAME` are blank
 - `ATTEMPT` is auto-detected from S3 and starts at `attempt-01`
 - `K6_PROFILE` defaults to `steady` for fixed mode and `hpa` for HPA mode
 - `INTER_CASE_DELAY` defaults to `0` for backward-compatible smoke and
   calibration runs
+
+Recommended repeat-attempt workflow:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  EXPERIMENT_NAME=rq1-final \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=120 \
+  RPS_LEVELS="1000 2500 5000"
+```
+
+With the same `EXPERIMENT_NAME`, the suite resolves to the same `RUN_ID`, so
+rerunning the command with `ATTEMPT` left blank will auto-increment from
+`attempt-01` to `attempt-02`, `attempt-03`, and so on.
 
 Manual overrides remain supported:
 
@@ -257,7 +274,7 @@ make run-benchmark-suite \
   TEST_DURATION=5m \
   INTER_CASE_DELAY=300 \
   RPS_LEVELS="1000 2500 5000" \
-  RUN_ID=eks-suite-hpa-final-rq2 \
+  RUN_ID=eks-hpa-final-rq2 \
   ATTEMPT=attempt-02
 ```
 

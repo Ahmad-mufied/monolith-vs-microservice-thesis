@@ -580,6 +580,7 @@ make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG
 
 make run-benchmark-suite \
   SCALING_MODE=fixed \
+  EXPERIMENT_NAME=rq1-fixed-final \
   TEST_DURATION=5m \
   INTER_CASE_DELAY=120 \
   SCENARIOS="login create-transaction enriched-transactions" \
@@ -590,8 +591,9 @@ make run-benchmark-suite \
 Expected suite shape:
 
 ```text
-run_id       : eks-suite-fixed-<yyyymmdd-HHMM>
-attempt      : attempt-01 unless the same run_id already exists in S3
+experiment   : rq1-fixed-final
+run_id       : eks-fixed-rq1-fixed-final
+attempt      : attempt-01, then attempt-02/03 when the same run_id is reused
 scaling_mode : fixed
 k6_profile   : steady
 scenarios    : login create-transaction enriched-transactions
@@ -610,6 +612,7 @@ make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG
 
 make run-benchmark-suite \
   SCALING_MODE=hpa \
+  EXPERIMENT_NAME=rq2-hpa-final \
   TEST_DURATION=5m \
   INTER_CASE_DELAY=300 \
   SCENARIOS="login create-transaction enriched-transactions" \
@@ -620,8 +623,9 @@ make run-benchmark-suite \
 Expected suite shape:
 
 ```text
-run_id       : eks-suite-hpa-<yyyymmdd-HHMM>
-attempt      : attempt-01 unless the same run_id already exists in S3
+experiment   : rq2-hpa-final
+run_id       : eks-hpa-rq2-hpa-final
+attempt      : attempt-01, then attempt-02/03 when the same run_id is reused
 scaling_mode : hpa
 k6_profile   : hpa
 scenarios    : login create-transaction enriched-transactions
@@ -703,6 +707,12 @@ sleep because there is no next case to stabilize for. It is not the same as k6
 `gracefulStop`, which only lets in-flight iterations finish inside one k6 run.
 Use `120` seconds for fixed final runs and `300` seconds for HPA final runs
 unless the experiment log documents a different value.
+
+`RUN_ID` remains the strongest override. If `RUN_ID` is blank and
+`EXPERIMENT_NAME` is set, the suite generates a stable `RUN_ID` using
+`eks-{mode}-{experiment_name}` so rerunning the same command can advance
+automatically from `attempt-01` to `attempt-02` and beyond. If both are blank,
+the runner falls back to the timestamp-based `RUN_ID`.
 
 ---
 
