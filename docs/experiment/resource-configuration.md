@@ -199,33 +199,244 @@ The recommended method for deriving the MSA split is:
 
 1. determine the total application ceiling for the architecture,
 2. identify which services participate in each benchmark scenario,
-3. estimate the relative importance of each service across the full scenario
-   set,
+3. classify each service by its workload character (CPU-bound vs I/O-bound),
 4. assign a larger budget to services with dominant workload roles,
-5. keep the same service-level budget logic between fixed mode and HPA mode.
+5. in HPA mode, derive per-pod limits from the service budget divided by
+   maxReplicas, where maxReplicas is chosen based on workload character.
 
-In this repository, the practical interpretation is:
+### 5.1 Workload Character Classification
 
-- `api-gateway` needs a meaningful but not dominant budget because it handles
-  every external request but does not own database writes,
-- `auth-service` needs a relatively high budget because login contains
-  CPU-heavy bcrypt work,
-- `item-service` needs a moderate budget because it supports validation and
-  enrichment but is not the main orchestration point,
-- `transaction-service` typically deserves the largest budget because it owns
-  the write path and the raw transaction retrieval path.
+Each service has a distinct compute character that determines the optimal
+replica and resource shape:
 
-This yields a role hierarchy like:
+- `api-gateway`: **I/O-bound** — goroutines spend most time waiting for
+  downstream gRPC responses. CPU actual usage per request is very low.
+  Benefits from many small pods to handle high concurrency.
+- `auth-service`: **CPU-bound** — bcrypt password comparison consumes one
+  full CPU core per request for ~100–300ms. Does not benefit from many small
+  pods because each pod is throttled. Benefits from fewer large pods.
+- `item-service`: **I/O-bound** — read-only database queries (validation and
+  summary lookup). Similar to api-gateway. Benefits from many small pods.
+- `transaction-service`: **mixed** — write path requires sequential database
+  steps (begin, insert, commit). Database connection pool is a constraint:
+  fewer pods means fewer total connections, which is more efficient. Benefits
+  from fewer larger pods.
+
+This classification drives the HPA replica shape:
 
 ```text
-transaction-service : highest
-auth-service        : high
-item-service        : medium
-api-gateway         : medium-to-lower
+I/O-bound  → many small pods  (api-gateway, item-service)
+CPU-bound  → few large pods   (auth-service)
+mixed      → few larger pods  (transaction-service)
 ```
 
-The exact numbers may change when the cluster size changes, but the method
-stays the same.
+### 5.2 HPA Request-to-Limit Ratio
+
+HPA triggers scale-out when:
+
+```text
+actual_usage / request > targetCPUUtilizationPercentage (70%)
+```
+
+The request value therefore controls how quickly HPA reacts:
+
+- request too large → HPA triggers late, pod already overloaded
+- request too small → HPA triggers too aggressively, wastes replicas
+
+The target ratio for this benchmark is **40–57% of limit**, which provides
+burst headroom before HPA triggers without being too conservative.
+
+### 5.3 Scale-In Headroom
+
+When a service is idle (e.g. auth-service during create-transaction scenario),
+HPA scales it in to minReplicas = 1. The freed CPU requests become available
+for other services to scale out. With all services at minReplicas:
+
+```text
+api-gateway:          200m request
+auth-service:        2000m request
+item-service:         200m request
+transaction-service:  800m request
+Total at minReplicas: 3200m
+
+Available headroom:  15800m - 3200m = 12600m
+```
+
+This 12600m headroom allows the dominant service for any given scenario to
+scale out fully without being blocked by idle services holding quota.
+
+### 5.4 Per-Scenario Scale-Out Analysis
+
+The following analysis shows whether each service can reach maxReplicas under
+each benchmark scenario, given the 12600m headroom available when all services
+start at minReplicas.
+
+**Baseline: all services at minReplicas (1 pod each)**
+
+```text
+api-gateway:          200m request × 1 =  200m
+auth-service:        2000m request × 1 = 2000m
+item-service:         200m request × 1 =  200m
+transaction-service:  800m request × 1 =  800m
+Total used:                              3200m
+Available headroom:  15800m - 3200m   = 12600m
+```
+
+---
+
+**Scenario 1 — Login (`POST /api/v1/auth/login`)**
+
+Active services: api-gateway (routing + JWT), auth-service (bcrypt + JWT issue).
+item-service and transaction-service are not involved and remain idle at 1 pod.
+
+auth-service is the dominant service. It is CPU-bound and benefits from scaling
+out to its maxReplicas of 2 large pods.
+
+```text
+Remaining after baseline:          12600m
+auth-service pod 2:      +2000m →  10600m remaining
+auth-service maxReplicas = 2 → STOP
+
+Total auth-service active limit: 2 × 3500m = 7000m ✅
+```
+
+api-gateway handles all inbound HTTP and gRPC translation. It is I/O-bound and
+benefits from scaling out to maxReplicas 5.
+
+```text
+Remaining after auth-service max:  10600m
+api-gateway pods 2–5: 4 × 200m = 800m → 9800m remaining
+api-gateway at max (5 pods) ✅
+```
+
+Conclusion: both active services reach maxReplicas. item-service and
+transaction-service remain idle at 1 pod. Remaining quota: **9800m**.
+
+---
+
+**Scenario 2 — Create Transaction (`POST /api/v1/transactions`)**
+
+Active services: api-gateway (routing), item-service (ValidateTransactionItems
+via gRPC), transaction-service (write path: begin TX, insert, commit).
+auth-service is not involved in the transaction write path and remains idle at
+1 pod, but its 2000m request remains reserved.
+
+transaction-service is the dominant service. It is mixed (write-heavy + DB
+connection pool constraint) and benefits from 2 large pods.
+
+```text
+Remaining after baseline:                12600m
+transaction-service pod 2:  +800m →     11800m remaining
+transaction-service maxReplicas = 2 → STOP
+
+Total transaction-service active limit: 2 × 2000m = 4000m ✅
+```
+
+item-service handles ValidateTransactionItems — read-only, I/O-bound. Benefits
+from scaling out to maxReplicas 5.
+
+```text
+Remaining after transaction-service max: 11800m
+item-service pods 2–5: 4 × 200m = 800m → 11000m remaining
+item-service at max (5 pods) ✅
+```
+
+api-gateway handles all inbound requests. I/O-bound, scales to maxReplicas 5.
+
+```text
+Remaining after item-service max: 11000m
+api-gateway pods 2–5: 4 × 200m = 800m → 10200m remaining
+api-gateway at max (5 pods) ✅
+```
+
+auth-service is idle at 1 pod. Its 2000m request is reserved but unused. This
+is an intentional trade-off: auth-service requires a large pod due to its
+CPU-bound nature, and the 2000m reservation does not block any other service
+from scaling out.
+
+Conclusion: all active services reach maxReplicas. Remaining quota: **10200m**.
+
+---
+
+**Scenario 3 — Enriched Transactions (`GET /api/v1/admin/transactions`)**
+
+Active services: all four. The enriched transaction flow is a fan-out pattern:
+
+```text
+api-gateway
+  → transaction-service → transaction_db (raw rows)
+  → api-gateway fan-out (parallel):
+      → auth-service → auth_db (GetUsersByIds)
+      → item-service → item_db (GetItemSummariesByIds)
+  → api-gateway in-memory join → response
+```
+
+All services participate but with different intensities. transaction-service
+and api-gateway carry the heaviest load; auth-service and item-service handle
+batch lookup calls.
+
+```text
+Remaining after baseline:                12600m
+transaction-service pod 2:  +800m →     11800m remaining
+transaction-service maxReplicas = 2 → STOP
+
+auth-service pod 2:        +2000m →      9800m remaining
+auth-service maxReplicas = 2 → STOP
+
+item-service pods 2–5: 4 × 200m = 800m → 9000m remaining
+item-service at max (5 pods) ✅
+
+api-gateway pods 2–5: 4 × 200m = 800m → 8200m remaining
+api-gateway at max (5 pods) ✅
+```
+
+Conclusion: all four services reach maxReplicas simultaneously. Remaining
+quota: **8200m**.
+
+---
+
+**Scenario 4 — Mixed Workload (25% each endpoint)**
+
+All services are active simultaneously with proportional load across all
+endpoints. This is the most demanding scenario for the HPA configuration.
+
+Worst case: all services scale out to maxReplicas at the same time.
+
+```text
+api-gateway:         5 × 200m  = 1000m
+auth-service:        2 × 2000m = 4000m
+item-service:        5 × 200m  = 1000m
+transaction-service: 2 × 800m  = 1600m
+Total requests at max:           7600m
+
+Remaining quota: 15800m - 7600m = 8200m ✅
+```
+
+All services can reach maxReplicas simultaneously without exceeding the
+namespace quota. The 8200m remaining confirms that the configuration has
+sufficient headroom even under the most demanding benchmark condition.
+
+---
+
+**Summary**
+
+| Scenario | api-gateway | auth-service | item-service | transaction-service | Remaining quota |
+|---|---|---|---|---|---|
+| Login | max (5 pods) ✅ | max (2 pods) ✅ | idle | idle | 9800m |
+| Create TX | max (5 pods) ✅ | idle | max (5 pods) ✅ | max (2 pods) ✅ | 10200m |
+| Enriched | max (5 pods) ✅ | max (2 pods) ✅ | max (5 pods) ✅ | max (2 pods) ✅ | 8200m |
+| Mixed | max (5 pods) ✅ | max (2 pods) ✅ | max (5 pods) ✅ | max (2 pods) ✅ | 8200m |
+
+In every scenario, all relevant services can scale out to their maxReplicas
+without being blocked by idle services holding quota. The minimum remaining
+quota across all scenarios is **8200m**, confirming that the configuration has
+sufficient headroom under all benchmark conditions.
+
+The only intentional inefficiency is auth-service always reserving 2000m
+request even when idle (scenarios 2 and 3). This is a deliberate trade-off:
+auth-service is CPU-bound and requires a large pod, so its request must be
+proportionally large. With 12600m total headroom available, this reservation
+does not block any other service from scaling out to its maximum capacity.
 
 ---
 
@@ -260,72 +471,59 @@ role-aware baseline.
 
 ---
 
-## 7. Thesis-Friendly Justification
+## 8. Active Configuration
 
-The following wording is suitable for the methodology chapter.
+The current benchmark uses the following resource configuration.
 
-> The monolithic and microservices architectures were constrained by the same
-> total application resource ceiling. However, the microservices resource
-> budget was not divided equally across services. Instead, it was allocated in
-> a role-aware manner based on the participation and expected computational
-> weight of each service across the benchmark scenarios. This approach was
-> chosen to avoid artificial bottlenecks caused by uniform per-service slicing
-> and to ensure that observed bottlenecks reflected the behavior of the
-> architecture and request path under study rather than an arbitrary equal
-> allocation policy.
+### Fixed Mode
 
-For HPA mode, the following wording is also suitable:
-
-> In HPA mode, the same service-level budget logic was preserved, but expressed
-> through smaller per-pod limits and service-specific `maxReplicas` values.
-> Thus, fixed mode and HPA mode remained comparable at the total resource
-> ceiling level while differing in how each service was allowed to consume its
-> budget over time.
-
----
-
-## 8. Worked Example
-
-If the final shared application ceiling follows
-[Application Ceiling Methodology](./application-ceiling-methodology.md), the
-current recommended total becomes:
-
-```text
-CPU    = 15800m
-Memory = 27648Mi
-```
-
-then a role-aware fixed allocation can be expressed conceptually as:
-
-```text
-api-gateway         : smaller share
-auth-service        : larger share
-item-service        : medium share
-transaction-service : largest share
-```
-
-One illustrative candidate is:
-
-| Service | Fixed CPU limit | Fixed memory limit |
-|---|---:|---:|
-| `api-gateway` | `2000m` | `3456Mi` |
-| `auth-service` | `4000m` | `6912Mi` |
-| `item-service` | `3000m` | `5184Mi` |
-| `transaction-service` | `6800m` | `12096Mi` |
-| **Total** | **`15800m`** | **`27648Mi`** |
-
-The matching HPA expression of the same service budgets would then be:
-
-| Service | Per-pod CPU limit | Per-pod memory limit | maxReplicas | Service max CPU | Service max memory |
+| Service | CPU request | CPU limit | Memory request | Memory limit | Replicas |
 |---|---:|---:|---:|---:|---:|
-| `api-gateway` | `500m` | `864Mi` | `4` | `2000m` | `3456Mi` |
-| `auth-service` | `1000m` | `1728Mi` | `4` | `4000m` | `6912Mi` |
-| `item-service` | `500m` | `864Mi` | `6` | `3000m` | `5184Mi` |
-| `transaction-service` | `1700m` | `3024Mi` | `4` | `6800m` | `12096Mi` |
-| **Total max** |  |  |  | **`15800m`** | **`27648Mi`** |
+| `api-gateway` | `750m` | `2500m` | `864Mi` | `3456Mi` | `1` |
+| `auth-service` | `2500m` | `7000m` | `3456Mi` | `10368Mi` | `1` |
+| `item-service` | `750m` | `2300m` | `1296Mi` | `3456Mi` | `1` |
+| `transaction-service` | `1000m` | `4000m` | `3024Mi` | `10368Mi` | `1` |
+| **Total** | **`5000m`** | **`15800m`** | **`8640Mi`** | **`27648Mi`** | **4** |
 
-This example is a methodology illustration. The live manifests remain the
-source of truth for the currently active benchmark configuration.
+### HPA Mode
+
+| Service | CPU req/pod | CPU limit/pod | Mem req/pod | Mem limit/pod | minReplicas | maxReplicas | Max CPU | Max Mem |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `api-gateway` | `200m` | `500m` | `432Mi` | `864Mi` | `1` | `5` | `2500m` | `4320Mi` |
+| `auth-service` | `2000m` | `3500m` | `3456Mi` | `5184Mi` | `1` | `2` | `7000m` | `10368Mi` |
+| `item-service` | `200m` | `460m` | `432Mi` | `864Mi` | `1` | `5` | `2300m` | `4320Mi` |
+| `transaction-service` | `800m` | `2000m` | `3024Mi` | `5184Mi` | `1` | `2` | `4000m` | `10368Mi` |
+| **Total max** | | | | | | | **`15800m`** | **`29376Mi`** |
+
+The HPA total maximum memory (29376Mi) exceeds the namespace quota ceiling
+(27648Mi) by design. Not all services will reach maxReplicas simultaneously.
+The namespace ResourceQuota enforces the hard ceiling at 27648Mi, so any
+scale-out attempt that would exceed the quota will be pending until quota is
+freed by scale-in of other services.
+
+### HPA Replica Shape Rationale
+
+| Service | Workload character | Replica shape | Reason |
+|---|---|---|---|
+| `api-gateway` | I/O-bound | many small (max 5) | concurrency bottleneck, not per-request CPU |
+| `auth-service` | CPU-bound | few large (max 2) | bcrypt saturates CPU per request; large pod more efficient than many small |
+| `item-service` | I/O-bound | many small (max 5) | read-only DB queries, high concurrency benefit |
+| `transaction-service` | mixed | few larger (max 2) | DB connection pool efficiency; write path is sequential |
+
+### Mixed-Workload Scenario Weights
+
+The `mixed-workload` scenario uses equal weights across all endpoints:
+
+| Endpoint | Weight |
+|---|---:|
+| `POST /api/v1/auth/login` | `25%` |
+| `POST /api/v1/transactions` | `25%` |
+| `GET /api/v1/transactions` (own) | `25%` |
+| `GET /api/v1/admin/transactions` | `25%` |
+
+Equal weights were chosen because no empirical traffic data exists to justify
+an unequal distribution. This is the most defensible neutral baseline for a
+controlled architecture comparison.
 
 ---
 
@@ -364,6 +562,11 @@ For this benchmark, the strongest default choice is:
 
 - equal total ceiling between monolith and microservices,
 - role-aware per-service split inside microservices,
-- fixed mode and HPA mode aligned at the service budget level,
+- fixed mode uses one pod per service with full service budget as the limit,
+- HPA mode uses workload-character-aware replica shape:
+  - I/O-bound services get many small pods (high concurrency),
+  - CPU-bound and mixed services get few large pods (compute efficiency),
+- fixed mode and HPA mode are comparable at the per-service budget level
+  (`limit × maxReplicas = fixed limit`),
 - equal split used only as an optional sensitivity study, not as the primary
   baseline.

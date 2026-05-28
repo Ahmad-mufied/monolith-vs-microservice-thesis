@@ -11,8 +11,8 @@ spec:
         - name: transaction-service
           resources:
             requests:
-              cpu: 2000m
-              memory: 3456Mi
+              cpu: 1000m
+              memory: 3024Mi
             limits:
-              cpu: 6800m
-              memory: 12096Mi
+              cpu: 4000m
+              memory: 10368Mi

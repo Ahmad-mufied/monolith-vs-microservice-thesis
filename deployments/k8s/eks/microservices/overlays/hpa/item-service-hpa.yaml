@@ -9,7 +9,7 @@ spec:
     kind: Deployment
     name: item-service
   minReplicas: 1
-  maxReplicas: 6
+  maxReplicas: 5
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 60
