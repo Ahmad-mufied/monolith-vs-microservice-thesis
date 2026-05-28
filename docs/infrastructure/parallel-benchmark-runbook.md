@@ -226,7 +226,55 @@ first RPS level since they do not mutate data.
 
 ---
 
-## 9. Verify S3 Results
+## 9. Full Benchmark Suite
+
+For final fixed or HPA runs, prefer the suite runner when you want to execute
+the full scenario and RPS matrix with less manual operator input:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  TEST_DURATION=5m \
+  RPS_LEVELS="1000 2500 5000"
+```
+
+Default suite behavior:
+
+- `SCENARIOS` defaults to `login create-transaction enriched-transactions`
+- `RPS_LEVELS` defaults to `1000 2500 5000 7500 10000`
+- `RUN_ID` is auto-generated as `eks-suite-{mode}-{yyyymmdd}-{HHMM}`
+- `ATTEMPT` is auto-detected from S3 and starts at `attempt-01`
+- `K6_PROFILE` defaults to `steady` for fixed mode and `hpa` for HPA mode
+
+Manual overrides remain supported:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=hpa \
+  TEST_DURATION=5m \
+  RPS_LEVELS="1000 2500 5000" \
+  RUN_ID=eks-suite-hpa-final-rq2 \
+  ATTEMPT=attempt-02
+```
+
+The suite runner still executes one `run-benchmark-parallel` case at a time.
+Monolith and microservices run in parallel for each case, while scenarios and
+RPS levels run serially.
+
+The suite runner also writes run-level metadata under:
+
+```text
+s3://<bucket>/experiments/<run_id>/_suite/manifest.json
+s3://<bucket>/experiments/<run_id>/_suite/summary.json
+```
+
+Both files include `resource_configuration` for the selected scaling mode. The
+value is generated from the same runner configuration that is passed into each
+attempt's `metadata.json`.
+
+---
+
+## 10. Verify S3 Results
 
 After each run:
 
@@ -254,7 +302,7 @@ Also verify that each attempt folder includes:
 
 ---
 
-## 10. Final Result Interpretation
+## 11. Final Result Interpretation
 
 `make run-benchmark-parallel` exits with:
 
@@ -284,7 +332,7 @@ Treat `OVERLOAD` as valid evidence for capacity discovery. Treat `INVALID` and
 
 ---
 
-## 11. Datadog Time Window Alignment
+## 12. Datadog Time Window Alignment
 
 After each parallel run, verify that both `datadog-time-window.json` files
 have timestamps within 30 seconds of each other:
@@ -299,7 +347,7 @@ perfectly aligned. This is acceptable for analysis but should be noted.
 
 ---
 
-## 12. Destroy Infrastructure
+## 13. Destroy Infrastructure
 
 Only destroy after all planned runs are complete and all S3 results are
 verified.
@@ -323,7 +371,7 @@ ECR images and S3 results are preserved after cluster destroy.
 
 ---
 
-## 12. Metadata Recording
+## 14. Metadata Recording
 
 Each run must record the scaling mode in `RESOURCES_CONFIGURATION_JSON`
 when calling `run-benchmark-parallel.sh`. The deploy scripts set this

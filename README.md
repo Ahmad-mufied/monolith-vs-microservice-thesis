@@ -321,6 +321,17 @@ make run-benchmark-parallel \
   S3_BUCKET=skripsi-benchmark-results
 ```
 
+For a full scenario/RPS matrix, use the suite runner. `RUN_ID` and `ATTEMPT`
+are generated automatically unless you override them:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  TEST_DURATION=5m \
+  RPS_LEVELS="1000 2500 5000" \
+  S3_BUCKET=skripsi-benchmark-results
+```
+
 Do not destroy infrastructure until all benchmark artifacts are verified in S3.
 
 ```bash
