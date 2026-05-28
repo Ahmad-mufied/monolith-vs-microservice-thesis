@@ -32,6 +32,7 @@ TEST_DURATION="${TEST_DURATION:-5m}"
 S3_BUCKET="${S3_BUCKET:?S3_BUCKET is required}"
 SCENARIOS="${SCENARIOS:-login create-transaction enriched-transactions}"
 RPS_LEVELS="${RPS_LEVELS:-1000 2500 5000 7500 10000}"
+SCENARIO_RPS_MATRIX="${SCENARIO_RPS_MATRIX:-}"
 INTER_CASE_DELAY="${INTER_CASE_DELAY:-0}"
 MAX_INTER_CASE_DELAY=86400
 AUTO_DESTROY_CONFIRMED="${AUTO_DESTROY_CONFIRMED:-false}"
@@ -46,6 +47,7 @@ ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 SUITE_WORKDIR="$(mktemp -d)"
 SUITE_CASES_JSONL="$SUITE_WORKDIR/cases.jsonl"
+SUITE_MATRIX_TSV="$SUITE_WORKDIR/scenario-rps-matrix.tsv"
 RENDER_ROOT="$SUITE_WORKDIR/rendered"
 RENDERED_EKS_MONOLITH_DIR="$RENDER_ROOT/deployments/k8s/eks/monolith"
 RENDERED_EKS_MICROSERVICES_DIR="$RENDER_ROOT/deployments/k8s/eks/microservices"
@@ -57,6 +59,7 @@ cleanup() {
 }
 trap cleanup EXIT
 : > "$SUITE_CASES_JSONL"
+: > "$SUITE_MATRIX_TSV"
 
 normalize_nonnegative_integer() {
   local value="$1"
@@ -92,9 +95,58 @@ sanitize_experiment_name() {
   printf '%s' "$value"
 }
 
+trim_whitespace() {
+  local value="$1"
+
+  value="$(sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' <<<"$value")"
+  printf '%s' "$value"
+}
+
+validate_supported_scenario() {
+  local scenario="$1"
+
+  case "$scenario" in
+    login|create-transaction|enriched-transactions|mixed-workload) ;;
+    *)
+      echo "ERROR: unsupported scenario '$scenario' (expected: login|create-transaction|enriched-transactions|mixed-workload)" >&2
+      return 1
+      ;;
+  esac
+}
+
+validate_rps_words() {
+  local rps_words="$1"
+  local target_rps
+
+  if [ -z "${rps_words//[[:space:]]/}" ]; then
+    echo "ERROR: RPS list must contain at least one positive integer" >&2
+    return 1
+  fi
+
+  for target_rps in $rps_words; do
+    if ! [[ "$target_rps" =~ ^[1-9][0-9]*$ ]]; then
+      echo "ERROR: invalid RPS value '$target_rps' (expected: positive integer)" >&2
+      return 1
+    fi
+  done
+}
+
+parse_rps_csv_to_words() {
+  local rps_csv="$1"
+  local normalized
+
+  normalized="$(printf '%s' "$rps_csv" | tr ',' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+  printf '%s' "$normalized"
+}
+
 validate_matrix_inputs() {
   local normalized_inter_case_delay
   local sanitized_experiment_name
+  local matrix_entry
+  local matrix_entry_count=0
+  local scenario
+  local rps_csv
+  local rps_words
 
   case "$SCALING_MODE" in
     fixed|hpa) ;;
@@ -104,32 +156,42 @@ validate_matrix_inputs() {
       ;;
   esac
 
-  if [ -z "${SCENARIOS//[[:space:]]/}" ]; then
-    echo "ERROR: SCENARIOS must contain at least one scenario" >&2
-    return 1
-  fi
+  if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
+    while IFS= read -r matrix_entry; do
+      matrix_entry="$(trim_whitespace "$matrix_entry")"
+      if [ -z "$matrix_entry" ]; then
+        continue
+      fi
 
-  for scenario in $SCENARIOS; do
-    case "$scenario" in
-      login|create-transaction|enriched-transactions|mixed-workload) ;;
-      *)
-        echo "ERROR: unsupported scenario '$scenario' (expected: login|create-transaction|enriched-transactions|mixed-workload)" >&2
+      if [[ "$matrix_entry" != *:* ]]; then
+        echo "ERROR: invalid SCENARIO_RPS_MATRIX entry '$matrix_entry' (expected: scenario:rps1,rps2,...)" >&2
         return 1
-        ;;
-    esac
-  done
+      fi
 
-  if [ -z "${RPS_LEVELS//[[:space:]]/}" ]; then
-    echo "ERROR: RPS_LEVELS must contain at least one positive integer" >&2
-    return 1
-  fi
+      scenario="$(trim_whitespace "${matrix_entry%%:*}")"
+      rps_csv="$(trim_whitespace "${matrix_entry#*:}")"
+      validate_supported_scenario "$scenario" || return 1
+      rps_words="$(parse_rps_csv_to_words "$rps_csv")"
+      validate_rps_words "$rps_words" || return 1
+      matrix_entry_count=$((matrix_entry_count + 1))
+    done < <(tr ';' '\n' <<<"$SCENARIO_RPS_MATRIX")
 
-  for target_rps in $RPS_LEVELS; do
-    if ! [[ "$target_rps" =~ ^[1-9][0-9]*$ ]]; then
-      echo "ERROR: invalid RPS_LEVELS value '$target_rps' (expected: positive integer)" >&2
+    if [ "$matrix_entry_count" -eq 0 ]; then
+      echo "ERROR: SCENARIO_RPS_MATRIX must contain at least one scenario:rps entry" >&2
       return 1
     fi
-  done
+  else
+    if [ -z "${SCENARIOS//[[:space:]]/}" ]; then
+      echo "ERROR: SCENARIOS must contain at least one scenario" >&2
+      return 1
+    fi
+
+    for scenario in $SCENARIOS; do
+      validate_supported_scenario "$scenario" || return 1
+    done
+
+    validate_rps_words "$RPS_LEVELS" || return 1
+  fi
 
   if ! [[ "$INTER_CASE_DELAY" =~ ^[0-9]+$ ]]; then
     echo "ERROR: invalid INTER_CASE_DELAY value '$INTER_CASE_DELAY' (expected: non-negative integer seconds, e.g. 300 for 5 minutes)" >&2
@@ -188,6 +250,9 @@ fi
 
 S3_RUN_URI="s3://${S3_BUCKET}/experiments/${RUN_ID}"
 SUITE_STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+EFFECTIVE_SCENARIOS=""
+EFFECTIVE_RPS_LEVELS=""
+TOTAL_CASES=0
 
 words_json_array() {
   local words="$1"
@@ -198,6 +263,72 @@ word_count() {
   local words="$1"
   set -- $words
   printf '%s' "$#"
+}
+
+build_suite_matrix_file() {
+  local matrix_entry
+  local scenario
+  local rps_csv
+  local rps_words
+
+  : > "$SUITE_MATRIX_TSV"
+
+  if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
+    while IFS= read -r matrix_entry; do
+      matrix_entry="$(trim_whitespace "$matrix_entry")"
+      if [ -z "$matrix_entry" ]; then
+        continue
+      fi
+
+      scenario="$(trim_whitespace "${matrix_entry%%:*}")"
+      rps_csv="$(trim_whitespace "${matrix_entry#*:}")"
+      rps_words="$(parse_rps_csv_to_words "$rps_csv")"
+      printf '%s\t%s\n' "$scenario" "$rps_words" >> "$SUITE_MATRIX_TSV"
+    done < <(tr ';' '\n' <<<"$SCENARIO_RPS_MATRIX")
+    return 0
+  fi
+
+  for scenario in $SCENARIOS; do
+    printf '%s\t%s\n' "$scenario" "$RPS_LEVELS" >> "$SUITE_MATRIX_TSV"
+  done
+}
+
+derive_effective_suite_metadata() {
+  local scenario
+  local rps_words
+  local target_rps
+  local scenarios_accumulator=""
+  local rps_union_accumulator=""
+
+  EFFECTIVE_SCENARIOS=""
+  EFFECTIVE_RPS_LEVELS=""
+  TOTAL_CASES=0
+
+  while IFS=$'\t' read -r scenario rps_words; do
+    [ -z "$scenario" ] && continue
+    scenarios_accumulator="${scenarios_accumulator}${scenario}"$'\n'
+    for target_rps in $rps_words; do
+      TOTAL_CASES=$((TOTAL_CASES + 1))
+      rps_union_accumulator="${rps_union_accumulator}${target_rps}"$'\n'
+    done
+  done < "$SUITE_MATRIX_TSV"
+
+  EFFECTIVE_SCENARIOS="$(printf '%s' "$scenarios_accumulator" | awk 'NF && !seen[$0]++' | paste -sd' ' -)"
+  EFFECTIVE_RPS_LEVELS="$(printf '%s' "$rps_union_accumulator" | awk 'NF' | sort -n -u | paste -sd' ' -)"
+}
+
+scenario_rps_matrix_json() {
+  jq -Rs '
+    split("\n")
+    | map(select(length > 0))
+    | map(
+        split("\t") as $parts
+        | {
+            scenario: $parts[0],
+            rps_levels: (($parts[1] // "") | split(" ") | map(select(length > 0) | tonumber))
+          }
+      )
+  ' < "$SUITE_MATRIX_TSV"
 }
 
 next_attempt_from_s3() {
@@ -327,8 +458,9 @@ upload_suite_manifest() {
     --arg s3_run_uri "$S3_RUN_URI" \
     --arg started_at_utc "$SUITE_STARTED_AT_UTC" \
     --argjson resource_configuration "$resource_configuration_json" \
-    --argjson scenarios "$(words_json_array "$SCENARIOS")" \
-    --argjson rps_levels "$(words_json_array "$RPS_LEVELS")" \
+    --argjson scenarios "$(words_json_array "$EFFECTIVE_SCENARIOS")" \
+    --argjson rps_levels "$(words_json_array "$EFFECTIVE_RPS_LEVELS")" \
+    --argjson scenario_rps_matrix "$(scenario_rps_matrix_json)" \
     '{
       experiment_name: (if $experiment_name == "" then null else $experiment_name end),
       run_id: $run_id,
@@ -339,6 +471,7 @@ upload_suite_manifest() {
       inter_case_delay: $inter_case_delay,
       scenarios: $scenarios,
       rps_levels: ($rps_levels | map(tonumber)),
+      scenario_rps_matrix: $scenario_rps_matrix,
       resource_configuration: $resource_configuration,
       s3_run_uri: $s3_run_uri,
       started_at_utc: $started_at_utc
@@ -391,6 +524,9 @@ upload_suite_summary() {
     --arg started_at_utc "$SUITE_STARTED_AT_UTC" \
     --arg finished_at_utc "$finished_at_utc" \
     --argjson resource_configuration "$resource_configuration_json" \
+    --argjson scenarios "$(words_json_array "$EFFECTIVE_SCENARIOS")" \
+    --argjson rps_levels "$(words_json_array "$EFFECTIVE_RPS_LEVELS")" \
+    --argjson scenario_rps_matrix "$(scenario_rps_matrix_json)" \
     '{
       experiment_name: (if $experiment_name == "" then null else $experiment_name end),
       run_id: $run_id,
@@ -403,6 +539,9 @@ upload_suite_summary() {
       suite_status: $suite_status,
       started_at_utc: $started_at_utc,
       finished_at_utc: $finished_at_utc,
+      scenarios: $scenarios,
+      rps_levels: ($rps_levels | map(tonumber)),
+      scenario_rps_matrix: $scenario_rps_matrix,
       resource_configuration: $resource_configuration,
       cases: .
     }' "$SUITE_CASES_JSONL" > "$summary_path"
@@ -450,6 +589,9 @@ if [ -z "$ATTEMPT" ]; then
   ATTEMPT="$(next_attempt_from_s3 "$S3_RUN_URI")"
 fi
 
+build_suite_matrix_file
+derive_effective_suite_metadata
+
 echo "=== Benchmark Suite ==="
 if [ -n "$EXPERIMENT_NAME" ]; then
   echo "  experiment   : $EXPERIMENT_NAME"
@@ -459,23 +601,27 @@ echo "  attempt      : $ATTEMPT"
 echo "  scaling_mode : $SCALING_MODE"
 echo "  k6_profile   : $K6_PROFILE"
 echo "  duration     : $TEST_DURATION"
-echo "  scenarios    : $SCENARIOS"
-echo "  rps_levels   : $RPS_LEVELS"
+echo "  scenarios    : $EFFECTIVE_SCENARIOS"
+if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
+  echo "  rps_matrix   : $SCENARIO_RPS_MATRIX"
+  echo "  rps_levels   : $EFFECTIVE_RPS_LEVELS (union)"
+else
+  echo "  rps_levels   : $EFFECTIVE_RPS_LEVELS"
+fi
+echo "  case_count   : $TOTAL_CASES"
 echo "  case_delay   : ${INTER_CASE_DELAY}s"
 echo "  auto_destroy : $AUTO_DESTROY_CONFIRMED"
 echo "  report_s3_uri: $S3_RUN_URI"
 echo ""
 
 suite_failed=0
-scenario_count="$(word_count "$SCENARIOS")"
-rps_count="$(word_count "$RPS_LEVELS")"
-total_cases=$((scenario_count * rps_count))
 completed_cases=0
 IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 upload_suite_manifest
 
-for scenario in $SCENARIOS; do
+while IFS=$'\t' read -r scenario scenario_rps_levels; do
+  [ -z "$scenario" ] && continue
   echo "=== Scenario: ${scenario} ==="
 
   if [ "$scenario" = "login" ]; then
@@ -487,7 +633,7 @@ for scenario in $SCENARIOS; do
     bash scripts/prepare-enrichment-benchmark.sh
   fi
 
-  for target_rps in $RPS_LEVELS; do
+  for target_rps in $scenario_rps_levels; do
     echo ""
     echo "=== Suite Case ==="
     echo "  scenario   : $scenario"
@@ -512,9 +658,9 @@ for scenario in $SCENARIOS; do
     fi
 
     completed_cases=$((completed_cases + 1))
-    maybe_wait_between_cases "$completed_cases" "$total_cases"
+    maybe_wait_between_cases "$completed_cases" "$TOTAL_CASES"
   done
-done
+done < "$SUITE_MATRIX_TSV"
 
 echo ""
 echo "=== Benchmark Suite Complete ==="

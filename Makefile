@@ -177,7 +177,7 @@ help:
 	@echo "  make terraform-recovery-fix-tainted-nodegroups      # dry-run safe untaint suggestions"
 	@echo "  make terraform-recovery-fix-tainted-nodegroups-apply # untaint active healthy node groups"
 	@echo "  make eks-prepare-enrichment-benchmark"
-	@echo "  make run-benchmark-suite SCALING_MODE=fixed EXPERIMENT_NAME=rq1-final TEST_DURATION=5m INTER_CASE_DELAY=120 AUTO_DESTROY_CONFIRMED=true RPS_LEVELS=\"1000 2500 5000\""
+	@echo "  make run-benchmark-suite SCALING_MODE=fixed EXPERIMENT_NAME=rq1-final TEST_DURATION=5m INTER_CASE_DELAY=120 AUTO_DESTROY_CONFIRMED=true SCENARIO_RPS_MATRIX=\"login:100,120,140,160,180,200;create-transaction:100,150,200,250,300,400,500;enriched-transactions:100,150,200,250,300,400,500\""
 	@echo "  make eks-create-secrets"
 	@echo "  make create-eks-secrets-monolith"
 	@echo "  make create-eks-secrets-microservices"
@@ -802,6 +802,7 @@ K6_PROFILE   ?= steady
 TEST_DURATION ?= 5m
 SCENARIOS    ?= login create-transaction enriched-transactions
 RPS_LEVELS   ?= 1000 2500 5000 7500 10000
+SCENARIO_RPS_MATRIX ?=
 INTER_CASE_DELAY ?= 0
 AUTO_DESTROY_CONFIRMED ?= false
 S3_BUCKET    ?= skripsi-benchmark-results
@@ -1058,6 +1059,7 @@ run-benchmark-suite:
 	TEST_DURATION=$(TEST_DURATION) \
 	SCENARIOS="$(SCENARIOS)" \
 	RPS_LEVELS="$(RPS_LEVELS)" \
+	SCENARIO_RPS_MATRIX="$(SCENARIO_RPS_MATRIX)" \
 	INTER_CASE_DELAY=$(INTER_CASE_DELAY) \
 	AUTO_DESTROY_CONFIRMED=$(AUTO_DESTROY_CONFIRMED) \
 	EXPERIMENT_NAME="$(if $(filter command line environment,$(origin EXPERIMENT_NAME)),$(EXPERIMENT_NAME),)" \
