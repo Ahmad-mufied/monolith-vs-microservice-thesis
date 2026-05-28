@@ -241,6 +241,7 @@ summary.json
 raw.json.gz
 stdout.log
 metadata.json
+result-status.json
 k6-options.json
 thresholds.json
 ```
@@ -377,7 +378,37 @@ For a fixed replica experiment without HPA, use this resources shape:
 
 The S3 path is an index for human navigation and overwrite protection.
 
-## 11. Attempt Policy
+## 11. Runner Result Semantics
+
+The parallel benchmark runner classifies each architecture run into one of four
+terminal results:
+
+- `PASS`: k6 completed and all thresholds passed
+- `OVERLOAD`: k6 completed and produced valid benchmark artifacts, but one or
+  more thresholds failed
+- `INVALID`: the run failed because of infra, configuration, runtime, or
+  artifact-delivery problems
+- `TIMEOUT`: the orchestration timeout was reached before a terminal result
+  could be verified
+
+Important interpretation rule:
+
+- `OVERLOAD` is a valid benchmark finding for capacity discovery
+- `INVALID` is not a valid benchmark result and should be rerun after the root
+  cause is fixed
+
+The runner still returns a non-zero shell exit code for any non-`PASS`
+outcome, including `OVERLOAD`, so automation can stop and force explicit human
+review.
+
+Primary evidence sources:
+
+- `thresholds.json` for pass vs overload
+- `result-status.json` for k6 exit and artifact-generation status
+- `stdout.log` for diagnostic context
+- Kubernetes job and pod termination state for infra/runtime failures
+
+## 12. Attempt Policy
 
 Use a new attempt folder for every repeated k6 execution.
 
@@ -405,7 +436,7 @@ experiments/20260512-103000/monolith/login/2500rps/attempt-01/
 
 Do not reuse an attempt folder.
 
-## 12. Destroy Policy
+## 13. Destroy Policy
 
 Destroy infrastructure only after:
 
@@ -427,7 +458,7 @@ When RDS is part of the destroy plan, this removes all database state.
 
 This is acceptable after results are safely stored in S3.
 
-## 13. Summary
+## 14. Summary
 
 Recommended final policy:
 

@@ -177,6 +177,7 @@ help:
 	@echo "  make terraform-recovery-fix-tainted-nodegroups      # dry-run safe untaint suggestions"
 	@echo "  make terraform-recovery-fix-tainted-nodegroups-apply # untaint active healthy node groups"
 	@echo "  make eks-prepare-enrichment-benchmark"
+	@echo "  make run-benchmark-suite SCALING_MODE=fixed TEST_DURATION=5m RPS_LEVELS=\"1000 2500 5000\""
 	@echo "  make create-eks-secrets-monolith"
 	@echo "  make create-eks-secrets-microservices"
 	@echo "  make eks-deploy-all"
@@ -797,6 +798,8 @@ ATTEMPT      ?= attempt-01
 SCALING_MODE ?= fixed
 K6_PROFILE   ?= steady
 TEST_DURATION ?= 5m
+SCENARIOS    ?= login create-transaction enriched-transactions
+RPS_LEVELS   ?= 1000 2500 5000 7500 10000
 S3_BUCKET    ?= skripsi-benchmark-results
 DATADOG_ENABLED ?= true
 DATADOG_ENV ?= benchmark
@@ -1038,3 +1041,18 @@ run-benchmark-parallel:
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
 	bash scripts/run-benchmark-parallel.sh
+
+.PHONY: run-benchmark-suite
+run-benchmark-suite:
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE="$(if $(filter command line environment,$(origin K6_PROFILE)),$(K6_PROFILE),)" \
+	TEST_DURATION=$(TEST_DURATION) \
+	SCENARIOS="$(SCENARIOS)" \
+	RPS_LEVELS="$(RPS_LEVELS)" \
+	RUN_ID="$(if $(filter command line environment,$(origin RUN_ID)),$(RUN_ID),)" \
+	ATTEMPT="$(if $(filter command line environment,$(origin ATTEMPT)),$(ATTEMPT),)" \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	AWS_REGION=$(AWS_REGION) \
+	bash scripts/run-benchmark-suite.sh
