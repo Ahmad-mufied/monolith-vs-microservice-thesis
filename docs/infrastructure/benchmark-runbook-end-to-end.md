@@ -810,6 +810,10 @@ uploaded benchmark artifacts in S3.
 
 ## Troubleshooting
 
+For a broader operator command cheat sheet that covers deployment rollout,
+job reruns, k6 inspection, Datadog checks, and AWS live cross-checks, see
+`docs/infrastructure/eks-debug-command-reference.md`.
+
 ### Pods not starting
 
 ```bash
@@ -862,6 +866,7 @@ kubectl --context=monolith run pg-test \
 
 | Command | Purpose |
 |---|---|
+| `docs/infrastructure/eks-debug-command-reference.md` | Operator cheat sheet for `kubectl` and AWS CLI debugging |
 | `make aws-create-s3` | Create S3 results bucket (one-time) |
 | `make aws-create-ecr` | Create ECR repositories (one-time) |
 | `make ecr-push-all` | Build and push all Docker images to ECR |
