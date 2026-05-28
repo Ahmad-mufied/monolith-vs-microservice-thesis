@@ -178,6 +178,7 @@ help:
 	@echo "  make terraform-recovery-fix-tainted-nodegroups-apply # untaint active healthy node groups"
 	@echo "  make eks-prepare-enrichment-benchmark"
 	@echo "  make run-benchmark-suite SCALING_MODE=fixed TEST_DURATION=5m RPS_LEVELS=\"1000 2500 5000\""
+	@echo "  make eks-create-secrets"
 	@echo "  make create-eks-secrets-monolith"
 	@echo "  make create-eks-secrets-microservices"
 	@echo "  make eks-deploy-all"
@@ -1027,6 +1028,11 @@ create-eks-secrets-monolith:
 .PHONY: create-eks-secrets-microservices
 create-eks-secrets-microservices:
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/create-eks-secrets-microservices.sh
+
+.PHONY: eks-create-secrets
+eks-create-secrets:
+	$(MAKE) create-eks-secrets-monolith
+	$(MAKE) create-eks-secrets-microservices
 
 .PHONY: run-benchmark-parallel
 run-benchmark-parallel:

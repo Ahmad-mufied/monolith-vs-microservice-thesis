@@ -225,12 +225,13 @@ Optional helper commands to create secrets from `env/*.env` plus Terraform
 outputs:
 
 ```bash
-make create-eks-secrets-monolith
-make create-eks-secrets-microservices
+make eks-create-secrets
 ```
 
-If you use the helper commands above, you do not need to run the long manual
-`kubectl create secret ...` commands below.
+If you use the helper command above, you do not need to run the long manual
+`kubectl create secret ...` commands below. Use
+`make create-eks-secrets-monolith` or `make create-eks-secrets-microservices`
+only when you intentionally want to recreate secrets for one cluster.
 
 ### Step 4.1 — Monolith Cluster Secrets
 
@@ -353,8 +354,8 @@ kubectl --context=msa create secret generic k6-runner-secret \
 
 If `DB_PASSWORD` contains reserved URI characters such as `@`, `:`, `/`, `?`,
 `#`, or `%`, URL-encode it before embedding it into PostgreSQL URIs. The
-`make create-eks-secrets-monolith` and `make create-eks-secrets-microservices`
-helpers now perform this encoding automatically.
+`make eks-create-secrets` helper now performs this encoding automatically for
+both clusters.
 
 ---
 

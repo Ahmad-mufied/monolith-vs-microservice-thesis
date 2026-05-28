@@ -104,9 +104,16 @@ eks-render-tfvars
   -> renders infra/terraform/*/terraform.tfvars
 terraform-auth-check
   -> verifies Terraform can read AWS credentials through terraform-process
-create-eks-secrets-monolith
-create-eks-secrets-microservices
-  -> create Kubernetes secrets for each cluster from env/ + Terraform outputs
+eks-create-secrets
+  -> create Kubernetes secrets for both EKS clusters from env/ + Terraform outputs
+```
+
+Granular targets are still available when only one cluster's secrets need to be
+recreated:
+
+```bash
+make create-eks-secrets-monolith
+make create-eks-secrets-microservices
 ```
 
 Important distinction:
@@ -615,6 +622,7 @@ Before committing:
 Before benchmark:
 
 ```text
+- make eks-create-secrets has been run after eks-apply/context setup
 - db-bootstrap-env exists
 - monolith-env exists
 - app secrets exist

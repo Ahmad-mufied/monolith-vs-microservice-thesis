@@ -527,14 +527,20 @@ See `docs/infrastructure/secret-management.md` for required secret keys.
 Optional helper commands:
 
 ```bash
+make eks-create-secrets
+```
+
+This command creates the benchmark and application secrets for both EKS clusters
+from the EKS env helper files under `env/` plus Terraform outputs. It also uses
+`TERRAFORM_AWS_PROFILE` internally so their `terraform output` calls follow the
+same auth path as `make eks-apply` and `make eks-destroy`.
+
+If you only need to recreate one cluster's secrets, use the granular targets:
+
+```bash
 make create-eks-secrets-monolith
 make create-eks-secrets-microservices
 ```
-
-These commands create the benchmark and application secrets from the EKS env
-helper files under `env/` plus Terraform outputs. They also use
-`TERRAFORM_AWS_PROFILE` internally so their `terraform output` calls follow the
-same auth path as `make eks-apply` and `make eks-destroy`.
 
 ```bash
 make eks-validate-manifests

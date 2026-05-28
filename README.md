@@ -308,8 +308,7 @@ make eks-apply
 make eks-setup-contexts
 
 # secrets and deploy
-make create-eks-secrets-monolith
-make create-eks-secrets-microservices
+make eks-create-secrets
 make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG
 
 # benchmark
