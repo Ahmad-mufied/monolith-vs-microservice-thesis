@@ -436,7 +436,7 @@ experiments/20260512-103000/monolith/login/2500rps/attempt-01/
 
 Do not reuse an attempt folder.
 
-## 12. Destroy Policy
+## 13. Destroy Policy
 
 Destroy infrastructure only after:
 
@@ -458,7 +458,7 @@ When RDS is part of the destroy plan, this removes all database state.
 
 This is acceptable after results are safely stored in S3.
 
-## 13. Summary
+## 14. Summary
 
 Recommended final policy:
 
