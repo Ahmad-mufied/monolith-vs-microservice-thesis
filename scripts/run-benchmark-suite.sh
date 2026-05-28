@@ -34,6 +34,7 @@ SCENARIOS="${SCENARIOS:-login create-transaction enriched-transactions}"
 RPS_LEVELS="${RPS_LEVELS:-1000 2500 5000 7500 10000}"
 INTER_CASE_DELAY="${INTER_CASE_DELAY:-0}"
 MAX_INTER_CASE_DELAY=86400
+AUTO_DESTROY_CONFIRMED="${AUTO_DESTROY_CONFIRMED:-false}"
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
 DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 K6_PROFILE="${K6_PROFILE:-}"
@@ -147,6 +148,19 @@ validate_matrix_inputs() {
       echo "ERROR: EXPERIMENT_NAME '$EXPERIMENT_NAME' does not contain any usable slug characters" >&2
       return 1
     fi
+  fi
+
+  case "$AUTO_DESTROY_CONFIRMED" in
+    true|false) ;;
+    *)
+      echo "ERROR: invalid AUTO_DESTROY_CONFIRMED value '$AUTO_DESTROY_CONFIRMED' (expected: true|false)" >&2
+      return 1
+      ;;
+  esac
+
+  if [ "$AUTO_DESTROY_CONFIRMED" = "true" ] && [ -z "$RUN_ID" ] && [ -z "$EXPERIMENT_NAME" ]; then
+    echo "ERROR: AUTO_DESTROY_CONFIRMED=true requires EXPERIMENT_NAME or RUN_ID so the unattended run has a stable identifier" >&2
+    return 1
   fi
 }
 
@@ -396,6 +410,22 @@ upload_suite_summary() {
   aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary.json" >/dev/null
 }
 
+maybe_destroy_experiment_stack() {
+  if [ "$AUTO_DESTROY_CONFIRMED" != "true" ]; then
+    return 0
+  fi
+
+  echo ""
+  echo "=== Auto Destroy ==="
+  echo "  mode           : confirmed"
+  echo "  command        : make eks-destroy-confirmed"
+  echo "  reason         : suite finished and suite summary is already uploaded to S3"
+  echo "  run_id         : $RUN_ID"
+  echo "  attempt        : $ATTEMPT"
+
+  make eks-destroy-confirmed
+}
+
 maybe_wait_between_cases() {
   local completed_cases="$1"
   local total_cases="$2"
@@ -432,6 +462,7 @@ echo "  duration     : $TEST_DURATION"
 echo "  scenarios    : $SCENARIOS"
 echo "  rps_levels   : $RPS_LEVELS"
 echo "  case_delay   : ${INTER_CASE_DELAY}s"
+echo "  auto_destroy : $AUTO_DESTROY_CONFIRMED"
 echo "  report_s3_uri: $S3_RUN_URI"
 echo ""
 
@@ -496,9 +527,11 @@ echo "  report_s3_uri: $S3_RUN_URI"
 
 if [ "$suite_failed" -ne 0 ]; then
   upload_suite_summary "completed_with_non_pass_cases"
+  maybe_destroy_experiment_stack
   echo "  suite_status : completed_with_non_pass_cases"
   exit 1
 fi
 
 upload_suite_summary "pass"
+maybe_destroy_experiment_stack
 echo "  suite_status : pass"
