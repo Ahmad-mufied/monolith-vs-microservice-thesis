@@ -1033,6 +1033,8 @@ attempt lifecycle is equivalent
 [ ] k6 summary.json exists
 [ ] raw.json.gz exists
 [ ] metadata.json exists
+[ ] thresholds.json exists for PASS vs OVERLOAD interpretation
+[ ] result-status.json exists for INVALID/runtime/artifact diagnostics
 [ ] achieved RPS is recorded
 [ ] error rate is valid
 [ ] dropped iterations are acceptable
