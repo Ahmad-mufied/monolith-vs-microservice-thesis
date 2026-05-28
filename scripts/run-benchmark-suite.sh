@@ -19,6 +19,12 @@ if [ -n "$explicit_s3_bucket" ]; then
   S3_BUCKET="$explicit_s3_bucket"
 fi
 
+if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
+  set -a
+  source env/image-tag.eks.env
+  set +a
+fi
+
 source scripts/lib/resource-configuration.sh
 
 SCALING_MODE="${SCALING_MODE:-fixed}"
@@ -32,8 +38,15 @@ K6_PROFILE="${K6_PROFILE:-}"
 RUN_ID="${RUN_ID:-}"
 ATTEMPT="${ATTEMPT:-}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
+ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
+IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 SUITE_WORKDIR="$(mktemp -d)"
 SUITE_CASES_JSONL="$SUITE_WORKDIR/cases.jsonl"
+RENDER_ROOT="$SUITE_WORKDIR/rendered"
+RENDERED_EKS_MONOLITH_DIR="$RENDER_ROOT/deployments/k8s/eks/monolith"
+RENDERED_EKS_MICROSERVICES_DIR="$RENDER_ROOT/deployments/k8s/eks/microservices"
+RENDERED_MONOLITH_OVERLAY_DIR="$RENDERED_EKS_MONOLITH_DIR/overlays/$SCALING_MODE"
+RENDERED_MICROSERVICES_OVERLAY_DIR="$RENDERED_EKS_MICROSERVICES_DIR/overlays/$SCALING_MODE"
 
 cleanup() {
   rm -rf "$SUITE_WORKDIR"
@@ -139,21 +152,58 @@ next_attempt_from_s3() {
 }
 
 reset_and_seed_benchmark_data() {
+  scale_down_app_workloads_for_data_reset
+
   kubectl --context=monolith delete job reset-monolith-data-job -n mono --ignore-not-found
-  kubectl --context=monolith apply -f deployments/k8s/eks/monolith/reset-monolith-data-job.yaml
+  kubectl --context=monolith apply -f "$RENDERED_EKS_MONOLITH_DIR/reset-monolith-data-job.yaml"
   kubectl --context=monolith wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=120s
 
   kubectl --context=msa delete job reset-microservices-data-job -n msa --ignore-not-found
-  kubectl --context=msa apply -f deployments/k8s/eks/microservices/reset-microservices-data-job.yaml
+  kubectl --context=msa apply -f "$RENDERED_EKS_MICROSERVICES_DIR/reset-microservices-data-job.yaml"
   kubectl --context=msa wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
 
   kubectl --context=monolith delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
-  kubectl --context=monolith apply -f deployments/k8s/eks/monolith/seed-monolith-benchmark-data-job.yaml
+  kubectl --context=monolith apply -f "$RENDERED_EKS_MONOLITH_DIR/seed-monolith-benchmark-data-job.yaml"
   kubectl --context=monolith wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
 
   kubectl --context=msa delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-  kubectl --context=msa apply -f deployments/k8s/eks/microservices/seed-microservices-benchmark-data-job.yaml
+  kubectl --context=msa apply -f "$RENDERED_EKS_MICROSERVICES_DIR/seed-microservices-benchmark-data-job.yaml"
   kubectl --context=msa wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
+
+  restore_app_workloads_after_data_reset
+}
+
+scale_down_app_workloads_for_data_reset() {
+  local svc
+
+  kubectl --context=monolith delete hpa monolith -n mono --ignore-not-found
+  if kubectl --context=monolith get deployment monolith -n mono >/dev/null 2>&1; then
+    kubectl --context=monolith scale deployment monolith -n mono --replicas=0
+    kubectl --context=monolith rollout status deployment/monolith -n mono --timeout=300s
+  fi
+
+  for svc in api-gateway auth-service item-service transaction-service; do
+    kubectl --context=msa delete hpa "$svc" -n msa --ignore-not-found
+  done
+
+  for svc in api-gateway auth-service item-service transaction-service; do
+    if kubectl --context=msa get deployment "$svc" -n msa >/dev/null 2>&1; then
+      kubectl --context=msa scale deployment "$svc" -n msa --replicas=0
+      kubectl --context=msa rollout status "deployment/${svc}" -n msa --timeout=300s
+    fi
+  done
+}
+
+restore_app_workloads_after_data_reset() {
+  local svc
+
+  kubectl --context=monolith apply -k "$RENDERED_MONOLITH_OVERLAY_DIR"
+  kubectl --context=monolith rollout status deployment/monolith -n mono --timeout=300s
+
+  kubectl --context=msa apply -k "$RENDERED_MICROSERVICES_OVERLAY_DIR"
+  for svc in auth-service item-service transaction-service api-gateway; do
+    kubectl --context=msa rollout status "deployment/${svc}" -n msa --timeout=300s
+  done
 }
 
 run_parallel_case() {
@@ -281,6 +331,8 @@ echo "  report_s3_uri: $S3_RUN_URI"
 echo ""
 
 suite_failed=0
+IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 upload_suite_manifest
 
 for scenario in $SCENARIOS; do
