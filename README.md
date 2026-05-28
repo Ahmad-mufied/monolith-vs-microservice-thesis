@@ -327,9 +327,15 @@ are generated automatically unless you override them:
 make run-benchmark-suite \
   SCALING_MODE=fixed \
   TEST_DURATION=5m \
+  INTER_CASE_DELAY=120 \
   RPS_LEVELS="1000 2500 5000" \
   S3_BUCKET=skripsi-benchmark-results
 ```
+
+Use `INTER_CASE_DELAY=0` for quick smoke or calibration runs. For measured
+final runs, prefer a stabilization gap between suite cases, for example
+`120` seconds for fixed mode and `300` seconds for HPA mode. The value must be
+an integer number of seconds; use `300` for five minutes, not `5m`.
 
 Do not destroy infrastructure until all benchmark artifacts are verified in S3.
 

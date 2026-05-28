@@ -235,6 +235,7 @@ the full scenario and RPS matrix with less manual operator input:
 make run-benchmark-suite \
   SCALING_MODE=fixed \
   TEST_DURATION=5m \
+  INTER_CASE_DELAY=120 \
   RPS_LEVELS="1000 2500 5000"
 ```
 
@@ -245,6 +246,8 @@ Default suite behavior:
 - `RUN_ID` is auto-generated as `eks-suite-{mode}-{yyyymmdd}-{HHMM}`
 - `ATTEMPT` is auto-detected from S3 and starts at `attempt-01`
 - `K6_PROFILE` defaults to `steady` for fixed mode and `hpa` for HPA mode
+- `INTER_CASE_DELAY` defaults to `0` for backward-compatible smoke and
+  calibration runs
 
 Manual overrides remain supported:
 
@@ -252,6 +255,7 @@ Manual overrides remain supported:
 make run-benchmark-suite \
   SCALING_MODE=hpa \
   TEST_DURATION=5m \
+  INTER_CASE_DELAY=300 \
   RPS_LEVELS="1000 2500 5000" \
   RUN_ID=eks-suite-hpa-final-rq2 \
   ATTEMPT=attempt-02
@@ -261,6 +265,24 @@ The suite runner still executes one `run-benchmark-parallel` case at a time.
 Monolith and microservices run in parallel for each case, while scenarios and
 RPS levels run serially.
 
+`INTER_CASE_DELAY` adds an operator-controlled stabilization gap between suite
+cases. It accepts a non-negative integer value in seconds, normalizes leading
+zeroes, and rejects values above `86400` seconds to avoid accidental multi-day
+pauses. Duration suffixes such as `5m` are not supported; use `300` for five
+minutes. If the suite has only one case, for example one scenario with one RPS
+level, the inter-case delay is skipped because there is no next case to
+stabilize. It is intentionally outside the k6 script because k6's
+`gracefulStop` controls in-flight iteration shutdown inside one run, not the
+system recovery period between independent benchmark runs. Recommended
+measured-run values:
+
+| Scaling mode | Suggested inter-case delay | Reason |
+|---|---:|---|
+| fixed | `60`-`120` seconds | Let application pods, database pressure, and Datadog metrics settle. |
+| hpa | `180`-`300` seconds | Let HPA metrics, replica changes, scale-down behavior, and Datadog telemetry settle. |
+
+For fast smoke tests, use `INTER_CASE_DELAY=0`.
+
 The suite runner also writes run-level metadata under:
 
 ```text
@@ -268,9 +290,9 @@ s3://<bucket>/experiments/<run_id>/_suite/manifest.json
 s3://<bucket>/experiments/<run_id>/_suite/summary.json
 ```
 
-Both files include `resource_configuration` for the selected scaling mode. The
-value is generated from the same runner configuration that is passed into each
-attempt's `metadata.json`.
+Both files include `resource_configuration` and `inter_case_delay` for the
+selected scaling mode. The resource value is generated from the same runner
+configuration that is passed into each attempt's `metadata.json`.
 
 ---
 

@@ -177,7 +177,7 @@ help:
 	@echo "  make terraform-recovery-fix-tainted-nodegroups      # dry-run safe untaint suggestions"
 	@echo "  make terraform-recovery-fix-tainted-nodegroups-apply # untaint active healthy node groups"
 	@echo "  make eks-prepare-enrichment-benchmark"
-	@echo "  make run-benchmark-suite SCALING_MODE=fixed TEST_DURATION=5m RPS_LEVELS=\"1000 2500 5000\""
+	@echo "  make run-benchmark-suite SCALING_MODE=fixed TEST_DURATION=5m INTER_CASE_DELAY=120 RPS_LEVELS=\"1000 2500 5000\""
 	@echo "  make eks-create-secrets"
 	@echo "  make create-eks-secrets-monolith"
 	@echo "  make create-eks-secrets-microservices"
@@ -801,6 +801,7 @@ K6_PROFILE   ?= steady
 TEST_DURATION ?= 5m
 SCENARIOS    ?= login create-transaction enriched-transactions
 RPS_LEVELS   ?= 1000 2500 5000 7500 10000
+INTER_CASE_DELAY ?= 0
 S3_BUCKET    ?= skripsi-benchmark-results
 DATADOG_ENABLED ?= true
 DATADOG_ENV ?= benchmark
@@ -1055,6 +1056,7 @@ run-benchmark-suite:
 	TEST_DURATION=$(TEST_DURATION) \
 	SCENARIOS="$(SCENARIOS)" \
 	RPS_LEVELS="$(RPS_LEVELS)" \
+	INTER_CASE_DELAY=$(INTER_CASE_DELAY) \
 	RUN_ID="$(if $(filter command line environment,$(origin RUN_ID)),$(RUN_ID),)" \
 	ATTEMPT="$(if $(filter command line environment,$(origin ATTEMPT)),$(ATTEMPT),)" \
 	S3_BUCKET=$(S3_BUCKET) \

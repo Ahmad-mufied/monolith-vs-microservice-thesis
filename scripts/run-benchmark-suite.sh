@@ -32,6 +32,8 @@ TEST_DURATION="${TEST_DURATION:-5m}"
 S3_BUCKET="${S3_BUCKET:?S3_BUCKET is required}"
 SCENARIOS="${SCENARIOS:-login create-transaction enriched-transactions}"
 RPS_LEVELS="${RPS_LEVELS:-1000 2500 5000 7500 10000}"
+INTER_CASE_DELAY="${INTER_CASE_DELAY:-0}"
+MAX_INTER_CASE_DELAY=86400
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
 DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 K6_PROFILE="${K6_PROFILE:-}"
@@ -54,7 +56,36 @@ cleanup() {
 trap cleanup EXIT
 : > "$SUITE_CASES_JSONL"
 
+normalize_nonnegative_integer() {
+  local value="$1"
+
+  value="$(sed 's/^0*//' <<<"$value")"
+  if [ -z "$value" ]; then
+    printf '0'
+    return 0
+  fi
+
+  printf '%s' "$value"
+}
+
+integer_greater_than() {
+  local left="$1"
+  local right="$2"
+
+  if [ "${#left}" -gt "${#right}" ]; then
+    return 0
+  fi
+
+  if [ "${#left}" -lt "${#right}" ]; then
+    return 1
+  fi
+
+  [[ "$left" > "$right" ]]
+}
+
 validate_matrix_inputs() {
+  local normalized_inter_case_delay
+
   case "$SCALING_MODE" in
     fixed|hpa) ;;
     *)
@@ -89,9 +120,21 @@ validate_matrix_inputs() {
       return 1
     fi
   done
+
+  if ! [[ "$INTER_CASE_DELAY" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: invalid INTER_CASE_DELAY value '$INTER_CASE_DELAY' (expected: non-negative integer seconds, e.g. 300 for 5 minutes)" >&2
+    return 1
+  fi
+
+  normalized_inter_case_delay="$(normalize_nonnegative_integer "$INTER_CASE_DELAY")"
+  if integer_greater_than "$normalized_inter_case_delay" "$MAX_INTER_CASE_DELAY"; then
+    echo "ERROR: invalid INTER_CASE_DELAY value '$INTER_CASE_DELAY' (maximum: ${MAX_INTER_CASE_DELAY} seconds)" >&2
+    return 1
+  fi
 }
 
 validate_matrix_inputs
+INTER_CASE_DELAY="$(normalize_nonnegative_integer "$INTER_CASE_DELAY")"
 
 if [ -z "$K6_PROFILE" ]; then
   if [ "$SCALING_MODE" = "hpa" ]; then
@@ -110,7 +153,13 @@ SUITE_STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 words_json_array() {
   local words="$1"
-  jq -cn --arg words "$words" '$words | split(" ") | map(select(length > 0))'
+  jq -cn --arg words "$words" '$words | [scan("\\S+")]'
+}
+
+word_count() {
+  local words="$1"
+  set -- $words
+  printf '%s' "$#"
 }
 
 next_attempt_from_s3() {
@@ -235,6 +284,7 @@ upload_suite_manifest() {
     --arg scaling_mode "$SCALING_MODE" \
     --arg k6_profile "$K6_PROFILE" \
     --arg test_duration "$TEST_DURATION" \
+    --argjson inter_case_delay "$INTER_CASE_DELAY" \
     --arg s3_run_uri "$S3_RUN_URI" \
     --arg started_at_utc "$SUITE_STARTED_AT_UTC" \
     --argjson resource_configuration "$resource_configuration_json" \
@@ -246,6 +296,7 @@ upload_suite_manifest() {
       scaling_mode: $scaling_mode,
       k6_profile: $k6_profile,
       test_duration: $test_duration,
+      inter_case_delay: $inter_case_delay,
       scenarios: $scenarios,
       rps_levels: ($rps_levels | map(tonumber)),
       resource_configuration: $resource_configuration,
@@ -293,6 +344,7 @@ upload_suite_summary() {
     --arg scaling_mode "$SCALING_MODE" \
     --arg k6_profile "$K6_PROFILE" \
     --arg test_duration "$TEST_DURATION" \
+    --argjson inter_case_delay "$INTER_CASE_DELAY" \
     --arg s3_run_uri "$S3_RUN_URI" \
     --arg suite_status "$suite_status" \
     --arg started_at_utc "$SUITE_STARTED_AT_UTC" \
@@ -304,6 +356,7 @@ upload_suite_summary() {
       scaling_mode: $scaling_mode,
       k6_profile: $k6_profile,
       test_duration: $test_duration,
+      inter_case_delay: $inter_case_delay,
       s3_run_uri: $s3_run_uri,
       suite_status: $suite_status,
       started_at_utc: $started_at_utc,
@@ -313,6 +366,26 @@ upload_suite_summary() {
     }' "$SUITE_CASES_JSONL" > "$summary_path"
 
   aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary.json" >/dev/null
+}
+
+maybe_wait_between_cases() {
+  local completed_cases="$1"
+  local total_cases="$2"
+
+  if [ "$INTER_CASE_DELAY" -eq 0 ]; then
+    return 0
+  fi
+
+  if [ "$completed_cases" -ge "$total_cases" ]; then
+    return 0
+  fi
+
+  echo ""
+  echo "=== Inter-case delay ==="
+  echo "  seconds        : $INTER_CASE_DELAY"
+  echo "  completed_case : ${completed_cases}/${total_cases}"
+  echo "  purpose        : let app pods, HPA metrics, database, and Datadog telemetry stabilize"
+  sleep "$INTER_CASE_DELAY"
 }
 
 if [ -z "$ATTEMPT" ]; then
@@ -327,10 +400,15 @@ echo "  k6_profile   : $K6_PROFILE"
 echo "  duration     : $TEST_DURATION"
 echo "  scenarios    : $SCENARIOS"
 echo "  rps_levels   : $RPS_LEVELS"
+echo "  case_delay   : ${INTER_CASE_DELAY}s"
 echo "  report_s3_uri: $S3_RUN_URI"
 echo ""
 
 suite_failed=0
+scenario_count="$(word_count "$SCENARIOS")"
+rps_count="$(word_count "$RPS_LEVELS")"
+total_cases=$((scenario_count * rps_count))
+completed_cases=0
 IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 upload_suite_manifest
@@ -370,6 +448,9 @@ for scenario in $SCENARIOS; do
     else
       append_case_summary "$scenario" "$target_rps" "pass" "$case_exit_code"
     fi
+
+    completed_cases=$((completed_cases + 1))
+    maybe_wait_between_cases "$completed_cases" "$total_cases"
   done
 done
 
