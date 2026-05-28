@@ -535,103 +535,252 @@ Interpret smoke runner results the same way as measured runs:
 
 ## Phase 6 — Measured Benchmark
 
-Run the three primary benchmark scenarios. Reset and seed before each
-scenario that mutates data (create-transaction).
+Use the suite runner for measured Bab 4 data collection. It executes the
+scenario/RPS matrix in a consistent order, runs monolith and microservices in
+parallel per case, uploads a suite manifest and summary to S3, and handles the
+reset/seed lifecycle for each scenario.
 
-### Scenario 1: Login
+### Phase 6.1 — Matrix Definition
+
+The primary Bab 4 matrix uses two deployment modes, three primary workload
+scenarios, and five target RPS levels.
+
+| Dimension | Values |
+|---|---|
+| Scaling modes | `fixed`, `hpa` |
+| Primary scenarios | `login`, `create-transaction`, `enriched-transactions` |
+| Default target RPS levels | `1000`, `2500`, `5000`, `7500`, `10000` |
+| Optional exploratory scenario | `mixed-workload` |
+
+Primary case count:
+
+```text
+3 scenarios x 5 RPS levels = 15 suite cases per scaling mode
+2 scaling modes x 15 cases = 30 primary suite cases
+```
+
+Each suite case runs the monolith and microservices k6 jobs together. The S3
+layout still stores one artifact folder per architecture:
+
+```text
+s3://<bucket>/experiments/<run_id>/<architecture>/<scenario>/<target_rps>rps/<attempt>/
+```
+
+Use `mixed-workload` only when you intentionally want an additional exploratory
+matrix. It is not part of the primary RQ1/RQ2 comparison unless the thesis
+chapter explicitly analyzes mixed traffic.
+
+### Phase 6.2 — Fixed Mode Primary Matrix
+
+Fixed mode is the primary clean architecture comparison for RQ1. It uses fixed
+replica counts and the `steady` k6 profile.
 
 ```bash
-RUN_ID="eks-run-$(date +%Y%m%d)"
+make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG
 
-make run-benchmark-parallel \
-  SCENARIO=login \
-  TARGET_RPS=1000 \
-  RUN_ID=$RUN_ID \
-  ATTEMPT=attempt-01 \
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=120 \
+  SCENARIOS="login create-transaction enriched-transactions" \
+  RPS_LEVELS="1000 2500 5000 7500 10000" \
   S3_BUCKET=skripsi-benchmark-results
 ```
 
-Interpret the final `run-benchmark-parallel` result carefully:
+Expected suite shape:
 
-- `PASS` means the benchmark completed and all thresholds passed
+```text
+run_id       : eks-suite-fixed-<yyyymmdd-HHMM>
+attempt      : attempt-01 unless the same run_id already exists in S3
+scaling_mode : fixed
+k6_profile   : steady
+scenarios    : login create-transaction enriched-transactions
+rps_levels   : 1000 2500 5000 7500 10000
+case count   : 15
+```
+
+### Phase 6.3 — HPA Mode Primary Matrix
+
+HPA mode is the primary autoscaling behavior comparison for RQ2. Redeploy both
+application stacks with HPA overlays before running the suite. Do not reuse a
+fixed-mode deployment by changing only `SCALING_MODE` on the runner.
+
+```bash
+make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG
+
+make run-benchmark-suite \
+  SCALING_MODE=hpa \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=300 \
+  SCENARIOS="login create-transaction enriched-transactions" \
+  RPS_LEVELS="1000 2500 5000 7500 10000" \
+  S3_BUCKET=skripsi-benchmark-results
+```
+
+Expected suite shape:
+
+```text
+run_id       : eks-suite-hpa-<yyyymmdd-HHMM>
+attempt      : attempt-01 unless the same run_id already exists in S3
+scaling_mode : hpa
+k6_profile   : hpa
+scenarios    : login create-transaction enriched-transactions
+rps_levels   : 1000 2500 5000 7500 10000
+case count   : 15
+```
+
+### Phase 6.4 — Calibration Matrix
+
+For early calibration, use smaller RPS levels and no inter-case delay so
+feedback is fast:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  TEST_DURATION=30s \
+  INTER_CASE_DELAY=0 \
+  SCENARIOS="login" \
+  RPS_LEVELS="50 100 150 200 250 300 350 400 450 500" \
+  S3_BUCKET=skripsi-benchmark-results
+```
+
+Calibration is useful for finding the first range where latency or dropped
+iterations become visible. Do not mix calibration runs with final Bab 4 tables
+unless they are clearly labeled as calibration.
+
+### Phase 6.5 — Optional Mixed Workload
+
+`mixed-workload` can be run as an optional exploratory scenario after the
+primary matrix:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=120 \
+  SCENARIOS="mixed-workload" \
+  RPS_LEVELS="1000 2500 5000 7500 10000" \
+  S3_BUCKET=skripsi-benchmark-results
+```
+
+For HPA exploratory mixed workload, redeploy HPA first and use
+`INTER_CASE_DELAY=300`.
+
+### Phase 6.6 — Scenario Data Lifecycle
+
+The suite runner uses this data lifecycle:
+
+- `login`: reset and seed once before the first RPS level.
+- `create-transaction`: reset and seed before every RPS level because the
+  scenario mutates transaction data.
+- `enriched-transactions`: reset, seed, and prepare enrichment data once before
+  the first RPS level.
+- `mixed-workload`: supported for exploration, but exclude it from the primary
+  Bab 4 RQ1/RQ2 matrix unless the thesis explicitly analyzes mixed load.
+
+### Phase 6.7 — Suite Interpretation
+
+Interpret suite and case results carefully:
+
+- `PASS` means the benchmark completed and all thresholds passed.
 - `OVERLOAD` means the benchmark completed and produced valid artifacts, but
-  one or more thresholds failed
-- `INVALID` means the run should not be used for analysis until rerun
-- `TIMEOUT` means the orchestration did not complete within the expected window
+  one or more thresholds failed.
+- `INVALID` means the run should not be used for analysis until rerun.
+- `TIMEOUT` means the orchestration did not complete within the expected
+  window.
 
-The command still exits non-zero for `OVERLOAD`, `INVALID`, and `TIMEOUT`, so
-review the printed per-architecture summary before deciding whether the run is
-usable for thesis analysis.
+The suite command exits non-zero when any case is non-pass, but it still writes
+the available per-case artifacts plus `_suite/summary.json`. Inspect the S3
+artifacts before deciding whether a non-pass case is a valid overload datapoint
+or an invalid run.
 
-### Scenario 2: Create Transaction
-
-Reset and seed before each RPS level:
-
-```bash
-# Reset both clusters
-kubectl --context=monolith delete job reset-monolith-data-job -n mono --ignore-not-found
-kubectl --context=monolith apply -f deployments/k8s/eks/monolith/reset-monolith-data-job.yaml
-kubectl --context=monolith wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=120s
-
-kubectl --context=msa delete job reset-microservices-data-job -n msa --ignore-not-found
-kubectl --context=msa apply -f deployments/k8s/eks/microservices/reset-microservices-data-job.yaml
-kubectl --context=msa wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
-
-# Seed both clusters
-kubectl --context=monolith delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
-kubectl --context=monolith apply -f deployments/k8s/eks/monolith/seed-monolith-benchmark-data-job.yaml
-kubectl --context=monolith wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
-
-kubectl --context=msa delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-kubectl --context=msa apply -f deployments/k8s/eks/microservices/seed-microservices-benchmark-data-job.yaml
-kubectl --context=msa wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
-
-# Run benchmark
-make run-benchmark-parallel \
-  SCENARIO=create-transaction \
-  TARGET_RPS=1000 \
-  RUN_ID=$RUN_ID \
-  ATTEMPT=attempt-01 \
-  S3_BUCKET=skripsi-benchmark-results
-```
-
-### Scenario 3: Enriched Transactions
-
-Requires enrichment data preparation after base seed:
-
-```bash
-# After reset and seed (same as above), prepare enrichment data
-make eks-prepare-enrichment-benchmark
-
-# Run benchmark
-make run-benchmark-parallel \
-  SCENARIO=enriched-transactions \
-  TARGET_RPS=1000 \
-  RUN_ID=$RUN_ID \
-  ATTEMPT=attempt-01 \
-  S3_BUCKET=skripsi-benchmark-results
-```
-
-### Multiple RPS Levels
-
-Repeat each scenario at different RPS levels. For create-transaction, reset
-and seed before each level. For login and enriched-transactions, seed once
-before the first level.
-
-Default target RPS levels: `1000 2500 5000 7500 10000`
+`INTER_CASE_DELAY` is a methodological stabilization gap between independent
+k6 jobs. It accepts a non-negative integer value in seconds and rejects values
+above `86400` seconds to avoid accidental multi-day pauses. Duration suffixes
+such as `5m` are not supported; use `300` for five minutes. When the suite has
+only one case, for example one scenario with one RPS level, the runner does not
+sleep because there is no next case to stabilize for. It is not the same as k6
+`gracefulStop`, which only lets in-flight iterations finish inside one k6 run.
+Use `120` seconds for fixed final runs and `300` seconds for HPA final runs
+unless the experiment log documents a different value.
 
 ---
 
 ## Phase 7 — Verify Results
 
-```bash
-# List all result files
-aws s3 ls s3://skripsi-benchmark-results/experiments/$RUN_ID/ --recursive | grep summary.json
+Verify the run-level suite files first:
 
-# Check a specific summary
+```bash
+aws s3 cp s3://skripsi-benchmark-results/experiments/$RUN_ID/_suite/manifest.json - | jq .
+aws s3 cp s3://skripsi-benchmark-results/experiments/$RUN_ID/_suite/summary.json - | jq .
+```
+
+Expected primary matrix values:
+
+```bash
+aws s3 cp s3://skripsi-benchmark-results/experiments/$RUN_ID/_suite/manifest.json - \
+  | jq '{scaling_mode, k6_profile, scenarios, rps_levels, inter_case_delay}'
+
+aws s3 cp s3://skripsi-benchmark-results/experiments/$RUN_ID/_suite/summary.json - \
+  | jq '{suite_status, case_count: (.cases | length), cases}'
+```
+
+For a primary fixed or HPA run, `case_count` should be `15` when the suite uses:
+
+```text
+SCENARIOS="login create-transaction enriched-transactions"
+RPS_LEVELS="1000 2500 5000 7500 10000"
+```
+
+Verify expected attempt folders for every primary scenario/RPS combination:
+
+```bash
+RUN_ID=<suite-run-id>
+BUCKET=skripsi-benchmark-results
+ATTEMPT=attempt-01
+
+for scenario in login create-transaction enriched-transactions; do
+  for rps in 1000 2500 5000 7500 10000; do
+    for architecture in monolith microservices; do
+      prefix="s3://${BUCKET}/experiments/${RUN_ID}/${architecture}/${scenario}/${rps}rps/${ATTEMPT}"
+      echo "=== ${prefix}"
+      aws s3 ls "${prefix}/" | awk '{print $4}' | sort
+    done
+  done
+done
+```
+
+Each attempt folder should include:
+
+```text
+summary.json
+raw.json.gz
+stdout.log
+metadata.json
+result-status.json
+k6-options.json
+thresholds.json
+datadog-time-window.json  # when Datadog is enabled
+```
+
+Check a specific summary:
+
+```bash
 aws s3 cp s3://skripsi-benchmark-results/experiments/$RUN_ID/monolith/login/1000rps/attempt-01/summary.json - \
   | jq '{p90: .metrics.http_req_duration.values["p(90)"], p95: .metrics.http_req_duration.values["p(95)"], error_rate: .metrics.http_req_failed.values.rate}'
 ```
+
+Check result classification for a case:
+
+```bash
+aws s3 cp s3://skripsi-benchmark-results/experiments/$RUN_ID/microservices/login/1000rps/attempt-01/result-status.json - \
+  | jq .
+```
+
+If a case is `OVERLOAD`, the result may still be valid for analysis when
+artifacts are present and the failure is caused by thresholds such as high
+latency or dropped iterations. If a case is `INVALID` or `TIMEOUT`, inspect the
+pod logs and rerun after fixing the infra/config/runtime problem.
 
 Do not destroy infrastructure until all expected files are present.
 
@@ -723,10 +872,14 @@ kubectl --context=monolith run pg-test \
 | `make eks-setup-contexts` | Configure kubectl for both clusters |
 | `SCALING_MODE=fixed make eks-deploy-monolith` | Deploy monolith (fixed replicas) |
 | `SCALING_MODE=fixed make eks-deploy-msa` | Deploy MSA (fixed replicas) |
+| `make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG` | Deploy both architectures in fixed mode |
 | `SCALING_MODE=hpa make eks-deploy-monolith` | Deploy monolith (HPA enabled) |
+| `make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG` | Deploy both architectures in HPA mode |
 | `DATADOG_API_KEY=<key> make datadog-install-eks-monolith` | Install Datadog on monolith cluster |
 | `DATADOG_API_KEY=<key> make datadog-install-eks-msa` | Install Datadog on MSA cluster |
 | `make run-benchmark-parallel SCENARIO=login TARGET_RPS=1000 RUN_ID=... S3_BUCKET=...` | Run parallel benchmark |
+| `make run-benchmark-suite SCALING_MODE=fixed SCENARIOS="login create-transaction enriched-transactions" RPS_LEVELS="1000 2500 5000 7500 10000"` | Run primary fixed-mode matrix |
+| `make run-benchmark-suite SCALING_MODE=hpa SCENARIOS="login create-transaction enriched-transactions" RPS_LEVELS="1000 2500 5000 7500 10000"` | Run primary HPA-mode matrix |
 | `make eks-destroy-confirmed` | Destroy experiment clusters and RDS after confirming benchmark artifacts are safe in S3 |
 | `make eks-shared-destroy` | Destroy VPC and IAM (keep S3 and ECR) |
 

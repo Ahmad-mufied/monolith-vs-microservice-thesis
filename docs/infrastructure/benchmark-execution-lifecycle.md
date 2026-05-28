@@ -32,7 +32,9 @@ Important rules:
 
 - do not reset data inside application startup,
 - do not run migration, reset, or seed during k6 execution,
-- run reset and seed before every k6 execution,
+- run reset and seed before every mutating k6 execution,
+- use an explicit inter-case delay between measured suite cases when the next case
+  should start from a stable system state,
 - upload k6 results to S3 before running the next execution or destroying infrastructure,
 - do not run `make eks-destroy-confirmed` until all expected result files are present in S3.
 
@@ -160,7 +162,9 @@ Migration does not need to run again in that case.
 
 ## 7. Reset and Seed Policy
 
-Reset and seed are required before every k6 execution.
+Reset and seed are required before every mutating k6 execution. For read-only
+scenarios, a single reset and seed before the first RPS level is enough when
+the same dataset remains valid for the whole scenario.
 
 Reason:
 
@@ -168,6 +172,24 @@ Reason:
 - retrying k6 without reset changes the dataset,
 - comparing monolith and microservices requires equivalent logical input data,
 - each attempt must start from a known state.
+
+Suite-runner policy:
+
+| Scenario | Reset/seed timing |
+|---|---|
+| `login` | Once before the first RPS level. |
+| `create-transaction` | Before every RPS level. |
+| `enriched-transactions` | Once before the first RPS level, followed by enrichment preparation. |
+| `mixed-workload` | Treat as mutating unless the workload definition is explicitly changed. |
+
+Measured final suites should use `INTER_CASE_DELAY` between independent cases.
+Recommended values are `120` seconds for fixed mode and `300` seconds for HPA
+mode. The value must be an integer number of seconds, so use `300` for five
+minutes rather than `5m`. If there is only one suite case, the inter-case delay
+is skipped. The inter-case delay is separate from k6 `gracefulStop`:
+`gracefulStop` finishes in-flight iterations inside one run, while
+`INTER_CASE_DELAY` gives pods, HPA metrics, PostgreSQL, and Datadog telemetry
+time to stabilize before the next run.
 
 Reset must clean data, not infrastructure.
 

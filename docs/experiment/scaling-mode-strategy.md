@@ -128,6 +128,34 @@ default `300s` downscale stabilization window.
 
 ---
 
+## 2.3 Benchmark Suite Inter-Case Delay
+
+Fixed and HPA modes are evaluated through independent k6 jobs for each
+scenario/RPS combination. The numeric RPS level is therefore a discrete
+experiment point, not a continuous ramp. The suite runner may insert an
+inter-case delay between cases through `INTER_CASE_DELAY`.
+
+Recommended final-run values:
+
+| Scaling mode | Suggested inter-case delay | Purpose |
+|---|---:|---|
+| fixed | `60`-`120` seconds | Let application pods, PostgreSQL pressure, and Datadog metrics settle before the next independent RPS point. |
+| hpa | `180`-`300` seconds | Let HPA CPU metrics, replica changes, scale-down behavior, and Datadog telemetry settle before the next independent RPS point. |
+
+The inter-case delay is part of the experiment methodology, not part of the k6
+load model. The runner accepts a non-negative integer value in seconds and
+rejects values above `86400` seconds to avoid accidental multi-day pauses.
+Duration suffixes such as `5m` are not supported; use `300` for five minutes.
+If a suite contains only one case, the inter-case delay is skipped. k6
+`gracefulStop` only controls how in-flight iterations finish inside one run. It
+does not provide a recovery gap between separate runs.
+
+For smoke tests and quick calibration, use `INTER_CASE_DELAY=0`. For measured
+Bab 4 runs, record the chosen inter-case delay in the suite manifest and keep it
+consistent across monolith and microservices comparisons.
+
+---
+
 ## 3. Understanding CPU and Memory Units
 
 The benchmark uses Amazon EC2 instance types for worker nodes, but Kubernetes

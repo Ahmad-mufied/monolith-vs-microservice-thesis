@@ -15,22 +15,26 @@ flowchart TB
   contexts["Setup kubectl contexts<br/>monolith, msa"]
   secrets["Create Kubernetes secrets<br/>apps, db bootstrap, k6 runner, Datadog"]
   validate["Validate manifests and cluster access<br/>image tags, contexts, secrets"]
-  deploy["Deploy applications<br/>bootstrap DB, migration, reset, seed, app deploy, optional Datadog"]
+  deploy["Deploy selected scaling mode<br/>fixed or HPA apps, migrations, optional Datadog"]
   smoke["Run smoke validation<br/>low RPS, short duration"]
-  choose["Choose scenario and RPS"]
-  resetSeed["Reset and seed data<br/>prepare enrichment data when required"]
-  k6["Run parallel k6 jobs<br/>make run-benchmark-parallel"]
+  suite["Run benchmark suite<br/>mode x scenario x RPS matrix"]
+  matrix["Primary matrix per mode<br/>3 scenarios x 5 RPS levels = 15 cases"]
+  resetSeed["Suite reset and seed lifecycle<br/>prepare enrichment data when required"]
+  k6["Run parallel k6 jobs per case<br/>monolith and microservices together"]
+  caseDelay["Inter-case delay<br/>fixed: 60-120s, HPA: 180-300s"]
   upload["Upload artifacts to S3<br/>summary, raw output, metadata, Datadog window"]
   verify["Verify S3 artifacts"]
-  more{"More scenarios / attempts?"}
+  more{"More attempts or switch scaling mode?"}
+  redeploy{"Switch fixed/HPA?"}
   destroyExp["Destroy experiment stack<br/>make eks-destroy-confirmed"]
   destroyShared{"Done with all experiments?"}
   sharedDestroy["Destroy shared stack<br/>make eks-shared-destroy"]
   done(["Done"])
 
   start --> persistent --> images --> renderManifests --> env --> auth --> shared --> experiment --> contexts --> secrets --> validate --> deploy --> smoke
-  smoke --> choose --> resetSeed --> k6 --> upload --> verify --> more
-  more -- "yes" --> choose
+  smoke --> suite --> matrix --> resetSeed --> k6 --> upload --> caseDelay --> verify --> more
+  more -- "same mode" --> suite
+  more -- "different mode" --> redeploy --> deploy
   more -- "no" --> destroyExp --> destroyShared
   destroyShared -- "yes" --> sharedDestroy --> done
   destroyShared -- "no" --> done
@@ -40,6 +44,33 @@ flowchart TB
 
 - Do not run migration, reset, or seed during k6 execution.
 - Use a new S3 attempt folder for every k6 execution.
+- Treat fixed and HPA as deployment states. Redeploy applications before
+  switching modes.
+- Use `INTER_CASE_DELAY` between measured suite cases so application pods,
+  database pressure, HPA metrics, and Datadog telemetry can stabilize.
 - Do not destroy EKS/RDS until benchmark artifacts are verified in S3.
 - S3 result bucket and ECR repositories are persistent resources outside
   Terraform.
+
+## Benchmark Matrix
+
+Primary Bab 4 runs use two deployment modes, three primary workload scenarios,
+and five target RPS levels.
+
+| Dimension | Values |
+|---|---|
+| Scaling modes | `fixed`, `hpa` |
+| Primary scenarios | `login`, `create-transaction`, `enriched-transactions` |
+| Default RPS levels | `1000`, `2500`, `5000`, `7500`, `10000` |
+| Optional exploratory scenario | `mixed-workload` |
+
+This produces `15` suite cases per scaling mode for the primary matrix:
+
+```text
+3 scenarios x 5 RPS levels = 15 cases per mode
+2 modes x 15 cases = 30 primary suite cases
+```
+
+Each suite case runs monolith and microservices jobs together. Switching from
+`fixed` to `hpa` is not a runner-only change; redeploy both application stacks
+with the matching overlay before starting the next mode.
