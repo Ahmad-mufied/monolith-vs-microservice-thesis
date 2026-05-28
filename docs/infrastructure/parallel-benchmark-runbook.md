@@ -243,6 +243,7 @@ Default suite behavior:
 
 - `SCENARIOS` defaults to `login create-transaction enriched-transactions`
 - `RPS_LEVELS` defaults to `1000 2500 5000 7500 10000`
+- `SCENARIO_RPS_MATRIX`, when set, overrides the cross-product behavior of `SCENARIOS` x `RPS_LEVELS`
 - `RUN_ID` stays highest-precedence when set manually
 - `EXPERIMENT_NAME`, when provided and `RUN_ID` is blank, generates a stable `RUN_ID` as `eks-{mode}-{experiment_name}`
 - `RUN_ID` falls back to `eks-{mode}-{yyyymmdd}-{HHMM}` only when both `RUN_ID` and `EXPERIMENT_NAME` are blank
@@ -267,6 +268,31 @@ make run-benchmark-suite \
 With the same `EXPERIMENT_NAME`, the suite resolves to the same `RUN_ID`, so
 rerunning the command with `ATTEMPT` left blank will auto-increment from
 `attempt-01` to `attempt-02`, `attempt-03`, and so on.
+
+Scenario-specific RPS matrix workflow:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  EXPERIMENT_NAME=rq1-fixed-primary \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=120 \
+  SCENARIO_RPS_MATRIX="login:100,120,140,160,180,200;create-transaction:100,150,200,250,300,400,500;enriched-transactions:100,150,200,250,300,400,500"
+```
+
+Matrix format:
+
+```text
+scenario:rps1,rps2,rps3;scenario:rps1,rps2
+```
+
+Notes:
+
+- `SCENARIO_RPS_MATRIX` is optional.
+- When it is set, the runner ignores the normal `SCENARIOS` and `RPS_LEVELS`
+  cross-product and uses the matrix entries instead.
+- The suite manifest and summary keep both the scenario list, the union of all
+  RPS values, and the full `scenario_rps_matrix`.
 
 Optional unattended cleanup workflow:
 

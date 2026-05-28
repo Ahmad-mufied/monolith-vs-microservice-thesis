@@ -601,6 +601,23 @@ rps_levels   : 1000 2500 5000 7500 10000
 case count   : 15
 ```
 
+When one scenario needs a tighter load range than the others, use
+`SCENARIO_RPS_MATRIX` instead of the normal `SCENARIOS` x `RPS_LEVELS`
+cross-product:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  EXPERIMENT_NAME=rq1-fixed-primary \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=120 \
+  SCENARIO_RPS_MATRIX="login:100,120,140,160,180,200;create-transaction:100,150,200,250,300,400,500;enriched-transactions:100,150,200,250,300,400,500" \
+  S3_BUCKET=skripsi-benchmark-results
+```
+
+This keeps the executor and methodology consistent while letting each scenario
+use a more informative calibrated RPS range.
+
 For unattended overnight runs, you may add:
 
 ```bash
@@ -723,6 +740,11 @@ unless the experiment log documents a different value.
 `eks-{mode}-{experiment_name}` so rerunning the same command can advance
 automatically from `attempt-01` to `attempt-02` and beyond. If both are blank,
 the runner falls back to the timestamp-based `RUN_ID`.
+
+`SCENARIO_RPS_MATRIX` is optional. When set, it overrides the usual
+`SCENARIOS` x `RPS_LEVELS` cross-product with a per-scenario mapping in the
+form `scenario:rps1,rps2;scenario:rps1,rps2`. The suite manifest and summary
+store the full matrix in `scenario_rps_matrix`.
 
 `AUTO_DESTROY_CONFIRMED=true` is an explicit unattended-run convenience flag.
 After the suite uploads `_suite/summary.json`, it forwards to
