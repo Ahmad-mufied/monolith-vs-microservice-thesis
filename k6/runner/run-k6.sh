@@ -234,6 +234,7 @@ echo "Generated result files:"
 find "$RESULT_DIR" -maxdepth 1 -type f -print | sort
 
 S3_STATUS=0
+s3_upload_attempted=false
 
 jq -n \
   --argjson k6_exit_code "$STATUS" \
@@ -255,6 +256,7 @@ jq -n \
   }' > "$RESULT_STATUS_PATH"
 
 if [ -n "${S3_URI:-}" ]; then
+  s3_upload_attempted=true
   if aws s3 sync "$RESULT_DIR" "$S3_URI/" --exclude "$(basename "$RESULT_STATUS_PATH")"; then
     echo "Uploaded k6 results to $S3_URI/"
   else
@@ -262,10 +264,15 @@ if [ -n "${S3_URI:-}" ]; then
   fi
 fi
 
-jq --argjson s3_exit_code "$S3_STATUS" \
+s3_exit_code_json=null
+if [ "$s3_upload_attempted" = true ]; then
+  s3_exit_code_json="$S3_STATUS"
+fi
+
+jq --argjson s3_exit_code "$s3_exit_code_json" \
   --arg classification_hint "$classification_hint" \
   '.s3_exit_code = $s3_exit_code
-   | .classification_hint = (if $s3_exit_code == 0 then $classification_hint else "upload_failed" end)' \
+   | .classification_hint = (if ($s3_exit_code == null or $s3_exit_code == 0) then $classification_hint else "upload_failed" end)' \
   "$RESULT_STATUS_PATH" > "$RESULT_DIR/result-status.updated.json"
 mv "$RESULT_DIR/result-status.updated.json" "$RESULT_STATUS_PATH"
 
