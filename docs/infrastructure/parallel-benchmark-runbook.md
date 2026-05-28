@@ -413,7 +413,7 @@ This is written to `metadata.json` and uploaded to S3 with each attempt.
 
 ---
 
-## 13. Recovery: HPA to Fixed Transition
+## 15. Recovery: HPA to Fixed Transition
 
 If a fixed-mode deploy is attempted while the MSA stack is still expanded by
 HPA, migration jobs may be blocked by the namespace `ResourceQuota`.
