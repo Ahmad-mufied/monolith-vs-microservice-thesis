@@ -276,7 +276,7 @@ jq --argjson s3_exit_code "$s3_exit_code_json" \
   "$RESULT_STATUS_PATH" > "$RESULT_DIR/result-status.updated.json"
 mv "$RESULT_DIR/result-status.updated.json" "$RESULT_STATUS_PATH"
 
-if [ "$S3_STATUS" -eq 0 ] && [ -n "${S3_URI:-}" ]; then
+if [ -n "${S3_URI:-}" ]; then
   set +e
   aws s3 cp "$RESULT_STATUS_PATH" "${S3_URI%/}/result-status.json" >/dev/null
   result_status_upload_exit=$?
