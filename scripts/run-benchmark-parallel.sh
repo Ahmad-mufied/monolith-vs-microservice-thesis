@@ -3,10 +3,26 @@
 # Both jobs start within seconds of each other for aligned Datadog time-series.
 set -euo pipefail
 
+explicit_aws_region="${AWS_REGION:-}"
+explicit_ecr_namespace="${ECR_NAMESPACE:-}"
+explicit_s3_bucket="${S3_BUCKET:-}"
+
 if [ -f env/aws-benchmark.env ]; then
   set -a
   source env/aws-benchmark.env
   set +a
+fi
+
+if [ -n "$explicit_aws_region" ]; then
+  AWS_REGION="$explicit_aws_region"
+fi
+
+if [ -n "$explicit_ecr_namespace" ]; then
+  ECR_NAMESPACE="$explicit_ecr_namespace"
+fi
+
+if [ -n "$explicit_s3_bucket" ]; then
+  S3_BUCKET="$explicit_s3_bucket"
 fi
 
 if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then

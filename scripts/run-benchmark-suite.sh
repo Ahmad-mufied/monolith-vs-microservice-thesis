@@ -2,10 +2,21 @@
 # Run the full benchmark matrix for one scaling mode.
 set -euo pipefail
 
+explicit_aws_region="${AWS_REGION:-}"
+explicit_s3_bucket="${S3_BUCKET:-}"
+
 if [ -f env/aws-benchmark.env ]; then
   set -a
   source env/aws-benchmark.env
   set +a
+fi
+
+if [ -n "$explicit_aws_region" ]; then
+  AWS_REGION="$explicit_aws_region"
+fi
+
+if [ -n "$explicit_s3_bucket" ]; then
+  S3_BUCKET="$explicit_s3_bucket"
 fi
 
 source scripts/lib/resource-configuration.sh
@@ -92,12 +103,28 @@ words_json_array() {
 next_attempt_from_s3() {
   local run_uri="$1"
   local listing
+  local listing_error
   local latest
   local next
 
-  if ! listing="$(aws s3 ls "$run_uri/" --recursive 2>/dev/null)"; then
-    echo "ERROR: unable to inspect S3 prefix for automatic attempt selection: $run_uri" >&2
-    return 1
+  listing_error="$(mktemp)"
+  if ! listing="$(aws s3 ls "$run_uri/" --recursive 2>"$listing_error")"; then
+    if [ -s "$listing_error" ]; then
+      cat "$listing_error" >&2
+      rm -f "$listing_error"
+      echo "ERROR: unable to inspect S3 prefix for automatic attempt selection: $run_uri" >&2
+      return 1
+    fi
+
+    rm -f "$listing_error"
+    printf 'attempt-01'
+    return 0
+  fi
+  rm -f "$listing_error"
+
+  if [ -z "$listing" ]; then
+    printf 'attempt-01'
+    return 0
   fi
 
   latest="$(sed -n 's|.*/attempt-\([0-9][0-9]*\)/.*|\1|p' <<<"$listing" | sort -n | tail -n 1)"
