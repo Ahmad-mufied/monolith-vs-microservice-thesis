@@ -11,8 +11,8 @@ spec:
         - name: item-service
           resources:
             requests:
-              cpu: 1000m
-              memory: 1728Mi
+              cpu: 750m
+              memory: 1296Mi
             limits:
-              cpu: 3000m
-              memory: 5184Mi
+              cpu: 2300m
+              memory: 3456Mi

@@ -11,8 +11,8 @@ spec:
         - name: auth-service
           resources:
             requests:
-              cpu: 1500m
-              memory: 2592Mi
+              cpu: 2500m
+              memory: 3456Mi
             limits:
-              cpu: 4000m
-              memory: 6912Mi
+              cpu: 7000m
+              memory: 10368Mi
