@@ -321,6 +321,17 @@ make run-benchmark-parallel \
   S3_BUCKET=skripsi-benchmark-results
 ```
 
+For a full scenario/RPS matrix, use the suite runner. `RUN_ID` and `ATTEMPT`
+are generated automatically unless you override them:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  TEST_DURATION=5m \
+  RPS_LEVELS="1000 2500 5000" \
+  S3_BUCKET=skripsi-benchmark-results
+```
+
 Do not destroy infrastructure until all benchmark artifacts are verified in S3.
 
 ```bash
@@ -405,12 +416,17 @@ Required files include:
 - `raw.json.gz`
 - `stdout.log`
 - `metadata.json`
+- `result-status.json`
 - `k6-options.json`
 - `thresholds.json`
 - `datadog-time-window.json` when Datadog is enabled
 
 `metadata.json` is the source of truth for analysis automation and for
 determining whether an attempt used fixed replicas or HPA.
+
+`thresholds.json` is the primary source for deciding whether a run is `PASS` or
+`OVERLOAD`, while `result-status.json` records k6 exit state, S3 upload state,
+and artifact-generation status for `INVALID` troubleshooting.
 
 For k6 script behavior and runner details, see [`k6/README.md`](k6/README.md).
 

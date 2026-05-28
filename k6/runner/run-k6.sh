@@ -15,6 +15,7 @@ METADATA_PARTIAL_PATH="${METADATA_PARTIAL_PATH:-$RESULT_DIR/metadata.partial.jso
 K6_OPTIONS_PATH="${K6_OPTIONS_PATH:-$RESULT_DIR/k6-options.json}"
 THRESHOLDS_PATH="${THRESHOLDS_PATH:-$RESULT_DIR/thresholds.json}"
 DATADOG_TIME_WINDOW_PATH="${DATADOG_TIME_WINDOW_PATH:-$RESULT_DIR/datadog-time-window.json}"
+RESULT_STATUS_PATH="${RESULT_STATUS_PATH:-$RESULT_DIR/result-status.json}"
 
 export SUMMARY_PATH
 export METADATA_PARTIAL_PATH
@@ -201,17 +202,96 @@ if [ -f "$METADATA_PARTIAL_PATH" ]; then
   fi
 fi
 
+summary_present=false
+thresholds_present=false
+raw_gzip_present=false
+metadata_present=false
+
+if [ -f "$SUMMARY_PATH" ]; then
+  summary_present=true
+fi
+
+if [ -f "$THRESHOLDS_PATH" ]; then
+  thresholds_present=true
+fi
+
+if [ -f "${RAW_PATH}.gz" ]; then
+  raw_gzip_present=true
+fi
+
+if [ -f "$METADATA_PATH" ]; then
+  metadata_present=true
+fi
+
+classification_hint="runtime_failed"
+if [ "$STATUS" -eq 0 ]; then
+  classification_hint="pass"
+elif [ "$summary_present" = true ] && [ "$thresholds_present" = true ]; then
+  classification_hint="threshold_failed"
+fi
+
 echo "Generated result files:"
 find "$RESULT_DIR" -maxdepth 1 -type f -print | sort
 
 S3_STATUS=0
+s3_upload_attempted=false
+
+jq -n \
+  --argjson k6_exit_code "$STATUS" \
+  --argjson artifacts_generated "$( [ "$summary_present" = true ] && [ "$thresholds_present" = true ] && [ "$metadata_present" = true ] && printf 'true' || printf 'false' )" \
+  --argjson summary_file_present "$( [ "$summary_present" = true ] && printf 'true' || printf 'false' )" \
+  --argjson thresholds_file_present "$( [ "$thresholds_present" = true ] && printf 'true' || printf 'false' )" \
+  --argjson metadata_file_present "$( [ "$metadata_present" = true ] && printf 'true' || printf 'false' )" \
+  --argjson raw_file_present "$( [ "$raw_gzip_present" = true ] && printf 'true' || printf 'false' )" \
+  --arg classification_hint "$classification_hint" \
+  '{
+    k6_exit_code: $k6_exit_code,
+    s3_exit_code: null,
+    artifacts_generated: $artifacts_generated,
+    summary_file_present: $summary_file_present,
+    thresholds_file_present: $thresholds_file_present,
+    metadata_file_present: $metadata_file_present,
+    raw_file_present: $raw_file_present,
+    classification_hint: $classification_hint
+  }' > "$RESULT_STATUS_PATH"
+
 if [ -n "${S3_URI:-}" ]; then
-  if aws s3 sync "$RESULT_DIR" "$S3_URI/"; then
+  s3_upload_attempted=true
+  if aws s3 sync "$RESULT_DIR" "$S3_URI/" --exclude "$(basename "$RESULT_STATUS_PATH")"; then
     echo "Uploaded k6 results to $S3_URI/"
   else
     S3_STATUS=$?
   fi
 fi
+
+s3_exit_code_json=null
+if [ "$s3_upload_attempted" = true ]; then
+  s3_exit_code_json="$S3_STATUS"
+fi
+
+jq --argjson s3_exit_code "$s3_exit_code_json" \
+  --arg classification_hint "$classification_hint" \
+  '.s3_exit_code = $s3_exit_code
+   | .classification_hint = (if ($s3_exit_code == null or $s3_exit_code == 0) then $classification_hint else "upload_failed" end)' \
+  "$RESULT_STATUS_PATH" > "$RESULT_DIR/result-status.updated.json"
+mv "$RESULT_DIR/result-status.updated.json" "$RESULT_STATUS_PATH"
+
+if [ -n "${S3_URI:-}" ]; then
+  set +e
+  aws s3 cp "$RESULT_STATUS_PATH" "${S3_URI%/}/result-status.json" >/dev/null
+  result_status_upload_exit=$?
+  set -e
+
+  if [ "$result_status_upload_exit" -ne 0 ]; then
+    S3_STATUS="$result_status_upload_exit"
+    jq --argjson s3_exit_code "$S3_STATUS" \
+      '.s3_exit_code = $s3_exit_code | .classification_hint = "upload_failed"' \
+      "$RESULT_STATUS_PATH" > "$RESULT_DIR/result-status.updated.json"
+    mv "$RESULT_DIR/result-status.updated.json" "$RESULT_STATUS_PATH"
+  fi
+fi
+
+echo "RESULT_STATUS_JSON=$(jq -c . "$RESULT_STATUS_PATH")"
 
 if [ "$S3_STATUS" -ne 0 ]; then
   echo "ERROR: S3 upload failed (aws exit code: $S3_STATUS). k6 exit code: $STATUS" >&2
