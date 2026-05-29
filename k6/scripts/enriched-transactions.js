@@ -9,9 +9,8 @@ import { users } from "./common/data.js";
 import {
   loginSetupAndExtractToken,
   enrichedTransactionsWorkloadRequest,
-  enrichedTransactionsSetupProbeRequest,
   expectStatus,
-  responseDataArrayLength,
+  requireEnrichedTransactionsReady,
 } from "./common/requests.js";
 import { handleSummary as baseHandleSummary } from "./common/summary.js";
 
@@ -45,27 +44,12 @@ function resolveToken() {
   return auth.token;
 }
 
-function validateEnrichmentData(token) {
-  const probe = enrichedTransactionsSetupProbeRequest(token, 1, 0);
-
-  if (probe.status !== 200) {
-    const body = typeof probe.body === "string" ? probe.body : "";
-    throw new Error(
-      `enriched-transactions setup probe failed: status=${probe.status}, body=${body}`
-    );
-  }
-
-  if (responseDataArrayLength(probe) === 0) {
-    throw new Error(
-      "enriched-transactions setup probe found no transaction data. " +
-      "Run the enrichment preparation job before this benchmark."
-    );
-  }
-}
-
 export function setup() {
   const token = resolveToken();
-  validateEnrichmentData(token);
+  requireEnrichedTransactionsReady(token, {
+    label: "enriched-transactions setup probe",
+    requireData: true,
+  });
   return { token };
 }
 

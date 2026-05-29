@@ -68,7 +68,7 @@ Validation and optional scripts:
 |---|---|
 | `smoke.js` | end-to-end deployment validation |
 | `sync-items.js` | optional full item synchronization workload |
-| `mixed-workload.js` | optional mixed traffic simulation |
+| `mixed-workload.js` | optional mixed traffic simulation; requires enrichment preparation when the enriched branch weight is enabled |
 
 ---
 
@@ -108,6 +108,20 @@ collect results
 
 The enrichment preparation step is not measured as part of the k6 result.
 
+### Mixed Workload Benchmark
+
+```text
+reset
+seed base users/items
+prepare enrichment transaction dataset when MIX_ENRICHED_TRANSACTIONS_WEIGHT > 0
+run k6/scripts/mixed-workload.js
+collect results
+```
+
+The default mixed workload includes an enriched-transactions branch. If that
+branch weight is non-zero, the runner must prepare enrichment data first or the
+scenario setup will fail intentionally.
+
 ---
 
 ## Seed Alignment
@@ -141,6 +155,15 @@ USER_EMAIL_SEPARATOR=-
 USER_EMAIL_PADDING=3
 USER_EMAIL_DOMAIN=example.com
 USER_PASSWORD=Password123!
+```
+
+When `enriched-transactions.js` uses `ADMIN_USER_EMAIL` /
+`ADMIN_USER_PASSWORD`, those credentials must still match a seeded benchmark
+user. For the repository default benchmark dataset, the expected pair is:
+
+```text
+ADMIN_USER_EMAIL=benchmark-user-001@example.com
+ADMIN_USER_PASSWORD=Password123!
 ```
 
 If a particular run does not follow the default benchmark generator pattern,
@@ -208,6 +231,13 @@ K6_PROFILE=steady
 ```
 
 For final benchmark scenarios, use `steady` unless the experiment specifically evaluates HPA behavior.
+
+`K6_PROFILE` is validated strictly. Unsupported profile names now fail fast
+instead of silently falling back to the steady benchmark executor.
+
+When `RAMP_STAGES_JSON` is provided, it must be valid JSON and contain a
+non-empty array of `{target, duration}` objects. Invalid stage JSON now fails
+fast instead of silently falling back to generated stages.
 
 ---
 
@@ -492,6 +522,10 @@ The S3 path is for navigation and overwrite prevention.
 `thresholds.json` is the primary source for `PASS` vs `OVERLOAD`, while
 `result-status.json` records k6 exit code, S3 upload state, and artifact
 presence for orchestration-level classification.
+
+A benchmark attempt is only `PASS` when k6 exits with code `0`. Runtime exits
+such as k6 `107` (script exception) must be treated as `INVALID` even if
+partial artifacts or threshold files were uploaded.
 
 `kubectl` is included for troubleshooting and optional cluster inspection during
 benchmark operations, but the current runner does not collect separate

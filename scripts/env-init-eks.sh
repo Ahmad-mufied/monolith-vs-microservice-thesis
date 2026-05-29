@@ -65,11 +65,11 @@ read_env_value() {
   grep -E "^${key}=" "$file" | head -n 1 | cut -d= -f2- || true
 }
 
-is_weak_k6_password() {
+is_invalid_k6_benchmark_password() {
   local value="${1:-}"
 
   case "$value" in
-    ""|"Password123!"|"replace-me"|"CHANGE_ME"|"change-me"|"your_api_key"|"example")
+    ""|"replace-me"|"CHANGE_ME"|"change-me"|"your_api_key"|"example")
       return 0
       ;;
   esac
@@ -210,13 +210,13 @@ ITEM_SERVICE_ADDR=item-service.msa.svc.cluster.local:50052"
 k6_runner_email="$(read_env_value env/k6-runner.eks.env ADMIN_USER_EMAIL)"
 k6_runner_email="${k6_runner_email:-benchmark-user-001@example.com}"
 k6_runner_password="$(read_env_value env/k6-runner.eks.env ADMIN_USER_PASSWORD)"
-generated_k6_runner_password="$(random_hex 24)"
+benchmark_k6_runner_password="Password123!"
 
 write_if_missing "env/k6-runner.eks.env" "ADMIN_USER_EMAIL=${k6_runner_email}
-ADMIN_USER_PASSWORD=${generated_k6_runner_password}"
+ADMIN_USER_PASSWORD=${benchmark_k6_runner_password}"
 
-if is_weak_k6_password "$k6_runner_password"; then
-  write_or_update_env_value "env/k6-runner.eks.env" "ADMIN_USER_PASSWORD" "$generated_k6_runner_password"
+if is_invalid_k6_benchmark_password "$k6_runner_password" || [[ "$k6_runner_password" != "$benchmark_k6_runner_password" ]]; then
+  write_or_update_env_value "env/k6-runner.eks.env" "ADMIN_USER_PASSWORD" "$benchmark_k6_runner_password"
 fi
 
 write_or_update_env_value "env/k6-runner.eks.env" "ADMIN_USER_EMAIL" "$k6_runner_email"

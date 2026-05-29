@@ -80,6 +80,14 @@ export const DATASET_VERSION = envString("DATASET_VERSION", "v1");
 export const IMAGE_TAG = envString("IMAGE_TAG", "");
 export const GIT_COMMIT = envString("GIT_COMMIT", "");
 
+const SUPPORTED_K6_PROFILES = new Set(["smoke", "steady", "ramp", "hpa"]);
+
+function assertCondition(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
 function metricTagFilter(metricTags) {
   if (!metricTags || Object.keys(metricTags).length === 0) {
     return "";
@@ -159,11 +167,14 @@ function parseStages() {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error("RAMP_STAGES_JSON must be a non-empty JSON array.");
       }
-    } catch (_) {
-      // fall back to generated stages
+
+      parsed.forEach((stage, index) => validateStage(stage, index, "RAMP_STAGES_JSON"));
+      return parsed;
+    } catch (error) {
+      throw new Error(`Invalid RAMP_STAGES_JSON: ${error.message}`);
     }
   }
 
@@ -183,3 +194,33 @@ function parseStages() {
     { target: 0, duration: envString("RAMP_DOWN_DURATION", "30s") },
   ];
 }
+
+function validateStage(stage, index, sourceName) {
+  assertCondition(stage && typeof stage === "object" && !Array.isArray(stage), `${sourceName}[${index}] must be an object.`);
+  assertCondition(Number.isInteger(stage.target) && stage.target >= 0, `${sourceName}[${index}].target must be a non-negative integer.`);
+  assertCondition(typeof stage.duration === "string" && stage.duration.trim() !== "", `${sourceName}[${index}].duration must be a non-empty duration string.`);
+}
+
+function validateConfig() {
+  assertCondition(SUPPORTED_K6_PROFILES.has(K6_PROFILE), `Unsupported K6_PROFILE '${K6_PROFILE}'. Expected one of: smoke, steady, ramp, hpa.`);
+  assertCondition(TARGET_RPS > 0, `TARGET_RPS must be > 0, got ${TARGET_RPS}.`);
+  assertCondition(PRE_ALLOCATED_VUS > 0, `PRE_ALLOCATED_VUS must be > 0, got ${PRE_ALLOCATED_VUS}.`);
+  assertCondition(MAX_VUS >= PRE_ALLOCATED_VUS, `MAX_VUS must be >= PRE_ALLOCATED_VUS (got MAX_VUS=${MAX_VUS}, PRE_ALLOCATED_VUS=${PRE_ALLOCATED_VUS}).`);
+  assertCondition(TOKEN_POOL_SIZE > 0, `TOKEN_POOL_SIZE must be > 0, got ${TOKEN_POOL_SIZE}.`);
+  assertCondition(USER_COUNT > 0, `USER_COUNT must be > 0, got ${USER_COUNT}.`);
+  assertCondition(ITEM_COUNT > 0, `ITEM_COUNT must be > 0, got ${ITEM_COUNT}.`);
+  assertCondition(TRANSACTION_AMOUNT > 0, `TRANSACTION_AMOUNT must be > 0, got ${TRANSACTION_AMOUNT}.`);
+  assertCondition(ITEM_LIST_LIMIT > 0, `ITEM_LIST_LIMIT must be > 0, got ${ITEM_LIST_LIMIT}.`);
+  assertCondition(OWN_TRANSACTION_LIMIT > 0, `OWN_TRANSACTION_LIMIT must be > 0, got ${OWN_TRANSACTION_LIMIT}.`);
+  assertCondition(ENRICHED_TRANSACTION_LIMIT > 0, `ENRICHED_TRANSACTION_LIMIT must be > 0, got ${ENRICHED_TRANSACTION_LIMIT}.`);
+  assertCondition(MAX_ERROR_RATE >= 0 && MAX_ERROR_RATE <= 1, `MAX_ERROR_RATE must be between 0 and 1, got ${MAX_ERROR_RATE}.`);
+  assertCondition(MIN_CHECK_RATE >= 0 && MIN_CHECK_RATE <= 1, `MIN_CHECK_RATE must be between 0 and 1, got ${MIN_CHECK_RATE}.`);
+  assertCondition(P90_THRESHOLD_MS > 0, `P90_THRESHOLD_MS must be > 0, got ${P90_THRESHOLD_MS}.`);
+  assertCondition(P95_THRESHOLD_MS > 0, `P95_THRESHOLD_MS must be > 0, got ${P95_THRESHOLD_MS}.`);
+
+  if (K6_PROFILE === "ramp" || K6_PROFILE === "hpa") {
+    parseStages().forEach((stage, index) => validateStage(stage, index, "generated stages"));
+  }
+}
+
+validateConfig();

@@ -39,6 +39,7 @@ RUN_ID="${RUN_ID:?RUN_ID is required}"
 ATTEMPT="${ATTEMPT:-attempt-01}"
 SCALING_MODE="${SCALING_MODE:-fixed}"
 K6_PROFILE="${K6_PROFILE:-steady}"
+ALLOW_NONSTANDARD_SCALING_PROFILE="${ALLOW_NONSTANDARD_SCALING_PROFILE:-false}"
 TEST_DURATION="${TEST_DURATION:-5m}"
 S3_BUCKET="${S3_BUCKET:?S3_BUCKET is required}"
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
@@ -78,6 +79,28 @@ echo "  duration     : $TEST_DURATION"
 echo "  image_tag    : $IMAGE_TAG"
 echo "  report_s3_uri: $S3_RUN_URI"
 echo ""
+
+case "$ALLOW_NONSTANDARD_SCALING_PROFILE" in
+  true|false) ;;
+  *)
+    echo "ERROR: invalid ALLOW_NONSTANDARD_SCALING_PROFILE value '$ALLOW_NONSTANDARD_SCALING_PROFILE' (expected: true|false)" >&2
+    exit 1
+    ;;
+esac
+
+if [ "$ALLOW_NONSTANDARD_SCALING_PROFILE" != "true" ]; then
+  case "$SCALING_MODE:$K6_PROFILE" in
+    fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa) ;;
+    fixed:hpa)
+      echo "ERROR: K6_PROFILE=hpa must not be used with SCALING_MODE=fixed. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only for a deliberate nonstandard experiment." >&2
+      exit 1
+      ;;
+    hpa:steady|hpa:ramp|hpa:smoke)
+      echo "ERROR: SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only for a deliberate nonstandard experiment." >&2
+      exit 1
+      ;;
+  esac
+fi
 
 # ─── Validate contexts ────────────────────────────────────────────────────────
 
@@ -289,10 +312,13 @@ inspect_architecture_result() {
     if [ "$s3_exit_code" != "null" ] && [ "$s3_exit_code" != "0" ]; then
       final_class="INVALID"
       reason="S3 upload failed after k6 execution"
+    elif [ "$classification_hint" = "runtime_failed" ] || { [ "$k6_exit_code" != "null" ] && [ "$k6_exit_code" != "0" ] && [ "$k6_exit_code" != "99" ]; }; then
+      final_class="INVALID"
+      reason="k6 exited with a non-threshold runtime failure (exit code: ${k6_exit_code})"
     elif [ "$threshold_class" = "OVERLOAD" ]; then
       final_class="OVERLOAD"
       reason="k6 completed but one or more thresholds failed"
-    elif [ "$threshold_class" = "PASS" ]; then
+    elif [ "$k6_exit_code" = "0" ] && [ "$threshold_class" = "PASS" ]; then
       final_class="PASS"
       reason="k6 completed and all thresholds passed"
     elif [ "$classification_hint" = "threshold_failed" ] && [ "$thresholds_file_present" = "true" ]; then
@@ -308,7 +334,7 @@ inspect_architecture_result() {
   elif [ "$threshold_class" = "OVERLOAD" ]; then
     final_class="OVERLOAD"
     reason="threshold artifacts show benchmark overload"
-  elif [ "$threshold_class" = "PASS" ]; then
+  elif [ "$terminal_state" = "COMPLETE" ] && [ "$threshold_class" = "PASS" ]; then
     final_class="PASS"
     reason="threshold artifacts show all benchmark thresholds passed"
   else

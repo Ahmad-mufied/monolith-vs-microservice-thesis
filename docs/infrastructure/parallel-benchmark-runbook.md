@@ -254,6 +254,10 @@ Default suite behavior:
   calibration runs
 - `AUTO_DESTROY_CONFIRMED` defaults to `false` and only triggers
   `make eks-destroy-confirmed` after `_suite/summary.json` is uploaded
+- by default, the runner fails fast if `SCALING_MODE` and `K6_PROFILE` are
+  paired incorrectly or if the live clusters do not actually match the
+  expected HPA/fixed state; use `ALLOW_NONSTANDARD_SCALING_PROFILE=true` only
+  for deliberate nonstandard experiments
 
 Recommended repeat-attempt workflow:
 
@@ -436,6 +440,10 @@ Use the final printed summary plus these artifacts to interpret the run:
 - `thresholds.json`: primary source for `PASS` vs `OVERLOAD`
 - `result-status.json`: k6 exit code, S3 upload status, and artifact presence
 - `stdout.log`: diagnostic context when classification is `INVALID`
+
+`PASS` requires a clean k6 exit code of `0`. A non-zero runtime exit such as
+k6 `107` (script exception) must be treated as `INVALID` even if partial
+artifacts or threshold files were uploaded to S3.
 
 The final summary also prints a run-level `Report generator source`, for
 example:
