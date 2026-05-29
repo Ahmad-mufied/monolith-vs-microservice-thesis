@@ -223,3 +223,25 @@ export function responseDataArrayLength(response) {
   const data = safeJson(response, "data", []);
   return Array.isArray(data) ? data.length : 0;
 }
+
+export function requireEnrichedTransactionsReady(token, options = {}) {
+  const {
+    limit = 1,
+    offset = 0,
+    label = "enriched-transactions setup probe",
+    requireData = true,
+  } = options;
+
+  const probe = enrichedTransactionsSetupProbeRequest(token, limit, offset);
+
+  if (probe.status !== 200) {
+    const body = typeof probe.body === "string" ? probe.body : "";
+    throw new Error(`${label}: status=${probe.status}, body=${body}`);
+  }
+
+  if (requireData && responseDataArrayLength(probe) === 0) {
+    throw new Error(`${label}: no transaction data found. Run the enrichment preparation job before this benchmark.`);
+  }
+
+  return probe;
+}

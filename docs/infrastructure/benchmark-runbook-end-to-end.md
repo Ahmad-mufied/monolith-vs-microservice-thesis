@@ -240,7 +240,7 @@ MONOLITH_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/ex
 DB_PASSWORD="<same password from env/terraform.experiment.env>"
 DB_PASSWORD_URI_ENCODED=$(printf '%s' "$DB_PASSWORD" | jq -sRr @uri)
 JWT_SECRET="<generate: openssl rand -hex 32>"
-ADMIN_USER_PASSWORD="$(openssl rand -hex 24)"
+ADMIN_USER_PASSWORD="Password123!"
 
 # DB bootstrap secret
 kubectl --context=monolith create namespace benchmark --dry-run=client -o yaml | kubectl --context=monolith apply -f -
@@ -272,7 +272,7 @@ kubectl --context=monolith create secret generic monolith-env \
   --from-literal=BCRYPT_COST=10 \
   --dry-run=client -o yaml | kubectl --context=monolith apply -f -
 
-# k6 runner secret (admin credentials for enriched-transactions)
+# k6 runner secret (must match the seeded benchmark admin user)
 kubectl --context=monolith create secret generic k6-runner-secret \
   --namespace benchmark \
   --from-literal=ADMIN_USER_EMAIL="benchmark-user-001@example.com" \
@@ -287,7 +287,7 @@ MSA_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experim
 DB_PASSWORD="<same password>"
 DB_PASSWORD_URI_ENCODED=$(printf '%s' "$DB_PASSWORD" | jq -sRr @uri)
 JWT_SECRET="<same JWT secret>"
-ADMIN_USER_PASSWORD="$(openssl rand -hex 24)"
+ADMIN_USER_PASSWORD="Password123!"
 GRPC_PORT_AUTH=50051
 GRPC_PORT_ITEM=50052
 GRPC_PORT_TX=50053
@@ -351,6 +351,11 @@ kubectl --context=msa create secret generic k6-runner-secret \
   --from-literal=ADMIN_USER_PASSWORD="$ADMIN_USER_PASSWORD" \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 ```
+
+The k6 runner admin credentials must stay aligned with the seeded benchmark
+dataset. In the default dataset, `benchmark-user-001@example.com` uses
+`Password123!`. Do not generate a random `ADMIN_USER_PASSWORD` unless the seed
+dataset password was also changed to match.
 
 If `DB_PASSWORD` contains reserved URI characters such as `@`, `:`, `/`, `?`,
 `#`, or `%`, URL-encode it before embedding it into PostgreSQL URIs. The
@@ -750,6 +755,11 @@ Interpret suite and case results carefully:
 - `TIMEOUT` means the orchestration did not complete within the expected
   window.
 
+For case-level interpretation, `PASS` also requires a clean k6 process exit
+code of `0`. If the benchmark pod exits with a non-zero runtime code such as
+k6 `107` (script exception), classify the case as `INVALID` even when
+`thresholds.json` or other partial artifacts exist in S3.
+
 The suite command exits non-zero when any case is non-pass, but it still writes
 the available per-case artifacts plus `_suite/summary.json`. Inspect the S3
 artifacts before deciding whether a non-pass case is a valid overload datapoint
@@ -976,5 +986,10 @@ kubectl --context=monolith run pg-test \
 |---|---|---|---|
 | RQ1 clean comparison | `fixed` | `steady` | `overlays/fixed` |
 | RQ2 + HPA behavior | `hpa` | `hpa` | `overlays/hpa` |
+
+The benchmark runners now fail fast when this pairing is violated or when the
+live cluster state does not match the expected fixed/HPA mode. This prevents
+silent misconfiguration such as `K6_PROFILE=hpa` against fixed overlays or an
+HPA run against a cluster where HPA objects are missing.
 
 See `docs/experiment/scaling-mode-strategy.md` for full details.

@@ -14,6 +14,7 @@ import {
   enrichedTransactionsRequest,
   expectStatus,
   expectJsonValue,
+  requireEnrichedTransactionsReady,
 } from "./common/requests.js";
 export { handleSummary } from "./common/summary.js";
 
@@ -63,6 +64,13 @@ export function setup() {
 
   if (tokenPool.length === 0) {
     throw new Error("No tokens generated for mixed-workload scenario.");
+  }
+
+  if (ENRICHED_TRANSACTIONS_WEIGHT > 0) {
+    requireEnrichedTransactionsReady(tokenPool[0], {
+      label: "mixed-workload enriched setup probe",
+      requireData: true,
+    });
   }
 
   return {

@@ -36,7 +36,7 @@ Additional validation or optional scenarios:
 |---|---|---|
 | Smoke | `k6/scripts/smoke.js` | validation only |
 | Sync Items | `k6/scripts/sync-items.js` | optional |
-| Mixed Workload | `k6/scripts/mixed-workload.js` | optional |
+| Mixed Workload | `k6/scripts/mixed-workload.js` | optional; requires enrichment preparation when the enriched branch weight is enabled |
 
 ---
 
@@ -99,6 +99,11 @@ For non-benchmark datasets that do not follow the generator pattern, pass
 optional k6 input files with `USERS_FILE` and `ITEM_IDS_FILE`. These files are
 runtime input for k6 only; they are not database seed data.
 
+When `enriched-transactions` is configured with `ADMIN_USER_EMAIL` /
+`ADMIN_USER_PASSWORD`, those credentials must also match the seeded benchmark
+user. For the repository default benchmark dataset, that means
+`benchmark-user-001@example.com / Password123!`.
+
 ### 3.3 Enriched Transactions
 
 Lifecycle:
@@ -121,6 +126,25 @@ GET /api/v1/admin/transactions
 The enrichment preparation step inserts transactions and transaction_items before the measured read benchmark begins.
 
 That preparation step is not part of the measured k6 result.
+
+### 3.4 Mixed Workload
+
+Lifecycle:
+
+```text
+reset data
+seed base users/items
+prepare enrichment transaction dataset when enriched branch weight > 0
+validate setup logins and enrichment probe
+run mixed-workload scenario
+collect results
+```
+
+If `MIX_ENRICHED_TRANSACTIONS_WEIGHT` is greater than zero, the scenario setup
+now validates that the enriched-transactions endpoint returns data before the
+measured workload begins. This prevents the mixed scenario from silently
+degrading into authentication/write-only traffic when enrichment fixtures are
+missing.
 
 ---
 
@@ -149,6 +173,10 @@ hpa
 ```
 
 `hpa` profile should be used only when autoscaling behavior is part of the experiment.
+
+`K6_PROFILE` and `RAMP_STAGES_JSON` are validated strictly. Invalid profile
+names or malformed custom ramp-stage JSON now fail fast instead of silently
+falling back to another executor or generated stages.
 
 ---
 

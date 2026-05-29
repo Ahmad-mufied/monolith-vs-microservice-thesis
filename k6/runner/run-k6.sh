@@ -226,7 +226,7 @@ fi
 classification_hint="runtime_failed"
 if [ "$STATUS" -eq 0 ]; then
   classification_hint="pass"
-elif [ "$summary_present" = true ] && [ "$thresholds_present" = true ]; then
+elif [ "$STATUS" -eq 99 ] && [ "$summary_present" = true ] && [ "$thresholds_present" = true ]; then
   classification_hint="threshold_failed"
 fi
 

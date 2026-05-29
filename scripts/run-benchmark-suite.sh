@@ -36,6 +36,7 @@ SCENARIO_RPS_MATRIX="${SCENARIO_RPS_MATRIX:-}"
 INTER_CASE_DELAY="${INTER_CASE_DELAY:-0}"
 MAX_INTER_CASE_DELAY=86400
 AUTO_DESTROY_CONFIRMED="${AUTO_DESTROY_CONFIRMED:-false}"
+ALLOW_NONSTANDARD_SCALING_PROFILE="${ALLOW_NONSTANDARD_SCALING_PROFILE:-false}"
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
 DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 K6_PROFILE="${K6_PROFILE:-}"
@@ -220,6 +221,14 @@ validate_matrix_inputs() {
       ;;
   esac
 
+  case "$ALLOW_NONSTANDARD_SCALING_PROFILE" in
+    true|false) ;;
+    *)
+      echo "ERROR: invalid ALLOW_NONSTANDARD_SCALING_PROFILE value '$ALLOW_NONSTANDARD_SCALING_PROFILE' (expected: true|false)" >&2
+      return 1
+      ;;
+  esac
+
   if [ "$AUTO_DESTROY_CONFIRMED" = "true" ] && [ -z "$RUN_ID" ] && [ -z "$EXPERIMENT_NAME" ]; then
     echo "ERROR: AUTO_DESTROY_CONFIRMED=true requires EXPERIMENT_NAME or RUN_ID so the unattended run has a stable identifier" >&2
     return 1
@@ -239,6 +248,31 @@ if [ -z "$K6_PROFILE" ]; then
     K6_PROFILE="steady"
   fi
 fi
+
+validate_scaling_profile_pairing() {
+  if [ "$ALLOW_NONSTANDARD_SCALING_PROFILE" = "true" ]; then
+    return 0
+  fi
+
+  case "$SCALING_MODE:$K6_PROFILE" in
+    fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa)
+      return 0
+      ;;
+    fixed:hpa)
+      echo "ERROR: K6_PROFILE=hpa must not be used with SCALING_MODE=fixed. Use SCALING_MODE=hpa with HPA overlays, or set ALLOW_NONSTANDARD_SCALING_PROFILE=true only if you are intentionally running a nonstandard experiment." >&2
+      return 1
+      ;;
+    hpa:steady|hpa:ramp|hpa:smoke)
+      echo "ERROR: SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only if you intentionally want a nonstandard pairing." >&2
+      return 1
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
+validate_scaling_profile_pairing
 
 if [ -z "$RUN_ID" ]; then
   if [ -n "$EXPERIMENT_NAME" ]; then
@@ -449,6 +483,42 @@ restore_app_workloads_after_data_reset() {
   for svc in auth-service item-service transaction-service api-gateway; do
     kubectl --context=msa rollout status "deployment/${svc}" -n msa --timeout=300s
   done
+
+  verify_live_scaling_mode_state
+}
+
+verify_live_scaling_mode_state() {
+  local mono_hpa_present=0
+  local msa_hpa_count=0
+
+  if kubectl --context=monolith get hpa monolith -n mono >/dev/null 2>&1; then
+    mono_hpa_present=1
+  fi
+
+  msa_hpa_count="$(
+    kubectl --context=msa get hpa -n msa --no-headers 2>/dev/null | wc -l | tr -d '[:space:]'
+  )"
+  msa_hpa_count="${msa_hpa_count:-0}"
+
+  if [ "$SCALING_MODE" = "hpa" ]; then
+    if [ "$mono_hpa_present" -ne 1 ]; then
+      echo "ERROR: expected monolith HPA to exist for SCALING_MODE=hpa, but none was found in namespace mono" >&2
+      return 1
+    fi
+    if [ "$msa_hpa_count" -lt 4 ]; then
+      echo "ERROR: expected microservices HPAs to exist for SCALING_MODE=hpa, but found only ${msa_hpa_count} HPA object(s) in namespace msa" >&2
+      return 1
+    fi
+  else
+    if [ "$mono_hpa_present" -ne 0 ]; then
+      echo "ERROR: found monolith HPA while SCALING_MODE=fixed. Redeploy fixed overlays before running the fixed benchmark suite." >&2
+      return 1
+    fi
+    if [ "$msa_hpa_count" -ne 0 ]; then
+      echo "ERROR: found ${msa_hpa_count} microservices HPA object(s) while SCALING_MODE=fixed. Redeploy fixed overlays before running the fixed benchmark suite." >&2
+      return 1
+    fi
+  fi
 }
 
 run_parallel_case() {
@@ -645,6 +715,7 @@ suite_failed=0
 completed_cases=0
 IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
+verify_live_scaling_mode_state
 upload_suite_manifest
 
 while IFS=$'\t' read -r scenario scenario_rps_levels; do
