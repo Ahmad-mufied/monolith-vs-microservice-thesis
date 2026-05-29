@@ -730,6 +730,25 @@ make run-benchmark-suite \
 For HPA exploratory mixed workload, redeploy HPA first and use
 `INTER_CASE_DELAY=300`.
 
+### Phase 6.5a — Optional Sync Items
+
+`sync-items` can also be integrated into the same benchmark workflow as an
+optional isolated scenario:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  TEST_DURATION=30s \
+  INTER_CASE_DELAY=0 \
+  SCENARIOS="sync-items" \
+  RPS_LEVELS="10" \
+  S3_BUCKET=skripsi-benchmark-results
+```
+
+Keep `sync-items` outside the primary matrix. Because `PUT /api/v1/items`
+performs full active-item synchronization, treat it like an isolated write-path
+validation case instead of a primary RQ1/RQ2 scenario.
+
 ### Phase 6.6 — Scenario Data Lifecycle
 
 The suite runner uses this data lifecycle:
@@ -737,6 +756,8 @@ The suite runner uses this data lifecycle:
 - `login`: reset and seed once before the first RPS level.
 - `create-transaction`: reset and seed before every RPS level because the
   scenario mutates transaction data.
+- `sync-items`: reset and seed before every RPS level because the scenario
+  replaces the active item set.
 - `enriched-transactions`: scale app workloads down, reset, seed, and prepare
   enrichment data once before the first RPS level, then restore the rendered
   fixed/HPA workloads before k6 starts. This avoids ResourceQuota deadlock and

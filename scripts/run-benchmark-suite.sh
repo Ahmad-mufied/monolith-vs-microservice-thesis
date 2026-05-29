@@ -107,9 +107,9 @@ validate_supported_scenario() {
   local scenario="$1"
 
   case "$scenario" in
-    login|create-transaction|enriched-transactions|mixed-workload) ;;
+    login|create-transaction|enriched-transactions|mixed-workload|sync-items) ;;
     *)
-      echo "ERROR: unsupported scenario '$scenario' (expected: login|create-transaction|enriched-transactions|mixed-workload)" >&2
+      echo "ERROR: unsupported scenario '$scenario' (expected: login|create-transaction|enriched-transactions|mixed-workload|sync-items)" >&2
       return 1
       ;;
   esac
@@ -737,7 +737,7 @@ while IFS=$'\t' read -r scenario scenario_rps_levels; do
     echo "  target_rps : $target_rps"
     echo "  attempt    : $ATTEMPT"
 
-    if [ "$scenario" = "create-transaction" ]; then
+    if [ "$scenario" = "create-transaction" ] || [ "$scenario" = "sync-items" ]; then
       reset_and_seed_benchmark_data
     fi
 
