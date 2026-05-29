@@ -87,6 +87,12 @@ purpose       : k6 runner Job
 The taint on testing-nodes prevents application pods from being scheduled
 there. k6 Job manifests include the matching toleration.
 
+For the microservices architecture, pod anti-affinity is used to spread service
+pods across the 2 app nodes. Each MSA service deployment includes a soft
+preference to avoid co-location with other MSA services on the same node. This
+prevents CPU-heavy services (e.g. `auth-service`) from monopolizing a single
+node. See `docs/infrastructure/deployment-strategy.md` section 12a for details.
+
 ---
 
 ## 5. RDS Split

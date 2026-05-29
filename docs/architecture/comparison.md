@@ -767,6 +767,7 @@ Other services may remain at lower replica count
 | HPA target | one deployment | multiple deployments |
 | Quota contention | simpler | possible between services |
 | Idle module replication | possible | less likely |
+| Pod node spreading | not needed (replicas are identical) | pod anti-affinity across app nodes |
 
 Microservices may be more efficient under focused load because only the hot service needs to scale.
 
