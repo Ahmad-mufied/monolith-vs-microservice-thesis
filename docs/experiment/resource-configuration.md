@@ -164,10 +164,11 @@ The comparison rule across these modes is:
 
 ```text
 fixed mode:
-  total active MSA limits = architecture ceiling
+  total active MSA limits = architecture ceiling (strict)
 
 hpa mode:
-  total maximum MSA limits = architecture ceiling
+  CPU total maximum limits = architecture ceiling (strict)
+  Memory total maximum limits = elastic oversubscription under ResourceQuota guardrail
 ```
 
 This distinction matters.
@@ -487,19 +488,38 @@ The current benchmark uses the following resource configuration.
 
 ### HPA Mode
 
-| Service | CPU req/pod | CPU limit/pod | Mem req/pod | Mem limit/pod | minReplicas | maxReplicas | Max CPU | Max Mem |
+HPA mode uses **quota-guarded elastic oversubscription**. CPU total maximum is
+strictly equal to the architecture ceiling. Memory total theoretical maximum
+slightly exceeds the ceiling by design, with the namespace ResourceQuota acting
+as the hard guardrail.
+
+```text
+Fixed mode  = strict active ceiling
+HPA mode    = quota-guarded elastic oversubscription
+```
+
+| Service | CPU req/pod | CPU limit/pod | Mem req/pod | Mem limit/pod | minReplicas | maxReplicas | Max CPU | Max Mem (theoretical) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | `api-gateway` | `200m` | `500m` | `432Mi` | `864Mi` | `1` | `5` | `2500m` | `4320Mi` |
 | `auth-service` | `2000m` | `3500m` | `3456Mi` | `5184Mi` | `1` | `2` | `7000m` | `10368Mi` |
 | `item-service` | `200m` | `460m` | `432Mi` | `864Mi` | `1` | `5` | `2300m` | `4320Mi` |
 | `transaction-service` | `800m` | `2000m` | `3024Mi` | `5184Mi` | `1` | `2` | `4000m` | `10368Mi` |
-| **Total max** | | | | | | | **`15800m`** | **`29376Mi`** |
+| **Total max** | | | | | | | **`15800m`** ✅ | **`29376Mi`** ⚠️ |
 
-The HPA total maximum memory (29376Mi) exceeds the namespace quota ceiling
-(27648Mi) by design. Not all services will reach maxReplicas simultaneously.
-The namespace ResourceQuota enforces the hard ceiling at 27648Mi, so any
-scale-out attempt that would exceed the quota will be pending until quota is
-freed by scale-in of other services.
+CPU total maximum = architecture ceiling (strict). Memory theoretical maximum
+(29376Mi) exceeds the namespace quota (27648Mi) by ~1728Mi (~6%). This is
+intentional: each service is assigned `maxReplicas` based on its workload
+character, not based on a precise per-service memory split.
+
+The namespace ResourceQuota (27648Mi) remains the hard ceiling for actual
+memory usage. If all services attempt to scale out to maxReplicas
+simultaneously and total memory requests approach the quota, new pods will be
+held Pending by the Kubernetes scheduler. This is expected behavior and is
+recorded as part of HPA behavior observation, not as a configuration failure.
+
+In practice, not all services reach maxReplicas simultaneously because each
+benchmark scenario activates only a subset of services. The oversubscription
+enables active services to utilize resources freed by idle services.
 
 ### HPA Replica Shape Rationale
 
