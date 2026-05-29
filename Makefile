@@ -178,6 +178,8 @@ help:
 	@echo "  make terraform-recovery-fix-tainted-nodegroups-apply # untaint active healthy node groups"
 	@echo "  make eks-prepare-enrichment-benchmark"
 	@echo "  make run-benchmark-suite SCALING_MODE=fixed EXPERIMENT_NAME=rq1-final TEST_DURATION=5m INTER_CASE_DELAY=120 AUTO_DESTROY_CONFIRMED=true SCENARIO_RPS_MATRIX=\"login:100,120,140,160,180,200;create-transaction:100,150,200,250,300,400,500;enriched-transactions:100,150,200,250,300,400,500\""
+	@echo "  # Optional login extension after the primary matrix:"
+	@echo "  make run-benchmark-suite SCALING_MODE=fixed EXPERIMENT_NAME=rq1-login-extension TEST_DURATION=5m INTER_CASE_DELAY=90 SCENARIOS=\"login\" RPS_LEVELS=\"225 250\""
 	@echo "  make eks-create-secrets"
 	@echo "  make create-eks-secrets-monolith"
 	@echo "  make create-eks-secrets-microservices"

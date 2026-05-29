@@ -618,6 +618,34 @@ make run-benchmark-suite \
 This keeps the executor and methodology consistent while letting each scenario
 use a more informative calibrated RPS range.
 
+For the final fixed primary matrix, interpret this choice as a conservative
+main run:
+
+- `login` is capped at `200` RPS because the microservices login path usually
+  reaches its critical transition zone earlier than the other scenarios.
+- `create-transaction` and `enriched-transactions` continue to `500` RPS
+  because the higher range still yields useful separation between
+  architectures.
+- If the thesis needs stronger evidence that monolith login still has headroom
+  above `200` RPS, add a separate `login` extension run rather than changing
+  the primary matrix while measured attempts are already in progress.
+
+Recommended fixed `login` extension run:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  EXPERIMENT_NAME=rq1-login-extension \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=90 \
+  SCENARIOS="login" \
+  RPS_LEVELS="225 250" \
+  S3_BUCKET=skripsi-benchmark-results
+```
+
+Treat this extension as supporting/exploratory evidence, not as a replacement
+for the primary fixed matrix.
+
 For unattended overnight runs, you may add:
 
 ```bash
@@ -704,8 +732,10 @@ The suite runner uses this data lifecycle:
 - `login`: reset and seed once before the first RPS level.
 - `create-transaction`: reset and seed before every RPS level because the
   scenario mutates transaction data.
-- `enriched-transactions`: reset, seed, and prepare enrichment data once before
-  the first RPS level.
+- `enriched-transactions`: scale app workloads down, reset, seed, and prepare
+  enrichment data once before the first RPS level, then restore the rendered
+  fixed/HPA workloads before k6 starts. This avoids ResourceQuota deadlock and
+  ensures the prepare jobs use the same rendered image references as the suite.
 - `mixed-workload`: supported for exploration, but exclude it from the primary
   Bab 4 RQ1/RQ2 matrix unless the thesis explicitly analyzes mixed load.
 

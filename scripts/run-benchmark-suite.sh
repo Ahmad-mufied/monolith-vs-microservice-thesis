@@ -391,6 +391,33 @@ reset_and_seed_benchmark_data() {
   restore_app_workloads_after_data_reset
 }
 
+reset_seed_and_prepare_enrichment_data() {
+  scale_down_app_workloads_for_data_reset
+
+  kubectl --context=monolith delete job reset-monolith-data-job -n mono --ignore-not-found
+  kubectl --context=monolith apply -f "$RENDERED_EKS_MONOLITH_DIR/reset-monolith-data-job.yaml"
+  kubectl --context=monolith wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=120s
+
+  kubectl --context=msa delete job reset-microservices-data-job -n msa --ignore-not-found
+  kubectl --context=msa apply -f "$RENDERED_EKS_MICROSERVICES_DIR/reset-microservices-data-job.yaml"
+  kubectl --context=msa wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
+
+  kubectl --context=monolith delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
+  kubectl --context=monolith apply -f "$RENDERED_EKS_MONOLITH_DIR/seed-monolith-benchmark-data-job.yaml"
+  kubectl --context=monolith wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
+
+  kubectl --context=msa delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
+  kubectl --context=msa apply -f "$RENDERED_EKS_MICROSERVICES_DIR/seed-microservices-benchmark-data-job.yaml"
+  kubectl --context=msa wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
+
+  MONOLITH_PREPARE_MANIFEST_PATH="$RENDERED_EKS_MONOLITH_DIR/prepare-monolith-enrichment-benchmark-data-job.yaml" \
+  MICROSERVICES_PREPARE_MANIFEST_PATH="$RENDERED_EKS_MICROSERVICES_DIR/prepare-microservices-enrichment-benchmark-data-job.yaml" \
+  PREPARE_ENRICHMENT_TIMEOUT="600s" \
+  bash scripts/prepare-enrichment-benchmark.sh
+
+  restore_app_workloads_after_data_reset
+}
+
 scale_down_app_workloads_for_data_reset() {
   local svc
 
@@ -629,8 +656,7 @@ while IFS=$'\t' read -r scenario scenario_rps_levels; do
   fi
 
   if [ "$scenario" = "enriched-transactions" ]; then
-    reset_and_seed_benchmark_data
-    bash scripts/prepare-enrichment-benchmark.sh
+    reset_seed_and_prepare_enrichment_data
   fi
 
   for target_rps in $scenario_rps_levels; do
