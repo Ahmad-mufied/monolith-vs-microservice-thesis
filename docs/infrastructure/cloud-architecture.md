@@ -70,7 +70,7 @@ two completely independent RDS instances run side by side.
 │  │  │     └─ namespace: mono               │                        │   │
 │  │  │           └─ monolith pods           │                        │   │
 │  │  │                                      │                        │   │
-│  │  │  testing-nodes  (1× t3.large)        │                        │   │
+│  │  │  testing-nodes  (1× c8i-flex.large)        │                        │   │
 │  │  │     └─ namespace: benchmark          │                        │   │
 │  │  │           └─ k6 runner Job           │                        │   │
 │  │  │                                      │                        │   │
@@ -93,7 +93,7 @@ two completely independent RDS instances run side by side.
 │  │  │           ├─ item-service       │                              │   │
 │  │  │           └─ transaction-svc    │                              │   │
 │  │  │                                 │                              │   │
-│  │  │  testing-nodes  (1× t3.large)   │                              │   │
+│  │  │  testing-nodes  (1× c8i-flex.large)   │                              │   │
 │  │  │     └─ namespace: benchmark     │                              │   │
 │  │  │           └─ k6 runner Job      │                              │   │
 │  │  │                                 │                              │   │
@@ -267,7 +267,7 @@ Each cluster has two node groups:
 ```text
 app-nodes            testing-nodes
 ──────────────       ─────────────
-2× c8i.2xlarge      1× t3.large
+2× c8i.2xlarge      1× c8i-flex.large
 8 vCPU each         2 vCPU
 16 GiB each         8 GiB
 labels:            labels:
@@ -768,7 +768,7 @@ illustrative `t3.xlarge` totals are no longer valid for budgeting.
 |---|---|---|
 | EKS control plane | $0.10 | $0.20 |
 | app-nodes (2× c8i.2xlarge) | recalculate live | recalculate live |
-| testing-nodes (1× t3.large) | ~$0.08 | ~$0.16 |
+| testing-nodes (1× c8i-flex.large) | ~$0.09 | ~$0.18 |
 | RDS (db.t3.medium) | ~$0.07 | ~$0.14 |
 | **Total active** | **recalculate live** | **recalculate live** |
 

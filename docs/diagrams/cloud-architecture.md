@@ -23,7 +23,7 @@ flowchart TB
         subgraph experimentTf["Experiment stack resources"]
           subgraph monoCluster["EKS cluster: skripsi-monolith"]
             monoAppNodes["app-nodes<br/>2 x c8i.xlarge<br/>node-group=app"]
-            monoTesting["testing-nodes<br/>1 x t3.large<br/>node-group=testing<br/>taint workload=benchmark"]
+            monoTesting["testing-nodes<br/>1 x c8i-flex.large<br/>node-group=testing<br/>taint workload=benchmark"]
             monoNs["namespace: mono<br/>monolith pod(s)"]
             monoBench["namespace: benchmark<br/>k6 runner job"]
             monoDD["namespace: datadog<br/>Datadog Agent DaemonSet"]
@@ -33,7 +33,7 @@ flowchart TB
 
           subgraph msaCluster["EKS cluster: skripsi-msa"]
             msaAppNodes["app-nodes<br/>2 x c8i.xlarge<br/>node-group=app"]
-            msaTesting["testing-nodes<br/>1 x t3.large<br/>node-group=testing<br/>taint workload=benchmark"]
+            msaTesting["testing-nodes<br/>1 x c8i-flex.large<br/>node-group=testing<br/>taint workload=benchmark"]
             msaNs["namespace: msa<br/>api-gateway, auth, item, transaction"]
             msaBench["namespace: benchmark<br/>k6 runner job"]
             msaDD["namespace: datadog<br/>Datadog Agent DaemonSet"]

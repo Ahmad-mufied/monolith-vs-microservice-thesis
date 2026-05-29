@@ -65,9 +65,9 @@ spec:
             - name: TEST_DURATION
               value: 5m
             - name: PRE_ALLOCATED_VUS
-              value: "100"
+              value: "200"
             - name: MAX_VUS
-              value: "500"
+              value: "2000"
             - name: DATADOG_ENABLED
               value: "true"
             - name: DATADOG_ENV
@@ -118,11 +118,11 @@ spec:
                   optional: true
           resources:
             requests:
-              cpu: 500m
-              memory: 512Mi
-            limits:
-              cpu: 2000m
+              cpu: 1200m
               memory: 2048Mi
+            limits:
+              cpu: 1500m
+              memory: 3584Mi
           volumeMounts:
             - name: work-tmp
               mountPath: /work/tmp
