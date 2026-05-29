@@ -576,6 +576,92 @@ node-group=testing
 
 ---
 
+## 12a. Microservices Pod Anti-Affinity
+
+The microservices architecture uses pod anti-affinity to spread service pods
+across available app nodes. This prevents CPU-heavy services (especially
+`auth-service`) from being co-located with other services on the same node,
+which would create an unbalanced resource distribution.
+
+### Problem
+
+Without anti-affinity, the Kubernetes scheduler may place all four MSA service
+pods on the same app node:
+
+```text
+App Node 1 (88% CPU):  auth-service (6989m) + api-gateway (25m)
+App Node 2 (0.8% CPU): item-service (1m) + transaction-service (1m)
+```
+
+This creates an artificial bottleneck on one node while the other node is
+underutilized.
+
+### Solution
+
+Each MSA base deployment includes a `preferredDuringSchedulingIgnoredDuringExecution`
+anti-affinity rule that prefers scheduling pods on nodes that do not already
+have pods with the `benchmark.skripsi.dev/architecture: microservices` label.
+
+```yaml
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: benchmark.skripsi.dev/architecture
+                operator: In
+                values:
+                  - microservices
+          topologyKey: kubernetes.io/hostname
+```
+
+### Expected Result
+
+With 2 app nodes and 4 services (fixed mode, 1 replica each), the scheduler
+will spread 2 services per node:
+
+```text
+App Node 1: auth-service + transaction-service
+App Node 2: api-gateway + item-service
+```
+
+Or any other 2-service combination, depending on scheduling order and resource
+availability.
+
+### Properties
+
+- `preferred` (not `required`): scheduler will still place pods if anti-affinity
+  cannot be satisfied. This avoids scheduling failures when only one node is
+  available.
+- `weight: 100`: highest soft preference, strongly encourages spreading.
+- `topologyKey: kubernetes.io/hostname`: spread across distinct nodes.
+- Uses existing label `benchmark.skripsi.dev/architecture: microservices` that
+  is already present on all MSA service pods.
+- Applies to both `fixed` and `HPA` overlays because the rule is in the base
+  manifest.
+
+### Fairness Impact
+
+Anti-affinity is applied symmetrically to all microservices services. It does
+not give any service a special advantage. It simply distributes services across
+available nodes, which is a standard Kubernetes scheduling practice.
+
+The monolith architecture does not need anti-affinity because it runs as a
+single deployment with replicas that are identical and interchangeable.
+
+### Files Modified
+
+```text
+deployments/k8s/eks/microservices/base/api-gateway.yaml
+deployments/k8s/eks/microservices/base/auth-service.yaml
+deployments/k8s/eks/microservices/base/item-service.yaml
+deployments/k8s/eks/microservices/base/transaction-service.yaml
+```
+
+---
+
 ## 13. Database Job Model
 
 Database preparation is separated from application runtime.

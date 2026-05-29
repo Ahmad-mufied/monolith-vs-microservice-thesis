@@ -24,6 +24,18 @@ spec:
           type: RuntimeDefault
       nodeSelector:
         node-group: app
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: benchmark.skripsi.dev/architecture
+                      operator: In
+                      values:
+                        - microservices
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: api-gateway
           image: REPLACE_WITH_API_GATEWAY_ECR_IMAGE
