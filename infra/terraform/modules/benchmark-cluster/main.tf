@@ -54,7 +54,7 @@ module "eks" {
 
     testing_nodes = {
       name           = "testing-nodes"
-      instance_types = ["t3.large"]
+      instance_types = ["c8i-flex.large"]
       min_size       = 1
       max_size       = 1
       desired_size   = 1

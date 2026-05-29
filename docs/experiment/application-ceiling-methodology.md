@@ -164,7 +164,7 @@ This keeps the application ceiling specific to the resource pool that hosts:
 The current benchmark environment uses, per architecture:
 
 - `2` app nodes of type `c8i.2xlarge`
-- `1` testing node of type `t3.large`
+- `1` testing node of type `c8i-flex.large`
 
 The ceiling calculation below intentionally uses only the `2` app nodes.
 

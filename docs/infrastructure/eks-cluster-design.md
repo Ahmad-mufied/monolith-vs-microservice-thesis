@@ -22,13 +22,13 @@ AWS ap-southeast-1
 │
 ├── Cluster A: skripsi-monolith
 │   ├── app-nodes      (2× c8i.2xlarge)  → mono namespace
-│   ├── testing-nodes  (1× t3.large)   → benchmark namespace
+│   ├── testing-nodes  (1× c8i-flex.large)   → benchmark namespace
 │   └── RDS A: skripsi-monolith-postgres
 │       └── mono_db
 │
 ├── Cluster B: skripsi-msa
 │   ├── app-nodes      (2× c8i.2xlarge)  → msa namespace
-│   ├── testing-nodes  (1× t3.large)   → benchmark namespace
+│   ├── testing-nodes  (1× c8i-flex.large)   → benchmark namespace
 │   └── RDS B: skripsi-msa-postgres
 │       ├── auth_db
 │       ├── item_db
@@ -77,7 +77,7 @@ purpose       : application pods (monolith or MSA services) on the stronger
 ### testing-nodes
 
 ```text
-instance type : t3.large (2 vCPU, 8 GiB)
+instance type : c8i-flex.large (2 vCPU, 4 GiB)
 count         : 1
 label         : node-group=testing
 taint         : workload=benchmark:NoSchedule
@@ -182,7 +182,7 @@ older `t3.xlarge`.
 |---|---|---|
 | EKS control plane | $0.10 | $0.20 |
 | app-nodes (2× c8i.2xlarge) | recalculate live | recalculate live |
-| testing-nodes (1× t3.large) | $0.08 | $0.16 |
+| testing-nodes (1× c8i-flex.large) | $0.09 | $0.18 |
 | RDS db.t3.medium | $0.07 | $0.14 |
 | **Total** | **recalculate live** | **recalculate live** |
 
