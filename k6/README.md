@@ -596,6 +596,10 @@ It does not send the older `item_ids` payload shape.
 
 Because `PUT /api/v1/items` is a full active item synchronization endpoint, run this scenario only in an isolated attempt after reset and seed.
 
+The benchmark runners now support `sync-items` as an optional scenario name,
+but it should stay outside the primary fixed/HPA matrix and be executed as its
+own isolated suite or single-case run.
+
 ### Enriched Transactions
 
 `enriched-transactions.js` expects transaction data to exist.

@@ -203,7 +203,25 @@ make run-benchmark-parallel \
 
 ---
 
-## 8. Multiple RPS Levels
+## 8. Optional Scenario: Sync Items
+
+`sync-items` is supported as an optional isolated workflow validation scenario.
+Because `PUT /api/v1/items` performs full active-item synchronization, reset and
+seed the base benchmark dataset before each run just like the write-path
+scenario.
+
+```bash
+make run-benchmark-parallel \
+  SCENARIO=sync-items \
+  TARGET_RPS=10 \
+  RUN_ID=eks-run-001 \
+  ATTEMPT=attempt-01 \
+  S3_BUCKET=<bucket>
+```
+
+---
+
+## 9. Multiple RPS Levels
 
 Repeat the run for each target RPS level. Reset and seed before each run
 for scenarios that mutate data (create-transaction).
@@ -227,7 +245,7 @@ first RPS level since they do not mutate data.
 
 ---
 
-## 9. Full Benchmark Suite
+## 10. Full Benchmark Suite
 
 For final fixed or HPA runs, prefer the suite runner when you want to execute
 the full scenario and RPS matrix with less manual operator input:
