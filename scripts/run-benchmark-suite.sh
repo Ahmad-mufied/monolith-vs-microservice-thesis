@@ -394,6 +394,7 @@ scenario_rps_matrix_json() {
 
 next_attempt_from_s3() {
   local run_uri="$1"
+  local scenario_filter="${2:-}"
   local listing
   local listing_error
   local latest
@@ -413,6 +414,20 @@ next_attempt_from_s3() {
     return 0
   fi
   rm -f "$listing_error"
+
+  if [ -z "$listing" ]; then
+    printf 'attempt-01'
+    return 0
+  fi
+
+  if [ -n "$scenario_filter" ]; then
+    local pre_filter_count
+    pre_filter_count="$(wc -l <<<"$listing" | tr -d '[:space:]')"
+    listing="$(grep "/${scenario_filter}/" <<<"$listing" || true)"
+    local post_filter_count
+    post_filter_count="$(wc -l <<<"$listing" | tr -d '[:space:]')"
+    echo "  attempt search : scenario='${scenario_filter}' matched ${post_filter_count}/${pre_filter_count} S3 entries" >&2
+  fi
 
   if [ -z "$listing" ]; then
     printf 'attempt-01'
@@ -713,7 +728,19 @@ maybe_wait_between_cases() {
 }
 
 if [ -z "$ATTEMPT" ]; then
-  ATTEMPT="$(next_attempt_from_s3 "$S3_RUN_URI")"
+  if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
+    FIRST_SCENARIO="$(trim_whitespace "${SCENARIO_RPS_MATRIX%%:*}")"
+  else
+    FIRST_SCENARIO="$(awk '{print $1}' <<<"$SCENARIOS")"
+  fi
+
+  if [ -z "$FIRST_SCENARIO" ]; then
+    echo "ERROR: could not determine first scenario for attempt selection" >&2
+    exit 1
+  fi
+
+  validate_supported_scenario "$FIRST_SCENARIO" || exit 1
+  ATTEMPT="$(next_attempt_from_s3 "$S3_RUN_URI" "$FIRST_SCENARIO")"
 fi
 
 build_suite_matrix_file
