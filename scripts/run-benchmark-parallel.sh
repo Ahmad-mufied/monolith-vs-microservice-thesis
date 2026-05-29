@@ -32,6 +32,7 @@ if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
 fi
 
 source scripts/lib/resource-configuration.sh
+source scripts/lib/benchmark-preflight.sh
 
 SCENARIO="${SCENARIO:?SCENARIO is required (login|create-transaction|enriched-transactions|mixed-workload|sync-items)}"
 TARGET_RPS="${TARGET_RPS:?TARGET_RPS is required}"
@@ -40,6 +41,7 @@ ATTEMPT="${ATTEMPT:-attempt-01}"
 SCALING_MODE="${SCALING_MODE:-fixed}"
 K6_PROFILE="${K6_PROFILE:-steady}"
 ALLOW_NONSTANDARD_SCALING_PROFILE="${ALLOW_NONSTANDARD_SCALING_PROFILE:-false}"
+SKIP_BENCHMARK_PREFLIGHT="${SKIP_BENCHMARK_PREFLIGHT:-false}"
 TEST_DURATION="${TEST_DURATION:-5m}"
 S3_BUCKET="${S3_BUCKET:?S3_BUCKET is required}"
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
@@ -88,6 +90,14 @@ case "$ALLOW_NONSTANDARD_SCALING_PROFILE" in
     ;;
 esac
 
+case "$SKIP_BENCHMARK_PREFLIGHT" in
+  true|false) ;;
+  *)
+    echo "ERROR: invalid SKIP_BENCHMARK_PREFLIGHT value '$SKIP_BENCHMARK_PREFLIGHT' (expected: true|false)" >&2
+    exit 1
+    ;;
+esac
+
 if [ "$ALLOW_NONSTANDARD_SCALING_PROFILE" != "true" ]; then
   case "$SCALING_MODE:$K6_PROFILE" in
     fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa) ;;
@@ -102,10 +112,24 @@ if [ "$ALLOW_NONSTANDARD_SCALING_PROFILE" != "true" ]; then
   esac
 fi
 
-# ─── Validate contexts ────────────────────────────────────────────────────────
+run_parallel_preflight() {
+  local context_label="$1"
+  local quiet="${2:-false}"
 
-kubectl --context=monolith get nodes > /dev/null 2>&1 || { echo "ERROR: monolith context not available"; exit 1; }
-kubectl --context=msa get nodes > /dev/null 2>&1 || { echo "ERROR: msa context not available"; exit 1; }
+  if [ "$SKIP_BENCHMARK_PREFLIGHT" = "true" ]; then
+    if [ "$quiet" != "true" ]; then
+      echo "=== Benchmark Preflight ==="
+      echo "  phase        : $context_label"
+      echo "  status       : skipped (SKIP_BENCHMARK_PREFLIGHT=true)"
+      echo ""
+    fi
+    return 0
+  fi
+
+  benchmark_preflight_or_die "$S3_BUCKET" "$context_label" "$quiet"
+}
+
+run_parallel_preflight "parallel benchmark bootstrap"
 
 IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
 MONOLITH_MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml"
@@ -573,6 +597,12 @@ while true; do
 done
 
 echo ""
+if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ] && ! benchmark_preflight_check "$S3_BUCKET" "parallel benchmark result inspection" "true"; then
+  echo "ERROR: benchmark jobs finished but local AWS or EKS auth expired before result inspection." >&2
+  echo "Fix: refresh auth, verify S3 artifacts for this attempt, then rerun the inspection workflow or the benchmark case if needed." >&2
+  exit 1
+fi
+
 mono_result_file="$INSPECTION_ROOT/monolith-result.json"
 msa_result_file="$INSPECTION_ROOT/microservices-result.json"
 

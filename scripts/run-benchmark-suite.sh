@@ -26,6 +26,7 @@ if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
 fi
 
 source scripts/lib/resource-configuration.sh
+source scripts/lib/benchmark-preflight.sh
 
 SCALING_MODE="${SCALING_MODE:-fixed}"
 TEST_DURATION="${TEST_DURATION:-5m}"
@@ -37,6 +38,7 @@ INTER_CASE_DELAY="${INTER_CASE_DELAY:-0}"
 MAX_INTER_CASE_DELAY=86400
 AUTO_DESTROY_CONFIRMED="${AUTO_DESTROY_CONFIRMED:-false}"
 ALLOW_NONSTANDARD_SCALING_PROFILE="${ALLOW_NONSTANDARD_SCALING_PROFILE:-false}"
+SKIP_BENCHMARK_PREFLIGHT="${SKIP_BENCHMARK_PREFLIGHT:-false}"
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
 DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 K6_PROFILE="${K6_PROFILE:-}"
@@ -229,6 +231,14 @@ validate_matrix_inputs() {
       ;;
   esac
 
+  case "$SKIP_BENCHMARK_PREFLIGHT" in
+    true|false) ;;
+    *)
+      echo "ERROR: invalid SKIP_BENCHMARK_PREFLIGHT value '$SKIP_BENCHMARK_PREFLIGHT' (expected: true|false)" >&2
+      return 1
+      ;;
+  esac
+
   if [ "$AUTO_DESTROY_CONFIRMED" = "true" ] && [ -z "$RUN_ID" ] && [ -z "$EXPERIMENT_NAME" ]; then
     echo "ERROR: AUTO_DESTROY_CONFIRMED=true requires EXPERIMENT_NAME or RUN_ID so the unattended run has a stable identifier" >&2
     return 1
@@ -273,6 +283,23 @@ validate_scaling_profile_pairing() {
 }
 
 validate_scaling_profile_pairing
+
+run_suite_preflight() {
+  local context_label="$1"
+  local quiet="${2:-false}"
+
+  if [ "$SKIP_BENCHMARK_PREFLIGHT" = "true" ]; then
+    if [ "$quiet" != "true" ]; then
+      echo "=== Benchmark Preflight ==="
+      echo "  phase        : $context_label"
+      echo "  status       : skipped (SKIP_BENCHMARK_PREFLIGHT=true)"
+      echo ""
+    fi
+    return 0
+  fi
+
+  benchmark_preflight_or_die "$S3_BUCKET" "$context_label" "$quiet"
+}
 
 if [ -z "$RUN_ID" ]; then
   if [ -n "$EXPERIMENT_NAME" ]; then
@@ -543,6 +570,8 @@ upload_suite_manifest() {
   local manifest_path="$SUITE_WORKDIR/manifest.json"
   local resource_configuration_json
 
+  run_suite_preflight "suite manifest upload" "true"
+
   resource_configuration_json="$(suite_resource_configuration_json "$SCALING_MODE")"
   jq -n \
     --arg experiment_name "$EXPERIMENT_NAME" \
@@ -608,6 +637,7 @@ upload_suite_summary() {
 
   finished_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   resource_configuration_json="$(suite_resource_configuration_json "$SCALING_MODE")"
+  run_suite_preflight "suite summary upload" "true"
   jq -s \
     --arg experiment_name "$EXPERIMENT_NAME" \
     --arg run_id "$RUN_ID" \
@@ -711,6 +741,8 @@ echo "  auto_destroy : $AUTO_DESTROY_CONFIRMED"
 echo "  report_s3_uri: $S3_RUN_URI"
 echo ""
 
+run_suite_preflight "suite bootstrap preflight"
+
 suite_failed=0
 completed_cases=0
 IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
@@ -736,6 +768,8 @@ while IFS=$'\t' read -r scenario scenario_rps_levels; do
     echo "  scenario   : $scenario"
     echo "  target_rps : $target_rps"
     echo "  attempt    : $ATTEMPT"
+
+    run_suite_preflight "suite case ${scenario} ${target_rps}rps" "true"
 
     if [ "$scenario" = "create-transaction" ] || [ "$scenario" = "sync-items" ]; then
       reset_and_seed_benchmark_data

@@ -173,6 +173,7 @@ help:
 	@echo "  make eks-render-manifests"
 	@echo "  make eks-render-tfvars"
 	@echo "  make terraform-auth-check"
+	@echo "  make benchmark-preflight-check"
 	@echo "  make terraform-recovery-check"
 	@echo "  make terraform-recovery-fix-tainted-nodegroups      # dry-run safe untaint suggestions"
 	@echo "  make terraform-recovery-fix-tainted-nodegroups-apply # untaint active healthy node groups"
@@ -214,6 +215,10 @@ env-init-microservices: env-init-base
 .PHONY: env-init-eks
 env-init-eks:
 	bash scripts/env-init-eks.sh
+
+.PHONY: benchmark-preflight-check
+benchmark-preflight-check:
+	bash scripts/benchmark-preflight-check.sh
 
 # =========================
 # Go Development
