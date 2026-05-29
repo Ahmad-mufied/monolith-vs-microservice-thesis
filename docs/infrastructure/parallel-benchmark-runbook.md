@@ -21,6 +21,18 @@ provisioning to result verification and teardown.
 - S3 bucket available
 ```
 
+Before any long benchmark run, refresh the AWS session you actually use for the
+experiment, then run the benchmark preflight:
+
+```bash
+aws login
+make benchmark-preflight-check
+```
+
+The suite and parallel runners now execute the same preflight automatically
+before submission and fail fast if AWS STS, S3 access, or either EKS context is
+already invalid.
+
 ---
 
 ## 3. Experiment Lifecycle Overview
@@ -276,6 +288,11 @@ Default suite behavior:
   paired incorrectly or if the live clusters do not actually match the
   expected HPA/fixed state; use `ALLOW_NONSTANDARD_SCALING_PROFILE=true` only
   for deliberate nonstandard experiments
+- by default, the runner also performs an AWS/EKS benchmark preflight before
+  the suite starts, before every case, and again before summary upload so an
+  expired local session stops with a clear error instead of degrading into
+  missing S3 artifacts; set `SKIP_BENCHMARK_PREFLIGHT=true` only for deliberate
+  debugging
 
 Recommended repeat-attempt workflow:
 

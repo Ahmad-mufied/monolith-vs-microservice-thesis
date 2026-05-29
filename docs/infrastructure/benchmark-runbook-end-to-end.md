@@ -206,6 +206,26 @@ kubectl --context=msa get nodes
 
 Expected: 3 nodes per cluster (2 app-nodes of type `c8i.2xlarge` + 1 testing-node), all Ready.
 
+Before any long benchmark suite, refresh the AWS session that will be used for
+S3 inspection and EKS authentication, then run the benchmark preflight:
+
+```bash
+aws login
+make benchmark-preflight-check
+```
+
+`make run-benchmark-suite` and `make run-benchmark-parallel` now run this same
+preflight automatically before benchmark submission. The automatic preflight
+checks:
+
+- `aws sts get-caller-identity`
+- `aws s3 ls s3://<bucket>/`
+- `kubectl --context=monolith get nodes`
+- `kubectl --context=msa get nodes`
+
+This means an expired local AWS or EKS session fails fast before a long suite
+continues into misleading missing-artifact states.
+
 
 ---
 
@@ -544,6 +564,12 @@ Use the suite runner for measured Bab 4 data collection. It executes the
 scenario/RPS matrix in a consistent order, runs monolith and microservices in
 parallel per case, uploads a suite manifest and summary to S3, and handles the
 reset/seed lifecycle for each scenario.
+
+The suite runner now also performs a benchmark preflight before the suite
+starts, before every case, and again before writing suite metadata to S3. The
+preflight checks the current AWS STS session, read access to the benchmark S3
+bucket, and both `kubectl` contexts. Use `SKIP_BENCHMARK_PREFLIGHT=true` only
+for deliberate debugging.
 
 ### Phase 6.1 — Matrix Definition
 
