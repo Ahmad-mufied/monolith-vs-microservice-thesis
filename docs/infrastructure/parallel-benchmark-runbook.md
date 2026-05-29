@@ -43,7 +43,8 @@ install Datadog on both clusters
 for each scenario:
     reset data
     seed data
-    [prepare enrichment data if enriched-transactions]
+    [prepare enrichment data while app workloads remain scaled down if enriched-transactions]
+    restore rendered app workloads
     run parallel k6 jobs
     verify S3 results
     ↓
@@ -279,6 +280,40 @@ make run-benchmark-suite \
   INTER_CASE_DELAY=120 \
   SCENARIO_RPS_MATRIX="login:100,120,140,160,180,200;create-transaction:100,150,200,250,300,400,500;enriched-transactions:100,150,200,250,300,400,500"
 ```
+
+Recommended interpretation for this fixed primary matrix:
+
+- Treat it as the conservative primary Bab 4 matrix.
+- `login` stops at `200` RPS to keep the main suite focused on the transition
+  zone where the microservices path is already informative.
+- `create-transaction` and `enriched-transactions` extend to `500` RPS because
+  both architectures still provide useful separation in that higher range.
+- If later analysis needs to show monolith `login` headroom beyond `200` RPS,
+  run a separate `login` extension experiment instead of changing the primary
+  matrix mid-stream.
+
+Optional fixed `login` extension workflow:
+
+```bash
+make run-benchmark-suite \
+  SCALING_MODE=fixed \
+  EXPERIMENT_NAME=rq1-login-extension \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=90 \
+  SCENARIOS="login" \
+  RPS_LEVELS="225 250"
+```
+
+This extension run is exploratory/supporting data. Keep it separate from
+`rq1-fixed-primary` so the primary matrix remains a clean, repeatable source of
+truth for Bab 4.
+
+For `enriched-transactions`, the suite now performs reset, seed, and enrichment
+preparation while the application deployments are still scaled down. Only after
+the preparation jobs complete does the runner restore the rendered fixed/HPA
+workloads and start the k6 case. This prevents the prepare job from being
+blocked by a full namespace `ResourceQuota` and guarantees that the job uses
+the same rendered image tag as the rest of the suite.
 
 Matrix format:
 
