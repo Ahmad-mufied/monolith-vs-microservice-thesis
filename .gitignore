@@ -112,6 +112,7 @@ crash.log
 crash.*.log
 override.tf
 override.tf.json
+*.zip
 *_override.tf
 *_override.tf.json
 .terraform.lock.hcl
