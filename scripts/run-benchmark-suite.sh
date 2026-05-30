@@ -507,6 +507,19 @@ next_attempt_from_s3_per_rps() {
     return 0
   fi
 
+  # Second pass: verify every RPS actually has max_attempt, not just any attempt.
+  # Without this, a mix of attempt-01 and attempt-02 would incorrectly return
+  # attempt-03 (new run) instead of attempt-02 (continuation).
+  for rps in $rps_words; do
+    rps_dir="${rps}rps"
+    local rps_attempts
+    rps_attempts="$(grep "/${rps_dir}/" <<<"$scenario_listing" | sed -n 's|.*/attempt-\([0-9][0-9]*\)/.*|\1|p' | sort -n | tail -n 1)"
+    if [ -z "$rps_attempts" ] || [ $((10#$rps_attempts)) -ne "$max_attempt" ]; then
+      all_have_max=false
+      break
+    fi
+  done
+
   if [ "$all_have_max" = false ]; then
     echo "  attempt search : scenario='${scenario}' rps='${rps_words}' some RPS missing attempt-$(printf '%02d' "$max_attempt") → attempt-$(printf '%02d' "$max_attempt") (continuation)" >&2
     printf 'attempt-%02d' "$max_attempt"
