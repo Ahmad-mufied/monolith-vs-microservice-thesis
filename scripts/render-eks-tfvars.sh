@@ -24,6 +24,9 @@ set +a
 
 shared_aws_region="${AWS_REGION:-ap-southeast-1}"
 shared_project="${PROJECT:-skripsi}"
+budget_amount="${BUDGET_AMOUNT:-30}"
+budget_threshold_percent="${BUDGET_THRESHOLD_PERCENT:-100}"
+budget_alert_emails="${BUDGET_ALERT_EMAILS:-}"
 experiment_aws_region="${AWS_REGION:-ap-southeast-1}"
 experiment_project="${PROJECT:-skripsi}"
 experiment_db_instance_class="${DB_INSTANCE_CLASS:-db.t3.micro}"
@@ -67,12 +70,48 @@ format_hcl_cidr_list() {
   printf '[%s]' "$output"
 }
 
+format_hcl_string_list() {
+  local raw="$1"
+  local -a entries=()
+  local entry trimmed output=""
+
+  if [[ -z "$raw" ]]; then
+    echo "[]" >&2
+    return
+  fi
+
+  IFS=',' read -r -a entries <<< "$raw"
+  for entry in "${entries[@]}"; do
+    trimmed="$(printf '%s' "$entry" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    if [[ -z "$trimmed" ]]; then
+      continue
+    fi
+    if [[ -n "$output" ]]; then
+      output+=", "
+    fi
+    output+="\"$trimmed\""
+  done
+
+  if [[ -z "$output" ]]; then
+    echo "[]"
+    return
+  fi
+
+  printf '[%s]' "$output"
+}
+
 cluster_endpoint_public_access_cidrs_hcl="$(format_hcl_cidr_list "$cluster_endpoint_public_access_cidrs")"
+budget_alert_emails_hcl="$(format_hcl_string_list "$budget_alert_emails")"
 
 cat > infra/terraform/shared/terraform.tfvars <<EOF
 aws_region        = "${shared_aws_region}"
 project           = "${shared_project}"
 s3_results_bucket = "${S3_RESULTS_BUCKET}"
+
+# Budget nuclear shutdown protection
+budget_amount            = ${budget_amount}
+budget_threshold_percent = ${budget_threshold_percent}
+budget_alert_emails      = ${budget_alert_emails_hcl}
 EOF
 
 cat > infra/terraform/experiment/terraform.tfvars <<EOF
