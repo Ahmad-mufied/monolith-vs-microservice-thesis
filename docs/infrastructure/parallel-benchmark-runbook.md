@@ -113,11 +113,15 @@ The source manifests in the repository stay unchanged. Each deploy or benchmark
 run now renders runtime-specific EKS manifests into a temporary directory and
 applies those rendered files.
 
-Important rule:
+Important rules:
 
 - changing `SCALING_MODE` in `make run-benchmark-parallel` does **not** switch
   the live application manifests
 - every `fixed <-> hpa` transition must be handled as a fresh redeploy event
+- when `SCALING_MODE=hpa`, `K6_PROFILE` auto-defaults to `hpa` and
+  `TEST_DURATION` is **ignored** by the k6 executor — the actual run duration
+  is controlled by HPA stage env vars (default: 13 minutes per case). See
+  §4.1 below.
 
 Verify the live mode after redeploy:
 
@@ -137,6 +141,42 @@ Expected checks:
 - HPA mode:
   - HPA objects present
   - baseline deployments typically start at `1` and scale during load
+
+### 4.1 HPA Duration Behavior
+
+When `SCALING_MODE=hpa`, the suite uses `K6_PROFILE=hpa` which applies a
+`ramping-arrival-rate` executor. This executor **ignores `TEST_DURATION`**
+entirely. The actual k6 run duration per case is:
+
+```text
+HPA_RAMP_UP_1  = 2m   (ramp to 25% TARGET_RPS)
+HPA_RAMP_UP_2  = 2m   (ramp to 50% TARGET_RPS)
+HPA_RAMP_UP_3  = 3m   (ramp to 100% TARGET_RPS)
+HPA_HOLD       = 5m   (hold at 100% TARGET_RPS)
+HPA_RAMP_DOWN  = 1m   (ramp to 0)
+─────────────────────
+Total          = 13 minutes per case
+```
+
+This means `TEST_DURATION=5m` in the suite command is recorded in
+`metadata.json` but has **no effect** on the k6 run.
+
+To shorten HPA runs (e.g. for faster iteration or budget constraints):
+
+```bash
+HPA_RAMP_UP_1=1m HPA_RAMP_UP_2=1m HPA_RAMP_UP_3=2m HPA_HOLD=3m HPA_RAMP_DOWN=30s \
+  make run-benchmark-suite SCALING_MODE=hpa EXPERIMENT_NAME=rq2-hpa ...
+# Total: 7.5 minutes per case
+```
+
+For the full HPA stage configuration reference, see
+`docs/experiment/scaling-mode-strategy.md` §6.3.
+
+Estimated suite time with default HPA stages:
+
+```text
+15 cases × 13m k6 + 5m INTER_CASE_DELAY = ~4.5 hours
+```
 
 ---
 

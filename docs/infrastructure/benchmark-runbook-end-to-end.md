@@ -706,6 +706,24 @@ make run-benchmark-suite \
   S3_BUCKET=skripsi-benchmark-results
 ```
 
+**Note on `TEST_DURATION` for HPA mode:** When `SCALING_MODE=hpa`, the
+suite uses `K6_PROFILE=hpa` which applies a `ramping-arrival-rate` executor.
+This executor ignores `TEST_DURATION` entirely. The actual k6 run duration
+per case is controlled by HPA stage environment variables and defaults to
+**13 minutes** (2m + 2m + 3m + 5m + 1m). `TEST_DURATION=5m` in the command
+above is recorded in `metadata.json` but does not affect the k6 run.
+
+To shorten HPA runs for faster iteration, override the stage durations:
+
+```bash
+HPA_RAMP_UP_1=1m HPA_RAMP_UP_2=1m HPA_RAMP_UP_3=2m HPA_HOLD=3m HPA_RAMP_DOWN=30s \
+  make run-benchmark-suite SCALING_MODE=hpa EXPERIMENT_NAME=rq2-hpa-final ...
+# Total: 7.5 minutes per case instead of 13 minutes
+```
+
+See `docs/experiment/scaling-mode-strategy.md` §6.3 for the full HPA stage
+configuration reference.
+
 Expected suite shape:
 
 ```text
@@ -717,6 +735,8 @@ k6_profile   : hpa
 scenarios    : login create-transaction enriched-transactions
 rps_levels   : 1000 2500 5000 7500 10000
 case count   : 15
+k6 duration  : ~13 minutes per case (HPA stages, not TEST_DURATION)
+suite time   : ~4.5 hours (15 cases × 13m + inter-case delays)
 ```
 
 ### Phase 6.4 — Calibration Matrix
