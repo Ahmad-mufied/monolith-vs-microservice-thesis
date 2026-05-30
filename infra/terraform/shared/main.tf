@@ -84,3 +84,23 @@ resource "aws_iam_role_policy" "k6_runner_s3" {
     }]
   })
 }
+
+# ─── AWS Budget Nuclear Shutdown ──────────────────────────────────────────────
+# Budget lives in shared stack so it persists across experiment apply/destroy
+# cycles. Cluster names and RDS identifiers are hardcoded based on the fixed
+# naming convention in experiment/main.tf.
+
+module "aws_budget" {
+  source = "../modules/aws-budget"
+
+  project                  = var.project
+  aws_region               = var.aws_region
+  budget_amount            = var.budget_amount
+  budget_threshold_percent = var.budget_threshold_percent
+  budget_alert_emails      = var.budget_alert_emails
+  cluster_names            = ["skripsi-monolith", "skripsi-msa"]
+  rds_instance_ids         = ["skripsi-monolith-postgres", "skripsi-msa-postgres"]
+  vpc_id                   = module.vpc.vpc_id
+  delete_eks               = true
+  tags                     = local.common_tags
+}

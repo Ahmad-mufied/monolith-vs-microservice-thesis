@@ -18,4 +18,9 @@ output "kubeconfig_command" {
   value = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${data.aws_region.current.name} --alias ${var.architecture}"
 }
 
+output "rds_identifier" {
+  description = "RDS instance identifier"
+  value       = aws_db_instance.postgres.identifier
+}
+
 data "aws_region" "current" {}

@@ -881,7 +881,49 @@ RQ2 analyses.
 | Secret management | `docs/infrastructure/secret-management.md` |
 | RQ1 methodology | `docs/research-questions/rq1-performance-analysis.md` |
 | RQ2 methodology | `docs/research-questions/rq2-resource-efficiency-analysis.md` |
+| Budget shutdown | `docs/infrastructure/aws-budget-shutdown.md` |
 
 This document is the architectural overview. For commands, exact YAML,
 or step-by-step operator instructions, consult the specific documents
 above.
+
+---
+
+## 17. Budget Safety Net
+
+To prevent runaway costs from idle benchmark infrastructure, an automated
+budget shutdown system is deployed alongside the shared infrastructure via the
+`aws-budget` Terraform module.
+
+```text
+AWS Budget monitors monthly cost
+    │
+    ├── 50%, 80%, 95% → email warnings
+    └── 100% → SNS → Lambda → nuclear shutdown
+```
+
+When the budget threshold is reached, the Lambda function automatically:
+
+1. deletes both EKS clusters and their node groups,
+2. stops both RDS instances,
+3. deletes the NAT Gateway and releases associated Elastic IPs.
+
+This reduces monthly idle cost to approximately $3–4 (S3 + ECR storage only).
+
+Configuration is in `infra/terraform/shared/terraform.tfvars`:
+
+```hcl
+budget_amount            = 30
+budget_threshold_percent = 100
+budget_alert_emails      = ["you@email.com"]
+```
+
+Budget is deployed automatically with `make eks-shared-apply`. Alternatively,
+it can be set up manually via AWS CLI — see
+`docs/infrastructure/aws-budget-shutdown.md` for both options.
+
+S3 bucket and ECR repositories are created separately via `make aws-create-s3`
+and `make aws-create-ecr`. They are not managed by Terraform, so no conflict
+with the shared stack.
+
+Full documentation: `docs/infrastructure/aws-budget-shutdown.md`.

@@ -38,3 +38,23 @@ variable "public_subnet_cidrs" {
   type        = list(string)
   default     = ["10.0.101.0/24", "10.0.102.0/24"]
 }
+
+# ─── Budget Nuclear Shutdown ──────────────────────────────────────────────────
+
+variable "budget_amount" {
+  description = "Monthly budget in USD for AWS nuclear shutdown protection"
+  type        = number
+  default     = 30
+}
+
+variable "budget_threshold_percent" {
+  description = "Budget threshold percentage to trigger nuclear shutdown (100 = default)"
+  type        = number
+  default     = 100
+}
+
+variable "budget_alert_emails" {
+  description = "Email addresses for budget warning alerts (50%, 80%, 95%)"
+  type        = list(string)
+  default     = []
+}
