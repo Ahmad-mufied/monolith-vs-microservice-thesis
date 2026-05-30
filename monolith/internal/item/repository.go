@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/jackc/pgx/v5"
@@ -27,6 +28,11 @@ func (r *PostgresRepository) SyncItems(ctx context.Context, items []SyncItem) er
 	defer func() { _ = tx.Rollback(context.Background()) }()
 
 	keepIDs, inserts, upserts := partitionSyncItems(items)
+
+	sort.Strings(keepIDs)
+	sort.Slice(upserts, func(i, j int) bool {
+		return *upserts[i].ID < *upserts[j].ID
+	})
 
 	if err := softDeleteOmittedItems(ctx, tx, keepIDs); err != nil {
 		return apperror.Internal("internal server error", fmt.Errorf("soft delete omitted items: %w", err))
@@ -96,15 +102,45 @@ WHERE id = $1::uuid
 // softDeleteOmittedItems sets deleted_at on all active items whose IDs are
 // not in keepIDs. An empty keepIDs means soft-delete all active items.
 func softDeleteOmittedItems(ctx context.Context, tx pgx.Tx, keepIDs []string) error {
-	const query = `
-UPDATE items
-SET deleted_at = now(), updated_at = now()
+	const selectQuery = `
+SELECT id::text
+FROM items
 WHERE deleted_at IS NULL
   AND (
     cardinality(COALESCE($1::uuid[], ARRAY[]::uuid[])) = 0
     OR NOT (id = ANY(COALESCE($1::uuid[], ARRAY[]::uuid[])))
-  )`
-	_, err := tx.Exec(ctx, query, keepIDs)
+  )
+ORDER BY id
+FOR UPDATE`
+
+	rows, err := tx.Query(ctx, selectQuery, keepIDs)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var idsToSoftDelete []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		idsToSoftDelete = append(idsToSoftDelete, id)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if len(idsToSoftDelete) == 0 {
+		return nil
+	}
+
+	const updateQuery = `
+UPDATE items
+SET deleted_at = now(), updated_at = now()
+WHERE id = ANY($1::uuid[])`
+
+	_, err = tx.Exec(ctx, updateQuery, idsToSoftDelete)
 	return err
 }
 
@@ -169,14 +205,26 @@ func scanItem(row interface{ Scan(...any) error }) (Item, error) {
 	return item, err
 }
 
-// mapConflictError translates a PostgreSQL unique-violation (23505) into a
-// domain-level Conflict error. Other errors are returned as-is.
+// mapConflictError translates PostgreSQL errors into domain-level errors.
+//   - unique_violation (23505) → 409 Conflict
+//   - serialization_failure (40001) → 409 Conflict (retryable)
+//   - deadlock_detected (40P01) → 409 Conflict (retryable)
+//   - query_canceled (57014) → 409 Conflict (timeout, retryable)
+//   - other errors → 500 Internal Server Error
 func mapConflictError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "23505" {
-		return apperror.Conflict("item name already exists")
+	pgErr, ok := errors.AsType[*pgconn.PgError](err)
+	if !ok {
+		return apperror.Internal("internal server error", fmt.Errorf("upsert item: %w", err))
 	}
-	return apperror.Internal("internal server error", fmt.Errorf("upsert item: %w", err))
+	switch pgErr.Code {
+	case "23505":
+		return apperror.Conflict("item name already exists")
+	case "40001", "40P01", "57014":
+		return apperror.Conflict("transaction conflict, please retry")
+	default:
+		return apperror.Internal("internal server error", fmt.Errorf("upsert item: %w", err))
+	}
 }
