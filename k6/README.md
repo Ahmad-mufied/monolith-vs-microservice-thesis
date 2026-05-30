@@ -575,12 +575,12 @@ If ANY RPS level is missing the max attempt:
 ```
 
 This allows resuming a failed suite run without creating unnecessary attempt
-numbers. For example, if `enriched-transactions:100,200` completed as
-attempt-01 but the suite failed before `250,300,...,1000`:
+numbers. For example, if `enriched-transactions:1000,2500` completed as
+attempt-01 but the suite failed before `5000,7500,10000`:
 
 ```text
-Re-run with: enriched-transactions:250,300,...,1000
-Detection: 250rps has no attempt → continuation
+Re-run with: enriched-transactions:1000,2500,5000,7500,10000
+Detection: 5000,7500,10000rps have no attempt → continuation
 Result: attempt-01 (same as the partial run)
 ```
 
