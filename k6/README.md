@@ -557,6 +557,39 @@ k6
 upload results
 ```
 
+### Automatic Attempt Detection
+
+The suite runner automatically detects the next attempt number by inspecting
+existing S3 artifacts. The detection uses per-RPS granularity:
+
+```text
+For each RPS level in the suite:
+  - Find highest attempt in S3 for that (scenario, RPS) pair
+  - Track the max attempt across all RPS
+
+If ALL RPS levels have the max attempt:
+  → return max + 1 (new run)
+
+If ANY RPS level is missing the max attempt:
+  → return max (continuation)
+```
+
+This allows resuming a failed suite run without creating unnecessary attempt
+numbers. For example, if `enriched-transactions:100,200` completed as
+attempt-01 but the suite failed before `250,300,...,1000`:
+
+```text
+Re-run with: enriched-transactions:250,300,...,1000
+Detection: 250rps has no attempt → continuation
+Result: attempt-01 (same as the partial run)
+```
+
+To override automatic detection, pass `ATTEMPT` explicitly:
+
+```text
+ATTEMPT=attempt-01
+```
+
 ---
 
 ## Important Notes
