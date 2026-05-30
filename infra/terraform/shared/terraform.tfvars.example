@@ -1,3 +1,8 @@
 aws_region         = "ap-southeast-1"
 project            = "skripsi"
 s3_results_bucket  = "skripsi-benchmark-results"   # manually created bucket name
+
+# Budget nuclear shutdown protection
+budget_amount            = 30                            # USD per month
+budget_threshold_percent = 100                           # trigger nuclear at 100%
+budget_alert_emails      = ["REPLACE_WITH_YOUR_EMAIL"]   # warning at 50%, 80%, 95%

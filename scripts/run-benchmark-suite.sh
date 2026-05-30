@@ -507,6 +507,19 @@ next_attempt_from_s3_per_rps() {
     return 0
   fi
 
+  # Second pass: verify every RPS actually has max_attempt, not just any attempt.
+  # Without this, a mix of attempt-01 and attempt-02 would incorrectly return
+  # attempt-03 (new run) instead of attempt-02 (continuation).
+  for rps in $rps_words; do
+    rps_dir="${rps}rps"
+    local rps_attempts
+    rps_attempts="$(grep "/${rps_dir}/" <<<"$scenario_listing" | sed -n 's|.*/attempt-\([0-9][0-9]*\)/.*|\1|p' | sort -n | tail -n 1)"
+    if [ -z "$rps_attempts" ] || [ $((10#$rps_attempts)) -ne "$max_attempt" ]; then
+      all_have_max=false
+      break
+    fi
+  done
+
   if [ "$all_have_max" = false ]; then
     echo "  attempt search : scenario='${scenario}' rps='${rps_words}' some RPS missing attempt-$(printf '%02d' "$max_attempt") → attempt-$(printf '%02d' "$max_attempt") (continuation)" >&2
     printf 'attempt-%02d' "$max_attempt"
@@ -516,6 +529,32 @@ next_attempt_from_s3_per_rps() {
   local next=$((max_attempt + 1))
   echo "  attempt search : scenario='${scenario}' rps='${rps_words}' all RPS have attempt-$(printf '%02d' "$max_attempt") → attempt-$(printf '%02d' "$next") (new run)" >&2
   printf 'attempt-%02d' "$next"
+}
+
+next_attempt_for_suite() {
+  local run_uri="$1"
+  local matrix_tsv="$2"
+  local scenario
+  local rps_words
+  local suite_max=0
+
+  while IFS=$'\t' read -r scenario rps_words; do
+    [ -z "$scenario" ] && continue
+
+    local case_attempt
+    case_attempt="$(next_attempt_from_s3_per_rps "$run_uri" "$scenario" "$rps_words" 2>/dev/null)"
+    local case_num=$((10#$(sed 's/attempt-//' <<<"$case_attempt")))
+
+    if [ "$case_num" -gt "$suite_max" ]; then
+      suite_max=$case_num
+    fi
+  done < "$matrix_tsv"
+
+  if [ "$suite_max" -eq 0 ]; then
+    printf 'attempt-01'
+  else
+    printf 'attempt-%02d' "$suite_max"
+  fi
 }
 
 reset_and_seed_benchmark_data() {
@@ -800,28 +839,12 @@ maybe_wait_between_cases() {
   sleep "$INTER_CASE_DELAY"
 }
 
-if [ -z "$ATTEMPT" ]; then
-  if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
-    FIRST_MATRIX_ENTRY="$(trim_whitespace "${SCENARIO_RPS_MATRIX%%;*}")"
-    FIRST_SCENARIO="$(trim_whitespace "${FIRST_MATRIX_ENTRY%%:*}")"
-    FIRST_RPS_CSV="$(trim_whitespace "${FIRST_MATRIX_ENTRY#*:}")"
-    FIRST_RPS_WORDS="$(parse_rps_csv_to_words "$FIRST_RPS_CSV")"
-  else
-    FIRST_SCENARIO="$(awk '{print $1}' <<<"$SCENARIOS")"
-    FIRST_RPS_WORDS="$RPS_LEVELS"
-  fi
-
-  if [ -z "$FIRST_SCENARIO" ]; then
-    echo "ERROR: could not determine first scenario for attempt selection" >&2
-    exit 1
-  fi
-
-  validate_supported_scenario "$FIRST_SCENARIO" || exit 1
-  ATTEMPT="$(next_attempt_from_s3_per_rps "$S3_RUN_URI" "$FIRST_SCENARIO" "$FIRST_RPS_WORDS")"
-fi
-
 build_suite_matrix_file
 derive_effective_suite_metadata
+
+if [ -z "$ATTEMPT" ]; then
+  ATTEMPT="$(next_attempt_for_suite "$S3_RUN_URI" "$SUITE_MATRIX_TSV")"
+fi
 
 echo "=== Benchmark Suite ==="
 if [ -n "$EXPERIMENT_NAME" ]; then
