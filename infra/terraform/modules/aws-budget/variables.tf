@@ -22,6 +22,11 @@ variable "budget_threshold_percent" {
 variable "budget_alert_emails" {
   description = "Email addresses for budget alerts (50%, 80%, 95%)"
   type        = list(string)
+
+  validation {
+    condition     = length(var.budget_alert_emails) > 0
+    error_message = "budget_alert_emails must contain at least one email address. AWS Budget notifications require at least one subscriber."
+  }
 }
 
 variable "cluster_names" {
