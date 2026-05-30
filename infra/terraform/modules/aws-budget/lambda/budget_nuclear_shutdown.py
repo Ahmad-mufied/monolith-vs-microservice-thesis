@@ -143,6 +143,7 @@ def delete_nat_gateways(vpc_id):
     logger.info(f"[NAT] Looking for NAT Gateways in VPC: {vpc_id}")
 
     nat_eip_alloc_ids = []
+    nat_gateway_ids = []
 
     try:
         response = ec2_client.describe_nat_gateways(
@@ -159,6 +160,7 @@ def delete_nat_gateways(vpc_id):
 
         for nat in nat_gateways:
             nat_id = nat["NatGatewayId"]
+            nat_gateway_ids.append(nat_id)
             for addr in nat.get("NatGatewayAddresses", []):
                 alloc_id = addr.get("AllocationId")
                 if alloc_id:
@@ -171,27 +173,28 @@ def delete_nat_gateways(vpc_id):
     except Exception as e:
         logger.error(f"[NAT] Error deleting NAT Gateways: {e}")
 
-    # Release EIPs from deleted NAT GWs
+    # Wait for NAT GWs to be fully deleted before releasing EIPs.
+    # DeleteNatGateway is async — EIP is still associated until NAT reaches
+    # 'deleted' state. ReleaseAddress will fail if called too early.
+    for nat_id in nat_gateway_ids:
+        try:
+            logger.info(f"[NAT] Waiting for {nat_id} to be deleted...")
+            waiter = ec2_client.get_waiter("nat_gateway_deleted")
+            waiter.wait(
+                NatGatewayIds=[nat_id],
+                WaiterConfig={"Delay": 5, "MaxAttempts": 60},
+            )
+            logger.info(f"[NAT] {nat_id} deleted.")
+        except Exception as e:
+            logger.error(f"[NAT] Timeout waiting for {nat_id}: {e}")
+
+    # Release EIPs that were associated with the deleted NAT GWs.
     for alloc_id in nat_eip_alloc_ids:
         try:
             ec2_client.release_address(AllocationId=alloc_id)
             logger.info(f"[NAT] Released EIP '{alloc_id}'.")
         except Exception as e:
             logger.error(f"[NAT] Error releasing EIP '{alloc_id}': {e}")
-
-    # Release any remaining unassociated EIPs
-    try:
-        addresses = ec2_client.describe_addresses(
-            Filters=[{"Name": "domain", "Values": ["vpc"]}]
-        )
-        for addr in addresses.get("Addresses", []):
-            if "AssociationId" not in addr:
-                alloc_id = addr.get("AllocationId")
-                if alloc_id and alloc_id not in nat_eip_alloc_ids:
-                    logger.info(f"[NAT] Releasing unassociated EIP '{alloc_id}'...")
-                    ec2_client.release_address(AllocationId=alloc_id)
-    except Exception as e:
-        logger.error(f"[NAT] Error releasing unassociated EIPs: {e}")
 
 
 def lambda_handler(event, context):
