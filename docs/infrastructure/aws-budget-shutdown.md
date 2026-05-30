@@ -105,11 +105,67 @@ aws iam create-role \
   --role-name skripsi-budget-nuclear-shutdown-role \
   --assume-role-policy-document file:///tmp/trust-policy.json
 
+# Create policy (scoped to project EKS clusters, RDS, NAT GW, Logs)
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+cat > /tmp/lambda-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EKSPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "eks:ListNodegroups",
+        "eks:DescribeNodegroup",
+        "eks:UpdateNodegroupConfig",
+        "eks:DeleteNodegroup",
+        "eks:DescribeCluster",
+        "eks:DeleteCluster"
+      ],
+      "Resource": [
+        "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:cluster/skripsi-monolith",
+        "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:nodegroup/skripsi-monolith/*",
+        "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:cluster/skripsi-msa",
+        "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:nodegroup/skripsi-msa/*"
+      ]
+    },
+    {
+      "Sid": "RDSPermissions",
+      "Effect": "Allow",
+      "Action": ["rds:DescribeDBInstances", "rds:StopDBInstance"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EC2NATGatewayPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeNatGateways",
+        "ec2:DeleteNatGateway",
+        "ec2:DescribeAddresses",
+        "ec2:ReleaseAddress"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*"
+    }
+  ]
+}
+EOF
+
 # Attach policy
 aws iam put-role-policy \
   --role-name skripsi-budget-nuclear-shutdown-role \
   --policy-name skripsi-budget-nuclear-shutdown-policy \
-  --policy-document file://infra/terraform/modules/aws-budget/lambda/lambda_iam_policy.json
+  --policy-document file:///tmp/lambda-policy.json
 ```
 
 #### Step 2: Deploy Lambda Function

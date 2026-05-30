@@ -7,8 +7,11 @@ terraform {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
   name_prefix = "${var.project}-budget"
+  account_id  = data.aws_caller_identity.current.account_id
 }
 
 # ─── CloudWatch Log Group for Lambda ──────────────────────────────────────────
@@ -40,7 +43,56 @@ resource "aws_iam_role_policy" "lambda" {
   name = "${local.name_prefix}-nuclear-shutdown-policy"
   role = aws_iam_role.lambda.id
 
-  policy = file("${path.module}/lambda/lambda_iam_policy.json")
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "EKSPermissions"
+        Effect = "Allow"
+        Action = [
+          "eks:ListNodegroups",
+          "eks:DescribeNodegroup",
+          "eks:UpdateNodegroupConfig",
+          "eks:DeleteNodegroup",
+          "eks:DescribeCluster",
+          "eks:DeleteCluster",
+        ]
+        Resource = flatten([
+          for cluster in var.cluster_names : [
+            "arn:aws:eks:${var.aws_region}:${local.account_id}:cluster/${cluster}",
+            "arn:aws:eks:${var.aws_region}:${local.account_id}:nodegroup/${cluster}/*",
+          ]
+        ])
+      },
+      {
+        Sid      = "RDSPermissions"
+        Effect   = "Allow"
+        Action   = ["rds:DescribeDBInstances", "rds:StopDBInstance"]
+        Resource = "*"
+      },
+      {
+        Sid    = "EC2NATGatewayPermissions"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeNatGateways",
+          "ec2:DeleteNatGateway",
+          "ec2:DescribeAddresses",
+          "ec2:ReleaseAddress",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CloudWatchLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      },
+    ]
+  })
 }
 
 # ─── Lambda Function ──────────────────────────────────────────────────────────
