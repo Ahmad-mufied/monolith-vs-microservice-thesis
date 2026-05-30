@@ -111,7 +111,7 @@ func TestServiceSyncItems(t *testing.T) {
 			wantCode:  apperror.CodeBadRequest,
 		},
 		{
-			name:      "missing amount",
+			name:      "missing amount is rejected",
 			req:       SyncItemsRequest{Items: []SyncItemRequest{{Name: "Item"}}},
 			repo:      &fakeRepo{},
 			wantError: true,
