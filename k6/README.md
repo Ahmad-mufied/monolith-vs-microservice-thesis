@@ -217,12 +217,12 @@ Supported item ID file shapes:
 
 Set `K6_PROFILE` to control the executor behavior.
 
-| Profile | Behavior |
-|---|---|
-| `smoke` | fixed VUs and duration |
-| `steady` | constant arrival rate |
-| `ramp` | ramping arrival rate |
-| `hpa` | staged load useful for observing HPA behavior |
+| Profile | k6 Executor | Use Case |
+|---|---|---|
+| `smoke` | `per-vu-iterations` | Deployment validation |
+| `steady` | `constant-arrival-rate` | Fixed-mode benchmark (RQ1) |
+| `ramp` | `ramping-arrival-rate` | Exploratory / calibration |
+| `hpa` | `ramping-arrival-rate` | HPA-mode benchmark (RQ2) |
 
 Default:
 
@@ -238,6 +238,164 @@ instead of silently falling back to the steady benchmark executor.
 When `RAMP_STAGES_JSON` is provided, it must be valid JSON and contain a
 non-empty array of `{target, duration}` objects. Invalid stage JSON now fails
 fast instead of silently falling back to generated stages.
+
+### Profile Duration Behavior
+
+Each profile determines the actual run duration differently. `TEST_DURATION`
+is **not** used by all profiles.
+
+| Profile | Duration controlled by | `TEST_DURATION` used? |
+|---|---|---|
+| `smoke` | `TEST_DURATION` | Yes |
+| `steady` | `TEST_DURATION` | Yes |
+| `ramp` | `RAMP_UP_DURATION` + `TEST_DURATION` + `RAMP_DOWN_DURATION` | Yes (hold stage) |
+| `hpa` | `HPA_RAMP_UP_1/2/3` + `HPA_HOLD` + `HPA_RAMP_DOWN` | **No** |
+
+**Important:** When `K6_PROFILE=hpa`, the `TEST_DURATION` variable is
+**ignored** by the k6 executor. The actual run duration is determined entirely
+by the HPA stage environment variables (default: 2+2+3+5+1 = 13 minutes).
+`TEST_DURATION` is still recorded in `metadata.json` for reference, but it
+does not control the k6 run.
+
+### Profile Details
+
+#### `smoke` — Fixed VUs
+
+```text
+Executor: per-vu-iterations (implicit)
+Duration: TEST_DURATION
+VUs: VUS
+```
+
+Runs a fixed number of VUs for the specified duration. No target RPS.
+Used for deployment validation, not for measured benchmarks.
+
+#### `steady` — Constant Arrival Rate
+
+```text
+Executor: constant-arrival-rate
+Rate: TARGET_RPS requests per TIME_UNIT
+Duration: TEST_DURATION
+```
+
+k6 maintains a constant request rate for the full duration. If iterations
+are slow, k6 spawns more VUs up to `MAX_VUS`. If VUs are exhausted,
+`dropped_iterations` increases.
+
+```text
+RPS
+ │ ████████████████████████
+ │
+ └──────────────────────── time
+     TEST_DURATION (e.g. 5m)
+```
+
+#### `ramp` — Ramping Arrival Rate
+
+```text
+Executor: ramping-arrival-rate
+Stages:
+  1. ramp to TARGET_RPS    over RAMP_UP_DURATION (default: 1m)
+  2. hold at TARGET_RPS    for TEST_DURATION
+  3. ramp to 0             over RAMP_DOWN_DURATION (default: 30s)
+```
+
+Linear ramp up, hold, and ramp down. Useful for calibration and
+exploratory runs.
+
+```text
+RPS
+ │      ██████████████████
+ │    ██                  ██
+ │  ██                      ██
+ └────────────────────────────── time
+    1m    TEST_DURATION    30s
+```
+
+#### `hpa` — Staged Load for HPA Observation
+
+```text
+Executor: ramping-arrival-rate
+Stages:
+  1. ramp to 25% TARGET_RPS   over HPA_RAMP_UP_1   (default: 2m)
+  2. ramp to 50% TARGET_RPS   over HPA_RAMP_UP_2   (default: 2m)
+  3. ramp to 100% TARGET_RPS  over HPA_RAMP_UP_3   (default: 3m)
+  4. hold at 100% TARGET_RPS  for HPA_HOLD          (default: 5m)
+  5. ramp to 0                over HPA_RAMP_DOWN    (default: 1m)
+                                                        Total: 13m
+```
+
+The staged ramp gives HPA time to observe CPU pressure and scale pods
+at each level before the next stage begins.
+
+```text
+RPS
+ │          ██████████████
+ │        ██              ██
+ │      ██                  ██
+ │    ██                      ██
+ │  ██                          ██
+ └──────────────────────────────── time
+   2m  2m  2m    5m hold    1m
+   25% 50% 100%             0%
+```
+
+HPA reacts to average CPU utilization over a rolling window (default 15
+seconds in Kubernetes). The ramp stages ensure CPU pressure builds
+gradually so the HPA controller has time to calculate desired replicas,
+schedule new pods, and allow them to become ready before the next load
+increase.
+
+### HPA Stage Environment Variables
+
+All HPA stage durations are configurable:
+
+| Variable | Default | Description |
+|---|---|---|
+| `HPA_RAMP_UP_1` | `2m` | Duration to ramp to 25% of TARGET_RPS |
+| `HPA_RAMP_UP_2` | `2m` | Duration to ramp to 50% of TARGET_RPS |
+| `HPA_RAMP_UP_3` | `3m` | Duration to ramp to 100% of TARGET_RPS |
+| `HPA_HOLD` | `5m` | Duration to hold at 100% of TARGET_RPS |
+| `HPA_RAMP_DOWN` | `1m` | Duration to ramp down to 0 |
+
+To shorten the HPA run (e.g. for faster iteration):
+
+```bash
+HPA_RAMP_UP_1=1m HPA_RAMP_UP_2=1m HPA_RAMP_UP_3=2m HPA_HOLD=3m HPA_RAMP_DOWN=30s \
+  make run-benchmark-suite SCALING_MODE=hpa ...
+# Total: 1+1+2+3+0.5 = 7.5 minutes per case
+```
+
+To override all stages with a custom JSON array:
+
+```bash
+RAMP_STAGES_JSON='[{"target":1250,"duration":"1m"},{"target":5000,"duration":"3m"},{"target":5000,"duration":"5m"},{"target":0,"duration":"30s"}]'
+```
+
+### Ramp Stage Environment Variables (K6_PROFILE=ramp)
+
+| Variable | Default | Description |
+|---|---|---|
+| `RAMP_UP_DURATION` | `1m` | Duration to ramp from 0 to TARGET_RPS |
+| `RAMP_DOWN_DURATION` | `30s` | Duration to ramp from TARGET_RPS to 0 |
+
+### Scaling Mode ↔ Profile Pairing
+
+The benchmark enforces strict pairing between `SCALING_MODE` and `K6_PROFILE`:
+
+| SCALING_MODE | K6_PROFILE | Valid? | Use Case |
+|---|---|---|---|
+| `fixed` | `steady` | Yes | Primary RQ1 comparison |
+| `fixed` | `ramp` | Yes | Calibration / exploratory |
+| `fixed` | `smoke` | Yes | Smoke test |
+| `fixed` | `hpa` | **No** | Error: HPA overlay missing |
+| `hpa` | `hpa` | Yes | Primary RQ2 comparison |
+| `hpa` | `steady` | **No** | Error: no ramp for HPA observation |
+| `hpa` | `ramp` | **No** | Error: no ramp for HPA observation |
+| `hpa` | `smoke` | **No** | Error: no ramp for HPA observation |
+
+Use `ALLOW_NONSTANDARD_SCALING_PROFILE=true` to bypass this check for
+deliberate nonstandard experiments.
 
 ---
 
@@ -273,13 +431,13 @@ IMAGE_TAG
 ### Load configuration
 
 ```text
-K6_PROFILE
-TARGET_RPS
-TEST_DURATION
-TIME_UNIT
-VUS
-PRE_ALLOCATED_VUS
-MAX_VUS
+K6_PROFILE          Controls executor type and duration behavior
+TARGET_RPS          Target requests per second (steady/ramp/hpa)
+TEST_DURATION       Run duration (steady/smoke) or hold duration (ramp). Ignored by hpa.
+TIME_UNIT           Time unit for rate (default: 1s)
+VUS                 Fixed VU count (smoke only)
+PRE_ALLOCATED_VUS   Initial VU pool (arrival-rate executors)
+MAX_VUS             Maximum VU pool (arrival-rate executors)
 ```
 
 ### Thresholds

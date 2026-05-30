@@ -743,6 +743,8 @@ Stage 2: ramp to 50% of TARGET_RPS over 2 minutes  (HPA_RAMP_UP_2)
 Stage 3: ramp to 100% of TARGET_RPS over 3 minutes (HPA_RAMP_UP_3)
 Stage 4: hold at 100% of TARGET_RPS for 5 minutes  (HPA_HOLD)
 Stage 5: ramp down to 0 over 1 minute              (HPA_RAMP_DOWN)
+                                                   ───────────────
+                                                   Total: 13 minutes
 ```
 
 All stage durations are configurable via environment variables. The defaults
@@ -753,6 +755,74 @@ HPA reacts to average CPU utilization over a rolling window (default 15
 seconds in Kubernetes). The ramp stages ensure CPU pressure builds gradually
 so the HPA controller has time to calculate desired replicas, schedule new
 pods, and allow them to become ready before the next load increase.
+
+**Important: `TEST_DURATION` is not used by `K6_PROFILE=hpa`.** The actual
+run duration is determined entirely by the HPA stage environment variables
+(`HPA_RAMP_UP_1/2/3` + `HPA_HOLD` + `HPA_RAMP_DOWN`). `TEST_DURATION` is
+still recorded in `metadata.json` for reference, but the k6 executor
+ignores it. This is a common source of confusion — setting
+`TEST_DURATION=5m` with `K6_PROFILE=hpa` does **not** produce a 5-minute
+run; the run will be 13 minutes (default) regardless.
+
+### 6.3.1 Duration Behavior Per Profile
+
+Each `K6_PROFILE` determines the actual k6 run duration differently:
+
+| Profile | k6 Executor | Duration controlled by | `TEST_DURATION` used? |
+|---|---|---|---|
+| `smoke` | per-vu-iterations | `TEST_DURATION` | Yes |
+| `steady` | constant-arrival-rate | `TEST_DURATION` | Yes |
+| `ramp` | ramping-arrival-rate | `RAMP_UP_DURATION` + `TEST_DURATION` + `RAMP_DOWN_DURATION` | Yes (hold stage only) |
+| `hpa` | ramping-arrival-rate | `HPA_RAMP_UP_1/2/3` + `HPA_HOLD` + `HPA_RAMP_DOWN` | **No** |
+
+Visual comparison:
+
+```text
+steady (TEST_DURATION=5m):
+RPS │ ████████████████████████
+    └──────────────────────── time
+        5 minutes constant
+
+hpa (default, TEST_DURATION ignored):
+RPS │          ██████████████
+    │        ██              ██
+    │      ██                  ██
+    │    ██                      ██
+    │  ██                          ██
+    └──────────────────────────────── time
+      2m  2m  2m    5m hold    1m      = 13 minutes
+```
+
+To shorten the HPA run for faster iteration:
+
+```bash
+HPA_RAMP_UP_1=1m HPA_RAMP_UP_2=1m HPA_RAMP_UP_3=2m HPA_HOLD=3m HPA_RAMP_DOWN=30s \
+  make run-benchmark-suite SCALING_MODE=hpa ...
+# Total: 1+1+2+3+0.5 = 7.5 minutes per case
+```
+
+To override all stages with a custom JSON array:
+
+```bash
+RAMP_STAGES_JSON='[{"target":1250,"duration":"1m"},{"target":5000,"duration":"3m"},{"target":5000,"duration":"5m"},{"target":0,"duration":"30s"}]'
+```
+
+### 6.3.2 HPA Stage Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `HPA_RAMP_UP_1` | `2m` | Duration to ramp to 25% of TARGET_RPS |
+| `HPA_RAMP_UP_2` | `2m` | Duration to ramp to 50% of TARGET_RPS |
+| `HPA_RAMP_UP_3` | `3m` | Duration to ramp to 100% of TARGET_RPS |
+| `HPA_HOLD` | `5m` | Duration to hold at 100% of TARGET_RPS |
+| `HPA_RAMP_DOWN` | `1m` | Duration to ramp down to 0 |
+
+### 6.3.3 Ramp Stage Environment Variables (K6_PROFILE=ramp)
+
+| Variable | Default | Description |
+|---|---|---|
+| `RAMP_UP_DURATION` | `1m` | Duration to ramp from 0 to TARGET_RPS |
+| `RAMP_DOWN_DURATION` | `30s` | Duration to ramp from TARGET_RPS to 0 |
 
 ### 6.4 Why K6_PROFILE=hpa Must Not Be Used with Fixed Overlay
 
