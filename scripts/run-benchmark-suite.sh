@@ -445,6 +445,79 @@ next_attempt_from_s3() {
   printf 'attempt-%02d' "$next"
 }
 
+next_attempt_from_s3_per_rps() {
+  local run_uri="$1"
+  local scenario="$2"
+  local rps_words="$3"
+  local listing
+  local listing_error
+  local max_attempt=0
+  local all_have_max=true
+  local rps
+  local rps_dir
+  local attempt_num
+
+  listing_error="$(mktemp)"
+  if ! listing="$(aws s3 ls "$run_uri/" --recursive 2>"$listing_error")"; then
+    if [ -s "$listing_error" ]; then
+      cat "$listing_error" >&2
+      rm -f "$listing_error"
+      echo "ERROR: unable to inspect S3 prefix for automatic attempt selection: $run_uri" >&2
+      return 1
+    fi
+
+    rm -f "$listing_error"
+    printf 'attempt-01'
+    return 0
+  fi
+  rm -f "$listing_error"
+
+  if [ -z "$listing" ]; then
+    printf 'attempt-01'
+    return 0
+  fi
+
+  local scenario_listing
+  scenario_listing="$(grep "/${scenario}/" <<<"$listing" || true)"
+
+  if [ -z "$scenario_listing" ]; then
+    echo "  attempt search : scenario='${scenario}' no existing entries → attempt-01" >&2
+    printf 'attempt-01'
+    return 0
+  fi
+
+  for rps in $rps_words; do
+    rps_dir="${rps}rps"
+    local rps_attempts
+    rps_attempts="$(grep "/${rps_dir}/" <<<"$scenario_listing" | sed -n 's|.*/attempt-\([0-9][0-9]*\)/.*|\1|p' | sort -n | tail -n 1)"
+
+    if [ -z "$rps_attempts" ]; then
+      all_have_max=false
+    else
+      attempt_num=$((10#$rps_attempts))
+      if [ "$attempt_num" -gt "$max_attempt" ]; then
+        max_attempt=$attempt_num
+      fi
+    fi
+  done
+
+  if [ "$max_attempt" -eq 0 ]; then
+    echo "  attempt search : scenario='${scenario}' rps='${rps_words}' no attempts found → attempt-01" >&2
+    printf 'attempt-01'
+    return 0
+  fi
+
+  if [ "$all_have_max" = false ]; then
+    echo "  attempt search : scenario='${scenario}' rps='${rps_words}' some RPS missing attempt-$(printf '%02d' "$max_attempt") → attempt-$(printf '%02d' "$max_attempt") (continuation)" >&2
+    printf 'attempt-%02d' "$max_attempt"
+    return 0
+  fi
+
+  local next=$((max_attempt + 1))
+  echo "  attempt search : scenario='${scenario}' rps='${rps_words}' all RPS have attempt-$(printf '%02d' "$max_attempt") → attempt-$(printf '%02d' "$next") (new run)" >&2
+  printf 'attempt-%02d' "$next"
+}
+
 reset_and_seed_benchmark_data() {
   scale_down_app_workloads_for_data_reset
 
@@ -729,9 +802,13 @@ maybe_wait_between_cases() {
 
 if [ -z "$ATTEMPT" ]; then
   if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
-    FIRST_SCENARIO="$(trim_whitespace "${SCENARIO_RPS_MATRIX%%:*}")"
+    FIRST_MATRIX_ENTRY="$(trim_whitespace "${SCENARIO_RPS_MATRIX%%;*}")"
+    FIRST_SCENARIO="$(trim_whitespace "${FIRST_MATRIX_ENTRY%%:*}")"
+    FIRST_RPS_CSV="$(trim_whitespace "${FIRST_MATRIX_ENTRY#*:}")"
+    FIRST_RPS_WORDS="$(parse_rps_csv_to_words "$FIRST_RPS_CSV")"
   else
     FIRST_SCENARIO="$(awk '{print $1}' <<<"$SCENARIOS")"
+    FIRST_RPS_WORDS="$RPS_LEVELS"
   fi
 
   if [ -z "$FIRST_SCENARIO" ]; then
@@ -740,7 +817,7 @@ if [ -z "$ATTEMPT" ]; then
   fi
 
   validate_supported_scenario "$FIRST_SCENARIO" || exit 1
-  ATTEMPT="$(next_attempt_from_s3 "$S3_RUN_URI" "$FIRST_SCENARIO")"
+  ATTEMPT="$(next_attempt_from_s3_per_rps "$S3_RUN_URI" "$FIRST_SCENARIO" "$FIRST_RPS_WORDS")"
 fi
 
 build_suite_matrix_file
