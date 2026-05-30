@@ -119,7 +119,6 @@ resource "aws_lambda_function" "shutdown" {
       RDS_INSTANCE_IDS = join(",", var.rds_instance_ids)
       VPC_ID           = var.vpc_id
       DELETE_EKS       = var.delete_eks ? "true" : "false"
-      AWS_REGION       = var.aws_region
     }
   }
 
