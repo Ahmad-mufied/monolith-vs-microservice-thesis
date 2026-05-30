@@ -128,8 +128,8 @@ aws lambda create-function \
   --memory-size 256 \
   --region ap-southeast-1 \
   --environment "Variables={
-    EKS_CLUSTERS=skripsi-monolith,skripsi-msa,
-    RDS_INSTANCE_IDS=skripsi-monolith-postgres,skripsi-msa-postgres,
+    EKS_CLUSTERS=skripsi-monolith,skripsi-msa
+    RDS_INSTANCE_IDS=skripsi-monolith-postgres,skripsi-msa-postgres
     VPC_ID=REPLACE_WITH_VPC_ID,
     DELETE_EKS=true,
     AWS_REGION=ap-southeast-1
@@ -325,7 +325,6 @@ Step 3: Delete NAT Gateways + Release Elastic IPs
         for each nat_gw:
           delete_nat_gateway()
         release EIPs associated with deleted NAT GWs
-        release any unassociated EIPs in the account
 ```
 
 ### Error Handling

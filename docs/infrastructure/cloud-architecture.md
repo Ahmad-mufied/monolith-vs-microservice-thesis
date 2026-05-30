@@ -908,7 +908,7 @@ When the budget threshold is reached, the Lambda function automatically:
 2. stops both RDS instances,
 3. deletes the NAT Gateway and releases associated Elastic IPs.
 
-This reduces monthly idle cost to approximately $3–4 (S3 + ECR storage only).
+This reduces monthly idle cost to approximately $3–4 (stopped RDS storage, S3, and ECR).
 
 Configuration is in `infra/terraform/shared/terraform.tfvars`:
 
