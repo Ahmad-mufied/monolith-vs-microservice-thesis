@@ -8,9 +8,11 @@ isolated EKS clusters simultaneously.
 This runbook covers the full experiment lifecycle from infrastructure
 provisioning to result verification and teardown.
 
-For the quota-constrained single-cluster alternative, use
-`docs/infrastructure/sequential-benchmark-runbook.md`. The parallel workflow in
-this document remains unchanged and still uses `monolith` and `msa` contexts.
+For the quota-constrained single-cluster AWS alternative, use
+`docs/infrastructure/sequential-benchmark-runbook.md`. For Vultr VKE parallel
+or sequential execution, use `docs/infrastructure/vultr-vke-runbook.md`. The
+AWS parallel workflow in this document remains unchanged and still uses
+`monolith` and `msa` contexts.
 
 ---
 
@@ -24,6 +26,11 @@ this document remains unchanged and still uses `monolith` and `msa` contexts.
 - Datadog installed on both clusters
 - S3 bucket available
 ```
+
+For Vultr, the equivalent prerequisites are documented in
+`docs/infrastructure/vultr-vke-runbook.md`: VKE clusters, Vultr PostgreSQL VMs,
+Docker Hub public images, AWS S3 credentials for k6 uploads, and
+measurement-derived resource baseline.
 
 Before any long benchmark run, refresh the AWS session you actually use for the
 experiment, then run the benchmark preflight:

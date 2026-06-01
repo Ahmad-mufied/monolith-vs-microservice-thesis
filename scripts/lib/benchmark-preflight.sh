@@ -45,7 +45,7 @@ benchmark_preflight_check() {
     if ! kubectl --context="$context" get nodes >/dev/null 2>"$context_error_file"; then
       echo "ERROR: kubectl context '${context}' is not ready for ${context_label}." >&2
       cat "$context_error_file" >&2
-      echo "Fix: refresh the EKS credential path and verify 'kubectl --context=${context} get nodes' succeeds." >&2
+      echo "Fix: refresh the Kubernetes credential path for the active provider and verify 'kubectl --context=${context} get nodes' succeeds." >&2
       cleanup_benchmark_preflight_files
       return 1
     fi

@@ -1,0 +1,20 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+packages:
+  - curl
+  - ca-certificates
+  - gnupg
+  - lsb-release
+runcmd:
+  - install -d /usr/share/keyrings
+  - curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+  - sh -c 'echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+  - apt-get update
+  - apt-get install -y postgresql-18
+  - sed -i "s/^#listen_addresses =.*/listen_addresses = '*'/" /etc/postgresql/18/main/postgresql.conf
+  - printf "host all postgres_admin ${vpc_cidr} scram-sha-256\nhost all postgres ${vpc_cidr} scram-sha-256\n" >> /etc/postgresql/18/main/pg_hba.conf
+  - systemctl restart postgresql
+  - sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE ROLE postgres_admin WITH LOGIN SUPERUSER PASSWORD '${postgres_password_sql_literal}';"
+  - sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER postgres PASSWORD '${postgres_password_sql_literal}';"
+

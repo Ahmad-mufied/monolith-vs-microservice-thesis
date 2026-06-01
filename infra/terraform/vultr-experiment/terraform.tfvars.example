@@ -1,0 +1,11 @@
+project               = "skripsi"
+region                = "sgp"
+kubernetes_version    = "v1.33.0+1"
+monolith_cluster_name = "skripsi-vultr-monolith"
+msa_cluster_name      = "skripsi-vultr-msa"
+app_node_plan         = "voc-c-16c-32gb-300s"
+testing_node_plan     = "vc2-4c-8gb"
+postgres_plan         = "vc2-4c-8gb"
+postgres_os_id        = 1743
+postgres_password     = "replace-with-generated-password"
+

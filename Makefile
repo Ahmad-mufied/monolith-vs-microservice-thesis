@@ -232,6 +232,10 @@ env-init-eks:
 env-init-hetzner:
 	bash scripts/env-init-hetzner.sh
 
+.PHONY: env-init-vultr
+env-init-vultr:
+	bash scripts/env-init-vultr.sh
+
 .PHONY: benchmark-preflight-check
 benchmark-preflight-check:
 	bash scripts/benchmark-preflight-check.sh
@@ -841,6 +845,9 @@ terraform-fmt:
 	cd infra/terraform/hetzner-shared && terraform fmt -recursive
 	cd infra/terraform/hetzner-experiment-sequential && terraform fmt -recursive
 	cd infra/terraform/hetzner-experiment && terraform fmt -recursive
+	cd infra/terraform/vultr-shared && terraform fmt -recursive
+	cd infra/terraform/vultr-experiment-sequential && terraform fmt -recursive
+	cd infra/terraform/vultr-experiment && terraform fmt -recursive
 
 # =========================
 # AWS Persistent Resources (one-time setup)
@@ -1007,6 +1014,9 @@ terraform-validate:
 	cd infra/terraform/hetzner-shared && terraform validate
 	cd infra/terraform/hetzner-experiment-sequential && terraform validate
 	cd infra/terraform/hetzner-experiment && terraform validate
+	cd infra/terraform/vultr-shared && terraform validate
+	cd infra/terraform/vultr-experiment-sequential && terraform validate
+	cd infra/terraform/vultr-experiment && terraform validate
 
 .PHONY: terraform-auth-check
 terraform-auth-check:
@@ -1218,6 +1228,101 @@ hetzner-deploy-all:
 	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/dockerhub-public-image-check.sh
 	CLOUD_PROVIDER=hetzner SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-all-eks-clusters.sh
 
+.PHONY: vultr-render-tfvars
+vultr-render-tfvars:
+	bash scripts/render-vultr-tfvars.sh
+
+.PHONY: vultr-shared-plan
+vultr-shared-plan:
+	bash scripts/terraform-vultr.sh shared init
+	bash scripts/terraform-vultr.sh shared plan -out=tfplan
+
+.PHONY: vultr-shared-apply
+vultr-shared-apply:
+	bash scripts/terraform-vultr.sh shared init
+	bash scripts/terraform-vultr.sh shared apply
+
+.PHONY: vultr-shared-destroy-confirmed
+vultr-shared-destroy-confirmed:
+	S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-vultr.sh shared destroy
+
+.PHONY: vultr-sequential-plan
+vultr-sequential-plan:
+	bash scripts/terraform-vultr.sh sequential init
+	bash scripts/terraform-vultr.sh sequential plan -out=tfplan
+
+.PHONY: vultr-sequential-apply
+vultr-sequential-apply:
+	bash scripts/terraform-vultr.sh sequential init
+	bash scripts/terraform-vultr.sh sequential apply
+
+.PHONY: vultr-sequential-destroy-confirmed
+vultr-sequential-destroy-confirmed:
+	S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-vultr.sh sequential destroy
+
+.PHONY: vultr-parallel-plan
+vultr-parallel-plan:
+	bash scripts/terraform-vultr.sh parallel init
+	bash scripts/terraform-vultr.sh parallel plan -out=tfplan
+
+.PHONY: vultr-parallel-apply
+vultr-parallel-apply:
+	bash scripts/terraform-vultr.sh parallel init
+	bash scripts/terraform-vultr.sh parallel apply
+
+.PHONY: vultr-parallel-destroy-confirmed
+vultr-parallel-destroy-confirmed:
+	S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-vultr.sh parallel destroy
+
+.PHONY: vultr-setup-context-sequential
+vultr-setup-context-sequential:
+	VULTR_MODE=sequential bash scripts/setup-vultr-contexts.sh
+
+.PHONY: vultr-setup-contexts-parallel
+vultr-setup-contexts-parallel:
+	VULTR_MODE=parallel bash scripts/setup-vultr-contexts.sh
+
+.PHONY: vultr-create-secrets-sequential
+vultr-create-secrets-sequential:
+	bash scripts/create-vultr-secrets-sequential.sh
+
+.PHONY: vultr-create-secrets
+vultr-create-secrets:
+	bash scripts/create-vultr-secrets-monolith.sh
+	bash scripts/create-vultr-secrets-microservices.sh
+
+.PHONY: vultr-measure-resource-baseline
+vultr-measure-resource-baseline:
+	bash scripts/measure-vultr-resource-baseline.sh
+
+.PHONY: vultr-preflight-check
+vultr-preflight-check:
+	bash scripts/vultr-preflight-check.sh
+
+.PHONY: vultr-render-manifests
+vultr-render-manifests:
+	@set -euo pipefail; \
+	RENDER_DIR="$$(mktemp -d)"; \
+	trap 'rm -rf "$$RENDER_DIR"' EXIT; \
+	echo "Rendering Vultr manifests to $$RENDER_DIR"; \
+	IMAGE_TAG=$(IMAGE_TAG) DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) OUTPUT_DIR="$$RENDER_DIR" bash scripts/render-vultr-manifests.sh >/dev/null; \
+	bash scripts/validate-eks-assets.sh deploy "$$RENDER_DIR"; \
+	bash scripts/validate-rendered-provider-assets.sh vultr "$$RENDER_DIR"; \
+	echo "Vultr manifests rendered and validated successfully"
+
+.PHONY: vultr-deploy-sequential-architecture
+vultr-deploy-sequential-architecture:
+	CLOUD_PROVIDER=vultr ARCHITECTURE=$(ARCHITECTURE) SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-sequential-architecture.sh
+
+.PHONY: vultr-deploy-all
+vultr-deploy-all:
+	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/dockerhub-public-image-check.sh
+	CLOUD_PROVIDER=vultr SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-all-eks-clusters.sh
+
+.PHONY: vultr-verify-live-mode
+vultr-verify-live-mode:
+	SCALING_MODE=$(SCALING_MODE) EXECUTION_MODE=$(EXECUTION_MODE) ARCHITECTURE=$(ARCHITECTURE) bash scripts/verify-live-mode.sh
+
 .PHONY: run-benchmark-parallel
 run-benchmark-parallel:
 	SCENARIO=$(SCENARIO) \
@@ -1298,6 +1403,80 @@ run-benchmark-parallel-hetzner:
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
 	bash scripts/run-benchmark-parallel.sh
+
+.PHONY: run-benchmark-parallel-vultr
+run-benchmark-parallel-vultr:
+	CLOUD_PROVIDER=vultr \
+	SCENARIO=$(SCENARIO) \
+	TARGET_RPS=$(TARGET_RPS) \
+	RUN_ID=$(RUN_ID) \
+	ATTEMPT=$(ATTEMPT) \
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE=$(K6_PROFILE) \
+	TEST_DURATION=$(TEST_DURATION) \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	bash scripts/run-benchmark-parallel.sh
+
+.PHONY: run-benchmark-sequential-vultr
+run-benchmark-sequential-vultr:
+	CLOUD_PROVIDER=vultr \
+	ARCHITECTURE=$(ARCHITECTURE) \
+	SCENARIO=$(SCENARIO) \
+	TARGET_RPS=$(TARGET_RPS) \
+	RUN_ID=$(RUN_ID) \
+	ATTEMPT=$(ATTEMPT) \
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE=$(K6_PROFILE) \
+	TEST_DURATION=$(TEST_DURATION) \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	ARCHITECTURE_ORDER="$(ARCHITECTURE_ORDER)" \
+	bash scripts/run-benchmark-sequential.sh
+
+.PHONY: run-benchmark-suite-vultr
+run-benchmark-suite-vultr:
+	CLOUD_PROVIDER=vultr \
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE="$(if $(filter command line environment,$(origin K6_PROFILE)),$(K6_PROFILE),)" \
+	TEST_DURATION=$(TEST_DURATION) \
+	SCENARIOS="$(SCENARIOS)" \
+	RPS_LEVELS="$(RPS_LEVELS)" \
+	SCENARIO_RPS_MATRIX="$(SCENARIO_RPS_MATRIX)" \
+	INTER_CASE_DELAY=$(INTER_CASE_DELAY) \
+	AUTO_DESTROY_CONFIRMED=$(AUTO_DESTROY_CONFIRMED) \
+	EXPERIMENT_NAME="$(if $(filter command line environment,$(origin EXPERIMENT_NAME)),$(EXPERIMENT_NAME),)" \
+	RUN_ID="$(if $(filter command line environment,$(origin RUN_ID)),$(RUN_ID),)" \
+	ATTEMPT="$(if $(filter command line environment,$(origin ATTEMPT)),$(ATTEMPT),)" \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	AWS_REGION=$(AWS_REGION) \
+	bash scripts/run-benchmark-suite.sh
+
+.PHONY: run-benchmark-suite-sequential-vultr
+run-benchmark-suite-sequential-vultr:
+	CLOUD_PROVIDER=vultr \
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE="$(if $(filter command line environment,$(origin K6_PROFILE)),$(K6_PROFILE),)" \
+	TEST_DURATION=$(TEST_DURATION) \
+	SCENARIOS="$(SCENARIOS)" \
+	RPS_LEVELS="$(RPS_LEVELS)" \
+	SCENARIO_RPS_MATRIX="$(SCENARIO_RPS_MATRIX)" \
+	ARCHITECTURE_ORDER="$(ARCHITECTURE_ORDER)" \
+	INTER_CASE_DELAY=$(INTER_CASE_DELAY) \
+	ARCHITECTURE_SWITCH_DELAY=$(ARCHITECTURE_SWITCH_DELAY) \
+	AUTO_DESTROY_CONFIRMED=$(AUTO_DESTROY_CONFIRMED) \
+	EXPERIMENT_NAME="$(if $(filter command line environment,$(origin EXPERIMENT_NAME)),$(EXPERIMENT_NAME),)" \
+	RUN_ID="$(if $(filter command line environment,$(origin RUN_ID)),$(RUN_ID),)" \
+	ATTEMPT="$(if $(filter command line environment,$(origin ATTEMPT)),$(ATTEMPT),)" \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	AWS_REGION=$(AWS_REGION) \
+	bash scripts/run-benchmark-suite-sequential.sh
 
 .PHONY: run-benchmark-suite-sequential
 run-benchmark-suite-sequential:

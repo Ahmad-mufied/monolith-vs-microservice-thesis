@@ -39,6 +39,25 @@ Rules:
 - The same app JWT and benchmark user credentials used by EKS env files are
   reused for Hetzner unless the operator intentionally rotates them.
 
+## Vultr VKE Benchmark Secrets
+
+The Vultr VKE path also does not have EKS Pod Identity. The k6 runner receives
+AWS S3 upload credentials through `benchmark/k6-runner-secret`, created by:
+
+```bash
+make vultr-create-secrets
+make vultr-create-secrets-sequential
+```
+
+Application secrets reuse the current Kubernetes Secret names consumed by the
+EKS manifests. PostgreSQL URLs point to Vultr private VPC IPs from Terraform
+outputs. Do not commit `env/vultr.env`, generated `terraform.tfvars`, local
+Terraform state, or kubeconfig files.
+
+For the full variable list and creation order, see
+`docs/infrastructure/vultr-configuration-reference.md` and
+`docs/infrastructure/vultr-vke-runbook.md`.
+
 ## Purpose
 
 This document describes secret and configuration management for the benchmark project.

@@ -25,6 +25,8 @@ if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
   set +a
 fi
 
+source scripts/lib/cloud-provider.sh
+load_cloud_provider_env
 source scripts/lib/resource-configuration.sh
 source scripts/lib/benchmark-preflight.sh
 
@@ -47,6 +49,8 @@ RUN_ID="${RUN_ID:-}"
 ATTEMPT="${ATTEMPT:-}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
+CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
+DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 SUITE_WORKDIR="$(mktemp -d)"
 SUITE_CASES_JSONL="$SUITE_WORKDIR/cases.jsonl"
@@ -302,10 +306,11 @@ run_suite_preflight() {
 }
 
 if [ -z "$RUN_ID" ]; then
+  run_prefix="$(provider_default_run_prefix parallel)"
   if [ -n "$EXPERIMENT_NAME" ]; then
-    RUN_ID="eks-${SCALING_MODE}-${EXPERIMENT_NAME}"
+    RUN_ID="${run_prefix}-${SCALING_MODE}-${EXPERIMENT_NAME}"
   else
-    RUN_ID="eks-${SCALING_MODE}-$(date +%Y%m%d-%H%M)"
+    RUN_ID="${run_prefix}-${SCALING_MODE}-$(date +%Y%m%d-%H%M)"
   fi
 fi
 
@@ -690,6 +695,8 @@ run_parallel_case() {
   DATADOG_ENABLED="$DATADOG_ENABLED" \
   DATADOG_ENV="$DATADOG_ENV" \
   AWS_REGION="$AWS_REGION" \
+  CLOUD_PROVIDER="$CLOUD_PROVIDER" \
+  DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
   bash scripts/run-benchmark-parallel.sh
 }
 
@@ -702,6 +709,8 @@ upload_suite_manifest() {
   resource_configuration_json="$(suite_resource_configuration_json "$SCALING_MODE")"
   jq -n \
     --arg experiment_name "$EXPERIMENT_NAME" \
+    --arg provider "$CLOUD_PROVIDER" \
+    --arg terraform_stack "$(provider_parallel_stack_name)" \
     --arg run_id "$RUN_ID" \
     --arg attempt "$ATTEMPT" \
     --arg scaling_mode "$SCALING_MODE" \
@@ -716,6 +725,9 @@ upload_suite_manifest() {
     --argjson scenario_rps_matrix "$(scenario_rps_matrix_json)" \
     '{
       experiment_name: (if $experiment_name == "" then null else $experiment_name end),
+      provider: $provider,
+      execution_mode: "parallel",
+      terraform_stack: $terraform_stack,
       run_id: $run_id,
       attempt: $attempt,
       scaling_mode: $scaling_mode,
@@ -767,6 +779,8 @@ upload_suite_summary() {
   run_suite_preflight "suite summary upload" "true"
   jq -s \
     --arg experiment_name "$EXPERIMENT_NAME" \
+    --arg provider "$CLOUD_PROVIDER" \
+    --arg terraform_stack "$(provider_parallel_stack_name)" \
     --arg run_id "$RUN_ID" \
     --arg attempt "$ATTEMPT" \
     --arg scaling_mode "$SCALING_MODE" \
@@ -783,6 +797,9 @@ upload_suite_summary() {
     --argjson scenario_rps_matrix "$(scenario_rps_matrix_json)" \
     '{
       experiment_name: (if $experiment_name == "" then null else $experiment_name end),
+      provider: $provider,
+      execution_mode: "parallel",
+      terraform_stack: $terraform_stack,
       run_id: $run_id,
       attempt: $attempt,
       scaling_mode: $scaling_mode,
@@ -811,12 +828,13 @@ maybe_destroy_experiment_stack() {
   echo ""
   echo "=== Auto Destroy ==="
   echo "  mode           : confirmed"
-  echo "  command        : make eks-destroy-confirmed"
+  destroy_target="$(provider_parallel_destroy_target)"
+  echo "  command        : make ${destroy_target}"
   echo "  reason         : suite finished and suite summary is already uploaded to S3"
   echo "  run_id         : $RUN_ID"
   echo "  attempt        : $ATTEMPT"
 
-  make eks-destroy-confirmed
+  make "$destroy_target"
 }
 
 maybe_wait_between_cases() {
@@ -872,7 +890,7 @@ run_suite_preflight "suite bootstrap preflight"
 
 suite_failed=0
 completed_cases=0
-IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+render_provider_manifests "$RENDER_ROOT"
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 verify_live_scaling_mode_state
 upload_suite_manifest

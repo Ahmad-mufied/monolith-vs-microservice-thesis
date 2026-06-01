@@ -64,6 +64,17 @@ Both architectures remain bounded by the same namespace ResourceQuota ceiling
 of `15800m CPU / 27648Mi memory`. The MSA pod-level requests and limits are
 role-aware rather than equal `250m` slices.
 
+For non-EKS providers such as Hetzner and Vultr, the numeric ResourceQuota can
+be derived from live app-node allocatable capacity. The fairness rule remains
+the same: monolith and microservices must receive the same generated CPU and
+memory namespace quota, and fixed/HPA pod resources must be scaled
+proportionally from the EKS baseline.
+
+For Vultr specifically, `make vultr-measure-resource-baseline` writes the live
+VKE app-node allocatable measurement to `env/vultr-resource-baseline.env`, and
+`make vultr-render-manifests` uses that file to render equal monolith and
+microservices quotas. Do not copy AWS EKS quota values into Vultr manifests.
+
 The broader methodology for why the MSA split is role-aware instead of equal
 per-service slicing is documented in
 `docs/experiment/resource-configuration.md`.
