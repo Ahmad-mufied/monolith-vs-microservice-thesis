@@ -162,7 +162,14 @@ K6_TAG_ARGS=(
   --tag "attempt=$ATTEMPT_VALUE"
   --tag "architecture=$ARCHITECTURE_VALUE"
   --tag "benchmark_scenario=$SCENARIO_NAME_VALUE"
+  --tag "execution_mode=$EXECUTION_MODE_VALUE"
 )
+if [ -n "$TERRAFORM_STACK_VALUE" ]; then
+  K6_TAG_ARGS+=(--tag "terraform_stack=$TERRAFORM_STACK_VALUE")
+fi
+if [ -n "$CLUSTER_NAME_VALUE" ]; then
+  K6_TAG_ARGS+=(--tag "cluster_name=$CLUSTER_NAME_VALUE")
+fi
 if [ "$DATADOG_ENABLED_VALUE" = "true" ]; then
   export K6_STATSD_ADDR="$K6_STATSD_ADDR_VALUE"
   export K6_STATSD_NAMESPACE="$K6_STATSD_NAMESPACE_VALUE"
