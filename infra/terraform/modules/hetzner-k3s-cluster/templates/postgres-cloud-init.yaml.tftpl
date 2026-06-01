@@ -19,4 +19,9 @@ runcmd:
   - sed -i "s/^#*host\s\+all\s\+all\s\+127.0.0.1\/32.*/host all all 127.0.0.1\/32 scram-sha-256/" /etc/postgresql/18/main/pg_hba.conf
   - echo "host all all ${network_cidr} scram-sha-256" >> /etc/postgresql/18/main/pg_hba.conf
   - systemctl restart postgresql
-  - sudo -u postgres psql -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'postgres_admin') THEN CREATE ROLE postgres_admin LOGIN SUPERUSER PASSWORD '${postgres_password}'; ELSE ALTER ROLE postgres_admin WITH PASSWORD '${postgres_password}'; END IF; END \$\$;"
+  - |
+    cat >/tmp/bootstrap-postgres-admin.sql <<'EOF'
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'postgres_admin') THEN CREATE ROLE postgres_admin LOGIN SUPERUSER PASSWORD '${postgres_password_sql_literal}'; ELSE ALTER ROLE postgres_admin WITH PASSWORD '${postgres_password_sql_literal}'; END IF; END $$;
+    EOF
+  - sudo -u postgres psql -v ON_ERROR_STOP=1 -f /tmp/bootstrap-postgres-admin.sql
+  - rm -f /tmp/bootstrap-postgres-admin.sql
