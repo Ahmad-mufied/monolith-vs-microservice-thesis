@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This document describes the Hetzner Cloud benchmark path. It is an additive
-provider path and does not replace the existing EKS workflow.
+This document describes the Hetzner Cloud benchmark path used for the final
+thesis benchmark environment.
 
 The benchmark semantics remain unchanged:
 
@@ -14,6 +14,13 @@ The benchmark semantics remain unchanged:
 - same Datadog analysis model.
 
 Only the infrastructure substrate changes.
+
+Final-thesis decision:
+
+- Bab 4 uses Hetzner Cloud as the single benchmark environment.
+- Historical EKS preparation and partial runs are not part of the final thesis
+  dataset.
+- All fixed and HPA measurements must therefore be rerun fully in Hetzner.
 
 ## Provider Split
 
@@ -118,6 +125,10 @@ env/hetzner-resource-baseline.json
 
 Rendered Hetzner manifests use this generated quota. Monolith and MSA must
 always receive the same CPU and memory ceiling.
+
+The quota is provider-native. It is not clamped back to the older EKS
+`15800m / 27648Mi` ceiling. Fairness is preserved by applying the same
+generated ceiling to both architectures within Hetzner.
 
 ## Security
 

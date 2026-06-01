@@ -14,7 +14,7 @@ The deployment strategy is split into three levels:
 ```text
 Level 1: Docker Compose
 Level 2: Minikube
-Level 3: AWS EKS
+Level 3: Hetzner Cloud Kubernetes
 ```
 
 Each level has a different purpose.
@@ -23,7 +23,7 @@ Docker Compose is used for local development and functional validation.
 
 Minikube is used for local Kubernetes dry-run.
 
-AWS EKS is used for the final benchmark environment.
+Hetzner Cloud Kubernetes is used for the final benchmark environment.
 
 ---
 
@@ -34,8 +34,8 @@ Final decision:
 ```text
 Local development       : Docker Compose
 Local Kubernetes dry-run: Minikube
-Final benchmark         : AWS EKS
-Database final          : Amazon RDS PostgreSQL 18
+Final benchmark         : Hetzner Cloud Kubernetes
+Database final          : PostgreSQL 18 on dedicated Hetzner compute
 Result storage final    : Amazon S3
 Observability final     : Datadog
 ```
@@ -54,10 +54,12 @@ Result upload : Amazon S3
 Important rule:
 
 ```text
-Only AWS EKS benchmark results are used as final thesis experiment results.
+Only Hetzner Cloud benchmark results are used as final thesis experiment
+results.
 ```
 
-Docker Compose and Minikube are used to reduce implementation risk before the final AWS experiment.
+Docker Compose and Minikube are used to reduce implementation risk before the
+final Hetzner experiment.
 
 ---
 
@@ -77,7 +79,7 @@ Purpose:
 
 Docker Compose is the fastest local validation layer.
 
-Use it before Minikube or EKS.
+Use it before Minikube or Hetzner Kubernetes.
 
 Suitable for:
 
@@ -95,7 +97,7 @@ Not suitable for:
 - final benchmark result
 - HPA testing
 - Kubernetes ResourceQuota testing
-- EKS topology validation
+- final-cluster topology validation
 ```
 
 ---

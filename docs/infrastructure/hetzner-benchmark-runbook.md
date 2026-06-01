@@ -1,5 +1,9 @@
 # Hetzner Benchmark Runbook
 
+Need the full Terraform-to-benchmark-to-destroy operator flow with detailed
+examples? Use
+[`hetzner-benchmark-runbook-end-to-end.md`](./hetzner-benchmark-runbook-end-to-end.md).
+
 ## 1. Prepare Environment
 
 Initialize the existing app env files and the Hetzner env file:
