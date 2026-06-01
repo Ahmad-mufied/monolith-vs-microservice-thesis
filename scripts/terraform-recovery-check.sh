@@ -223,7 +223,7 @@ check_addon_state() {
       fi
     else
       print_status "STALE_IN_STATE" "Addon missing in AWS for $cluster_name: $addon_name"
-      printf '  suggested: AWS_PROFILE=%s terraform -chdir=%s state rm %s\n' \
+      printf '  suggested: AWS_PROFILE=%s terraform -chdir=%s state rm %q\n' \
         "$terraform_aws_profile" "$tf_experiment_dir" "$addon_address"
     fi
   fi
