@@ -92,8 +92,10 @@ if [[ -n "$cluster_status" && "$cluster_status" != "None" ]]; then
         --addon-name "$addon_name" \
         --query 'addon.status' \
         --output text 2>/dev/null || true)"
-      if [[ -n "$addon_status" && "$addon_status" != "None" ]]; then
-        print_status "OK" "Sequential addon exists: $cluster_name/$addon_name ($addon_status)"
+      if [[ "$addon_status" == "ACTIVE" ]]; then
+        print_status "OK" "Sequential addon active: $cluster_name/$addon_name"
+      elif [[ -n "$addon_status" && "$addon_status" != "None" ]]; then
+        print_status "IN_PROGRESS" "Sequential addon present but not active: $cluster_name/$addon_name ($addon_status)"
       else
         print_status "REVIEW" "Sequential addon not found yet: $cluster_name/$addon_name"
       fi
