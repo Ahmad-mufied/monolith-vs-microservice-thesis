@@ -125,6 +125,7 @@ resource "hcloud_server" "postgres" {
   }
 
   user_data = templatefile("${path.module}/templates/postgres-cloud-init.yaml.tftpl", {
+    network_cidr      = var.network_cidr
     postgres_password = var.postgres_password
   })
 }

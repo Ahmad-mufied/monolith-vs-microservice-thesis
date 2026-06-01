@@ -24,6 +24,11 @@ variable "network_id" {
   type        = number
 }
 
+variable "network_cidr" {
+  description = "Hetzner Cloud private network CIDR allowed to reach cluster-internal services."
+  type        = string
+}
+
 variable "network_zone" {
   description = "Hetzner Cloud network zone for private subnet attachments."
   type        = string

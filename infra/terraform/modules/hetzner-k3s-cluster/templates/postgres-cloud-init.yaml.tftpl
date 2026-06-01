@@ -17,6 +17,6 @@ runcmd:
     password_encryption = scram-sha-256
     EOF
   - sed -i "s/^#*host\s\+all\s\+all\s\+127.0.0.1\/32.*/host all all 127.0.0.1\/32 scram-sha-256/" /etc/postgresql/18/main/pg_hba.conf
-  - echo "host all all 10.10.0.0/16 scram-sha-256" >> /etc/postgresql/18/main/pg_hba.conf
+  - echo "host all all ${network_cidr} scram-sha-256" >> /etc/postgresql/18/main/pg_hba.conf
   - systemctl restart postgresql
   - sudo -u postgres psql -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'postgres_admin') THEN CREATE ROLE postgres_admin LOGIN SUPERUSER PASSWORD '${postgres_password}'; ELSE ALTER ROLE postgres_admin WITH PASSWORD '${postgres_password}'; END IF; END \$\$;"

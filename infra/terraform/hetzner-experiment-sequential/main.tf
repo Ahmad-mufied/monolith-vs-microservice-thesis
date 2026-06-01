@@ -39,6 +39,7 @@ module "sequential_cluster" {
   architecture               = "benchmark"
   location                   = var.location
   network_id                 = data.terraform_remote_state.shared.outputs.network_id
+  network_cidr               = data.terraform_remote_state.shared.outputs.network_cidr
   network_zone               = data.terraform_remote_state.shared.outputs.network_zone
   ssh_key_ids                = data.terraform_remote_state.shared.outputs.ssh_key_ids
   control_plane_firewall_ids = data.terraform_remote_state.shared.outputs.control_plane_firewall_ids
