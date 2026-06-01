@@ -100,6 +100,12 @@ Amazon RDS PostgreSQL 18
 mono_db
 ```
 
+In parallel benchmark mode this topology runs on the dedicated
+`skripsi-monolith` EKS cluster. In sequential benchmark mode it runs in the
+`mono` namespace on `skripsi-benchmark` while the microservices namespace is
+scaled down. The monolith request path, database name, resource ceiling, and
+benchmark semantics remain the same in both modes.
+
 This request path is intentionally linear. A client request reaches the
 monolith over HTTP, the monolith executes all relevant application logic
 locally, and PostgreSQL is the only external dependency on the hot path. That

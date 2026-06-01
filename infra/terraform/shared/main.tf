@@ -98,8 +98,8 @@ module "aws_budget" {
   budget_amount            = var.budget_amount
   budget_threshold_percent = var.budget_threshold_percent
   budget_alert_emails      = var.budget_alert_emails
-  cluster_names            = ["skripsi-monolith", "skripsi-msa"]
-  rds_instance_ids         = ["skripsi-monolith-postgres", "skripsi-msa-postgres"]
+  cluster_names            = ["skripsi-monolith", "skripsi-msa", "skripsi-benchmark"]
+  rds_instance_ids         = ["skripsi-monolith-postgres", "skripsi-msa-postgres", "skripsi-benchmark-postgres"]
   vpc_id                   = module.vpc.vpc_id
   delete_eks               = true
   tags                     = local.common_tags

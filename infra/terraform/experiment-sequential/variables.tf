@@ -1,15 +1,7 @@
-variable "cluster_name" {
-  description = "EKS cluster name"
+variable "aws_region" {
+  description = "AWS region"
   type        = string
-}
-
-variable "architecture" {
-  description = "Architecture label: monolith, msa, or benchmark"
-  type        = string
-  validation {
-    condition     = contains(["monolith", "msa", "benchmark"], var.architecture)
-    error_message = "architecture must be monolith, msa, or benchmark"
-  }
+  default     = "ap-southeast-1"
 }
 
 variable "project" {
@@ -18,23 +10,14 @@ variable "project" {
   default     = "skripsi"
 }
 
-variable "vpc_id" {
-  description = "VPC ID from shared module"
+variable "sequential_cluster_name" {
+  description = "Single EKS cluster name for sequential benchmark execution"
   type        = string
-}
-
-variable "private_subnet_ids" {
-  description = "Private subnet IDs from shared module"
-  type        = list(string)
-}
-
-variable "k6_runner_role_arn" {
-  description = "IAM role ARN for k6 runner EKS Pod Identity"
-  type        = string
+  default     = "skripsi-benchmark"
 }
 
 variable "cluster_endpoint_public_access_cidrs" {
-  description = "CIDR blocks allowed to reach the public EKS Kubernetes API endpoint"
+  description = "Operator public CIDR allowlist for the public EKS Kubernetes API endpoint"
   type        = list(string)
 
   validation {
@@ -53,12 +36,13 @@ variable "cluster_endpoint_public_access_cidrs" {
 }
 
 variable "db_password" {
-  description = "RDS master password"
+  description = "RDS master password for the sequential benchmark database"
   type        = string
   sensitive   = true
 }
 
 variable "db_instance_class" {
-  description = "RDS instance class for the benchmark cluster database"
+  description = "RDS instance class for the sequential benchmark database"
   type        = string
+  default     = "db.t3.micro"
 }

@@ -58,9 +58,11 @@ Datadog should help answer questions such as:
 Important benchmark interpretation rule:
 
 ```text
-Monolith and microservices benchmark runs remain sequential, but Datadog may
-still present both architectures together in a combined comparison dashboard
-after those separate runs are completed.
+Parallel benchmark mode runs monolith and microservices at the same wall-clock
+time on two clusters. Sequential benchmark mode runs them one after another on
+the skripsi-benchmark cluster. Datadog comparison dashboards must filter by
+execution_mode, cluster_name, architecture, scenario_name, run_id, and the
+recorded Datadog time window.
 ```
 
 ## 2. Architecture Decision
@@ -89,6 +91,7 @@ Current values files:
 | Minikube | `deployments/helm/datadog/values-minikube.yaml` |
 | AWS EKS — monolith cluster | `deployments/helm/datadog/values-eks-monolith.yaml` |
 | AWS EKS — MSA cluster | `deployments/helm/datadog/values-eks-msa.yaml` |
+| AWS EKS — sequential benchmark cluster | `deployments/helm/datadog/values-eks-sequential.yaml` |
 
 Current Makefile targets:
 
@@ -135,13 +138,12 @@ the Datadog `env` meaning. EKS deployments must still override local image and
 version defaults, but the Datadog environment purpose should remain
 `development` locally and `benchmark` on EKS.
 
-Important integration note for the separate EKS deployment path:
+Important integration note for the EKS deployment path:
 
 ```text
 These tracked Kubernetes manifests represent local/Minikube defaults.
-When the EKS deployment path is integrated, deployment-specific overrides must
-replace local-only image settings and Datadog runtime identity values,
-especially:
+The EKS render/deploy scripts replace local-only image settings and Datadog
+runtime identity values before applying manifests, especially:
 
 - tags.datadoghq.com/env: development -> benchmark
 - tags.datadoghq.com/version: local -> deployed image tag
@@ -886,9 +888,11 @@ api-gateway
 
 ## 12. AWS EKS Runbook
 
-EKS is the final benchmark target. The dual cluster design uses two separate
-EKS clusters — one for monolith and one for MSA — each with its own Datadog
-Helm values file and `cluster_name` tag.
+EKS is the final benchmark target. Parallel mode uses two separate EKS clusters
+— one for monolith and one for MSA — each with its own Datadog Helm values file
+and `cluster_name` tag. Sequential mode uses one EKS cluster
+(`skripsi-benchmark`) and switches the active architecture phase inside that
+cluster.
 
 Install Datadog on monolith cluster:
 
@@ -902,12 +906,16 @@ Install Datadog on MSA cluster:
 DATADOG_API_KEY=<redacted> make datadog-install-eks-msa
 ```
 
-The two EKS values files differ only in `clusterName` and `tags`:
+The two parallel EKS values files differ only in `clusterName` and `tags`:
 
 | Setting | Monolith cluster | MSA cluster |
 |---|---|---|
 | `clusterName` | `skripsi-monolith` | `skripsi-msa` |
 | `architecture` tag | `architecture:monolith` | `architecture:microservices` |
+
+Sequential mode uses `deployments/helm/datadog/values-eks-sequential.yaml`.
+The deploy script also sets `datadog.clusterName` from
+`SEQUENTIAL_CLUSTER_NAME`, defaulting to `skripsi-benchmark`.
 
 Both clusters use `env:benchmark` as the Datadog Agent environment tag.
 Application pods on EKS must also expose `DD_ENV=benchmark` semantics through
@@ -917,8 +925,10 @@ for the local Minikube flow, while k6 benchmark jobs should use
 `DATADOG_ENV=benchmark`.
 
 Use the repository's active EKS provisioning and deployment runbook for the
-cluster lifecycle, then apply the Datadog install commands above on each
-cluster after the workloads and secrets are ready.
+cluster lifecycle. Parallel mode can install Datadog with the two explicit
+targets above. Sequential mode installs Datadog from
+`scripts/deploy-sequential-architecture.sh` when `DATADOG_API_KEY` is
+configured and not a placeholder.
 
 Important EKS rule:
 
@@ -1087,7 +1097,6 @@ kubectl top pods -A
 Current limitations:
 
 - automatic pgx query tracing is not enabled,
-- EKS Terraform integration is not implemented yet,
 - Datadog RDS integration is not yet configured in infrastructure code,
 - final Datadog dashboard definitions are not yet committed.
 

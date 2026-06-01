@@ -18,6 +18,18 @@ The comparison focuses on the architectural characteristics that directly affect
 
 Both architectures implement the same external REST API and equivalent business behavior. The main difference lies in their internal runtime structure, database ownership model, communication pattern, and scaling unit.
 
+The benchmark execution topology is not an application architecture variant.
+It only controls how the two existing architectures are scheduled for
+measurement:
+
+- parallel mode runs monolith and microservices at the same wall-clock time on
+  two isolated EKS clusters,
+- sequential mode runs one architecture phase at a time on one EKS cluster for
+  quota-constrained AWS accounts.
+
+Both modes must preserve the same resource ceilings, workload scripts, seed
+data assumptions, and request completion semantics.
+
 ---
 
 ## 2. Comparison Scope
@@ -1001,6 +1013,12 @@ Controlled variables:
 | Dataset | Logically equivalent seed |
 | Authentication behavior | Equivalent JWT rules |
 | Response format | Equivalent JSON format |
+| Execution mode | Recorded as `parallel` or `sequential`; must not change app semantics |
+
+Execution topology controls how measurements are scheduled, not what is being
+measured. Parallel mode gives wall-clock aligned Datadog series. Sequential
+mode gives lower AWS footprint and uses `ARCHITECTURE_SWITCH_DELAY` plus
+recorded Datadog windows to keep comparison periods clear.
 
 Avoid unfair differences:
 
@@ -1127,6 +1145,7 @@ Therefore, this project uses a synchronous REST + gRPC flow for create transacti
 | MSA scaling | per service |
 | Autoscaling metric | CPU-based HPA |
 | Resource fairness | 15800m CPU / 27648Mi memory ceiling |
+| Execution topology | parallel or sequential, documented in benchmark metadata |
 | Async transaction flow | excluded |
 | Caching | excluded unless applied fairly |
 | Message queue | excluded |

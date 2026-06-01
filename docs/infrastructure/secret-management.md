@@ -106,6 +106,8 @@ terraform-auth-check
   -> verifies Terraform can read AWS credentials through terraform-process
 eks-create-secrets
   -> create Kubernetes secrets for both EKS clusters from env/ + Terraform outputs
+eks-create-secrets-sequential
+  -> create mono, msa, and benchmark namespace secrets in the single sequential cluster
 ```
 
 Granular targets are still available when only one cluster's secrets need to be
@@ -114,6 +116,7 @@ recreated:
 ```bash
 make create-eks-secrets-monolith
 make create-eks-secrets-microservices
+make eks-create-secrets-sequential
 ```
 
 Important distinction:
@@ -622,7 +625,8 @@ Before committing:
 Before benchmark:
 
 ```text
-- make eks-create-secrets has been run after eks-apply/context setup
+- make eks-create-secrets has been run after eks-apply/context setup, or
+  make eks-create-secrets-sequential has been run after sequential context setup
 - db-bootstrap-env exists
 - monolith-env exists
 - app secrets exist

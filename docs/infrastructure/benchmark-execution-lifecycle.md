@@ -36,7 +36,9 @@ Important rules:
 - use an explicit inter-case delay between measured suite cases when the next case
   should start from a stable system state,
 - upload k6 results to S3 before running the next execution or destroying infrastructure,
-- do not run `make eks-destroy-confirmed` until all expected result files are present in S3.
+- do not run `make eks-destroy-confirmed` or
+  `make eks-sequential-destroy-confirmed` until all expected result files are
+  present in S3.
 
 ## 3. Infrastructure Lifecycle
 
@@ -47,12 +49,13 @@ build/push images
 -> render EKS manifests with IMAGE_TAG
 -> aws login
 -> make terraform-auth-check
--> make eks-apply
+-> make eks-apply                  # parallel mode
+   or make eks-sequential-apply    # sequential mode
 ```
 
-This provisions the benchmark infrastructure:
+This provisions the selected benchmark infrastructure:
 
-- EKS cluster,
+- EKS cluster or clusters,
 - node groups,
 - RDS PostgreSQL,
 - IAM roles / IRSA / EKS Pod Identity,
@@ -64,7 +67,7 @@ An experiment lifecycle ends with:
 ```text
 aws login
 -> make terraform-auth-check
-> make eks-destroy-confirmed
+-> make eks-destroy-confirmed or make eks-sequential-destroy-confirmed
 ```
 
 When RDS is included in the destroy plan, all database state is removed:
@@ -83,7 +86,7 @@ Use this flow when starting from a new IaC-provisioned environment:
 ```text
 aws login
 -> make terraform-auth-check
--> make eks-apply
+-> make eks-apply or make eks-sequential-apply
 -> create EKS and RDS
 -> run database bootstrap job
 -> run migration job
