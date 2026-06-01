@@ -29,17 +29,40 @@ read_env_value() {
   local file="$1"
   local key="$2"
   [ -f "$file" ] || return 0
-  grep -E "^${key}=" "$file" | head -n 1 | cut -d= -f2- || true
+  bash -lc 'set -a; source "$1" >/dev/null 2>&1; key="$2"; printf "%s" "${!key-}"' _ "$file" "$key"
 }
 
-write_if_missing() {
+format_env_assignment() {
+  local key="$1"
+  local value="$2"
+  printf '%s=%q\n' "$key" "$value"
+}
+
+create_default_hetzner_env() {
   local file="$1"
-  local content="$2"
   if [ -f "$file" ]; then
     echo "skip $file (already exists)"
     return
   fi
-  printf '%s\n' "$content" >"$file"
+  {
+    format_env_assignment "HCLOUD_TOKEN" "replace-me"
+    format_env_assignment "PROJECT" "skripsi"
+    format_env_assignment "HCLOUD_LOCATION" "sin"
+    format_env_assignment "HCLOUD_NETWORK_ZONE" "ap-southeast"
+    format_env_assignment "OPERATOR_CIDRS" "$operator_cidr"
+    format_env_assignment "OPERATOR_SSH_PUBLIC_KEY" "$operator_ssh_key"
+    format_env_assignment "POSTGRES_PASSWORD" "$postgres_password"
+    format_env_assignment "HETZNER_SEQUENTIAL_CLUSTER_NAME" "skripsi-hetzner-benchmark"
+    format_env_assignment "HETZNER_MONOLITH_CLUSTER_NAME" "skripsi-hetzner-monolith"
+    format_env_assignment "HETZNER_MSA_CLUSTER_NAME" "skripsi-hetzner-msa"
+    format_env_assignment "HETZNER_CONTROL_PLANE_SERVER_TYPE" "ccx13"
+    format_env_assignment "HETZNER_APP_SERVER_TYPE" "ccx43"
+    format_env_assignment "HETZNER_TESTING_SERVER_TYPE" "ccx23"
+    format_env_assignment "HETZNER_POSTGRES_SERVER_TYPE" "ccx33"
+    format_env_assignment "DOCKERHUB_NAMESPACE" "replace-me"
+    format_env_assignment "AWS_REGION" "ap-southeast-1"
+    format_env_assignment "S3_BUCKET" "skripsi-benchmark-results"
+  } >"$file"
   echo "created $file"
 }
 
@@ -47,15 +70,32 @@ write_or_update_env_value() {
   local file="$1"
   local key="$2"
   local value="$3"
+  local line
+  line="$(format_env_assignment "$key" "$value")"
   if [ ! -f "$file" ]; then
-    printf '%s=%s\n' "$key" "$value" >"$file"
+    printf '%s\n' "$line" >"$file"
     echo "created $file"
     return
   fi
   if grep -q -E "^${key}=" "$file"; then
-    perl -0pi -e "s#^${key}=.*#${key}=${value}#m" "$file"
+    local tmp
+    local existing_line
+    local replaced="false"
+    tmp="$(mktemp)"
+    while IFS= read -r existing_line || [ -n "$existing_line" ]; do
+      if [[ "$existing_line" == "${key}="* ]]; then
+        printf '%s\n' "$line" >>"$tmp"
+        replaced="true"
+        continue
+      fi
+      printf '%s\n' "$existing_line" >>"$tmp"
+    done <"$file"
+    if [ "$replaced" != "true" ]; then
+      printf '%s\n' "$line" >>"$tmp"
+    fi
+    mv "$tmp" "$file"
   else
-    printf '%s=%s\n' "$key" "$value" >>"$file"
+    printf '%s\n' "$line" >>"$file"
   fi
   echo "updated $file"
 }
@@ -71,23 +111,7 @@ if [ -z "$operator_ssh_key" ] && [ -f "$HOME/.ssh/id_ed25519.pub" ]; then
 fi
 operator_ssh_key="${operator_ssh_key:-REPLACE_WITH_OPERATOR_SSH_PUBLIC_KEY}"
 
-write_if_missing "env/hetzner.env" "HCLOUD_TOKEN=replace-me
-PROJECT=skripsi
-HCLOUD_LOCATION=sin
-HCLOUD_NETWORK_ZONE=ap-southeast
-OPERATOR_CIDRS=${operator_cidr}
-OPERATOR_SSH_PUBLIC_KEY=${operator_ssh_key}
-POSTGRES_PASSWORD=${postgres_password}
-HETZNER_SEQUENTIAL_CLUSTER_NAME=skripsi-hetzner-benchmark
-HETZNER_MONOLITH_CLUSTER_NAME=skripsi-hetzner-monolith
-HETZNER_MSA_CLUSTER_NAME=skripsi-hetzner-msa
-HETZNER_CONTROL_PLANE_SERVER_TYPE=ccx13
-HETZNER_APP_SERVER_TYPE=ccx43
-HETZNER_TESTING_SERVER_TYPE=ccx23
-HETZNER_POSTGRES_SERVER_TYPE=ccx33
-DOCKERHUB_NAMESPACE=replace-me
-AWS_REGION=ap-southeast-1
-S3_BUCKET=skripsi-benchmark-results"
+create_default_hetzner_env "env/hetzner.env"
 
 write_or_update_env_value "env/hetzner.env" "POSTGRES_PASSWORD" "$postgres_password"
 write_or_update_env_value "env/hetzner.env" "OPERATOR_CIDRS" "$operator_cidr"
