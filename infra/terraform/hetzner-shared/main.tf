@@ -67,6 +67,20 @@ resource "hcloud_firewall" "control_plane" {
 
   rule {
     direction  = "in"
+    protocol   = "tcp"
+    port       = "1-65535"
+    source_ips = [var.network_cidr]
+  }
+
+  rule {
+    direction  = "in"
+    protocol   = "udp"
+    port       = "1-65535"
+    source_ips = [var.network_cidr]
+  }
+
+  rule {
+    direction  = "in"
     protocol   = "icmp"
     source_ips = [var.network_cidr]
   }
