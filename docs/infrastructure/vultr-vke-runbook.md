@@ -194,6 +194,12 @@ postgres_firewall_group_id
 
 Parallel mode creates two isolated VKE clusters and two PostgreSQL VMs:
 
+Cost guardrail: this stack intentionally provisions both architecture clusters
+at the same time so Datadog and k6 windows align. With the default plans, app
+nodes, testing nodes, and PostgreSQL VMs are created for both monolith and MSA.
+Use sequential mode instead when quota, credit, or budget cannot support the
+full parallel topology, and destroy promptly after S3 results are verified.
+
 ```bash
 make vultr-parallel-plan
 make vultr-parallel-apply

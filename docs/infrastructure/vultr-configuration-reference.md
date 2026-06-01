@@ -105,6 +105,23 @@ and Vultr Terraform states.
 | `S3_BENCHMARK_DATA_VERIFIED=true make vultr-sequential-destroy-confirmed` | Destroy sequential experiment resources. |
 | `S3_BENCHMARK_DATA_VERIFIED=true make vultr-shared-destroy-confirmed` | Destroy shared Vultr resources. |
 
+## Cost Guardrails
+
+The Vultr plan variables are cost-impacting infrastructure choices:
+
+```text
+VULTR_APP_NODE_PLAN
+VULTR_TESTING_NODE_PLAN
+VULTR_POSTGRES_PLAN
+```
+
+The parallel stack deliberately creates two full benchmark clusters, one for
+monolith and one for microservices, to preserve same-wall-clock benchmark
+comparison. Do not make only one parallel module optional unless all downstream
+outputs, context setup, secret creation, deployment, benchmark, and metadata
+paths are also redesigned. Use the sequential stack as the supported
+lower-cost/quota fallback.
+
 ## Kubernetes Contexts
 
 | Mode | Context | Namespace | Workload |
@@ -203,4 +220,3 @@ The Vultr integration should fail rather than silently continue when:
 
 These guardrails are intentionally simple and repo-native. They avoid extra
 controllers or services while protecting benchmark reproducibility.
-

@@ -2,6 +2,9 @@ project                 = "skripsi"
 region                  = "sgp"
 kubernetes_version      = "v1.33.0+1"
 sequential_cluster_name = "skripsi-vultr-benchmark"
+
+# Cost-impacting benchmark SKUs. The sequential stack runs one architecture at
+# a time and is the supported lower-cost/quota fallback for Vultr.
 app_node_plan           = "voc-c-16c-32gb-300s"
 testing_node_plan       = "vc2-4c-8gb"
 postgres_plan           = "vc2-4c-8gb"
