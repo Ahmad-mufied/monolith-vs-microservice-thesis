@@ -21,8 +21,29 @@ detect_public_ip_cidr() {
       [ -n "$ip" ] && break
     done
   fi
-  [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
-  printf '%s/32\n' "$ip"
+
+  if [[ -z "$ip" ]]; then
+    return 1
+  fi
+
+  if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    local o1="" o2="" o3="" o4="" octet=""
+    IFS='.' read -r o1 o2 o3 o4 <<<"$ip"
+    for octet in "$o1" "$o2" "$o3" "$o4"; do
+      if ((octet < 0 || octet > 255)); then
+        return 1
+      fi
+    done
+    printf '%s/32\n' "$ip"
+    return
+  fi
+
+  if [[ "$ip" == *:* && "$ip" =~ ^[0-9A-Fa-f:]+$ ]]; then
+    printf '%s/128\n' "$ip"
+    return
+  fi
+
+  return 1
 }
 
 read_env_value() {
@@ -101,20 +122,62 @@ write_or_update_env_value() {
 }
 
 operator_cidr="$(read_env_value env/hetzner.env OPERATOR_CIDRS)"
-operator_cidr="${operator_cidr:-$(detect_public_ip_cidr || true)}"
+operator_cidr_source="$(read_env_value env/hetzner.env OPERATOR_CIDRS_SOURCE)"
+detected_public_ip_cidr="$(detect_public_ip_cidr || true)"
 operator_cidr="${operator_cidr:-REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR}"
+if [[ -z "$operator_cidr_source" ]]; then
+  case "$operator_cidr" in
+    ""|REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR)
+      operator_cidr_source="auto"
+      ;;
+    *)
+      operator_cidr_source="manual"
+      ;;
+  esac
+fi
+if [[ "$operator_cidr_source" == "auto" ]]; then
+  if [[ -n "$detected_public_ip_cidr" ]]; then
+    operator_cidr="$detected_public_ip_cidr"
+  fi
+elif [[ "$operator_cidr" == "REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR" && -n "$detected_public_ip_cidr" ]]; then
+  operator_cidr="$detected_public_ip_cidr"
+  operator_cidr_source="auto"
+fi
+
 postgres_password="$(read_env_value env/hetzner.env POSTGRES_PASSWORD)"
 postgres_password="${postgres_password:-$(random_hex 24)}"
 operator_ssh_key="$(read_env_value env/hetzner.env OPERATOR_SSH_PUBLIC_KEY)"
-if [ -z "$operator_ssh_key" ] && [ -f "$HOME/.ssh/id_ed25519.pub" ]; then
-  operator_ssh_key="$(cat "$HOME/.ssh/id_ed25519.pub")"
+operator_ssh_key_source="$(read_env_value env/hetzner.env OPERATOR_SSH_PUBLIC_KEY_SOURCE)"
+detected_operator_ssh_key=""
+if [ -f "$HOME/.ssh/id_ed25519.pub" ]; then
+  detected_operator_ssh_key="$(cat "$HOME/.ssh/id_ed25519.pub")"
 fi
 operator_ssh_key="${operator_ssh_key:-REPLACE_WITH_OPERATOR_SSH_PUBLIC_KEY}"
+if [[ -z "$operator_ssh_key_source" ]]; then
+  case "$operator_ssh_key" in
+    ""|REPLACE_WITH_OPERATOR_SSH_PUBLIC_KEY)
+      operator_ssh_key_source="auto"
+      ;;
+    *)
+      operator_ssh_key_source="manual"
+      ;;
+  esac
+fi
+if [[ "$operator_ssh_key_source" == "auto" ]]; then
+  if [[ -n "$detected_operator_ssh_key" ]]; then
+    operator_ssh_key="$detected_operator_ssh_key"
+  fi
+elif [[ "$operator_ssh_key" == "REPLACE_WITH_OPERATOR_SSH_PUBLIC_KEY" && -n "$detected_operator_ssh_key" ]]; then
+  operator_ssh_key="$detected_operator_ssh_key"
+  operator_ssh_key_source="auto"
+fi
 
 create_default_hetzner_env "env/hetzner.env"
 
 write_or_update_env_value "env/hetzner.env" "POSTGRES_PASSWORD" "$postgres_password"
 write_or_update_env_value "env/hetzner.env" "OPERATOR_CIDRS" "$operator_cidr"
+write_or_update_env_value "env/hetzner.env" "OPERATOR_CIDRS_SOURCE" "$operator_cidr_source"
 write_or_update_env_value "env/hetzner.env" "OPERATOR_SSH_PUBLIC_KEY" "$operator_ssh_key"
+write_or_update_env_value "env/hetzner.env" "OPERATOR_SSH_PUBLIC_KEY_SOURCE" "$operator_ssh_key_source"
 
 echo "Hetzner env initialization complete"
