@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+env_file="env/terraform.experiment.env"
+
+if [[ -f "$env_file" ]]; then
+  set -a
+  source "$env_file"
+  set +a
+fi
+
 terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
 aws_region="${AWS_REGION:-ap-southeast-1}"
 cluster_name="${SEQUENTIAL_CLUSTER_NAME:-skripsi-benchmark}"
