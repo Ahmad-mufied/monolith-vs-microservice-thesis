@@ -173,23 +173,29 @@ restore_active() {
   done
 }
 
+recreate_job() {
+  local namespace="$1"
+  local job_name="$2"
+  local manifest="$3"
+  local complete_timeout="$4"
+
+  kubectl --context="$SEQUENTIAL_CONTEXT" delete job "$job_name" -n "$namespace" --ignore-not-found
+  if kubectl --context="$SEQUENTIAL_CONTEXT" get job "$job_name" -n "$namespace" >/dev/null 2>&1; then
+    kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=delete "job/${job_name}" -n "$namespace" --timeout=120s
+  fi
+  kubectl --context="$SEQUENTIAL_CONTEXT" apply -f "$manifest"
+  kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=condition=complete "job/${job_name}" -n "$namespace" --timeout="$complete_timeout"
+}
+
 reset_seed_active() {
   local architecture="$1"
   scale_down_active "$architecture"
   if [ "$architecture" = "monolith" ]; then
-    kubectl --context="$SEQUENTIAL_CONTEXT" delete job reset-monolith-data-job -n mono --ignore-not-found
-    kubectl --context="$SEQUENTIAL_CONTEXT" apply -f "$RENDER_ROOT/deployments/k8s/eks/monolith/reset-monolith-data-job.yaml"
-    kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=120s
-    kubectl --context="$SEQUENTIAL_CONTEXT" delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
-    kubectl --context="$SEQUENTIAL_CONTEXT" apply -f "$RENDER_ROOT/deployments/k8s/eks/monolith/seed-monolith-benchmark-data-job.yaml"
-    kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
+    recreate_job mono reset-monolith-data-job "$RENDER_ROOT/deployments/k8s/eks/monolith/reset-monolith-data-job.yaml" 120s
+    recreate_job mono seed-monolith-benchmark-data-job "$RENDER_ROOT/deployments/k8s/eks/monolith/seed-monolith-benchmark-data-job.yaml" 300s
   else
-    kubectl --context="$SEQUENTIAL_CONTEXT" delete job reset-microservices-data-job -n msa --ignore-not-found
-    kubectl --context="$SEQUENTIAL_CONTEXT" apply -f "$RENDER_ROOT/deployments/k8s/eks/microservices/reset-microservices-data-job.yaml"
-    kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
-    kubectl --context="$SEQUENTIAL_CONTEXT" delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-    kubectl --context="$SEQUENTIAL_CONTEXT" apply -f "$RENDER_ROOT/deployments/k8s/eks/microservices/seed-microservices-benchmark-data-job.yaml"
-    kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
+    recreate_job msa reset-microservices-data-job "$RENDER_ROOT/deployments/k8s/eks/microservices/reset-microservices-data-job.yaml" 120s
+    recreate_job msa seed-microservices-benchmark-data-job "$RENDER_ROOT/deployments/k8s/eks/microservices/seed-microservices-benchmark-data-job.yaml" 300s
   fi
   restore_active "$architecture"
 }
@@ -198,13 +204,9 @@ prepare_enrichment_active() {
   local architecture="$1"
   scale_down_active "$architecture"
   if [ "$architecture" = "monolith" ]; then
-    kubectl --context="$SEQUENTIAL_CONTEXT" delete job prepare-monolith-enrichment-benchmark-data-job -n mono --ignore-not-found
-    kubectl --context="$SEQUENTIAL_CONTEXT" apply -f "$RENDER_ROOT/deployments/k8s/eks/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml"
-    kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=condition=complete job/prepare-monolith-enrichment-benchmark-data-job -n mono --timeout=600s
+    recreate_job mono prepare-monolith-enrichment-benchmark-data-job "$RENDER_ROOT/deployments/k8s/eks/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml" 600s
   else
-    kubectl --context="$SEQUENTIAL_CONTEXT" delete job prepare-microservices-enrichment-benchmark-data-job -n msa --ignore-not-found
-    kubectl --context="$SEQUENTIAL_CONTEXT" apply -f "$RENDER_ROOT/deployments/k8s/eks/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml"
-    kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=condition=complete job/prepare-microservices-enrichment-benchmark-data-job -n msa --timeout=600s
+    recreate_job msa prepare-microservices-enrichment-benchmark-data-job "$RENDER_ROOT/deployments/k8s/eks/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml" 600s
   fi
   restore_active "$architecture"
 }
