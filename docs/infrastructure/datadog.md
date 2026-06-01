@@ -112,6 +112,7 @@ Datadog-related files:
 deployments/helm/datadog/values-minikube.yaml
 deployments/helm/datadog/values-eks-monolith.yaml
 deployments/helm/datadog/values-eks-msa.yaml
+deployments/helm/datadog/values-eks-sequential.yaml
 scripts/create-datadog-secret.sh
 docs/infrastructure/datadog.md
 docs/infrastructure/datadog-resource-overhead.md
