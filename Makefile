@@ -1201,11 +1201,13 @@ hetzner-preflight-check:
 
 .PHONY: hetzner-render-manifests
 hetzner-render-manifests:
-	$(eval RENDER_DIR := $(shell mktemp -d))
-	@echo "Rendering Hetzner manifests to $(RENDER_DIR)"
-	@IMAGE_TAG=$(IMAGE_TAG) DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) OUTPUT_DIR="$(RENDER_DIR)" bash scripts/render-hetzner-manifests.sh >/dev/null
-	@bash scripts/validate-eks-assets.sh deploy "$(RENDER_DIR)"
-	@echo "Rendered manifests ready at $(RENDER_DIR)"
+	@set -euo pipefail; \
+	RENDER_DIR="$$(mktemp -d)"; \
+	trap 'rm -rf "$$RENDER_DIR"' EXIT; \
+	echo "Rendering Hetzner manifests to $$RENDER_DIR"; \
+	IMAGE_TAG=$(IMAGE_TAG) DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) OUTPUT_DIR="$$RENDER_DIR" bash scripts/render-hetzner-manifests.sh >/dev/null; \
+	bash scripts/validate-eks-assets.sh deploy "$$RENDER_DIR"; \
+	echo "Hetzner manifests rendered and validated successfully"
 
 .PHONY: hetzner-deploy-sequential-architecture
 hetzner-deploy-sequential-architecture:
