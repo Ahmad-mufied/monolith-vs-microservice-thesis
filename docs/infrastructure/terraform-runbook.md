@@ -1,5 +1,37 @@
 # Terraform Runbook
 
+## Hetzner Hybrid Path
+
+The EKS stacks remain unchanged. The Hetzner path is additive and uses separate
+Terraform state:
+
+```text
+infra/terraform/hetzner-shared
+infra/terraform/hetzner-experiment-sequential
+infra/terraform/hetzner-experiment
+```
+
+Use these targets for Hetzner:
+
+```bash
+make env-init-hetzner
+make hetzner-render-tfvars
+make hetzner-shared-apply
+make hetzner-sequential-apply
+make hetzner-setup-context-sequential
+make hetzner-measure-resource-baseline
+```
+
+Destroy remains guarded by S3 verification:
+
+```bash
+S3_BENCHMARK_DATA_VERIFIED=true make hetzner-sequential-destroy-confirmed
+```
+
+Do not migrate AWS Terraform state to Hetzner. The providers manage different
+resource identities, so mixing state would create unnecessary state corruption
+risk.
+
 ## 1. Purpose
 
 Step-by-step guide for provisioning and destroying the benchmark

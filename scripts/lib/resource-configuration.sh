@@ -3,6 +3,19 @@
 resources_configuration_json() {
   local architecture="$1"
   local scaling_mode="$2"
+  local provider="${CLOUD_PROVIDER:-aws}"
+  local baseline_env="${HETZNER_RESOURCE_BASELINE_ENV:-env/hetzner-resource-baseline.env}"
+
+  if [ "$provider" = "hetzner" ]; then
+    if [ ! -f "$baseline_env" ]; then
+      echo "ERROR: missing $baseline_env; run: make hetzner-measure-resource-baseline" >&2
+      return 1
+    fi
+
+    set -a
+    source "$baseline_env"
+    set +a
+  fi
 
   case "$architecture" in
     monolith|microservices) ;;
@@ -19,6 +32,30 @@ resources_configuration_json() {
       return 1
       ;;
   esac
+
+  if [ "$provider" = "hetzner" ]; then
+    : "${HETZNER_APP_CPU_QUOTA:?HETZNER_APP_CPU_QUOTA must be set in $baseline_env}"
+    : "${HETZNER_APP_MEMORY_QUOTA:?HETZNER_APP_MEMORY_QUOTA must be set in $baseline_env}"
+    jq -cn \
+      --arg architecture "$architecture" \
+      --arg autoscaling_mode "$scaling_mode" \
+      --arg cpu "$HETZNER_APP_CPU_QUOTA" \
+      --arg memory "$HETZNER_APP_MEMORY_QUOTA" \
+      --arg app_node_count "${HETZNER_APP_NODE_COUNT:-2}" \
+      --arg allocatable_cpu "${HETZNER_APP_ALLOCATABLE_CPU:-unknown}" \
+      --arg allocatable_memory "${HETZNER_APP_ALLOCATABLE_MEMORY:-unknown}" \
+      '{
+        provider: "hetzner",
+        architecture: $architecture,
+        autoscaling_mode: $autoscaling_mode,
+        hpa_enabled: ($autoscaling_mode == "hpa"),
+        namespace_resource_quota: {cpu: $cpu, memory: $memory},
+        measured_app_node_count: ($app_node_count | tonumber),
+        measured_app_allocatable: {cpu: $allocatable_cpu, memory: $allocatable_memory},
+        resource_profile: "hetzner-measurement-derived"
+      }'
+    return 0
+  fi
 
   if [ "$architecture" = "monolith" ]; then
     if [ "$scaling_mode" = "hpa" ]; then

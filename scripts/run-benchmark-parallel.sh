@@ -13,6 +13,12 @@ if [ -f env/aws-benchmark.env ]; then
   set +a
 fi
 
+if [ "${CLOUD_PROVIDER:-aws}" = "hetzner" ] && [ -f env/hetzner.env ]; then
+  set -a
+  source env/hetzner.env
+  set +a
+fi
+
 if [ -n "$explicit_aws_region" ]; then
   AWS_REGION="$explicit_aws_region"
 fi
@@ -49,6 +55,8 @@ DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
+CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
+DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
 RENDER_ROOT="$(mktemp -d)"
 INSPECTION_ROOT="$(mktemp -d)"
 
@@ -79,6 +87,7 @@ echo "  scaling_mode : $SCALING_MODE"
 echo "  k6_profile   : $K6_PROFILE"
 echo "  duration     : $TEST_DURATION"
 echo "  image_tag    : $IMAGE_TAG"
+echo "  provider     : $CLOUD_PROVIDER"
 echo "  report_s3_uri: $S3_RUN_URI"
 echo ""
 
@@ -131,7 +140,12 @@ run_parallel_preflight() {
 
 run_parallel_preflight "parallel benchmark bootstrap"
 
-IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+if [ "$CLOUD_PROVIDER" = "hetzner" ]; then
+  : "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required for CLOUD_PROVIDER=hetzner}"
+  IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-hetzner-manifests.sh >/dev/null
+else
+  IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+fi
 MONOLITH_MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml"
 MICROSERVICES_MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml"
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"

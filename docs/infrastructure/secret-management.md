@@ -1,5 +1,44 @@
 # Secret Management
 
+## Hetzner Hybrid Benchmark Secrets
+
+The Hetzner benchmark path does not have EKS Pod Identity. For v1, Terraform
+creates a least-privilege AWS IAM user in `infra/terraform/shared` and k6
+receives that user's S3 credentials through the `benchmark/k6-runner-secret`
+Kubernetes Secret.
+
+Required `env/hetzner.env` values:
+
+```text
+HCLOUD_TOKEN
+POSTGRES_PASSWORD
+DOCKERHUB_NAMESPACE
+AWS_REGION
+S3_BUCKET
+```
+
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` can be set manually in
+`env/hetzner.env`, but the preferred path is to read them from Terraform
+outputs:
+
+```bash
+terraform -chdir=infra/terraform/shared output -raw hetzner_k6_s3_access_key_id
+terraform -chdir=infra/terraform/shared output -raw hetzner_k6_s3_secret_access_key
+```
+
+Rules:
+
+- Hetzner hybrid benchmark is the only exception in this repository where AWS
+  access keys may be present in `env/hetzner.env` and the
+  `benchmark/k6-runner-secret`. Those credentials must be scoped to the
+  benchmark bucket or prefix. The shared Terraform stack enforces access only
+  under `s3://<bucket>/experiments/*`.
+- PostgreSQL accepts private-network traffic only.
+- Docker Hub public images must never contain secrets, kubeconfigs, `.tfstate`,
+  `.tfvars`, or local env files.
+- The same app JWT and benchmark user credentials used by EKS env files are
+  reused for Hetzner unless the operator intentionally rotates them.
+
 ## Purpose
 
 This document describes secret and configuration management for the benchmark project.
@@ -23,9 +62,11 @@ Use Kubernetes Secret for sensitive runtime values.
 
 Use ConfigMap for non-sensitive configuration.
 
-Use EKS Pod Identity or IRSA for AWS access.
+Use EKS Pod Identity or IRSA for AWS access on EKS-managed clusters.
 
-Do not store AWS access keys in Kubernetes Secrets.
+Do not store AWS access keys in Kubernetes Secrets for EKS-managed clusters.
+Hetzner hybrid benchmark is the documented exception and uses
+`benchmark/k6-runner-secret` plus shared Terraform outputs for S3 upload.
 
 ---
 
@@ -398,9 +439,9 @@ ADMIN_USER_EMAIL
 ADMIN_USER_PASSWORD
 ```
 
-Do not store AWS keys here.
+Do not store AWS keys here for EKS-managed clusters.
 
-The k6 runner should upload to S3 through EKS Pod Identity or IRSA.
+On EKS, the k6 runner should upload to S3 through EKS Pod Identity or IRSA.
 
 ---
 

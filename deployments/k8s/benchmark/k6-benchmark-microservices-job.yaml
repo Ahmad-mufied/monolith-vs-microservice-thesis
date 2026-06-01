@@ -124,6 +124,24 @@ spec:
                   name: k6-runner-secret
                   key: ADMIN_USER_PASSWORD
                   optional: true
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: k6-runner-secret
+                  key: AWS_ACCESS_KEY_ID
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: k6-runner-secret
+                  key: AWS_SECRET_ACCESS_KEY
+                  optional: true
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: k6-runner-secret
+                  key: AWS_REGION
+                  optional: true
           resources:
             requests:
               cpu: 1200m
