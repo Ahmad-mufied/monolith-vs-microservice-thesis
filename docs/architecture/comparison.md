@@ -1016,7 +1016,7 @@ Controlled variables:
 | Execution mode | Recorded as `parallel` or `sequential`; must not change app semantics |
 
 Execution topology controls how measurements are scheduled, not what is being
-measured. Parallel mode gives wall-clock aligned Datadog series. Sequential
+measured. Parallel mode gives wall-clock-aligned Datadog series. Sequential
 mode gives lower AWS footprint and uses `ARCHITECTURE_SWITCH_DELAY` plus
 recorded Datadog windows to keep comparison periods clear.
 
