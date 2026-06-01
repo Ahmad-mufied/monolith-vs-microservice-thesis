@@ -28,6 +28,12 @@ This document complements:
 - [Scaling Mode Strategy](./scaling-mode-strategy.md)
 - [Datadog Resource Overhead](../infrastructure/datadog-resource-overhead.md)
 
+The Hetzner benchmark path follows the same measurement-first rule, but it
+does not reuse the EKS `15800m CPU / 27648Mi memory` ceiling. Hetzner app-node
+capacity is measured live after provisioning, then the generated CPU and memory
+quota is applied equally to monolith and microservices. See
+`docs/infrastructure/hetzner-cloud-architecture.md`.
+
 The resource-configuration document explains **how** the application budget is
 split between services and scaling modes. This document explains **how the
 total budget itself is derived**.

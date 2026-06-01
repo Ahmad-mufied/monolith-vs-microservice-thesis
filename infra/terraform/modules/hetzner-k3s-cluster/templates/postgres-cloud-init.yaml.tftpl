@@ -1,0 +1,22 @@
+#cloud-config
+package_update: true
+packages:
+  - curl
+  - ca-certificates
+  - gnupg
+  - lsb-release
+runcmd:
+  - install -d /usr/share/postgresql-common/pgdg
+  - curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+  - sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" >/etc/apt/sources.list.d/pgdg.list'
+  - apt-get update
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-18
+  - |
+    cat >/etc/postgresql/18/main/conf.d/benchmark.conf <<'EOF'
+    listen_addresses = '*'
+    password_encryption = scram-sha-256
+    EOF
+  - sed -i "s/^#*host\s\+all\s\+all\s\+127.0.0.1\/32.*/host all all 127.0.0.1\/32 scram-sha-256/" /etc/postgresql/18/main/pg_hba.conf
+  - echo "host all all 10.10.0.0/16 scram-sha-256" >> /etc/postgresql/18/main/pg_hba.conf
+  - systemctl restart postgresql
+  - sudo -u postgres psql -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'postgres_admin') THEN CREATE ROLE postgres_admin LOGIN SUPERUSER PASSWORD '${postgres_password}'; ELSE ALTER ROLE postgres_admin WITH PASSWORD '${postgres_password}'; END IF; END \$\$;"

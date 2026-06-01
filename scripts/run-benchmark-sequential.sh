@@ -12,6 +12,12 @@ if [ -f env/aws-benchmark.env ]; then
   set +a
 fi
 
+if [ "${CLOUD_PROVIDER:-aws}" = "hetzner" ] && [ -f env/hetzner.env ]; then
+  set -a
+  source env/hetzner.env
+  set +a
+fi
+
 if [ -n "$explicit_aws_region" ]; then
   AWS_REGION="$explicit_aws_region"
 fi
@@ -47,8 +53,10 @@ DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
+CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
+DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
 SEQUENTIAL_CONTEXT="${SEQUENTIAL_CONTEXT:-benchmark}"
-SEQUENTIAL_CLUSTER_NAME="${SEQUENTIAL_CLUSTER_NAME:-skripsi-benchmark}"
+SEQUENTIAL_CLUSTER_NAME="${SEQUENTIAL_CLUSTER_NAME:-${HETZNER_SEQUENTIAL_CLUSTER_NAME:-skripsi-benchmark}}"
 ARCHITECTURE_ORDER="${ARCHITECTURE_ORDER:-monolith microservices}"
 RENDER_ROOT="$(mktemp -d)"
 INSPECTION_ROOT="$(mktemp -d)"
@@ -124,6 +132,7 @@ echo "  scaling_mode  : $SCALING_MODE"
 echo "  k6_profile    : $K6_PROFILE"
 echo "  duration      : $TEST_DURATION"
 echo "  image_tag     : $IMAGE_TAG"
+echo "  provider      : $CLOUD_PROVIDER"
 echo "  report_s3_uri : $S3_RUN_URI"
 echo ""
 
@@ -131,7 +140,12 @@ if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
   BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_or_die "$S3_BUCKET" "sequential benchmark bootstrap" "false"
 fi
 
-IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+if [ "$CLOUD_PROVIDER" = "hetzner" ]; then
+  : "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required for CLOUD_PROVIDER=hetzner}"
+  IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-hetzner-manifests.sh >/dev/null
+else
+  IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+fi
 MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/$MANIFEST_NAME"
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 
@@ -144,7 +158,7 @@ rendered_manifest="$(
     -e "/name: ARCHITECTURE/{n; s|value:.*|value: ${ARCHITECTURE}|}" \
     -e "/name: EXECUTION_MODE/{n; s|value:.*|value: sequential|}" \
     -e "/name: ARCHITECTURE_ORDER/{n; s|value:.*|value: ${ARCHITECTURE_ORDER}|}" \
-    -e "/name: TERRAFORM_STACK/{n; s|value:.*|value: experiment-sequential|}" \
+    -e "/name: TERRAFORM_STACK/{n; s|value:.*|value: $([ "$CLOUD_PROVIDER" = "hetzner" ] && printf 'hetzner-experiment-sequential' || printf 'experiment-sequential')|}" \
     -e "/name: CLUSTER_NAME/{n; s|value:.*|value: ${SEQUENTIAL_CLUSTER_NAME}|}" \
     -e "/name: SCENARIO_NAME/{n; s|value:.*|value: ${SCENARIO}|}" \
     -e "/name: TARGET_RPS/{n; s|value:.*|value: \"${TARGET_RPS}\"|}" \
@@ -154,7 +168,7 @@ rendered_manifest="$(
     -e "/name: DATADOG_ENABLED/{n; s|value:.*|value: \"${DATADOG_ENABLED}\"|}" \
     -e "/name: DATADOG_ENV/{n; s|value:.*|value: ${DATADOG_ENV}|}" \
     -e "/name: S3_URI/{n; s|value:.*|value: ${S3_URI}|}" \
-    -e "/name: INFRA_CONFIGURATION_JSON/{n; s|value:.*|value: '{\"provider\":\"aws\",\"region\":\"${AWS_REGION}\",\"eks_cluster\":\"${SEQUENTIAL_CLUSTER_NAME}\",\"app_node_pool\":\"app-nodes\",\"testing_node_pool\":\"testing-nodes\",\"postgres_version\":\"18\",\"execution_mode\":\"sequential\"}'|}" \
+    -e "/name: INFRA_CONFIGURATION_JSON/{n; s|value:.*|value: '{\"provider\":\"${CLOUD_PROVIDER}\",\"region\":\"${AWS_REGION}\",\"cluster\":\"${SEQUENTIAL_CLUSTER_NAME}\",\"app_node_pool\":\"app-nodes\",\"testing_node_pool\":\"testing-nodes\",\"postgres_version\":\"18\",\"execution_mode\":\"sequential\"}'|}" \
     -e "/name: RESOURCES_CONFIGURATION_JSON/{n; s|value:.*|value: '${resources_json}'|}" \
     "$MANIFEST"
 )"

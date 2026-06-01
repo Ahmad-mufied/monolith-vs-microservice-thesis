@@ -30,6 +30,13 @@ ceiling. Use it when account quota cannot support the full parallel topology.
 The detailed operator flow is in
 `docs/infrastructure/sequential-benchmark-runbook.md`.
 
+An additive Hetzner Cloud path is also available for the CPU-optimized thesis
+baseline. In that path, Hetzner provides k3s compute, private networking, and
+PostgreSQL VM nodes; AWS S3 remains the benchmark artifact store; and Docker
+Hub public images replace ECR for Hetzner runs. See
+`docs/infrastructure/hetzner-cloud-architecture.md` and
+`docs/infrastructure/hetzner-benchmark-runbook.md`.
+
 ---
 
 ## 2. Architectural Goal

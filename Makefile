@@ -77,6 +77,7 @@ help:
 	@echo "  make env-init-monolith"
 	@echo "  make env-init-microservices"
 	@echo "  make env-init-eks"
+	@echo "  make env-init-hetzner"
 	@echo "  make fmt"
 	@echo "  make test"
 	@echo "  make lint"
@@ -189,6 +190,15 @@ help:
 	@echo "  make eks-deploy-all"
 	@echo "  make eks-deploy-all-fixed"
 	@echo "  make eks-deploy-all-hpa"
+	@echo "  make hetzner-render-tfvars"
+	@echo "  make hetzner-shared-apply"
+	@echo "  make hetzner-sequential-apply"
+	@echo "  make hetzner-setup-context-sequential"
+	@echo "  make hetzner-create-secrets-sequential"
+	@echo "  make hetzner-measure-resource-baseline"
+	@echo "  make hetzner-deploy-sequential-architecture ARCHITECTURE=monolith SCALING_MODE=fixed"
+	@echo "  make run-benchmark-sequential-hetzner ARCHITECTURE=monolith SCENARIO=login TARGET_RPS=100 RUN_ID=hetzner-smoke"
+	@echo "  make dockerhub-push-all DOCKERHUB_NAMESPACE=<namespace>"
 	@echo "  make create-local-postgres-secrets"
 	@echo "  make create-local-secrets"
 	@echo "  make create-local-secrets-microservices"
@@ -217,6 +227,10 @@ env-init-microservices: env-init-base
 .PHONY: env-init-eks
 env-init-eks:
 	bash scripts/env-init-eks.sh
+
+.PHONY: env-init-hetzner
+env-init-hetzner:
+	bash scripts/env-init-hetzner.sh
 
 .PHONY: benchmark-preflight-check
 benchmark-preflight-check:
@@ -824,6 +838,9 @@ terraform-fmt:
 	cd infra/terraform/shared && terraform fmt -recursive
 	cd infra/terraform/experiment && terraform fmt -recursive
 	cd infra/terraform/experiment-sequential && terraform fmt -recursive
+	cd infra/terraform/hetzner-shared && terraform fmt -recursive
+	cd infra/terraform/hetzner-experiment-sequential && terraform fmt -recursive
+	cd infra/terraform/hetzner-experiment && terraform fmt -recursive
 
 # =========================
 # AWS Persistent Resources (one-time setup)
@@ -939,6 +956,28 @@ ecr-push-all: aws-ecr-login
 	docker push $(ECR)/$(ECR_NAMESPACE)/k6-runner:$(IMAGE_TAG)
 	@echo "All images pushed with tag: $(IMAGE_TAG)"
 
+.PHONY: dockerhub-push-all
+dockerhub-push-all:
+	@if [ -z "$(DOCKERHUB_NAMESPACE)" ] || [ "$(DOCKERHUB_NAMESPACE)" = "replace-me" ]; then \
+		echo "DOCKERHUB_NAMESPACE must be set to your Docker Hub namespace" >&2; \
+		exit 1; \
+	fi
+	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/monolith:$(IMAGE_TAG) -f monolith/Dockerfile .
+	docker push docker.io/$(DOCKERHUB_NAMESPACE)/monolith:$(IMAGE_TAG)
+	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/api-gateway:$(IMAGE_TAG) -f microservices/api-gateway/Dockerfile .
+	docker push docker.io/$(DOCKERHUB_NAMESPACE)/api-gateway:$(IMAGE_TAG)
+	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/auth-service:$(IMAGE_TAG) -f microservices/auth-service/Dockerfile .
+	docker push docker.io/$(DOCKERHUB_NAMESPACE)/auth-service:$(IMAGE_TAG)
+	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/item-service:$(IMAGE_TAG) -f microservices/item-service/Dockerfile .
+	docker push docker.io/$(DOCKERHUB_NAMESPACE)/item-service:$(IMAGE_TAG)
+	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/transaction-service:$(IMAGE_TAG) -f microservices/transaction-service/Dockerfile .
+	docker push docker.io/$(DOCKERHUB_NAMESPACE)/transaction-service:$(IMAGE_TAG)
+	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/seed-runner:$(IMAGE_TAG) -f seed/Dockerfile .
+	docker push docker.io/$(DOCKERHUB_NAMESPACE)/seed-runner:$(IMAGE_TAG)
+	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/k6-runner:$(IMAGE_TAG) -f k6/runner/Dockerfile .
+	docker push docker.io/$(DOCKERHUB_NAMESPACE)/k6-runner:$(IMAGE_TAG)
+	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/dockerhub-public-image-check.sh
+
 .PHONY: eks-render-manifests eks-update-manifests
 eks-render-manifests eks-update-manifests:
 	$(eval RENDER_DIR := $(shell mktemp -d))
@@ -965,6 +1004,9 @@ terraform-validate:
 	cd infra/terraform/shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
 	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
 	cd infra/terraform/experiment-sequential && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
+	cd infra/terraform/hetzner-shared && terraform validate
+	cd infra/terraform/hetzner-experiment-sequential && terraform validate
+	cd infra/terraform/hetzner-experiment && terraform validate
 
 .PHONY: terraform-auth-check
 terraform-auth-check:
@@ -1090,6 +1132,90 @@ eks-create-secrets:
 eks-create-secrets-sequential:
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/create-eks-secrets-sequential.sh
 
+.PHONY: hetzner-render-tfvars
+hetzner-render-tfvars:
+	bash scripts/render-hetzner-tfvars.sh
+
+.PHONY: hetzner-shared-plan
+hetzner-shared-plan:
+	bash scripts/terraform-hetzner.sh shared init
+	bash scripts/terraform-hetzner.sh shared plan -out=tfplan
+
+.PHONY: hetzner-shared-apply
+hetzner-shared-apply:
+	bash scripts/terraform-hetzner.sh shared init
+	bash scripts/terraform-hetzner.sh shared apply
+
+.PHONY: hetzner-sequential-plan
+hetzner-sequential-plan:
+	bash scripts/terraform-hetzner.sh sequential init
+	bash scripts/terraform-hetzner.sh sequential plan -out=tfplan
+
+.PHONY: hetzner-sequential-apply
+hetzner-sequential-apply:
+	bash scripts/terraform-hetzner.sh sequential init
+	bash scripts/terraform-hetzner.sh sequential apply
+
+.PHONY: hetzner-sequential-destroy-confirmed
+hetzner-sequential-destroy-confirmed:
+	S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-hetzner.sh sequential destroy
+
+.PHONY: hetzner-parallel-plan
+hetzner-parallel-plan:
+	bash scripts/terraform-hetzner.sh parallel init
+	bash scripts/terraform-hetzner.sh parallel plan -out=tfplan
+
+.PHONY: hetzner-parallel-apply
+hetzner-parallel-apply:
+	bash scripts/terraform-hetzner.sh parallel init
+	bash scripts/terraform-hetzner.sh parallel apply
+
+.PHONY: hetzner-parallel-destroy-confirmed
+hetzner-parallel-destroy-confirmed:
+	S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-hetzner.sh parallel destroy
+
+.PHONY: hetzner-setup-context-sequential
+hetzner-setup-context-sequential:
+	HETZNER_MODE=sequential bash scripts/setup-hetzner-contexts.sh
+
+.PHONY: hetzner-setup-contexts-parallel
+hetzner-setup-contexts-parallel:
+	HETZNER_MODE=parallel bash scripts/setup-hetzner-contexts.sh
+
+.PHONY: hetzner-create-secrets-sequential
+hetzner-create-secrets-sequential:
+	bash scripts/create-hetzner-secrets-sequential.sh
+
+.PHONY: hetzner-create-secrets
+hetzner-create-secrets:
+	bash scripts/create-hetzner-secrets-monolith.sh
+	bash scripts/create-hetzner-secrets-microservices.sh
+
+.PHONY: hetzner-measure-resource-baseline
+hetzner-measure-resource-baseline:
+	bash scripts/measure-hetzner-resource-baseline.sh
+
+.PHONY: hetzner-preflight-check
+hetzner-preflight-check:
+	bash scripts/hetzner-preflight-check.sh
+
+.PHONY: hetzner-render-manifests
+hetzner-render-manifests:
+	$(eval RENDER_DIR := $(shell mktemp -d))
+	@echo "Rendering Hetzner manifests to $(RENDER_DIR)"
+	@IMAGE_TAG=$(IMAGE_TAG) DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) OUTPUT_DIR="$(RENDER_DIR)" bash scripts/render-hetzner-manifests.sh >/dev/null
+	@bash scripts/validate-eks-assets.sh deploy "$(RENDER_DIR)"
+	@echo "Rendered manifests ready at $(RENDER_DIR)"
+
+.PHONY: hetzner-deploy-sequential-architecture
+hetzner-deploy-sequential-architecture:
+	CLOUD_PROVIDER=hetzner ARCHITECTURE=$(ARCHITECTURE) SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-sequential-architecture.sh
+
+.PHONY: hetzner-deploy-all
+hetzner-deploy-all:
+	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/dockerhub-public-image-check.sh
+	CLOUD_PROVIDER=hetzner SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-all-eks-clusters.sh
+
 .PHONY: run-benchmark-parallel
 run-benchmark-parallel:
 	SCENARIO=$(SCENARIO) \
@@ -1138,6 +1264,38 @@ run-benchmark-sequential:
 	DATADOG_ENV=$(DATADOG_ENV) \
 	ARCHITECTURE_ORDER="$(ARCHITECTURE_ORDER)" \
 	bash scripts/run-benchmark-sequential.sh
+
+.PHONY: run-benchmark-sequential-hetzner
+run-benchmark-sequential-hetzner:
+	CLOUD_PROVIDER=hetzner \
+	ARCHITECTURE=$(ARCHITECTURE) \
+	SCENARIO=$(SCENARIO) \
+	TARGET_RPS=$(TARGET_RPS) \
+	RUN_ID=$(RUN_ID) \
+	ATTEMPT=$(ATTEMPT) \
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE=$(K6_PROFILE) \
+	TEST_DURATION=$(TEST_DURATION) \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	ARCHITECTURE_ORDER="$(ARCHITECTURE_ORDER)" \
+	bash scripts/run-benchmark-sequential.sh
+
+.PHONY: run-benchmark-parallel-hetzner
+run-benchmark-parallel-hetzner:
+	CLOUD_PROVIDER=hetzner \
+	SCENARIO=$(SCENARIO) \
+	TARGET_RPS=$(TARGET_RPS) \
+	RUN_ID=$(RUN_ID) \
+	ATTEMPT=$(ATTEMPT) \
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE=$(K6_PROFILE) \
+	TEST_DURATION=$(TEST_DURATION) \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	bash scripts/run-benchmark-parallel.sh
 
 .PHONY: run-benchmark-suite-sequential
 run-benchmark-suite-sequential:

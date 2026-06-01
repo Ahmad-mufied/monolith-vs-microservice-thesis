@@ -14,6 +14,12 @@ if [ -f env/aws-benchmark.env ]; then
   set +a
 fi
 
+if [ "${CLOUD_PROVIDER:-aws}" = "hetzner" ] && [ -f env/hetzner.env ]; then
+  set -a
+  source env/hetzner.env
+  set +a
+fi
+
 if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
   set -a
   source env/image-tag.eks.env
@@ -27,6 +33,8 @@ EKS_JOB_DIR="deployments/k8s/eks/monolith"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
+DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
+CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
 RENDER_ROOT="$(mktemp -d)"
 RENDERED_EKS_JOB_DIR=""
 RENDERED_MONOLITH_OVERLAY_DIR=""
@@ -60,7 +68,13 @@ require_secret() {
 echo "=== Deploying monolith cluster (context: $CONTEXT) ==="
 
 echo "Rendering EKS manifests with IMAGE_TAG=$IMAGE_TAG"
-IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+if [ "$CLOUD_PROVIDER" = "hetzner" ]; then
+  : "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required for CLOUD_PROVIDER=hetzner}"
+  echo "Rendering Hetzner manifests with IMAGE_TAG=$IMAGE_TAG"
+  IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-hetzner-manifests.sh >/dev/null
+else
+  IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+fi
 RENDERED_EKS_JOB_DIR="$RENDER_ROOT/$EKS_JOB_DIR"
 RENDERED_MONOLITH_OVERLAY_DIR="$RENDERED_EKS_JOB_DIR/overlays/$SCALING_MODE"
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"

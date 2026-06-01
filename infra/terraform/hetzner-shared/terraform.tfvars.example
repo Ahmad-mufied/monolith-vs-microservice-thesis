@@ -1,0 +1,7 @@
+hcloud_token            = "REPLACE_WITH_HCLOUD_TOKEN"
+project                 = "skripsi"
+operator_cidrs          = ["REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR"]
+operator_ssh_public_key = "REPLACE_WITH_OPERATOR_SSH_PUBLIC_KEY"
+network_cidr            = "10.10.0.0/16"
+subnet_cidr             = "10.10.1.0/24"
+network_zone            = "ap-southeast"
