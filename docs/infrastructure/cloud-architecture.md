@@ -1012,8 +1012,11 @@ AWS Budget monitors monthly cost
 
 When the budget threshold is reached, the Lambda function automatically:
 
-1. deletes both EKS clusters and their node groups,
-2. stops both RDS instances,
+1. deletes all benchmark EKS clusters and their node groups
+   (`skripsi-monolith`, `skripsi-msa`, and `skripsi-benchmark`),
+2. stops all benchmark RDS instances
+   (`skripsi-monolith-postgres`, `skripsi-msa-postgres`, and
+   `skripsi-benchmark-postgres`),
 3. deletes the NAT Gateway and releases associated Elastic IPs.
 
 This reduces monthly idle cost to approximately $3–4 (stopped RDS storage, S3, and ECR).
