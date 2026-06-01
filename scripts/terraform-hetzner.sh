@@ -2,7 +2,7 @@
 set -euo pipefail
 
 stack="${HETZNER_TERRAFORM_STACK:-${1:-}}"
-if [ "$#" -gt 0 ]; then
+if [ -z "${HETZNER_TERRAFORM_STACK:-}" ] && [ "$#" -gt 0 ]; then
   shift
 fi
 
