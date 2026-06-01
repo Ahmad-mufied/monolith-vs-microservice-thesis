@@ -4,10 +4,16 @@ resources_configuration_json() {
   local architecture="$1"
   local scaling_mode="$2"
   local provider="${CLOUD_PROVIDER:-aws}"
+  local baseline_env="${HETZNER_RESOURCE_BASELINE_ENV:-env/hetzner-resource-baseline.env}"
 
-  if [ "$provider" = "hetzner" ] && [ -f "${HETZNER_RESOURCE_BASELINE_ENV:-env/hetzner-resource-baseline.env}" ]; then
+  if [ "$provider" = "hetzner" ]; then
+    if [ ! -f "$baseline_env" ]; then
+      echo "ERROR: missing $baseline_env; run: make hetzner-measure-resource-baseline" >&2
+      return 1
+    fi
+
     set -a
-    source "${HETZNER_RESOURCE_BASELINE_ENV:-env/hetzner-resource-baseline.env}"
+    source "$baseline_env"
     set +a
   fi
 
@@ -28,8 +34,8 @@ resources_configuration_json() {
   esac
 
   if [ "$provider" = "hetzner" ]; then
-    : "${HETZNER_APP_CPU_QUOTA:?HETZNER_APP_CPU_QUOTA must be set for CLOUD_PROVIDER=hetzner}"
-    : "${HETZNER_APP_MEMORY_QUOTA:?HETZNER_APP_MEMORY_QUOTA must be set for CLOUD_PROVIDER=hetzner}"
+    : "${HETZNER_APP_CPU_QUOTA:?HETZNER_APP_CPU_QUOTA must be set in $baseline_env}"
+    : "${HETZNER_APP_MEMORY_QUOTA:?HETZNER_APP_MEMORY_QUOTA must be set in $baseline_env}"
     jq -cn \
       --arg architecture "$architecture" \
       --arg autoscaling_mode "$scaling_mode" \
