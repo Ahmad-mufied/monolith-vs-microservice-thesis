@@ -44,7 +44,7 @@ For the final AWS benchmark, the repository supports two isolated execution
 modes:
 
 - Parallel mode runs both architectures at the same time on two isolated EKS
-  clusters for wall-clock aligned Datadog time-series.
+  clusters for wall-clock-aligned Datadog time-series.
 - Sequential mode runs one architecture at a time on one EKS cluster for AWS
   accounts with tighter vCPU quota or budget limits.
 
