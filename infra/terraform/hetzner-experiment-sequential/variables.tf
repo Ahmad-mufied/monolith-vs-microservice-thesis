@@ -50,4 +50,9 @@ variable "postgres_password" {
   description = "PostgreSQL postgres_admin password."
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.postgres_password) >= 16 && var.postgres_password == trimspace(var.postgres_password)
+    error_message = "postgres_password must be at least 16 characters and must not contain leading or trailing whitespace."
+  }
 }
