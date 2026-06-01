@@ -17,7 +17,8 @@ fetch_kubeconfig() {
     return 1
   fi
 
-  ssh "root@${public_ip}" "sed 's/127.0.0.1/${public_ip}/g' /etc/rancher/k3s/k3s.yaml" > "$path"
+  ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o LogLevel=ERROR \
+    "root@${public_ip}" "sed 's/127.0.0.1/${public_ip}/g' /etc/rancher/k3s/k3s.yaml" > "$path"
   chmod 600 "$path"
   KUBECONFIG="$path" kubectl config rename-context default "$context" >/dev/null 2>&1 || true
   KUBECONFIG="$path" kubectl --context="$context" get nodes
