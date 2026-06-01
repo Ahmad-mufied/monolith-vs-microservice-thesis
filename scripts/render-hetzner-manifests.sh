@@ -19,6 +19,7 @@ if [ "$SKIP_HETZNER_RESOURCE_BASELINE" != "true" ]; then
 fi
 
 output_dir_owned="false"
+check_file=""
 if [[ -z "${OUTPUT_DIR+x}" ]]; then
   OUTPUT_DIR="$(mktemp -d)"
   output_dir_owned="true"
@@ -29,6 +30,9 @@ fi
 }
 
 cleanup() {
+  if [[ -n "$check_file" && -f "$check_file" ]]; then
+    rm -f "$check_file"
+  fi
   if [[ "$output_dir_owned" == "true" && -d "$OUTPUT_DIR" ]]; then
     rm -rf "$OUTPUT_DIR"
   fi
@@ -152,12 +156,14 @@ patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-microser
 patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml" "INFRA_CONFIGURATION_JSON" "'{\"provider\":\"hetzner\",\"location\":\"sin\",\"cluster\":\"skripsi-hetzner\",\"app_node_pool\":\"app-nodes\",\"testing_node_pool\":\"testing-nodes\",\"postgres_version\":\"18\"}'"
 patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml" "INFRA_CONFIGURATION_JSON" "'{\"provider\":\"hetzner\",\"location\":\"sin\",\"cluster\":\"skripsi-hetzner\",\"app_node_pool\":\"app-nodes\",\"testing_node_pool\":\"testing-nodes\",\"postgres_version\":\"18\"}'"
 
-if rg -n 'replace-me\.dkr\.ecr|amazonaws\.com/skripsi' "$OUTPUT_DIR/deployments/k8s" >/tmp/hetzner-render-check.txt; then
-  cat /tmp/hetzner-render-check.txt >&2
+check_file="$(mktemp)"
+if rg -n 'replace-me\.dkr\.ecr|amazonaws\.com/skripsi' "$OUTPUT_DIR/deployments/k8s" >"$check_file"; then
+  cat "$check_file" >&2
   echo "ERROR: rendered Hetzner manifests still contain AWS/ECR placeholders" >&2
   exit 1
 fi
-rm -f /tmp/hetzner-render-check.txt
+rm -f "$check_file"
+check_file=""
 
 trap - ERR
 echo "$OUTPUT_DIR"
