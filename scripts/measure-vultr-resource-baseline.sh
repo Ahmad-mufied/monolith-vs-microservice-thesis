@@ -8,6 +8,7 @@ safety_cpu_m="${VULTR_RESOURCE_SAFETY_CPU_M:-500}"
 safety_memory_mi="${VULTR_RESOURCE_SAFETY_MEMORY_MI:-2048}"
 
 mkdir -p "$(dirname "$output_env")"
+mkdir -p "$(dirname "$output_json")"
 
 nodes_json="$(kubectl --context="$context" get nodes -l node-group=app -o json)"
 node_count="$(jq '.items | length' <<<"$nodes_json")"
@@ -103,4 +104,3 @@ echo "Wrote Vultr resource baseline:"
 echo "  $output_env"
 echo "  $output_json"
 cat "$output_env"
-

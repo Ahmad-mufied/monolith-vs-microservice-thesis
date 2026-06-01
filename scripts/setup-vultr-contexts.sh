@@ -10,8 +10,12 @@ write_kubeconfig() {
   local context="$3"
   local expected_cluster="$4"
   local path="env/kubeconfig/${context}.yaml"
+  local old_umask
 
+  old_umask="$(umask)"
+  umask 077
   terraform -chdir="$stack" output -raw "$output_name" | base64 -d > "$path"
+  umask "$old_umask"
   chmod 600 "$path"
   KUBECONFIG="$path" kubectl config rename-context "$(KUBECONFIG="$path" kubectl config current-context)" "$context" >/dev/null 2>&1 || true
   KUBECONFIG="$path" kubectl --context="$context" get nodes >/dev/null
@@ -32,11 +36,14 @@ write_kubeconfig() {
   fi
 
   mkdir -p "$HOME/.kube"
+  old_umask="$(umask)"
+  umask 077
   if [ -f "$HOME/.kube/config" ]; then
     KUBECONFIG="$HOME/.kube/config:$path" kubectl config view --flatten > "$path.merged"
   else
     KUBECONFIG="$path" kubectl config view --flatten > "$path.merged"
   fi
+  umask "$old_umask"
   mv "$path.merged" "$HOME/.kube/config"
   chmod 600 "$HOME/.kube/config"
   echo "wrote kubeconfig for $expected_cluster: $path"
@@ -58,4 +65,3 @@ case "$mode" in
     exit 1
     ;;
 esac
-

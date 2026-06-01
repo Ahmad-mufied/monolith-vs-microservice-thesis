@@ -37,7 +37,7 @@ read_env_value() {
   local file="$1"
   local key="$2"
   [ -f "$file" ] || return 0
-  bash -lc 'set -a; source "$1" >/dev/null 2>&1; key="$2"; printf "%s" "${!key-}"' _ "$file" "$key"
+  bash -c 'set -a; source "$1" >/dev/null 2>&1; key="$2"; printf "%s" "${!key-}"' _ "$file" "$key"
 }
 
 format_env_assignment() {
@@ -142,4 +142,3 @@ write_or_update_env_value "$env_file" "OPERATOR_SSH_PUBLIC_KEY_SOURCE" "$operato
 echo "Vultr env initialization complete"
 echo "  file: $env_file"
 echo "  next: edit VULTR_API_KEY and DOCKERHUB_NAMESPACE if they are still placeholders"
-

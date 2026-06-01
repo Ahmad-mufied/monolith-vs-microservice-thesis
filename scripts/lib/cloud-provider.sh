@@ -118,14 +118,13 @@ provider_default_cluster_name() {
   case "${CLOUD_PROVIDER:-aws}:$architecture" in
     aws:monolith) printf 'skripsi-monolith' ;;
     aws:microservices|aws:msa) printf 'skripsi-msa' ;;
-    aws:sequential|"aws:") printf "${SEQUENTIAL_CLUSTER_NAME:-skripsi-benchmark}" ;;
-    hetzner:monolith) printf "${HETZNER_MONOLITH_CLUSTER_NAME:-skripsi-hetzner-monolith}" ;;
-    hetzner:microservices|hetzner:msa) printf "${HETZNER_MSA_CLUSTER_NAME:-skripsi-hetzner-msa}" ;;
-    hetzner:sequential|"hetzner:") printf "${HETZNER_SEQUENTIAL_CLUSTER_NAME:-skripsi-hetzner-benchmark}" ;;
-    vultr:monolith) printf "${VULTR_MONOLITH_CLUSTER_NAME:-skripsi-vultr-monolith}" ;;
-    vultr:microservices|vultr:msa) printf "${VULTR_MSA_CLUSTER_NAME:-skripsi-vultr-msa}" ;;
-    vultr:sequential|"vultr:") printf "${VULTR_SEQUENTIAL_CLUSTER_NAME:-skripsi-vultr-benchmark}" ;;
+    aws:sequential|"aws:") printf '%s' "${SEQUENTIAL_CLUSTER_NAME:-skripsi-benchmark}" ;;
+    hetzner:monolith) printf '%s' "${HETZNER_MONOLITH_CLUSTER_NAME:-skripsi-hetzner-monolith}" ;;
+    hetzner:microservices|hetzner:msa) printf '%s' "${HETZNER_MSA_CLUSTER_NAME:-skripsi-hetzner-msa}" ;;
+    hetzner:sequential|"hetzner:") printf '%s' "${HETZNER_SEQUENTIAL_CLUSTER_NAME:-skripsi-hetzner-benchmark}" ;;
+    vultr:monolith) printf '%s' "${VULTR_MONOLITH_CLUSTER_NAME:-skripsi-vultr-monolith}" ;;
+    vultr:microservices|vultr:msa) printf '%s' "${VULTR_MSA_CLUSTER_NAME:-skripsi-vultr-msa}" ;;
+    vultr:sequential|"vultr:") printf '%s' "${VULTR_SEQUENTIAL_CLUSTER_NAME:-skripsi-vultr-benchmark}" ;;
     *) echo "ERROR: unsupported provider/architecture '${CLOUD_PROVIDER:-}:${architecture}'" >&2; return 1 ;;
   esac
 }
-
