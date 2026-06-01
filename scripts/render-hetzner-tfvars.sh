@@ -17,6 +17,11 @@ set +a
 : "${OPERATOR_CIDRS:?OPERATOR_CIDRS must be set in env/hetzner.env}"
 : "${OPERATOR_SSH_PUBLIC_KEY:?OPERATOR_SSH_PUBLIC_KEY must be set in env/hetzner.env}"
 
+if [ "$HCLOUD_TOKEN" = "replace-me" ]; then
+  echo "HCLOUD_TOKEN is still the placeholder 'replace-me'" >&2
+  exit 1
+fi
+
 validate_operator_cidrs() {
   local raw="$1"
   local entry trimmed
