@@ -28,8 +28,11 @@ terraform -chdir=infra/terraform/shared output -raw hetzner_k6_s3_secret_access_
 
 Rules:
 
-- AWS credentials must be scoped to the benchmark bucket or prefix. The shared
-  Terraform stack enforces access only under `s3://<bucket>/experiments/*`.
+- Hetzner hybrid benchmark is the only exception in this repository where AWS
+  access keys may be present in `env/hetzner.env` and the
+  `benchmark/k6-runner-secret`. Those credentials must be scoped to the
+  benchmark bucket or prefix. The shared Terraform stack enforces access only
+  under `s3://<bucket>/experiments/*`.
 - PostgreSQL accepts private-network traffic only.
 - Docker Hub public images must never contain secrets, kubeconfigs, `.tfstate`,
   `.tfvars`, or local env files.
@@ -59,9 +62,11 @@ Use Kubernetes Secret for sensitive runtime values.
 
 Use ConfigMap for non-sensitive configuration.
 
-Use EKS Pod Identity or IRSA for AWS access.
+Use EKS Pod Identity or IRSA for AWS access on EKS-managed clusters.
 
-Do not store AWS access keys in Kubernetes Secrets.
+Do not store AWS access keys in Kubernetes Secrets for EKS-managed clusters.
+Hetzner hybrid benchmark is the documented exception and uses
+`benchmark/k6-runner-secret` plus shared Terraform outputs for S3 upload.
 
 ---
 
@@ -434,9 +439,9 @@ ADMIN_USER_EMAIL
 ADMIN_USER_PASSWORD
 ```
 
-Do not store AWS keys here.
+Do not store AWS keys here for EKS-managed clusters.
 
-The k6 runner should upload to S3 through EKS Pod Identity or IRSA.
+On EKS, the k6 runner should upload to S3 through EKS Pod Identity or IRSA.
 
 ---
 
