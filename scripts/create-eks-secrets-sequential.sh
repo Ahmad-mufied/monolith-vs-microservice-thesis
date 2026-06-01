@@ -91,6 +91,41 @@ terraform_with_profile() {
   AWS_PROFILE="$terraform_aws_profile" terraform "$@"
 }
 
+temp_secret_files=()
+cleanup() {
+  local file
+  for file in "${temp_secret_files[@]}"; do
+    rm -f "$file"
+  done
+}
+trap cleanup EXIT
+
+create_secret_from_pairs() {
+  local namespace="$1"
+  local secret_name="$2"
+  shift 2
+
+  if (( $# == 0 )) || (( $# % 2 != 0 )); then
+    echo "create_secret_from_pairs requires key/value pairs for ${namespace}/${secret_name}" >&2
+    exit 1
+  fi
+
+  local temp_env_file
+  temp_env_file="$(mktemp)"
+  chmod 600 "$temp_env_file"
+  temp_secret_files+=("$temp_env_file")
+
+  while (( $# > 0 )); do
+    printf '%s=%s\n' "$1" "$2" >> "$temp_env_file"
+    shift 2
+  done
+
+  $K8S create secret generic "$secret_name" \
+    --namespace "$namespace" \
+    --from-env-file="$temp_env_file" \
+    --dry-run=client -o yaml | $K8S apply -f -
+}
+
 sequential_rds="$(terraform_with_profile -chdir=infra/terraform/experiment-sequential output -raw sequential_rds_endpoint)"
 encoded_db_password="$(url_encode "$db_password")"
 context="${SEQUENTIAL_CONTEXT:-benchmark}"
@@ -100,74 +135,60 @@ $K8S create namespace benchmark --dry-run=client -o yaml | $K8S apply -f -
 $K8S create namespace mono --dry-run=client -o yaml | $K8S apply -f -
 $K8S create namespace msa --dry-run=client -o yaml | $K8S apply -f -
 
-$K8S create secret generic db-bootstrap-env \
-  --namespace benchmark \
-  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/bootstrap?sslmode=require" \
-  --dry-run=client -o yaml | $K8S apply -f -
+create_secret_from_pairs benchmark db-bootstrap-env \
+  BOOTSTRAP_DATABASE_URL "postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/bootstrap?sslmode=require"
 
-$K8S create secret generic monolith-env \
-  --namespace mono \
-  --from-literal=APP_ENV="${monolith_app_env:-production}" \
-  --from-literal=APP_PORT="${monolith_app_port:-8080}" \
-  --from-literal=SERVICE_NAME="${monolith_service_name:-monolith}" \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/mono_db?sslmode=require" \
-  --from-literal=JWT_SECRET="$monolith_jwt_secret" \
-  --from-literal=DB_POOL_MAX_CONNS="${monolith_pool_max:-25}" \
-  --from-literal=DB_POOL_MIN_CONNS="${monolith_pool_min:-2}" \
-  --from-literal=DB_POOL_MAX_CONN_LIFETIME="${monolith_pool_lifetime:-5m}" \
-  --from-literal=DB_POOL_MAX_CONN_IDLE_TIME="${monolith_pool_idle:-1m}" \
-  --from-literal=DB_PING_TIMEOUT="${monolith_db_ping_timeout:-5s}" \
-  --from-literal=HTTP_READ_HEADER_TIMEOUT="${monolith_read_header_timeout:-5s}" \
-  --from-literal=HTTP_READ_TIMEOUT="${monolith_read_timeout:-15s}" \
-  --from-literal=HTTP_WRITE_TIMEOUT="${monolith_write_timeout:-30s}" \
-  --from-literal=HTTP_IDLE_TIMEOUT="${monolith_idle_timeout:-1m}" \
-  --from-literal=HTTP_SHUTDOWN_TIMEOUT="${monolith_shutdown_timeout:-10s}" \
-  --from-literal=HTTP_MAX_HEADER_BYTES="${monolith_max_header_bytes:-1048576}" \
-  --from-literal=BCRYPT_COST="${monolith_bcrypt_cost:-10}" \
-  --dry-run=client -o yaml | $K8S apply -f -
+create_secret_from_pairs mono monolith-env \
+  APP_ENV "${monolith_app_env:-production}" \
+  APP_PORT "${monolith_app_port:-8080}" \
+  SERVICE_NAME "${monolith_service_name:-monolith}" \
+  DATABASE_URL "postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/mono_db?sslmode=require" \
+  JWT_SECRET "$monolith_jwt_secret" \
+  DB_POOL_MAX_CONNS "${monolith_pool_max:-25}" \
+  DB_POOL_MIN_CONNS "${monolith_pool_min:-2}" \
+  DB_POOL_MAX_CONN_LIFETIME "${monolith_pool_lifetime:-5m}" \
+  DB_POOL_MAX_CONN_IDLE_TIME "${monolith_pool_idle:-1m}" \
+  DB_PING_TIMEOUT "${monolith_db_ping_timeout:-5s}" \
+  HTTP_READ_HEADER_TIMEOUT "${monolith_read_header_timeout:-5s}" \
+  HTTP_READ_TIMEOUT "${monolith_read_timeout:-15s}" \
+  HTTP_WRITE_TIMEOUT "${monolith_write_timeout:-30s}" \
+  HTTP_IDLE_TIMEOUT "${monolith_idle_timeout:-1m}" \
+  HTTP_SHUTDOWN_TIMEOUT "${monolith_shutdown_timeout:-10s}" \
+  HTTP_MAX_HEADER_BYTES "${monolith_max_header_bytes:-1048576}" \
+  BCRYPT_COST "${monolith_bcrypt_cost:-10}"
 
-$K8S create secret generic api-gateway-secret \
-  --namespace msa \
-  --from-literal=APP_ENV="${api_gateway_app_env:-production}" \
-  --from-literal=HTTP_PORT="${api_gateway_http_port:-8080}" \
-  --from-literal=SERVICE_NAME="${api_gateway_service_name:-api-gateway}" \
-  --from-literal=JWT_SECRET="$api_gateway_jwt_secret" \
-  --from-literal=AUTH_SERVICE_ADDR="${api_gateway_auth_service_addr:-auth-service.msa.svc.cluster.local:50051}" \
-  --from-literal=ITEM_SERVICE_ADDR="${api_gateway_item_service_addr:-item-service.msa.svc.cluster.local:50052}" \
-  --from-literal=TRANSACTION_SERVICE_ADDR="${api_gateway_transaction_service_addr:-transaction-service.msa.svc.cluster.local:50053}" \
-  --dry-run=client -o yaml | $K8S apply -f -
+create_secret_from_pairs msa api-gateway-secret \
+  APP_ENV "${api_gateway_app_env:-production}" \
+  HTTP_PORT "${api_gateway_http_port:-8080}" \
+  SERVICE_NAME "${api_gateway_service_name:-api-gateway}" \
+  JWT_SECRET "$api_gateway_jwt_secret" \
+  AUTH_SERVICE_ADDR "${api_gateway_auth_service_addr:-auth-service.msa.svc.cluster.local:50051}" \
+  ITEM_SERVICE_ADDR "${api_gateway_item_service_addr:-item-service.msa.svc.cluster.local:50052}" \
+  TRANSACTION_SERVICE_ADDR "${api_gateway_transaction_service_addr:-transaction-service.msa.svc.cluster.local:50053}"
 
-$K8S create secret generic auth-service-secret \
-  --namespace msa \
-  --from-literal=APP_ENV="${auth_service_app_env:-production}" \
-  --from-literal=GRPC_PORT="${auth_service_grpc_port:-50051}" \
-  --from-literal=SERVICE_NAME="${auth_service_name:-auth-service}" \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/auth_db?sslmode=require" \
-  --from-literal=BCRYPT_COST="${auth_service_bcrypt_cost:-10}" \
-  --from-literal=JWT_SECRET="$auth_service_jwt_secret" \
-  --dry-run=client -o yaml | $K8S apply -f -
+create_secret_from_pairs msa auth-service-secret \
+  APP_ENV "${auth_service_app_env:-production}" \
+  GRPC_PORT "${auth_service_grpc_port:-50051}" \
+  SERVICE_NAME "${auth_service_name:-auth-service}" \
+  DATABASE_URL "postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/auth_db?sslmode=require" \
+  BCRYPT_COST "${auth_service_bcrypt_cost:-10}" \
+  JWT_SECRET "$auth_service_jwt_secret"
 
-$K8S create secret generic item-service-secret \
-  --namespace msa \
-  --from-literal=APP_ENV="${item_service_app_env:-production}" \
-  --from-literal=GRPC_PORT="${item_service_grpc_port:-50052}" \
-  --from-literal=SERVICE_NAME="${item_service_name:-item-service}" \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/item_db?sslmode=require" \
-  --dry-run=client -o yaml | $K8S apply -f -
+create_secret_from_pairs msa item-service-secret \
+  APP_ENV "${item_service_app_env:-production}" \
+  GRPC_PORT "${item_service_grpc_port:-50052}" \
+  SERVICE_NAME "${item_service_name:-item-service}" \
+  DATABASE_URL "postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/item_db?sslmode=require"
 
-$K8S create secret generic transaction-service-secret \
-  --namespace msa \
-  --from-literal=APP_ENV="${transaction_service_app_env:-production}" \
-  --from-literal=GRPC_PORT="${transaction_service_grpc_port:-50053}" \
-  --from-literal=SERVICE_NAME="${transaction_service_name:-transaction-service}" \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/transaction_db?sslmode=require" \
-  --from-literal=ITEM_SERVICE_ADDR="${transaction_service_item_service_addr:-item-service.msa.svc.cluster.local:50052}" \
-  --dry-run=client -o yaml | $K8S apply -f -
+create_secret_from_pairs msa transaction-service-secret \
+  APP_ENV "${transaction_service_app_env:-production}" \
+  GRPC_PORT "${transaction_service_grpc_port:-50053}" \
+  SERVICE_NAME "${transaction_service_name:-transaction-service}" \
+  DATABASE_URL "postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/transaction_db?sslmode=require" \
+  ITEM_SERVICE_ADDR "${transaction_service_item_service_addr:-item-service.msa.svc.cluster.local:50052}"
 
-$K8S create secret generic k6-runner-secret \
-  --namespace benchmark \
-  --from-literal=ADMIN_USER_EMAIL="$admin_user_email" \
-  --from-literal=ADMIN_USER_PASSWORD="$admin_user_password" \
-  --dry-run=client -o yaml | $K8S apply -f -
+create_secret_from_pairs benchmark k6-runner-secret \
+  ADMIN_USER_EMAIL "$admin_user_email" \
+  ADMIN_USER_PASSWORD "$admin_user_password"
 
 echo "EKS sequential secrets created in context: $context"
