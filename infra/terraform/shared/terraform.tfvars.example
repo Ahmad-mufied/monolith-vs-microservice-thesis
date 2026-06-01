@@ -1,5 +1,8 @@
 aws_region         = "ap-southeast-1"
 project            = "skripsi"
+monolith_cluster_name = "skripsi-monolith"
+msa_cluster_name      = "skripsi-msa"
+sequential_cluster_name = "skripsi-benchmark"
 s3_results_bucket  = "skripsi-benchmark-results"   # manually created bucket name
 
 # Budget nuclear shutdown protection

@@ -8,6 +8,18 @@ variable "project" {
   default = "skripsi"
 }
 
+variable "monolith_cluster_name" {
+  description = "EKS cluster name for the monolith benchmark stack"
+  type        = string
+  default     = "skripsi-monolith"
+}
+
+variable "msa_cluster_name" {
+  description = "EKS cluster name for the microservices benchmark stack"
+  type        = string
+  default     = "skripsi-msa"
+}
+
 variable "cluster_endpoint_public_access_cidrs" {
   description = "Operator public CIDR allowlist for the public EKS Kubernetes API endpoint"
   type        = list(string)

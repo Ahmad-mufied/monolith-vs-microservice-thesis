@@ -10,6 +10,24 @@ variable "project" {
   default     = "skripsi"
 }
 
+variable "monolith_cluster_name" {
+  description = "EKS cluster name for the monolith benchmark stack"
+  type        = string
+  default     = "skripsi-monolith"
+}
+
+variable "msa_cluster_name" {
+  description = "EKS cluster name for the microservices benchmark stack"
+  type        = string
+  default     = "skripsi-msa"
+}
+
+variable "sequential_cluster_name" {
+  description = "EKS cluster name for the sequential benchmark stack"
+  type        = string
+  default     = "skripsi-benchmark"
+}
+
 variable "s3_results_bucket" {
   description = "Name of the manually created S3 bucket for benchmark results"
   type        = string

@@ -124,6 +124,10 @@ db_password="$(read_env_value env/terraform.experiment.env DB_PASSWORD)"
 db_password="${db_password:-$(random_hex 24)}"
 db_instance_class="$(read_env_value env/terraform.experiment.env DB_INSTANCE_CLASS)"
 db_instance_class="${db_instance_class:-db.t3.micro}"
+monolith_cluster_name="$(read_env_value env/terraform.experiment.env MONOLITH_CLUSTER_NAME)"
+monolith_cluster_name="${monolith_cluster_name:-skripsi-monolith}"
+msa_cluster_name="$(read_env_value env/terraform.experiment.env MSA_CLUSTER_NAME)"
+msa_cluster_name="${msa_cluster_name:-skripsi-msa}"
 sequential_cluster_name="$(read_env_value env/terraform.experiment.env SEQUENTIAL_CLUSTER_NAME)"
 sequential_cluster_name="${sequential_cluster_name:-skripsi-benchmark}"
 cluster_endpoint_public_access_cidrs="$(read_env_value env/terraform.experiment.env CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS)"
@@ -163,10 +167,15 @@ write_if_missing "env/terraform.experiment.env" "AWS_REGION=ap-southeast-1
 PROJECT=skripsi
 DB_PASSWORD=${db_password}
 DB_INSTANCE_CLASS=${db_instance_class}
+MONOLITH_CLUSTER_NAME=${monolith_cluster_name}
+MSA_CLUSTER_NAME=${msa_cluster_name}
 SEQUENTIAL_CLUSTER_NAME=${sequential_cluster_name}
 CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS=${cluster_endpoint_public_access_cidrs}
 CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=${cluster_endpoint_public_access_cidrs_source}"
 write_or_update_env_value "env/terraform.experiment.env" "DB_INSTANCE_CLASS" "$db_instance_class"
+write_or_update_env_value "env/terraform.experiment.env" "MONOLITH_CLUSTER_NAME" "$monolith_cluster_name"
+write_or_update_env_value "env/terraform.experiment.env" "MSA_CLUSTER_NAME" "$msa_cluster_name"
+write_or_update_env_value "env/terraform.experiment.env" "SEQUENTIAL_CLUSTER_NAME" "$sequential_cluster_name"
 
 write_if_missing "env/datadog.eks.env" "DATADOG_API_KEY=replace-me
 DATADOG_SITE=datadoghq.com"
