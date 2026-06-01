@@ -9,15 +9,15 @@ fetch_kubeconfig() {
   local output_name="$2"
   local context="$3"
   local path="env/kubeconfig/${context}.yaml"
-  local command
+  local public_ip
 
-  command="$(terraform -chdir="$stack" output -raw "$output_name")"
-  if [ -z "$command" ]; then
-    echo "missing kubeconfig fetch command output: $stack $output_name" >&2
+  public_ip="$(terraform -chdir="$stack" output -raw "$output_name")"
+  if [ -z "$public_ip" ]; then
+    echo "missing control-plane public IP output: $stack $output_name" >&2
     return 1
   fi
 
-  eval "$command" > "$path"
+  ssh "root@${public_ip}" "sed 's/127.0.0.1/${public_ip}/g' /etc/rancher/k3s/k3s.yaml" > "$path"
   chmod 600 "$path"
   KUBECONFIG="$path" kubectl config rename-context default "$context" >/dev/null 2>&1 || true
   KUBECONFIG="$path" kubectl --context="$context" get nodes
@@ -35,11 +35,11 @@ fetch_kubeconfig() {
 
 case "$mode" in
   sequential)
-    fetch_kubeconfig infra/terraform/hetzner-experiment-sequential kubeconfig_fetch_command benchmark
+    fetch_kubeconfig infra/terraform/hetzner-experiment-sequential control_plane_public_ip benchmark
     ;;
   parallel)
-    fetch_kubeconfig infra/terraform/hetzner-experiment monolith_kubeconfig_fetch_command monolith
-    fetch_kubeconfig infra/terraform/hetzner-experiment msa_kubeconfig_fetch_command msa
+    fetch_kubeconfig infra/terraform/hetzner-experiment monolith_control_plane_public_ip monolith
+    fetch_kubeconfig infra/terraform/hetzner-experiment msa_control_plane_public_ip msa
     ;;
   *)
     echo "HETZNER_MODE must be sequential or parallel" >&2

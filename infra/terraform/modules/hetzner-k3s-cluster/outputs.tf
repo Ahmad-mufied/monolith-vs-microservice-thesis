@@ -27,8 +27,3 @@ output "postgres_private_ip" {
   description = "Private IPv4 address of the PostgreSQL server."
   value       = one(hcloud_server.postgres.network).ip
 }
-
-output "kubeconfig_fetch_command" {
-  description = "Command to fetch kubeconfig from the control plane."
-  value       = "ssh root@${hcloud_server.control_plane.ipv4_address} 'sed s/127.0.0.1/${hcloud_server.control_plane.ipv4_address}/g /etc/rancher/k3s/k3s.yaml'"
-}

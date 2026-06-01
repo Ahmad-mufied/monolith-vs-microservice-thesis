@@ -12,8 +12,3 @@ output "postgres_private_ip" {
   description = "Sequential PostgreSQL private IPv4 address."
   value       = module.sequential_cluster.postgres_private_ip
 }
-
-output "kubeconfig_fetch_command" {
-  description = "Command to fetch sequential kubeconfig."
-  value       = module.sequential_cluster.kubeconfig_fetch_command
-}
