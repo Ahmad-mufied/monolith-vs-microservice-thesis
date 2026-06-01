@@ -78,7 +78,6 @@ app_node_plan             = "${VULTR_APP_NODE_PLAN:-voc-c-16c-32gb-300s}"
 testing_node_plan         = "${VULTR_TESTING_NODE_PLAN:-vc2-4c-8gb}"
 postgres_plan             = "${VULTR_POSTGRES_PLAN:-vc2-4c-8gb}"
 postgres_os_id            = ${VULTR_POSTGRES_OS_ID:-1743}
-postgres_password         = "${POSTGRES_PASSWORD}"
 EOF
 
 cat > infra/terraform/vultr-experiment-sequential/terraform.tfvars <<EOF
@@ -90,8 +89,7 @@ app_node_plan             = "${VULTR_APP_NODE_PLAN:-voc-c-16c-32gb-300s}"
 testing_node_plan         = "${VULTR_TESTING_NODE_PLAN:-vc2-4c-8gb}"
 postgres_plan             = "${VULTR_POSTGRES_PLAN:-vc2-4c-8gb}"
 postgres_os_id            = ${VULTR_POSTGRES_OS_ID:-1743}
-postgres_password         = "${POSTGRES_PASSWORD}"
 EOF
 
 echo "Rendered Vultr Terraform tfvars files"
-
+echo "POSTGRES_PASSWORD is kept in env/vultr.env and passed by scripts/terraform-vultr.sh as TF_VAR_postgres_password"

@@ -10,6 +10,29 @@ read_env_value() {
   grep -E "^${2}=" "$1" | head -n 1 | cut -d= -f2- || true
 }
 
+terraform_output_required() {
+  local stack="$1"
+  local output_name="$2"
+  local description="$3"
+  local value err_file
+
+  err_file="$(mktemp)"
+  if ! value="$(terraform -chdir="$stack" output -raw "$output_name" 2>"$err_file")"; then
+    echo "ERROR: failed to read $description from Terraform output '$output_name'" >&2
+    sed 's/^/  terraform: /' "$err_file" >&2
+    rm -f "$err_file"
+    exit 1
+  fi
+  rm -f "$err_file"
+
+  if [ -z "$value" ]; then
+    echo "ERROR: Terraform output '$output_name' for $description is empty" >&2
+    exit 1
+  fi
+
+  printf '%s' "$value"
+}
+
 for file in env/vultr.env env/monolith.eks.env env/k6-runner.eks.env; do
   [ -f "$file" ] || { echo "missing $file; run: make env-init-eks and make env-init-vultr" >&2; exit 1; }
 done
@@ -24,7 +47,11 @@ load_vultr_s3_credentials
 : "${AWS_REGION:?AWS_REGION must be set in env/vultr.env}"
 : "${S3_BUCKET:?S3_BUCKET must be set in env/vultr.env}"
 
-postgres_ip="${VULTR_SEQUENTIAL_POSTGRES_IP:-$(terraform -chdir=infra/terraform/vultr-experiment output -raw monolith_postgres_private_ip)}"
+if [ -n "${VULTR_SEQUENTIAL_POSTGRES_IP:-}" ]; then
+  postgres_ip="$VULTR_SEQUENTIAL_POSTGRES_IP"
+else
+  postgres_ip="$(terraform_output_required infra/terraform/vultr-experiment monolith_postgres_private_ip "monolith PostgreSQL private IP")"
+fi
 encoded_db_password="$(url_encode "$POSTGRES_PASSWORD")"
 K8S="kubectl --context=${VULTR_CONTEXT:-monolith}"
 jwt_secret="$(read_env_value env/monolith.eks.env JWT_SECRET)"
