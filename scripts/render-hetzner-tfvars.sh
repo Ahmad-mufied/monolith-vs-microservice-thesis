@@ -17,12 +17,22 @@ set +a
 : "${OPERATOR_CIDRS:?OPERATOR_CIDRS must be set in env/hetzner.env}"
 : "${OPERATOR_SSH_PUBLIC_KEY:?OPERATOR_SSH_PUBLIC_KEY must be set in env/hetzner.env}"
 
-case "$OPERATOR_CIDRS" in
-  ""|REPLACE_WITH_*|0.0.0.0/0|::/0)
-    echo "OPERATOR_CIDRS must contain explicit CIDR(s), not placeholders or world-open ranges" >&2
-    exit 1
-    ;;
-esac
+validate_operator_cidrs() {
+  local raw="$1"
+  local entry trimmed
+  IFS=',' read -r -a entries <<<"$raw"
+  for entry in "${entries[@]}"; do
+    trimmed="$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' <<<"$entry")"
+    case "$trimmed" in
+      ""|REPLACE_WITH_*|0.0.0.0/0|::/0)
+        echo "OPERATOR_CIDRS must contain explicit CIDR(s), not placeholders or world-open ranges" >&2
+        exit 1
+        ;;
+    esac
+  done
+}
+
+validate_operator_cidrs "$OPERATOR_CIDRS"
 
 case "$OPERATOR_SSH_PUBLIC_KEY" in
   ssh-*) ;;
