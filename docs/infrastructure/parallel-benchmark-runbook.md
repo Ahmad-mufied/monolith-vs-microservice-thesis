@@ -8,6 +8,10 @@ isolated EKS clusters simultaneously.
 This runbook covers the full experiment lifecycle from infrastructure
 provisioning to result verification and teardown.
 
+For the quota-constrained single-cluster alternative, use
+`docs/infrastructure/sequential-benchmark-runbook.md`. The parallel workflow in
+this document remains unchanged and still uses `monolith` and `msa` contexts.
+
 ---
 
 ## 2. Prerequisites

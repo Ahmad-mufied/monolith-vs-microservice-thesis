@@ -118,6 +118,16 @@ example so one experiment session cannot accidentally mix image tags.
 
 ## Phase 2 — Infrastructure Provisioning
 
+Choose the experiment topology before applying cost-heavy resources:
+
+| Mode | Use when | Terraform stack | Contexts |
+|---|---|---|---|
+| Parallel | you need aligned Datadog time-series and have enough quota | `infra/terraform/experiment` | `monolith`, `msa` |
+| Sequential | account quota or budget only allows one active benchmark stack | `infra/terraform/experiment-sequential` | `benchmark` |
+
+The shared stack is common to both modes. Under a 24-vCPU quota, avoid keeping
+parallel and sequential experiment stacks active at the same time.
+
 ### Step 2.1 — Apply Shared Infrastructure (VPC + IAM)
 
 ```bash
@@ -144,7 +154,7 @@ AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/shared output
 # vpc_id, private_subnet_ids, k6_runner_role_arn
 ```
 
-### Step 2.2 — Apply Experiment Clusters (Two EKS + Two RDS)
+### Step 2.2 — Apply Parallel Experiment Clusters (Two EKS + Two RDS)
 
 ```bash
 cd infra/terraform/experiment
@@ -194,6 +204,23 @@ AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment output
 `infra/terraform/shared/terraform.tfstate`. Apply `shared` first, then
 `experiment`, from the same laptop.
 
+### Step 2.2b — Apply Sequential Experiment Cluster (One EKS + One RDS)
+
+Use this instead of Step 2.2 when quota is constrained:
+
+```bash
+make terraform-sequential-recovery-check
+make eks-sequential-plan
+make eks-sequential-apply
+
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment-sequential output
+# sequential_cluster_name, sequential_rds_endpoint
+```
+
+The sequential stack creates `skripsi-benchmark` and
+`skripsi-benchmark-postgres`. The wrapper blocks apply if those live AWS
+resources exist but the sequential state does not track them.
+
 ### Step 2.3 — Configure kubectl Contexts
 
 ```bash
@@ -205,6 +232,13 @@ kubectl --context=msa get nodes
 ```
 
 Expected: 3 nodes per cluster (2 app-nodes of type `c8i.2xlarge` + 1 testing-node), all Ready.
+
+Sequential mode:
+
+```bash
+make eks-setup-context-sequential
+kubectl --context=benchmark get nodes
+```
 
 Before any long benchmark suite, refresh the AWS session that will be used for
 S3 inspection and EKS authentication, then run the benchmark preflight:
@@ -252,6 +286,13 @@ If you use the helper command above, you do not need to run the long manual
 `kubectl create secret ...` commands below. Use
 `make create-eks-secrets-monolith` or `make create-eks-secrets-microservices`
 only when you intentionally want to recreate secrets for one cluster.
+
+Sequential mode uses a separate helper because both architectures share the
+same `benchmark` cluster and RDS endpoint:
+
+```bash
+make eks-create-secrets-sequential
+```
 
 ### Step 4.1 — Monolith Cluster Secrets
 
@@ -1031,9 +1072,13 @@ kubectl --context=monolith run pg-test \
 | `make terraform-auth-check` | Verify Terraform-compatible AWS auth before plan/apply/destroy |
 | `make eks-shared-apply` | Apply shared Terraform (VPC + IAM) |
 | `make eks-apply` | Apply experiment Terraform (2 EKS + 2 RDS) |
+| `make eks-sequential-apply` | Apply sequential experiment Terraform (1 EKS + 1 RDS) |
 | `make eks-setup-contexts` | Configure kubectl for both clusters |
+| `make eks-setup-context-sequential` | Configure kubectl context `benchmark` for sequential mode |
+| `make eks-create-secrets-sequential` | Create sequential-mode secrets in `benchmark`, `mono`, and `msa` namespaces |
 | `SCALING_MODE=fixed make eks-deploy-monolith` | Deploy monolith (fixed replicas) |
 | `SCALING_MODE=fixed make eks-deploy-msa` | Deploy MSA (fixed replicas) |
+| `ARCHITECTURE=monolith SCALING_MODE=fixed make eks-deploy-sequential-architecture` | Deploy one active architecture on the sequential cluster |
 | `make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG` | Deploy both architectures in fixed mode |
 | `SCALING_MODE=hpa make eks-deploy-monolith` | Deploy monolith (HPA enabled) |
 | `make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG` | Deploy both architectures in HPA mode |
@@ -1042,7 +1087,9 @@ kubectl --context=monolith run pg-test \
 | `make run-benchmark-parallel SCENARIO=login TARGET_RPS=1000 RUN_ID=... S3_BUCKET=...` | Run parallel benchmark |
 | `make run-benchmark-suite SCALING_MODE=fixed SCENARIOS="login create-transaction enriched-transactions" RPS_LEVELS="1000 2500 5000 7500 10000"` | Run primary fixed-mode matrix |
 | `make run-benchmark-suite SCALING_MODE=hpa SCENARIOS="login create-transaction enriched-transactions" RPS_LEVELS="1000 2500 5000 7500 10000"` | Run primary HPA-mode matrix |
+| `make run-benchmark-suite-sequential SCALING_MODE=fixed ARCHITECTURE_ORDER="monolith microservices" ARCHITECTURE_SWITCH_DELAY=300` | Run one architecture at a time on the sequential cluster with a consistent Datadog separation gap |
 | `make eks-destroy-confirmed` | Destroy experiment clusters and RDS after confirming benchmark artifacts are safe in S3 |
+| `make eks-sequential-destroy-confirmed` | Destroy sequential cluster and RDS after confirming benchmark artifacts are safe in S3 |
 | `make eks-shared-destroy` | Destroy VPC and IAM (keep S3 and ECR) |
 
 ---

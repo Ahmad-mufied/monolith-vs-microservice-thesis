@@ -87,8 +87,8 @@ resource "aws_iam_role_policy" "k6_runner_s3" {
 
 # ─── AWS Budget Nuclear Shutdown ──────────────────────────────────────────────
 # Budget lives in shared stack so it persists across experiment apply/destroy
-# cycles. Cluster names and RDS identifiers are hardcoded based on the fixed
-# naming convention in experiment/main.tf.
+# cycles. Cluster names and RDS identifiers must stay aligned with the
+# experiment stack naming inputs.
 
 module "aws_budget" {
   source = "../modules/aws-budget"
@@ -98,8 +98,8 @@ module "aws_budget" {
   budget_amount            = var.budget_amount
   budget_threshold_percent = var.budget_threshold_percent
   budget_alert_emails      = var.budget_alert_emails
-  cluster_names            = ["skripsi-monolith", "skripsi-msa"]
-  rds_instance_ids         = ["skripsi-monolith-postgres", "skripsi-msa-postgres"]
+  cluster_names            = [var.monolith_cluster_name, var.msa_cluster_name, var.sequential_cluster_name]
+  rds_instance_ids         = ["${var.monolith_cluster_name}-postgres", "${var.msa_cluster_name}-postgres", "${var.sequential_cluster_name}-postgres"]
   vpc_id                   = module.vpc.vpc_id
   delete_eks               = true
   tags                     = local.common_tags

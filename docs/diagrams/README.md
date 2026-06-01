@@ -10,7 +10,8 @@ thesis writing.
 
 | Diagram | Purpose |
 |---|---|
-| [`cloud-architecture.md`](cloud-architecture.md) | AWS EKS, RDS, S3, ECR, Datadog, and operator topology |
+| [`cloud-architecture.md`](cloud-architecture.md) | Parallel and sequential AWS EKS, RDS, S3, ECR, Datadog, and operator topology |
+| [`sequential-parallel-topology.md`](sequential-parallel-topology.md) | Parallel vs sequential EKS benchmark topology, switching, and metadata flow |
 | [`architecture-comparison.md`](architecture-comparison.md) | Side-by-side monolith and microservices runtime comparison |
 | [`benchmark-lifecycle.md`](benchmark-lifecycle.md) | End-to-end benchmark execution lifecycle |
 | [`login-sequence.md`](login-sequence.md) | Benchmark 1 login request flow |
@@ -23,4 +24,3 @@ GitHub renders Mermaid blocks in Markdown automatically.
 
 For thesis assets, export diagrams from Mermaid-compatible tooling after the
 text source is reviewed and stable.
-

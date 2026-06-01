@@ -19,9 +19,16 @@ Monolith       — one Go application, one database
 Microservices  — four Go services, three databases, gRPC between services
 ```
 
-To keep the comparison fair under cloud-native conditions, both
-architectures are deployed in **two isolated EKS clusters** that run in
-parallel with identical configuration and an identical resource ceiling.
+To keep the comparison fair under cloud-native conditions, the primary
+benchmark topology deploys both architectures in **two isolated EKS clusters**
+that run in parallel with identical configuration and an identical resource
+ceiling.
+
+The repository also supports a quota-constrained sequential topology:
+`skripsi-benchmark` runs one architecture at a time on the same resource
+ceiling. Use it when account quota cannot support the full parallel topology.
+The detailed operator flow is in
+`docs/infrastructure/sequential-benchmark-runbook.md`.
 
 ---
 
@@ -38,10 +45,15 @@ reflect contention rather than architectural difference.
 
 ### 2.2 Aligned time-series for direct comparison
 
-When both architectures run at the same wall-clock time, Datadog
+When both architectures run at the same wall-clock time in parallel mode, Datadog
 time-series for CPU, memory, latency, and replica count can be overlaid
 directly. This is more robust than running sequentially and stitching time
 windows together during analysis.
+
+Sequential mode intentionally gives up this wall-clock alignment to stay within
+smaller vCPU quota. Its metadata records `execution_mode=sequential`,
+`architecture_order`, `terraform_stack=experiment-sequential`, and the active
+cluster name so analysis can compare the explicit time windows instead.
 
 ### 2.3 Equivalent resource ceiling
 
@@ -54,80 +66,81 @@ for RQ2 (resource efficiency).
 
 ## 3. High-Level Topology
 
-The benchmark runs in one AWS region (`ap-southeast-1`) and uses one
-shared VPC. Inside the VPC, two completely independent EKS clusters and
-two completely independent RDS instances run side by side.
+The benchmark runs in one AWS region (`ap-southeast-1`) and uses one shared
+VPC. The repository supports two explicit infrastructure modes:
+
+- **Parallel mode** uses `infra/terraform/experiment` and runs two isolated EKS
+  clusters plus two isolated RDS instances side by side.
+- **Sequential mode** uses `infra/terraform/experiment-sequential` and runs one
+  EKS cluster plus one RDS instance, with only one architecture active at a
+  time.
+
+The detailed Mermaid version for both modes lives in
+`docs/diagrams/cloud-architecture.md`.
+
+### 3.1 Parallel Mode Topology
+
+Parallel mode is the preferred topology when vCPU quota is sufficient. It keeps
+monolith and microservices isolated by cluster, database instance, Kubernetes
+context, and Datadog cluster name.
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│  AWS Account (ap-southeast-1)                                          │
-│                                                                         │
-│  ┌─────────────────────────── Shared VPC ──────────────────────────┐   │
-│  │                                                                  │   │
-│  │  ┌──── Cluster A: skripsi-monolith ────┐                        │   │
-│  │  │                                      │                        │   │
-│  │  │  app-nodes      (2× c8i.2xlarge)     │                        │   │
-│  │  │     └─ namespace: mono               │                        │   │
-│  │  │           └─ monolith pods           │                        │   │
-│  │  │                                      │                        │   │
-│  │  │  testing-nodes  (1× c8i-flex.large)        │                        │   │
-│  │  │     └─ namespace: benchmark          │                        │   │
-│  │  │           └─ k6 runner Job           │                        │   │
-│  │  │                                      │                        │   │
-│  │  │  Datadog Agent DaemonSet             │                        │   │
-│  │  │     cluster_name: skripsi-monolith   │                        │   │
-│  │  └──────────────┬───────────────────────┘                        │   │
-│  │                 │                                                 │   │
-│  │                 ▼                                                 │   │
-│  │       ┌──── RDS A ────┐                                          │   │
-│  │       │  monolith     │                                          │   │
-│  │       │  └─ mono_db   │                                          │   │
-│  │       └───────────────┘                                          │   │
-│  │                                                                  │   │
-│  │  ┌──── Cluster B: skripsi-msa ────┐                              │   │
-│  │  │                                 │                              │   │
-│  │  │  app-nodes      (2× c8i.2xlarge) │                              │   │
-│  │  │     └─ namespace: msa           │                              │   │
-│  │  │           ├─ api-gateway        │                              │   │
-│  │  │           ├─ auth-service       │                              │   │
-│  │  │           ├─ item-service       │                              │   │
-│  │  │           └─ transaction-svc    │                              │   │
-│  │  │                                 │                              │   │
-│  │  │  testing-nodes  (1× c8i-flex.large)   │                              │   │
-│  │  │     └─ namespace: benchmark     │                              │   │
-│  │  │           └─ k6 runner Job      │                              │   │
-│  │  │                                 │                              │   │
-│  │  │  Datadog Agent DaemonSet        │                              │   │
-│  │  │     cluster_name: skripsi-msa   │                              │   │
-│  │  └────────────┬────────────────────┘                              │   │
-│  │               │                                                   │   │
-│  │               ▼                                                   │   │
-│  │     ┌──── RDS B ────────────────┐                                │   │
-│  │     │  msa                      │                                │   │
-│  │     │  ├─ auth_db               │                                │   │
-│  │     │  ├─ item_db               │                                │   │
-│  │     │  └─ transaction_db        │                                │   │
-│  │     └───────────────────────────┘                                │   │
-│  │                                                                  │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-│  ┌─── Shared persistent resources (manual, outside Terraform) ───┐    │
-│  │                                                                 │    │
-│  │  ECR (skripsi/*)        S3 results bucket                      │    │
-│  │  └─ container images    └─ benchmark artifacts (summary.json)  │    │
-│  └─────────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────────┘
+AWS account: ap-southeast-1
 
-           │                                 │
-           ▼                                 ▼
-   ┌──────────────────┐           ┌──────────────────┐
-   │  Datadog SaaS    │           │  Operator laptop │
-   │  (one account,   │           │  (kubectl, helm, │
-   │   two clusters)  │           │   terraform)     │
-   └──────────────────┘           └──────────────────┘
+  Manual persistent resources
+  ------------------------------------------------------------
+  ECR: skripsi/* images
+  S3 : benchmark result bucket
+
+  Terraform shared stack: infra/terraform/shared
+  ------------------------------------------------------------
+  Shared VPC
+  Shared private subnets for EKS nodes and RDS
+  Shared public subnets for ELB and NAT
+  Shared k6 runner IAM role
+
+  Terraform experiment stack: infra/terraform/experiment
+  ------------------------------------------------------------
+
+  +-------------------------------+     +-------------------------------+
+  | EKS: skripsi-monolith         |     | EKS: skripsi-msa              |
+  |                               |     |                               |
+  | app-nodes                     |     | app-nodes                     |
+  | - 2 x c8i.2xlarge             |     | - 2 x c8i.2xlarge             |
+  | - namespace: mono             |     | - namespace: msa              |
+  | - monolith pod(s)             |     | - api-gateway                 |
+  |                               |     | - auth-service                |
+  | testing-nodes                 |     | - item-service                |
+  | - 1 x c8i-flex.large          |     | - transaction-service         |
+  | - namespace: benchmark        |     |                               |
+  | - k6 runner Job               |     | testing-nodes                 |
+  |                               |     | - 1 x c8i-flex.large          |
+  | namespace: datadog            |     | - namespace: benchmark        |
+  | - Datadog Agent DaemonSet     |     | - k6 runner Job               |
+  | - cluster: skripsi-monolith    |     |                               |
+  +---------------+---------------+     | namespace: datadog            |
+                  |                     | - Datadog Agent DaemonSet     |
+                  |                     | - cluster: skripsi-msa         |
+                  |                     +---------------+---------------+
+                  |                                     |
+                  v                                     v
+  +-------------------------------+     +-------------------------------+
+  | RDS: skripsi-monolith-postgres|     | RDS: skripsi-msa-postgres     |
+  | - mono_db                     |     | - auth_db                     |
+  +-------------------------------+     | - item_db                     |
+                                        | - transaction_db              |
+                                        +-------------------------------+
+
+  Operator laptop
+  ------------------------------------------------------------
+  make, terraform, kubectl, helm
+
+  Datadog SaaS
+  ------------------------------------------------------------
+  Metrics, traces, logs, HPA behavior, RDS metrics where enabled
 ```
 
-The architecture deliberately keeps the two clusters as twins:
+The parallel architecture deliberately keeps the two clusters as twins:
 
 - same node group sizes,
 - same node instance types,
@@ -138,6 +151,87 @@ The architecture deliberately keeps the two clusters as twins:
 
 The only differences are the workload they host (monolith vs four MSA
 services) and the database scope they serve.
+
+### 3.2 Sequential Mode Topology
+
+Sequential mode is the quota-constrained topology. It keeps the same app-node
+and testing-node shape as a single architecture in parallel mode, but it does
+not keep both full architecture stacks active at once.
+
+```text
+AWS account: ap-southeast-1
+
+  Manual persistent resources
+  ------------------------------------------------------------
+  ECR: skripsi/* images
+  S3 : benchmark result bucket
+
+  Terraform shared stack: infra/terraform/shared
+  ------------------------------------------------------------
+  Shared VPC
+  Shared private subnets for EKS nodes and RDS
+  Shared public subnets for ELB and NAT
+  Shared k6 runner IAM role
+
+  Terraform sequential stack: infra/terraform/experiment-sequential
+  ------------------------------------------------------------
+
+  +-----------------------------------------------------------+
+  | EKS: skripsi-benchmark                                   |
+  |                                                           |
+  | app-nodes                                                 |
+  | - 2 x c8i.2xlarge                                         |
+  | - namespace: mono                                         |
+  | - monolith pod(s), active only during monolith phase       |
+  |                                                           |
+  | - namespace: msa                                          |
+  | - api-gateway, auth-service, item-service, transaction-svc |
+  | - active only during microservices phase                   |
+  |                                                           |
+  | testing-nodes                                             |
+  | - 1 x c8i-flex.large                                      |
+  | - namespace: benchmark                                    |
+  | - db bootstrap, seed, and k6 runner Job                    |
+  |                                                           |
+  | namespace: datadog                                        |
+  | - Datadog Agent DaemonSet                                 |
+  | - cluster: skripsi-benchmark                               |
+  +----------------------------+------------------------------+
+                               |
+                               v
+  +-----------------------------------------------------------+
+  | RDS: skripsi-benchmark-postgres                           |
+  | - mono_db                                                  |
+  | - auth_db                                                  |
+  | - item_db                                                  |
+  | - transaction_db                                           |
+  +-----------------------------------------------------------+
+
+  Sequential benchmark phase order
+  ------------------------------------------------------------
+  1. Deploy active architecture
+  2. Scale inactive architecture to zero
+  3. Run migration job for active architecture
+  4. Run seed job for active architecture
+  5. Run k6 for active architecture
+  6. Upload result artifacts to S3
+  7. Wait ARCHITECTURE_SWITCH_DELAY, default 300 seconds
+  8. Repeat for the next architecture
+
+  Operator laptop
+  ------------------------------------------------------------
+  make, terraform, kubectl, helm
+
+  Datadog SaaS
+  ------------------------------------------------------------
+  Metrics and traces are compared by explicit metadata windows, not by
+  overlapping wall-clock execution.
+```
+
+The active deploy script scales the inactive architecture to zero before
+migration, seed, and benchmark execution. This avoids silent CPU contention and
+keeps the active architecture's application ceiling aligned with the parallel
+mode ceiling.
 
 ---
 
@@ -174,6 +268,8 @@ before a benchmark and destroyed afterwards.
 | EKS cluster — msa | `infra/terraform/experiment` | No |
 | RDS instance — monolith | `infra/terraform/experiment` | No |
 | RDS instance — msa | `infra/terraform/experiment` | No |
+| EKS cluster — sequential benchmark | `infra/terraform/experiment-sequential` | No |
+| RDS instance — sequential benchmark | `infra/terraform/experiment-sequential` | No |
 
 Rationale: clusters and databases are expensive to keep idle. They should
 exist only during active benchmark sessions. Terraform handles them as a
@@ -184,7 +280,8 @@ disposable unit.
 ```text
 infra/terraform/
 ├── shared/              ← writes terraform.tfstate locally
-└── experiment/          ← reads ../shared/terraform.tfstate
+├── experiment/          ← reads ../shared/terraform.tfstate
+└── experiment-sequential/ ← reads ../shared/terraform.tfstate
 ```
 
 `experiment` consumes `vpc_id`, `private_subnet_ids`, and
@@ -408,9 +505,9 @@ contract and the `K6_PROFILE` ↔ manifest convention.
 
 ## 7. Database Layer (RDS)
 
-Each cluster has its own RDS instance. They are completely independent —
-different VPC security groups, different subnet groups, different DNS
-endpoints.
+In parallel mode, each cluster has its own RDS instance. They are completely
+independent — different VPC security groups, different subnet groups, different
+DNS endpoints.
 
 ```text
 RDS A (monolith)                RDS B (msa)
@@ -418,7 +515,7 @@ RDS A (monolith)                RDS B (msa)
 identifier:                     identifier:
   skripsi-monolith-postgres       skripsi-msa-postgres
 engine: PostgreSQL 18           engine: PostgreSQL 18
-instance class: db.t3.medium    instance class: db.t3.medium
+instance class: db.t3.micro     instance class: db.t3.micro
 storage: 20-50 GiB gp3          storage: 20-50 GiB gp3
 multi-AZ: false                 multi-AZ: false
 public access: false            public access: false
@@ -429,6 +526,17 @@ databases:                      databases:
   └─ mono_db                      ├─ auth_db
                                   ├─ item_db
                                   └─ transaction_db
+```
+
+In sequential mode, one RDS instance (`skripsi-benchmark-postgres`) hosts the
+same logical databases:
+
+```text
+bootstrap
+mono_db
+auth_db
+item_db
+transaction_db
 ```
 
 Each RDS instance starts with a `bootstrap` database. The actual
@@ -769,7 +877,7 @@ illustrative `t3.xlarge` totals are no longer valid for budgeting.
 | EKS control plane | $0.10 | $0.20 |
 | app-nodes (2× c8i.2xlarge) | recalculate live | recalculate live |
 | testing-nodes (1× c8i-flex.large) | ~$0.09 | ~$0.18 |
-| RDS (db.t3.medium) | ~$0.07 | ~$0.14 |
+| RDS (db.t3.micro) | recalculate live | recalculate live |
 | **Total active** | **recalculate live** | **recalculate live** |
 
 Persistent costs:
@@ -904,8 +1012,11 @@ AWS Budget monitors monthly cost
 
 When the budget threshold is reached, the Lambda function automatically:
 
-1. deletes both EKS clusters and their node groups,
-2. stops both RDS instances,
+1. deletes all benchmark EKS clusters and their node groups
+   (`skripsi-monolith`, `skripsi-msa`, and `skripsi-benchmark`),
+2. stops all benchmark RDS instances
+   (`skripsi-monolith-postgres`, `skripsi-msa-postgres`, and
+   `skripsi-benchmark-postgres`),
 3. deletes the NAT Gateway and releases associated Elastic IPs.
 
 This reduces monthly idle cost to approximately $3–4 (stopped RDS storage, S3, and ECR).

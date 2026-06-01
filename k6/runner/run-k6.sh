@@ -53,6 +53,10 @@ RUN_ID_VALUE="${RUN_ID:-local-run}"
 ATTEMPT_VALUE="${ATTEMPT:-attempt-01}"
 ARCHITECTURE_VALUE="${ARCHITECTURE:-unknown}"
 SCENARIO_NAME_VALUE="${SCENARIO_NAME:-unknown}"
+EXECUTION_MODE_VALUE="${EXECUTION_MODE:-parallel}"
+ARCHITECTURE_ORDER_VALUE="${ARCHITECTURE_ORDER:-}"
+TERRAFORM_STACK_VALUE="${TERRAFORM_STACK:-}"
+CLUSTER_NAME_VALUE="${CLUSTER_NAME:-}"
 
 for value_name in TARGET_RPS_VALUE PRE_ALLOCATED_VUS_VALUE MAX_VUS_VALUE; do
   value="${!value_name}"
@@ -75,6 +79,10 @@ jq -n \
   --arg run_id "$RUN_ID_VALUE" \
   --arg attempt "$ATTEMPT_VALUE" \
   --arg architecture "$ARCHITECTURE_VALUE" \
+  --arg execution_mode "$EXECUTION_MODE_VALUE" \
+  --arg architecture_order "$ARCHITECTURE_ORDER_VALUE" \
+  --arg terraform_stack "$TERRAFORM_STACK_VALUE" \
+  --arg cluster_name "$CLUSTER_NAME_VALUE" \
   --arg scenario_name "$SCENARIO_NAME_VALUE" \
   --arg k6_script "k6/scripts/${K6_SCRIPT}" \
   --arg k6_profile "${K6_PROFILE:-steady}" \
@@ -106,6 +114,10 @@ jq -n \
   '{
     run_id: $run_id,
     attempt: $attempt,
+    execution_mode: $execution_mode,
+    architecture_order: (if $architecture_order == "" then null else ($architecture_order | split(" ")) end),
+    terraform_stack: (if $terraform_stack == "" then null else $terraform_stack end),
+    cluster_name: (if $cluster_name == "" then null else $cluster_name end),
     architecture: $architecture,
     scenario_name: $scenario_name,
     k6_script: $k6_script,
@@ -150,7 +162,14 @@ K6_TAG_ARGS=(
   --tag "attempt=$ATTEMPT_VALUE"
   --tag "architecture=$ARCHITECTURE_VALUE"
   --tag "benchmark_scenario=$SCENARIO_NAME_VALUE"
+  --tag "execution_mode=$EXECUTION_MODE_VALUE"
 )
+if [ -n "$TERRAFORM_STACK_VALUE" ]; then
+  K6_TAG_ARGS+=(--tag "terraform_stack=$TERRAFORM_STACK_VALUE")
+fi
+if [ -n "$CLUSTER_NAME_VALUE" ]; then
+  K6_TAG_ARGS+=(--tag "cluster_name=$CLUSTER_NAME_VALUE")
+fi
 if [ "$DATADOG_ENABLED_VALUE" = "true" ]; then
   export K6_STATSD_ADDR="$K6_STATSD_ADDR_VALUE"
   export K6_STATSD_NAMESPACE="$K6_STATSD_NAMESPACE_VALUE"

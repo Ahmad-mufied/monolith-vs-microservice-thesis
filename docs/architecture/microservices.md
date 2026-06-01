@@ -84,6 +84,12 @@ from more than one service.
 
 The microservices system runs on Kubernetes as multiple Deployments.
 
+In parallel benchmark mode these Deployments run on the dedicated
+`skripsi-msa` EKS cluster. In sequential benchmark mode they run in the `msa`
+namespace on `skripsi-benchmark` while the monolith namespace is scaled down.
+The API Gateway, gRPC call graph, database-per-service model, resource ceiling,
+and benchmark semantics remain the same in both modes.
+
 ```text
 +----------------------------------------------------------+
 |                       EKS Cluster                         |
@@ -874,7 +880,7 @@ Transaction Service owns transaction persistence, but it does not own item data.
 It therefore calls Item Service through `ValidateTransactionItems` before
 writing to `transaction_db`. Item validation remains validation-only and does
 not deduct `available_amount`, keeping the benchmark focused on request path
-cost rather than distributed stock consistency.
+cost rather than distributed availability consistency.
 
 Flow:
 

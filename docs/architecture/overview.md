@@ -21,6 +21,18 @@ This makes the system suitable for a controlled experimental comparison of:
 - autoscaling behavior,
 - resource efficiency.
 
+The runtime architecture comparison is independent from the benchmark
+execution topology. The same monolith and microservices implementations can be
+measured in:
+
+- parallel mode, where each architecture runs on its own EKS cluster at the
+  same wall-clock time, or
+- sequential mode, where one architecture at a time runs on a single reusable
+  EKS cluster because account quota is constrained.
+
+Execution mode must not change the external API, dataset, migration behavior,
+resource ceiling, or application request path.
+
 ---
 
 ## 2. Architectural Goal
@@ -485,30 +497,41 @@ Main components:
 - k6 for load testing,
 - Terraform for infrastructure provisioning.
 
-High-level deployment topology:
+High-level deployment topology in parallel mode:
 
 ```text
-                         +----------------------+
-                         |        AWS VPC       |
-                         |                      |
-+-------------+          |  +----------------+  |
-|   Client    |          |  |  EKS Cluster   |  |
-|    k6       |--------->|  |                |  |
-+-------------+          |  |  app-nodes     |  |
-                         |  |  testing-nodes |  |
-                         |  +----------------+  |
-                         |          |           |
-                         |          v           |
-                         |  +----------------+  |
-                         |  | RDS PostgreSQL |  |
-                         |  |      18        |  |
-                         |  +----------------+  |
-                         |          |           |
-                         |          v           |
-                         |  +----------------+  |
-                         |  | S3 Results     |  |
-                         |  +----------------+  |
-                         +----------------------+
+AWS VPC
+├── EKS: skripsi-monolith
+│   ├── app-nodes      -> mono namespace
+│   ├── testing-nodes  -> benchmark namespace
+│   └── RDS            -> mono_db
+│
+└── EKS: skripsi-msa
+    ├── app-nodes      -> msa namespace
+    ├── testing-nodes  -> benchmark namespace
+    └── RDS            -> auth_db, item_db, transaction_db
+
+S3 stores benchmark artifacts from both clusters.
+Datadog receives telemetry with distinct cluster_name tags.
+```
+
+High-level deployment topology in sequential mode:
+
+```text
+AWS VPC
+└── EKS: skripsi-benchmark
+    ├── app-nodes      -> one active architecture at a time
+    ├── testing-nodes  -> benchmark namespace
+    └── RDS            -> mono_db, auth_db, item_db, transaction_db
+
+Sequential phase 1:
+  mono namespace active, msa scaled down
+
+Sequential phase 2:
+  msa namespace active, mono scaled down
+
+S3 stores the same artifact layout.
+Datadog comparison uses recorded time windows instead of wall-clock alignment.
 ```
 
 Node placement:
@@ -697,7 +720,10 @@ The experiment assumes:
 - both architectures use PostgreSQL 18,
 - both architectures use equivalent logical datasets,
 - both architectures are tested using the same k6 scripts,
-- both architectures are deployed in the same AWS/EKS environment,
+- both architectures are deployed with the same AWS/EKS baseline and the same
+  per-architecture resource ceiling,
+- execution mode is recorded as `parallel` or `sequential` and does not change
+  benchmark semantics,
 - both architectures are evaluated using the same metric definitions.
 
 The purpose is to isolate the architectural differences as much as possible.

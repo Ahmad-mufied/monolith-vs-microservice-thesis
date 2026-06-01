@@ -4,11 +4,11 @@ variable "cluster_name" {
 }
 
 variable "architecture" {
-  description = "Architecture label: monolith or msa"
+  description = "Architecture label: monolith, msa, or benchmark"
   type        = string
   validation {
-    condition     = contains(["monolith", "msa"], var.architecture)
-    error_message = "architecture must be monolith or msa"
+    condition     = contains(["monolith", "msa", "benchmark"], var.architecture)
+    error_message = "architecture must be monolith, msa, or benchmark"
   }
 }
 

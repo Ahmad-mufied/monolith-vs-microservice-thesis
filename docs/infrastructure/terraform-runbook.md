@@ -2,8 +2,9 @@
 
 ## 1. Purpose
 
-Step-by-step guide for provisioning and destroying the dual EKS cluster
-benchmark infrastructure.
+Step-by-step guide for provisioning and destroying the benchmark
+infrastructure. It covers both the dual-cluster parallel topology and the
+single-cluster sequential topology.
 
 ---
 
@@ -427,7 +428,9 @@ becomes the source of truth consumed by the `experiment` stack.
 
 ---
 
-## 6. Step 3 — Apply Experiment Clusters
+## 6. Step 3 — Choose and Apply Experiment Topology
+
+### 6.1 Parallel topology: two EKS clusters and two RDS instances
 
 ```bash
 cd infra/terraform/experiment
@@ -502,9 +505,53 @@ The `terraform-auth-check`, `eks-apply`, and `eks-destroy` Makefile targets now
 pass `TERRAFORM_AWS_PROFILE` explicitly into the Terraform wrapper script, so a
 non-default profile selection is preserved consistently across those flows.
 
+### 6.2 Sequential topology: one EKS cluster and one RDS instance
+
+Use sequential topology when account quota cannot support both full benchmark
+stacks at the same time. It reuses the same `shared` stack and creates only:
+
+```text
+EKS: skripsi-benchmark
+RDS: skripsi-benchmark-postgres
+```
+
+The Terraform stack lives at:
+
+```text
+infra/terraform/experiment-sequential
+```
+
+Apply through the wrapper so `DB_PASSWORD` is injected consistently and drift
+checks run before apply:
+
+```bash
+make terraform-sequential-recovery-check
+make eks-sequential-plan
+make eks-sequential-apply
+```
+
+Verify outputs:
+
+```bash
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment-sequential output
+# sequential_cluster_name, sequential_rds_endpoint
+# sequential_kubeconfig_command
+```
+
+The sequential wrapper refuses to apply if AWS already has
+`skripsi-benchmark` or `skripsi-benchmark-postgres` but the local sequential
+state does not track them. This prevents an interrupted apply from turning into
+a silent duplicate-name or drift failure.
+
+Only one experiment topology should normally be active at a time under a
+24-vCPU account quota. Destroy the previous experiment stack after S3 artifact
+verification before applying the other topology.
+
 ---
 
 ## 7. Step 4 — Configure kubectl Contexts
+
+Parallel contexts:
 
 ```bash
 make eks-setup-contexts
@@ -515,6 +562,13 @@ aws eks update-kubeconfig --name skripsi-msa      --region ap-southeast-1 --alia
 # Verify
 kubectl --context=monolith get nodes
 kubectl --context=msa get nodes
+```
+
+Sequential context:
+
+```bash
+make eks-setup-context-sequential
+kubectl --context=benchmark get nodes
 ```
 
 ---
@@ -541,6 +595,16 @@ If you only need to recreate one cluster's secrets, use the granular targets:
 make create-eks-secrets-monolith
 make create-eks-secrets-microservices
 ```
+
+For sequential topology:
+
+```bash
+make eks-create-secrets-sequential
+```
+
+This creates `mono`, `msa`, and `benchmark` namespace secrets in the
+`benchmark` context and points all database URLs to
+`sequential_rds_endpoint`.
 
 ```bash
 make eks-validate-manifests
@@ -596,6 +660,17 @@ Use the shorter implicit form only when you intentionally want the deploy
 scripts to derive `IMAGE_TAG` from the current `HEAD` at command execution
 time.
 
+Sequential deploys use one active architecture at a time:
+
+```bash
+ARCHITECTURE=monolith SCALING_MODE=fixed make eks-deploy-sequential-architecture
+ARCHITECTURE=microservices SCALING_MODE=fixed make eks-deploy-sequential-architecture
+```
+
+Switching architecture in sequential mode is a redeploy event. The deploy
+script scales the opposite architecture to zero before preparing the selected
+architecture.
+
 ---
 
 ## 10. Step 7 — Install Datadog
@@ -640,6 +715,19 @@ make run-benchmark-parallel \
   S3_BUCKET=<bucket_name>
 ```
 
+Sequential benchmark alternative:
+
+```bash
+make run-benchmark-suite-sequential \
+  SCALING_MODE=fixed \
+  ARCHITECTURE_ORDER="monolith microservices" \
+  EXPERIMENT_NAME=rq1-fixed-sequential \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=120 \
+  ARCHITECTURE_SWITCH_DELAY=300 \
+  S3_BUCKET=<bucket_name>
+```
+
 ---
 
 ## 12. Step 9 — Verify S3 Results
@@ -668,6 +756,9 @@ Do not destroy infrastructure until all expected files are present.
 ```bash
 # Destroy clusters and RDS only after verifying benchmark data exists in S3
 make eks-destroy-confirmed
+
+# Sequential experiment stack
+make eks-sequential-destroy-confirmed
 
 # Destroy shared resources (only when experiment is fully complete).
 # WARNING: this removes the VPC and IAM roles.

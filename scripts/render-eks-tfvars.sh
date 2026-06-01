@@ -30,6 +30,9 @@ budget_alert_emails="${BUDGET_ALERT_EMAILS:-}"
 experiment_aws_region="${AWS_REGION:-ap-southeast-1}"
 experiment_project="${PROJECT:-skripsi}"
 experiment_db_instance_class="${DB_INSTANCE_CLASS:-db.t3.micro}"
+monolith_cluster_name="${MONOLITH_CLUSTER_NAME:-skripsi-monolith}"
+msa_cluster_name="${MSA_CLUSTER_NAME:-skripsi-msa}"
+sequential_cluster_name="${SEQUENTIAL_CLUSTER_NAME:-skripsi-benchmark}"
 cluster_endpoint_public_access_cidrs="${CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS}"
 
 case "$cluster_endpoint_public_access_cidrs" in
@@ -76,7 +79,7 @@ format_hcl_string_list() {
   local entry trimmed output=""
 
   if [[ -z "$raw" ]]; then
-    echo "[]" >&2
+    echo "[]"
     return
   fi
 
@@ -106,6 +109,9 @@ budget_alert_emails_hcl="$(format_hcl_string_list "$budget_alert_emails")"
 cat > infra/terraform/shared/terraform.tfvars <<EOF
 aws_region        = "${shared_aws_region}"
 project           = "${shared_project}"
+monolith_cluster_name = "${monolith_cluster_name}"
+msa_cluster_name = "${msa_cluster_name}"
+sequential_cluster_name = "${sequential_cluster_name}"
 s3_results_bucket = "${S3_RESULTS_BUCKET}"
 
 # Budget nuclear shutdown protection
@@ -117,6 +123,16 @@ EOF
 cat > infra/terraform/experiment/terraform.tfvars <<EOF
 aws_region  = "${experiment_aws_region}"
 project     = "${experiment_project}"
+monolith_cluster_name = "${monolith_cluster_name}"
+msa_cluster_name = "${msa_cluster_name}"
+cluster_endpoint_public_access_cidrs = ${cluster_endpoint_public_access_cidrs_hcl}
+db_instance_class = "${experiment_db_instance_class}"
+EOF
+
+cat > infra/terraform/experiment-sequential/terraform.tfvars <<EOF
+aws_region  = "${experiment_aws_region}"
+project     = "${experiment_project}"
+sequential_cluster_name = "${sequential_cluster_name}"
 cluster_endpoint_public_access_cidrs = ${cluster_endpoint_public_access_cidrs_hcl}
 db_instance_class = "${experiment_db_instance_class}"
 EOF
@@ -124,3 +140,4 @@ EOF
 echo "Rendered Terraform tfvars files:"
 echo "  infra/terraform/shared/terraform.tfvars"
 echo "  infra/terraform/experiment/terraform.tfvars"
+echo "  infra/terraform/experiment-sequential/terraform.tfvars"

@@ -20,6 +20,7 @@ experiment sequence, use:
 - `docs/infrastructure/terraform-runbook.md`
 - `docs/infrastructure/benchmark-runbook-end-to-end.md`
 - `docs/infrastructure/parallel-benchmark-runbook.md`
+- `docs/infrastructure/sequential-benchmark-runbook.md`
 
 ---
 
@@ -48,6 +49,7 @@ Kubernetes contexts:
 
 - `monolith`
 - `msa`
+- `benchmark` for sequential mode
 
 Namespaces:
 
@@ -553,11 +555,16 @@ AWS_PROFILE=terraform-process aws logs tail /aws/eks/skripsi-monolith/cluster \
 Prefer repository scripts and Make targets for the normal lifecycle:
 
 - `make eks-setup-contexts`
+- `make eks-setup-context-sequential`
 - `make eks-deploy-monolith`
 - `make eks-deploy-msa`
+- `make eks-deploy-sequential-architecture`
 - `make run-benchmark-parallel`
 - `make run-benchmark-suite`
+- `make run-benchmark-sequential`
+- `make run-benchmark-suite-sequential`
 - `make terraform-recovery-check`
+- `make terraform-sequential-recovery-check`
 
 Use this reference when:
 

@@ -50,6 +50,14 @@ spec:
               value: steady
             - name: ARCHITECTURE
               value: monolith
+            - name: EXECUTION_MODE
+              value: parallel
+            - name: ARCHITECTURE_ORDER
+              value: monolith microservices
+            - name: TERRAFORM_STACK
+              value: experiment
+            - name: CLUSTER_NAME
+              value: skripsi-monolith
             - name: SCENARIO_NAME
               value: login
             - name: DATASET

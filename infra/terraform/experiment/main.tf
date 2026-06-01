@@ -32,7 +32,7 @@ locals {
 module "monolith_cluster" {
   source = "../modules/benchmark-cluster"
 
-  cluster_name                         = "skripsi-monolith"
+  cluster_name                         = var.monolith_cluster_name
   architecture                         = "monolith"
   project                              = var.project
   vpc_id                               = local.vpc_id
@@ -48,7 +48,7 @@ module "monolith_cluster" {
 module "msa_cluster" {
   source = "../modules/benchmark-cluster"
 
-  cluster_name                         = "skripsi-msa"
+  cluster_name                         = var.msa_cluster_name
   architecture                         = "msa"
   project                              = var.project
   vpc_id                               = local.vpc_id
