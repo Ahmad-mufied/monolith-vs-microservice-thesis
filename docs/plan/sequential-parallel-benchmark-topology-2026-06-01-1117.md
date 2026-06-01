@@ -146,7 +146,7 @@ make run-benchmark-suite-sequential \
   SCENARIO_RPS_MATRIX="login:1000,2500,5000;create-transaction:1000,2500,5000;enriched-transactions:1000,2500,5000"
 ```
 
-`ARCHITECTURE_ORDER` can be reversed for controlled reruns:
+The `ARCHITECTURE_ORDER` value can be reversed for controlled reruns:
 
 ```bash
 ARCHITECTURE_ORDER="microservices monolith"
