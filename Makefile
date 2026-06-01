@@ -175,10 +175,12 @@ help:
 	@echo "  make terraform-auth-check"
 	@echo "  make benchmark-preflight-check"
 	@echo "  make terraform-recovery-check"
+	@echo "  make terraform-sequential-recovery-check"
 	@echo "  make terraform-recovery-fix-tainted-nodegroups      # dry-run safe untaint suggestions"
 	@echo "  make terraform-recovery-fix-tainted-nodegroups-apply # untaint active healthy node groups"
 	@echo "  make eks-prepare-enrichment-benchmark"
 	@echo "  make run-benchmark-suite SCALING_MODE=fixed EXPERIMENT_NAME=rq1-final TEST_DURATION=5m INTER_CASE_DELAY=120 AUTO_DESTROY_CONFIRMED=true SCENARIO_RPS_MATRIX=\"login:100,120,140,160,180,200;create-transaction:100,150,200,250,300,400,500;enriched-transactions:100,150,200,250,300,400,500\""
+	@echo "  make run-benchmark-suite-sequential SCALING_MODE=fixed ARCHITECTURE_ORDER=\"monolith microservices\" EXPERIMENT_NAME=rq1-fixed-sequential TEST_DURATION=5m INTER_CASE_DELAY=120 ARCHITECTURE_SWITCH_DELAY=300 SCENARIO_RPS_MATRIX=\"login:100,120,140;create-transaction:100,150,200;enriched-transactions:100,150,200\""
 	@echo "  # Optional login extension after the primary matrix:"
 	@echo "  make run-benchmark-suite SCALING_MODE=fixed EXPERIMENT_NAME=rq1-login-extension TEST_DURATION=5m INTER_CASE_DELAY=90 SCENARIOS=\"login\" RPS_LEVELS=\"225 250\""
 	@echo "  make eks-create-secrets"
@@ -811,6 +813,7 @@ SCENARIOS    ?= login create-transaction enriched-transactions
 RPS_LEVELS   ?= 1000 2500 5000 7500 10000
 SCENARIO_RPS_MATRIX ?=
 INTER_CASE_DELAY ?= 0
+ARCHITECTURE_SWITCH_DELAY ?= 300
 AUTO_DESTROY_CONFIRMED ?= false
 S3_BUCKET    ?= skripsi-benchmark-results
 DATADOG_ENABLED ?= true
@@ -820,6 +823,7 @@ DATADOG_ENV ?= benchmark
 terraform-fmt:
 	cd infra/terraform/shared && terraform fmt -recursive
 	cd infra/terraform/experiment && terraform fmt -recursive
+	cd infra/terraform/experiment-sequential && terraform fmt -recursive
 
 # =========================
 # AWS Persistent Resources (one-time setup)
@@ -960,6 +964,7 @@ eks-render-tfvars:
 terraform-validate:
 	cd infra/terraform/shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
 	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
+	cd infra/terraform/experiment-sequential && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
 
 .PHONY: terraform-auth-check
 terraform-auth-check:
@@ -972,6 +977,10 @@ terraform-auth-check:
 .PHONY: terraform-recovery-check
 terraform-recovery-check:
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-recovery-check.sh
+
+.PHONY: terraform-sequential-recovery-check
+terraform-sequential-recovery-check:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential-recovery-check.sh
 
 .PHONY: terraform-recovery-fix-tainted-nodegroups
 terraform-recovery-fix-tainted-nodegroups:
@@ -994,6 +1003,11 @@ eks-apply:
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh init
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh apply
 
+.PHONY: eks-plan
+eks-plan:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh plan -out=tfplan
+
 .PHONY: eks-destroy
 eks-destroy:
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh init
@@ -1003,9 +1017,32 @@ eks-destroy:
 eks-destroy-confirmed:
 	S3_BENCHMARK_DATA_VERIFIED=true $(MAKE) eks-destroy
 
+.PHONY: eks-sequential-plan
+eks-sequential-plan:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh plan -out=tfplan
+
+.PHONY: eks-sequential-apply
+eks-sequential-apply:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh apply
+
+.PHONY: eks-sequential-destroy
+eks-sequential-destroy:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh destroy
+
+.PHONY: eks-sequential-destroy-confirmed
+eks-sequential-destroy-confirmed:
+	S3_BENCHMARK_DATA_VERIFIED=true $(MAKE) eks-sequential-destroy
+
 .PHONY: eks-setup-contexts
 eks-setup-contexts:
 	bash scripts/setup-eks-contexts.sh
+
+.PHONY: eks-setup-context-sequential
+eks-setup-context-sequential:
+	bash scripts/setup-eks-contexts-sequential.sh
 
 .PHONY: eks-deploy-monolith
 eks-deploy-monolith:
@@ -1014,6 +1051,10 @@ eks-deploy-monolith:
 .PHONY: eks-deploy-msa
 eks-deploy-msa:
 	SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/deploy-msa-cluster.sh
+
+.PHONY: eks-deploy-sequential-architecture
+eks-deploy-sequential-architecture:
+	ARCHITECTURE=$(ARCHITECTURE) SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/deploy-sequential-architecture.sh
 
 .PHONY: eks-deploy-all
 eks-deploy-all:
@@ -1044,6 +1085,10 @@ create-eks-secrets-microservices:
 eks-create-secrets:
 	$(MAKE) create-eks-secrets-monolith
 	$(MAKE) create-eks-secrets-microservices
+
+.PHONY: eks-create-secrets-sequential
+eks-create-secrets-sequential:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/create-eks-secrets-sequential.sh
 
 .PHONY: run-benchmark-parallel
 run-benchmark-parallel:
@@ -1077,3 +1122,40 @@ run-benchmark-suite:
 	DATADOG_ENV=$(DATADOG_ENV) \
 	AWS_REGION=$(AWS_REGION) \
 	bash scripts/run-benchmark-suite.sh
+
+.PHONY: run-benchmark-sequential
+run-benchmark-sequential:
+	ARCHITECTURE=$(ARCHITECTURE) \
+	SCENARIO=$(SCENARIO) \
+	TARGET_RPS=$(TARGET_RPS) \
+	RUN_ID=$(RUN_ID) \
+	ATTEMPT=$(ATTEMPT) \
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE=$(K6_PROFILE) \
+	TEST_DURATION=$(TEST_DURATION) \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	ARCHITECTURE_ORDER="$(ARCHITECTURE_ORDER)" \
+	bash scripts/run-benchmark-sequential.sh
+
+.PHONY: run-benchmark-suite-sequential
+run-benchmark-suite-sequential:
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE="$(if $(filter command line environment,$(origin K6_PROFILE)),$(K6_PROFILE),)" \
+	TEST_DURATION=$(TEST_DURATION) \
+	SCENARIOS="$(SCENARIOS)" \
+	RPS_LEVELS="$(RPS_LEVELS)" \
+	SCENARIO_RPS_MATRIX="$(SCENARIO_RPS_MATRIX)" \
+	ARCHITECTURE_ORDER="$(ARCHITECTURE_ORDER)" \
+	INTER_CASE_DELAY=$(INTER_CASE_DELAY) \
+	ARCHITECTURE_SWITCH_DELAY=$(ARCHITECTURE_SWITCH_DELAY) \
+	AUTO_DESTROY_CONFIRMED=$(AUTO_DESTROY_CONFIRMED) \
+	EXPERIMENT_NAME="$(if $(filter command line environment,$(origin EXPERIMENT_NAME)),$(EXPERIMENT_NAME),)" \
+	RUN_ID="$(if $(filter command line environment,$(origin RUN_ID)),$(RUN_ID),)" \
+	ATTEMPT="$(if $(filter command line environment,$(origin ATTEMPT)),$(ATTEMPT),)" \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	AWS_REGION=$(AWS_REGION) \
+	bash scripts/run-benchmark-suite-sequential.sh

@@ -85,7 +85,9 @@ monolith-vs-microservice-thesis/
 │   ├── helm/
 │   │   └── datadog/
 │   └── k8s/
-│       └── benchmark/
+│       ├── benchmark/
+│       ├── eks/
+│       └── local/
 ├── infra/
 ├── k6/
 └── scripts/
@@ -151,15 +153,50 @@ docs/
 │   ├── project-structure.md
 │   ├── database-schema.md
 │   ├── database-migration.md
+│   ├── k6-workload-scenarios.md
 │   ├── validation-strategy.md
 │   ├── local-deployment.md
 │   ├── run-monolith-local.md
 │   └── run-microservices-local.md
 │
-└── infrastructure/
-    ├── rds-postgres.md
-    ├── deployment-strategy.md
-    └── secret-management.md
+├── diagrams/
+│   ├── README.md
+│   ├── cloud-architecture.md
+│   ├── sequential-parallel-topology.md
+│   ├── architecture-comparison.md
+│   ├── benchmark-lifecycle.md
+│   ├── login-sequence.md
+│   ├── create-transaction-sequence.md
+│   └── enriched-transactions-sequence.md
+│
+├── experiment/
+│   ├── application-ceiling-methodology.md
+│   ├── resource-configuration.md
+│   └── scaling-mode-strategy.md
+│
+├── infrastructure/
+│   ├── cloud-architecture.md
+│   ├── eks-cluster-design.md
+│   ├── terraform-runbook.md
+│   ├── benchmark-execution-lifecycle.md
+│   ├── benchmark-runbook-end-to-end.md
+│   ├── parallel-benchmark-runbook.md
+│   ├── sequential-benchmark-runbook.md
+│   ├── rds-postgres.md
+│   ├── datadog.md
+│   ├── datadog-resource-overhead.md
+│   ├── secret-management.md
+│   ├── deployment-strategy.md
+│   ├── eks-debug-command-reference.md
+│   └── aws-budget-shutdown.md
+│
+├── plan/
+│   └── sequential-parallel-benchmark-topology-*.md
+│
+└── research-questions/
+    ├── README.md
+    ├── rq1-performance-analysis.md
+    └── rq2-resource-efficiency-analysis.md
 ```
 
 Rule:
@@ -589,9 +626,6 @@ deployments/
     │   └── microservices/
     │       └── db-bootstrap-job.yaml
     │
-    ├── eks/
-    │   └── ...
-    │
     ├── local/
     │   ├── shared/
     │   │   ├── postgres.yaml
@@ -629,18 +663,17 @@ deployments/
     ├── namespaces/
     │   └── local.yaml
     │
-    ├── eks/
-    │   ├── monolith/
-    │   │   ├── base/
-    │   │   └── overlays/
-    │   │       ├── fixed/
-    │   │       └── hpa/
-    │   └── microservices/
-    │       ├── base/
-    │       └── overlays/
-    │           ├── fixed/
-    │           └── hpa/
-    │
+    └── eks/
+        ├── monolith/
+        │   ├── base/
+        │   └── overlays/
+        │       ├── fixed/
+        │       └── hpa/
+        └── microservices/
+            ├── base/
+            └── overlays/
+                ├── fixed/
+                └── hpa/
 ```
 
 Rules:
@@ -667,33 +700,52 @@ Path:
 infra/
 ```
 
-Status: **Not yet implemented.**
-
-Planned structure:
+Current structure:
 
 ```text
 infra/
 └── terraform/
-    └── experiment/
-        └── modules/
-            ├── vpc/
-            ├── eks/
-            ├── node-groups/
-            ├── rds/
-            ├── s3/
-            └── iam/
+    ├── shared/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    │
+    ├── experiment/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    │
+    ├── experiment-sequential/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   ├── outputs.tf
+    │   └── terraform.tfvars.example
+    │
+    └── modules/
+        ├── aws-budget/
+        └── benchmark-cluster/
 ```
 
-Terraform will manage:
+Terraform manages:
 
-- VPC,
-- EKS cluster,
-- app node group,
-- testing node group,
-- RDS PostgreSQL 18,
-- S3 result bucket,
-- IAM roles,
-- security groups.
+- shared VPC, subnets, route tables, NAT, and k6 IAM role in `shared/`,
+- two-cluster parallel benchmark topology in `experiment/`,
+- one-cluster sequential benchmark topology in `experiment-sequential/`,
+- EKS clusters, app node groups, testing node groups, RDS PostgreSQL 18, and
+  security groups through `modules/benchmark-cluster`,
+- budget guardrail resources through `modules/aws-budget`.
+
+Rules:
+
+- S3 result buckets and ECR repositories are persistent resources created by
+  operator commands, not destroyed by experiment Terraform teardown.
+- `experiment/` and `experiment-sequential/` both read outputs from
+  `shared/terraform.tfstate`.
+- Use `scripts/terraform-experiment.sh` for parallel mode and
+  `scripts/terraform-sequential.sh` for sequential mode so required variables
+  such as `TF_VAR_db_password` are injected consistently.
+- Do not keep both experiment stacks active when the AWS account is constrained
+  to a 24 vCPU quota.
 
 ---
 
@@ -705,17 +757,21 @@ Path:
 k6/
 ```
 
-Status: **Not yet implemented.**
-
-Planned structure:
+Current structure:
 
 ```text
 k6/
 ├── scripts/
+│   ├── login.js
+│   ├── create-transaction.js
+│   ├── enriched-transactions.js
+│   └── mixed-workload.js
+│
 ├── runner/
-└── scenarios/
-    ├── monolith/
-    └── microservices/
+│   ├── Dockerfile
+│   └── run-k6.sh
+│
+└── assets/
 ```
 
 Rules:
@@ -723,7 +779,11 @@ Rules:
 - k6 scripts must be driven by environment variables,
 - k6 must use RPS-based scenarios,
 - monolith and microservices must use symmetrical scenarios,
+- k6 runner jobs must run on `testing-nodes`, not `app-nodes`,
 - results must be uploaded to S3 before infrastructure is destroyed.
+- `run-k6.sh` writes metadata that identifies `execution_mode`,
+  `architecture_order`, `terraform_stack`, and `cluster_name` for parallel and
+  sequential analysis.
 
 ---
 
@@ -739,16 +799,53 @@ Current structure:
 
 ```text
 scripts/
+├── benchmark-preflight-check.sh
+├── create-datadog-secret.sh
+├── create-eks-secrets-microservices.sh
+├── create-eks-secrets-monolith.sh
+├── create-eks-secrets-sequential.sh
 ├── create-local-postgres-secrets.sh
 ├── create-local-secrets.sh
 ├── create-local-secrets-microservices.sh
+├── deploy-all-eks-clusters.sh
+├── deploy-monolith-cluster.sh
+├── deploy-msa-cluster.sh
+├── deploy-sequential-architecture.sh
+├── eks-update-manifests.sh
 ├── env-init-base.sh
+├── env-init-datadog-minikube.sh
+├── env-init-eks.sh
 ├── env-init-monolith.sh
 ├── env-init-microservices.sh
-└── go-mod-tidy-all.sh
+├── go-mod-tidy-all.sh
+├── install-metrics-server.sh
+├── prepare-enrichment-benchmark.sh
+├── render-eks-manifests.sh
+├── render-eks-tfvars.sh
+├── run-benchmark-parallel.sh
+├── run-benchmark-sequential.sh
+├── run-benchmark-suite.sh
+├── run-benchmark-suite-sequential.sh
+├── setup-eks-contexts.sh
+├── setup-eks-contexts-sequential.sh
+├── terraform-experiment.sh
+├── terraform-recovery-check.sh
+├── terraform-recovery-fix-tainted-nodegroups.sh
+├── terraform-sequential.sh
+├── terraform-sequential-recovery-check.sh
+└── validate-eks-assets.sh
 ```
 
-Scripts should be simple wrappers around documented commands.
+Rules:
+
+- Scripts should be simple wrappers around documented commands.
+- Parallel mode scripts must keep `monolith` and `msa` contexts isolated.
+- Sequential mode scripts must use the `benchmark` context and scale the
+  inactive architecture to zero before running migration, seed, or k6.
+- Benchmark scripts must fail fast on missing AWS, EKS, S3, kubeconfig, or
+  required environment state rather than silently continuing.
+- Terraform scripts must use explicit stack directories so parallel and
+  sequential state do not drift into each other.
 
 ---
 

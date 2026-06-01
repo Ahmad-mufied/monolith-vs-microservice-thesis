@@ -1,13 +1,17 @@
-# EKS Cluster Design — Dual Isolated Clusters
+# EKS Cluster Design — Parallel and Sequential Topologies
 
 ## 1. Purpose
 
-This document describes the dual isolated EKS cluster design used for the
-thesis benchmark experiment.
+This document describes the EKS cluster designs used for the thesis benchmark
+experiment.
 
 Two separate EKS clusters run in parallel to eliminate resource contention
 between the monolith and microservices architectures and to produce aligned
 Datadog time-series for direct comparison.
+
+A quota-constrained sequential topology is also available. It uses one EKS
+cluster and one RDS instance, then runs monolith and microservices phases one
+after another. See `docs/infrastructure/sequential-benchmark-runbook.md`.
 
 ---
 
@@ -39,6 +43,27 @@ AWS ap-southeast-1
 └── Shared Datadog account (two cluster_name tags)
 ```
 
+Sequential topology:
+
+```text
+AWS ap-southeast-1
+│
+├── Shared VPC (10.0.0.0/16)
+│
+├── Cluster: skripsi-benchmark
+│   ├── app-nodes      (2× c8i.2xlarge)     → mono or msa active workload
+│   ├── testing-nodes  (1× c8i-flex.large)  → benchmark namespace
+│   └── RDS: skripsi-benchmark-postgres
+│       ├── mono_db
+│       ├── auth_db
+│       ├── item_db
+│       └── transaction_db
+│
+├── Shared ECR
+├── Shared S3
+└── Shared Datadog account (cluster_name=skripsi-benchmark)
+```
+
 ---
 
 ## 3. Why Two Clusters
@@ -56,6 +81,11 @@ dedicated compute, dedicated database, and dedicated network paths.
 Additional benefit: both k6 jobs start at the same time, so Datadog
 time-series for CPU, memory, latency, and replica count are aligned and
 can be overlaid directly in dashboards.
+
+Sequential mode intentionally trades that wall-clock alignment for lower
+footprint. It is valid only because the deploy workflow keeps one architecture
+active at a time and stores `execution_mode=sequential` plus the Datadog time
+window in benchmark metadata.
 
 ---
 
@@ -103,12 +133,13 @@ Each cluster has its own RDS instance.
 |---|---|---|
 | skripsi-monolith | skripsi-monolith-postgres | `mono_db` |
 | skripsi-msa | skripsi-msa-postgres | `auth_db`, `item_db`, `transaction_db` |
+| skripsi-benchmark | skripsi-benchmark-postgres | `mono_db`, `auth_db`, `item_db`, `transaction_db` |
 
 RDS configuration:
 
 ```text
 engine         : PostgreSQL 18
-instance class : db.t3.medium
+instance class : db.t3.micro by default
 storage        : 20 GiB gp3 (max 50 GiB)
 multi-AZ       : disabled
 public access  : disabled
@@ -149,6 +180,7 @@ distinguished by the `cluster_name` tag set in the Helm values:
 |---|---|---|
 | skripsi-monolith | `skripsi-monolith` | `architecture:monolith` |
 | skripsi-msa | `skripsi-msa` | `architecture:microservices` |
+| skripsi-benchmark | `skripsi-benchmark` | active app pods keep their architecture tag |
 
 Application pods also carry `env:benchmark` via Unified Service Tagging,
 which aligns with the k6 runner `DATADOG_ENV=benchmark`.
@@ -176,6 +208,14 @@ aws eks update-kubeconfig --name skripsi-msa      --region ap-southeast-1 --alia
 All subsequent kubectl commands use `--context=monolith` or `--context=msa`
 to target the correct cluster.
 
+Sequential mode uses:
+
+```bash
+make eks-setup-context-sequential
+```
+
+This creates the `benchmark` context for `skripsi-benchmark`.
+
 ---
 
 ## 9. Cost Estimate
@@ -189,7 +229,7 @@ older `t3.xlarge`.
 | EKS control plane | $0.10 | $0.20 |
 | app-nodes (2× c8i.2xlarge) | recalculate live | recalculate live |
 | testing-nodes (1× c8i-flex.large) | $0.09 | $0.18 |
-| RDS db.t3.medium | $0.07 | $0.14 |
+| RDS db.t3.micro | recalculate live | recalculate live |
 | **Total** | **recalculate live** | **recalculate live** |
 
 A typical benchmark session (provision + deploy + 3 scenarios × 2 RPS
@@ -215,7 +255,13 @@ infra/terraform/
 │       ├── variables.tf
 │       └── outputs.tf
 │
-└── experiment/                ← instantiates two clusters (local state)
+├── experiment/                ← instantiates two clusters (local state)
+│   ├── main.tf
+│   ├── variables.tf
+│   ├── outputs.tf
+│   └── terraform.tfvars.example
+│
+└── experiment-sequential/     ← instantiates one cluster (local state)
     ├── main.tf
     ├── variables.tf
     ├── outputs.tf
@@ -233,6 +279,9 @@ make eks-shared-apply
 
 # 2. Both clusters
 make eks-apply
+
+# Alternative: one sequential cluster
+make eks-sequential-apply
 ```
 
 Both stacks use local Terraform state. The `experiment` stack reads shared

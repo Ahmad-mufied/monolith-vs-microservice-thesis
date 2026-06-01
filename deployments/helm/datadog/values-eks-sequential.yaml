@@ -1,0 +1,43 @@
+targetSystem: linux
+
+agents:
+  tolerations:
+    - key: workload
+      operator: Equal
+      value: benchmark
+      effect: NoSchedule
+
+datadog:
+  apiKeyExistingSecret: datadog-secret
+  clusterName: skripsi-benchmark
+
+  tags:
+    - env:benchmark
+    - project:skripsi-benchmark
+    - execution_mode:sequential
+
+  logs:
+    enabled: true
+    containerCollectAll: true
+
+  apm:
+    portEnabled: true
+    socketEnabled: false
+
+  dogstatsd:
+    port: 8125
+    useHostPort: true
+    nonLocalTraffic: true
+
+  processAgent:
+    enabled: true
+    processCollection: true
+
+  kubeStateMetricsCore:
+    enabled: true
+
+clusterAgent:
+  enabled: true
+  admissionController:
+    enabled: true
+    mutateUnlabelled: false

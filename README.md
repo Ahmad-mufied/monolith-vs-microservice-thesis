@@ -40,12 +40,26 @@ The microservices variant runs as four independently deployable Go services.
 External communication uses REST HTTP, while internal microservices
 communication uses gRPC.
 
-For the final AWS benchmark, both architectures run in parallel on two isolated
-EKS clusters:
+For the final AWS benchmark, the repository supports two isolated execution
+modes:
+
+- Parallel mode runs both architectures at the same time on two isolated EKS
+  clusters for wall-clock-aligned Datadog time-series.
+- Sequential mode runs one architecture at a time on one EKS cluster for AWS
+  accounts with tighter vCPU quota or budget limits.
+
+Parallel mode topology:
 
 ```text
 skripsi-monolith  -> mono namespace, benchmark namespace, RDS mono_db
 skripsi-msa       -> msa namespace, benchmark namespace, RDS auth_db/item_db/transaction_db
+```
+
+Sequential mode topology:
+
+```text
+skripsi-benchmark -> mono namespace, msa namespace, benchmark namespace,
+                     one RDS with mono_db/auth_db/item_db/transaction_db
 ```
 
 Both clusters use the same measured application resource ceiling:
@@ -65,6 +79,7 @@ Architecture and benchmark diagrams are available in
 [`docs/diagrams/`](docs/diagrams/):
 
 - [`cloud-architecture.md`](docs/diagrams/cloud-architecture.md)
+- [`sequential-parallel-topology.md`](docs/diagrams/sequential-parallel-topology.md)
 - [`architecture-comparison.md`](docs/diagrams/architecture-comparison.md)
 - [`benchmark-lifecycle.md`](docs/diagrams/benchmark-lifecycle.md)
 - [`login-sequence.md`](docs/diagrams/login-sequence.md)
@@ -95,7 +110,7 @@ Architecture and benchmark diagrams are available in
 ├── buf.yaml                  # protobuf module configuration
 ├── buf.gen.yaml              # protobuf Go/gRPC generation configuration
 ├── monolith/                 # monolith application
-├── microservices/            # api-gateway, auth, item, transaction services
+├── microservices/            # api-gateway, auth-service, item-service, transaction-service
 ├── proto/                    # gRPC contracts and generated Go code
 ├── pkg/                      # shared technical utilities
 ├── seed/                     # benchmark seed/reset tooling
@@ -320,6 +335,23 @@ make run-benchmark-parallel \
   S3_BUCKET=skripsi-benchmark-results
 ```
 
+Quota-constrained alternative:
+
+```bash
+make eks-sequential-apply
+make eks-setup-context-sequential
+make eks-create-secrets-sequential
+
+make run-benchmark-suite-sequential \
+  SCALING_MODE=fixed \
+  ARCHITECTURE_ORDER="monolith microservices" \
+  TEST_DURATION=5m \
+  INTER_CASE_DELAY=120 \
+  ARCHITECTURE_SWITCH_DELAY=300 \
+  RPS_LEVELS="1000 2500 5000" \
+  S3_BUCKET=skripsi-benchmark-results
+```
+
 For a full scenario/RPS matrix, use the suite runner. `RUN_ID` and `ATTEMPT`
 are generated automatically unless you override them:
 
@@ -337,6 +369,10 @@ final runs, prefer a stabilization gap between suite cases, for example
 `120` seconds for fixed mode and `300` seconds for HPA mode. The value must be
 an integer number of seconds; use `300` for five minutes, not `5m`.
 
+For sequential suites, also set `ARCHITECTURE_SWITCH_DELAY` explicitly. It is
+the consistent gap between monolith and microservices phases and defaults to
+`300` seconds, which makes Datadog resource windows easier to separate.
+
 Do not destroy infrastructure until all benchmark artifacts are verified in S3.
 
 ```bash
@@ -351,6 +387,7 @@ Detailed EKS documentation:
 - [`docs/infrastructure/terraform-runbook.md`](docs/infrastructure/terraform-runbook.md)
 - [`docs/infrastructure/benchmark-runbook-end-to-end.md`](docs/infrastructure/benchmark-runbook-end-to-end.md)
 - [`docs/infrastructure/parallel-benchmark-runbook.md`](docs/infrastructure/parallel-benchmark-runbook.md)
+- [`docs/infrastructure/sequential-benchmark-runbook.md`](docs/infrastructure/sequential-benchmark-runbook.md)
 
 ## Images and ECR
 
@@ -616,6 +653,7 @@ Infrastructure:
 - [`docs/infrastructure/terraform-runbook.md`](docs/infrastructure/terraform-runbook.md)
 - [`docs/infrastructure/benchmark-execution-lifecycle.md`](docs/infrastructure/benchmark-execution-lifecycle.md)
 - [`docs/infrastructure/parallel-benchmark-runbook.md`](docs/infrastructure/parallel-benchmark-runbook.md)
+- [`docs/infrastructure/sequential-benchmark-runbook.md`](docs/infrastructure/sequential-benchmark-runbook.md)
 - [`docs/infrastructure/rds-postgres.md`](docs/infrastructure/rds-postgres.md)
 - [`docs/infrastructure/secret-management.md`](docs/infrastructure/secret-management.md)
 - [`docs/infrastructure/deployment-strategy.md`](docs/infrastructure/deployment-strategy.md)

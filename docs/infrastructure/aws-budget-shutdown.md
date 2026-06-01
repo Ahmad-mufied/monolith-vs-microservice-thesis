@@ -18,7 +18,7 @@ AWS Budget (monitor monthly cost)
                    ┌───────────────────────┼───────────────────────┐
                    ▼                       ▼                       ▼
            Delete EKS clusters      Stop RDS instances     Delete NAT GW
-           (kedua cluster)          (kedua instance)       + release EIPs
+           (parallel/sequential)    (parallel/sequential)  + release EIPs
 ```
 
 Email notifications at 50%, 80%, and 95% are sent directly by AWS Budgets.
@@ -127,7 +127,9 @@ cat > /tmp/lambda-policy.json << EOF
         "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:cluster/skripsi-monolith",
         "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:nodegroup/skripsi-monolith/*",
         "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:cluster/skripsi-msa",
-        "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:nodegroup/skripsi-msa/*"
+        "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:nodegroup/skripsi-msa/*",
+        "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:cluster/skripsi-benchmark",
+        "arn:aws:eks:ap-southeast-1:${ACCOUNT_ID}:nodegroup/skripsi-benchmark/*"
       ]
     },
     {
@@ -184,8 +186,8 @@ aws lambda create-function \
   --memory-size 256 \
   --region ap-southeast-1 \
   --environment "Variables={
-    EKS_CLUSTERS=skripsi-monolith,skripsi-msa
-    RDS_INSTANCE_IDS=skripsi-monolith-postgres,skripsi-msa-postgres
+    EKS_CLUSTERS=skripsi-monolith,skripsi-msa,skripsi-benchmark
+    RDS_INSTANCE_IDS=skripsi-monolith-postgres,skripsi-msa-postgres,skripsi-benchmark-postgres
     VPC_ID=REPLACE_WITH_VPC_ID,
     DELETE_EKS=true,
     AWS_REGION=ap-southeast-1
@@ -366,14 +368,14 @@ Lambda executes in this order:
 
 ```text
 Step 1: Delete EKS Node Groups + Clusters
-        for each cluster in [skripsi-monolith, skripsi-msa]:
+        for each cluster in [skripsi-monolith, skripsi-msa, skripsi-benchmark]:
           for each nodegroup:
             delete_nodegroup()
           wait_until_deleted()
           delete_cluster()
 
 Step 2: Stop RDS Instances
-        for each instance in [skripsi-monolith-postgres, skripsi-msa-postgres]:
+        for each instance in [skripsi-monolith-postgres, skripsi-msa-postgres, skripsi-benchmark-postgres]:
           stop_db_instance()
 
 Step 3: Delete NAT Gateways + Release Elastic IPs

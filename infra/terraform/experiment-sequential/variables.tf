@@ -1,23 +1,19 @@
 variable "aws_region" {
-  type    = string
-  default = "ap-southeast-1"
+  description = "AWS region"
+  type        = string
+  default     = "ap-southeast-1"
 }
 
 variable "project" {
-  type    = string
-  default = "skripsi"
+  description = "Project name prefix"
+  type        = string
+  default     = "skripsi"
 }
 
-variable "monolith_cluster_name" {
-  description = "EKS cluster name for the monolith benchmark stack"
+variable "sequential_cluster_name" {
+  description = "Single EKS cluster name for sequential benchmark execution"
   type        = string
-  default     = "skripsi-monolith"
-}
-
-variable "msa_cluster_name" {
-  description = "EKS cluster name for the microservices benchmark stack"
-  type        = string
-  default     = "skripsi-msa"
+  default     = "skripsi-benchmark"
 }
 
 variable "cluster_endpoint_public_access_cidrs" {
@@ -40,13 +36,13 @@ variable "cluster_endpoint_public_access_cidrs" {
 }
 
 variable "db_password" {
-  description = "RDS master password for both clusters"
+  description = "RDS master password for the sequential benchmark database"
   type        = string
   sensitive   = true
 }
 
 variable "db_instance_class" {
-  description = "RDS instance class for both benchmark cluster databases"
+  description = "RDS instance class for the sequential benchmark database"
   type        = string
   default     = "db.t3.micro"
 }

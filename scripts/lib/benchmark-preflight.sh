@@ -6,16 +6,16 @@ benchmark_preflight_check() {
   local quiet="${3:-false}"
   local aws_error_file
   local s3_error_file
-  local mono_error_file
-  local msa_error_file
+  local context_error_file
+  local contexts="${BENCHMARK_PREFLIGHT_CONTEXTS:-monolith msa}"
+  local context
 
   aws_error_file="$(mktemp)"
   s3_error_file="$(mktemp)"
-  mono_error_file="$(mktemp)"
-  msa_error_file="$(mktemp)"
+  context_error_file="$(mktemp)"
 
   cleanup_benchmark_preflight_files() {
-    rm -f "$aws_error_file" "$s3_error_file" "$mono_error_file" "$msa_error_file"
+    rm -f "$aws_error_file" "$s3_error_file" "$context_error_file"
   }
 
   if [ "$quiet" != "true" ]; then
@@ -40,27 +40,21 @@ benchmark_preflight_check() {
     return 1
   fi
 
-  if ! kubectl --context=monolith get nodes >/dev/null 2>"$mono_error_file"; then
-    echo "ERROR: kubectl context 'monolith' is not ready for ${context_label}." >&2
-    cat "$mono_error_file" >&2
-    echo "Fix: refresh the EKS credential path and verify 'kubectl --context=monolith get nodes' succeeds." >&2
-    cleanup_benchmark_preflight_files
-    return 1
-  fi
-
-  if ! kubectl --context=msa get nodes >/dev/null 2>"$msa_error_file"; then
-    echo "ERROR: kubectl context 'msa' is not ready for ${context_label}." >&2
-    cat "$msa_error_file" >&2
-    echo "Fix: refresh the EKS credential path and verify 'kubectl --context=msa get nodes' succeeds." >&2
-    cleanup_benchmark_preflight_files
-    return 1
-  fi
+  for context in $contexts; do
+    : > "$context_error_file"
+    if ! kubectl --context="$context" get nodes >/dev/null 2>"$context_error_file"; then
+      echo "ERROR: kubectl context '${context}' is not ready for ${context_label}." >&2
+      cat "$context_error_file" >&2
+      echo "Fix: refresh the EKS credential path and verify 'kubectl --context=${context} get nodes' succeeds." >&2
+      cleanup_benchmark_preflight_files
+      return 1
+    fi
+  done
 
   if [ "$quiet" != "true" ]; then
     echo "  aws_session  : ok"
     echo "  s3_access    : ok"
-    echo "  monolith_ctx : ok"
-    echo "  msa_ctx      : ok"
+    echo "  contexts     : ${contexts}"
     echo ""
   fi
 
