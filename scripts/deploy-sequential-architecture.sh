@@ -54,6 +54,20 @@ require_secret() {
   fi
 }
 
+recreate_job() {
+  local namespace="$1"
+  local job_name="$2"
+  local manifest="$3"
+  local complete_timeout="$4"
+
+  $K8S delete job "$job_name" -n "$namespace" --ignore-not-found
+  if $K8S get job "$job_name" -n "$namespace" >/dev/null 2>&1; then
+    $K8S wait --for=delete "job/${job_name}" -n "$namespace" --timeout=120s
+  fi
+  $K8S apply -f "$manifest"
+  $K8S wait --for=condition=complete "job/${job_name}" -n "$namespace" --timeout="$complete_timeout"
+}
+
 scale_down_monolith() {
   $K8S delete hpa monolith -n mono --ignore-not-found
   if $K8S get deployment monolith -n mono >/dev/null 2>&1; then
@@ -128,23 +142,15 @@ case "$ARCHITECTURE" in
 
     scale_down_microservices
 
-    $K8S delete job db-bootstrap-job -n benchmark --ignore-not-found
-    $K8S apply -f deployments/k8s/benchmark/monolith/db-bootstrap-job.yaml
-    $K8S wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=120s
+    recreate_job benchmark db-bootstrap-job deployments/k8s/benchmark/monolith/db-bootstrap-job.yaml 120s
 
     scale_down_monolith
 
-    $K8S delete job monolith-migration-job -n mono --ignore-not-found
-    $K8S apply -f "$rendered_job_dir/migration-job.yaml"
-    $K8S wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
+    recreate_job mono monolith-migration-job "$rendered_job_dir/migration-job.yaml" 180s
 
-    $K8S delete job reset-monolith-data-job -n mono --ignore-not-found
-    $K8S apply -f "$rendered_job_dir/reset-monolith-data-job.yaml"
-    $K8S wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=120s
+    recreate_job mono reset-monolith-data-job "$rendered_job_dir/reset-monolith-data-job.yaml" 120s
 
-    $K8S delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
-    $K8S apply -f "$rendered_job_dir/seed-monolith-benchmark-data-job.yaml"
-    $K8S wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
+    recreate_job mono seed-monolith-benchmark-data-job "$rendered_job_dir/seed-monolith-benchmark-data-job.yaml" 300s
 
     $K8S apply -k "$rendered_overlay_dir"
     if [ "$SCALING_MODE" = "hpa" ]; then
@@ -166,27 +172,17 @@ case "$ARCHITECTURE" in
 
     scale_down_monolith
 
-    $K8S delete job db-bootstrap-job -n benchmark --ignore-not-found
-    $K8S apply -f deployments/k8s/benchmark/microservices/db-bootstrap-job.yaml
-    $K8S wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=120s
+    recreate_job benchmark db-bootstrap-job deployments/k8s/benchmark/microservices/db-bootstrap-job.yaml 120s
 
     scale_down_microservices
 
     for svc in auth item transaction; do
-      $K8S delete job "${svc}-migration-job" -n msa --ignore-not-found
-      $K8S apply -f "${rendered_job_dir}/${svc}-migration-job.yaml"
-    done
-    for svc in auth item transaction; do
-      $K8S wait --for=condition=complete job/"${svc}-migration-job" -n msa --timeout=180s
+      recreate_job msa "${svc}-migration-job" "${rendered_job_dir}/${svc}-migration-job.yaml" 180s
     done
 
-    $K8S delete job reset-microservices-data-job -n msa --ignore-not-found
-    $K8S apply -f "$rendered_job_dir/reset-microservices-data-job.yaml"
-    $K8S wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
+    recreate_job msa reset-microservices-data-job "$rendered_job_dir/reset-microservices-data-job.yaml" 120s
 
-    $K8S delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-    $K8S apply -f "$rendered_job_dir/seed-microservices-benchmark-data-job.yaml"
-    $K8S wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
+    recreate_job msa seed-microservices-benchmark-data-job "$rendered_job_dir/seed-microservices-benchmark-data-job.yaml" 300s
 
     $K8S apply -k "$rendered_overlay_dir"
     if [ "$SCALING_MODE" = "hpa" ]; then
