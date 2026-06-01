@@ -30,6 +30,8 @@ budget_alert_emails="${BUDGET_ALERT_EMAILS:-}"
 experiment_aws_region="${AWS_REGION:-ap-southeast-1}"
 experiment_project="${PROJECT:-skripsi}"
 experiment_db_instance_class="${DB_INSTANCE_CLASS:-db.t3.micro}"
+experiment_cluster_version="${CLUSTER_VERSION:-1.34}"
+experiment_cluster_support_type="${CLUSTER_SUPPORT_TYPE:-STANDARD}"
 monolith_cluster_name="${MONOLITH_CLUSTER_NAME:-skripsi-monolith}"
 msa_cluster_name="${MSA_CLUSTER_NAME:-skripsi-msa}"
 sequential_cluster_name="${SEQUENTIAL_CLUSTER_NAME:-skripsi-benchmark}"
@@ -38,6 +40,20 @@ cluster_endpoint_public_access_cidrs="${CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS}"
 case "$cluster_endpoint_public_access_cidrs" in
   ""|REPLACE_WITH_*|0.0.0.0/0|::/0)
     echo "CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS must contain one or more explicit operator CIDRs, not placeholders or world-open ranges" >&2
+    exit 1
+    ;;
+esac
+
+if [[ ! "$experiment_cluster_version" =~ ^1\.[0-9]+$ ]]; then
+  echo "CLUSTER_VERSION must be a Kubernetes minor version such as 1.34" >&2
+  exit 1
+fi
+
+case "$experiment_cluster_support_type" in
+  STANDARD|EXTENDED)
+    ;;
+  *)
+    echo "CLUSTER_SUPPORT_TYPE must be STANDARD or EXTENDED" >&2
     exit 1
     ;;
 esac
@@ -125,6 +141,8 @@ aws_region  = "${experiment_aws_region}"
 project     = "${experiment_project}"
 monolith_cluster_name = "${monolith_cluster_name}"
 msa_cluster_name = "${msa_cluster_name}"
+cluster_version = "${experiment_cluster_version}"
+cluster_support_type = "${experiment_cluster_support_type}"
 cluster_endpoint_public_access_cidrs = ${cluster_endpoint_public_access_cidrs_hcl}
 db_instance_class = "${experiment_db_instance_class}"
 EOF
@@ -133,6 +151,8 @@ cat > infra/terraform/experiment-sequential/terraform.tfvars <<EOF
 aws_region  = "${experiment_aws_region}"
 project     = "${experiment_project}"
 sequential_cluster_name = "${sequential_cluster_name}"
+cluster_version = "${experiment_cluster_version}"
+cluster_support_type = "${experiment_cluster_support_type}"
 cluster_endpoint_public_access_cidrs = ${cluster_endpoint_public_access_cidrs_hcl}
 db_instance_class = "${experiment_db_instance_class}"
 EOF

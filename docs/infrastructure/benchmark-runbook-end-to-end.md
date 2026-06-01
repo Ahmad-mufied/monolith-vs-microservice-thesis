@@ -128,6 +128,39 @@ Choose the experiment topology before applying cost-heavy resources:
 The shared stack is common to both modes. Under a 24-vCPU quota, avoid keeping
 parallel and sequential experiment stacks active at the same time.
 
+### Step 2.0 — Confirm EKS Version Support
+
+Before applying EKS resources, confirm the configured Kubernetes version is
+still in Amazon EKS Standard Support. The Terraform defaults are:
+
+```text
+cluster_version      = "1.34"
+cluster_support_type = "STANDARD"
+```
+
+AWS support windows change over time. Before final measured runs, check the
+live AWS EKS version lifecycle documentation and update `cluster_version` if
+the repository default has left Standard Support.
+
+For an existing parallel stack, inspect live clusters:
+
+```bash
+AWS_PROFILE=terraform-process aws eks describe-cluster \
+  --region ap-southeast-1 \
+  --name skripsi-monolith \
+  --query 'cluster.{version:version,status:status,upgradePolicy:upgradePolicy}' \
+  --output table
+
+AWS_PROFILE=terraform-process aws eks describe-cluster \
+  --region ap-southeast-1 \
+  --name skripsi-msa \
+  --query 'cluster.{version:version,status:status,upgradePolicy:upgradePolicy}' \
+  --output table
+```
+
+Sequential mode uses `skripsi-benchmark`. The expected support policy is
+`upgradePolicy.supportType=STANDARD`.
+
 ### Step 2.1 — Apply Shared Infrastructure (VPC + IAM)
 
 ```bash

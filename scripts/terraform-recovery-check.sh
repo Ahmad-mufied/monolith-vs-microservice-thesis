@@ -201,9 +201,37 @@ msa_cluster_name="${MSA_CLUSTER_NAME:-${project_prefix}-msa}"
 monolith_rds_id="${MONOLITH_RDS_ID:-${project_prefix}-monolith-postgres}"
 msa_rds_id="${MSA_RDS_ID:-${project_prefix}-msa-postgres}"
 
+check_addon_state() {
+  local cluster_name="$1"
+  local addon_name="$2"
+  local addon_address="$3"
+  local addon_status=""
+
+  addon_status="$(list_or_empty aws_with_profile eks describe-addon \
+    --region "$aws_region" \
+    --cluster-name "$cluster_name" \
+    --addon-name "$addon_name" \
+    --query 'addon.status' \
+    --output text)"
+
+  if have_state_address "$experiment_state_list" "$addon_address"; then
+    if [[ -n "$addon_status" && "$addon_status" != "None" ]]; then
+      if [[ "$addon_status" == "ACTIVE" ]]; then
+        print_status "OK" "Addon active for $cluster_name: $addon_name"
+      else
+        print_status "IN_PROGRESS" "Addon present but not active for $cluster_name: $addon_name ($addon_status)"
+      fi
+    else
+      print_status "STALE_IN_STATE" "Addon missing in AWS for $cluster_name: $addon_name"
+      printf '  suggested: AWS_PROFILE=%s terraform -chdir=%s state rm %s\n' \
+        "$terraform_aws_profile" "$tf_experiment_dir" "$addon_address"
+    fi
+  fi
+}
+
 check_cluster() {
   local cluster_name="$1"
-  local addon_address="$2"
+  local module_prefix="$2"
   local pod_identity_address="$3"
   local nodegroup_app_address="$4"
   local nodegroup_testing_address="$5"
@@ -230,21 +258,10 @@ check_cluster() {
     print_status "REVIEW" "No node groups returned for $cluster_name"
   fi
 
-  local addon_status
-  addon_status="$(list_or_empty aws_with_profile eks describe-addon --region "$aws_region" --cluster-name "$cluster_name" --addon-name eks-pod-identity-agent --query 'addon.status' --output text)"
-  if have_state_address "$experiment_state_list" "$addon_address"; then
-    if [[ -n "$addon_status" && "$addon_status" != "None" ]]; then
-      if [[ "$addon_status" == "ACTIVE" ]]; then
-        print_status "OK" "Addon active for $cluster_name: eks-pod-identity-agent"
-      else
-        print_status "IN_PROGRESS" "Addon present but not active for $cluster_name: $addon_status"
-      fi
-    else
-      print_status "STALE_IN_STATE" "Addon missing in AWS for $cluster_name: eks-pod-identity-agent"
-      printf '  suggested: AWS_PROFILE=%s terraform -chdir=%s state rm %s\n' \
-        "$terraform_aws_profile" "$tf_experiment_dir" "$addon_address"
-    fi
-  fi
+  check_addon_state "$cluster_name" "coredns" "${module_prefix}.module.eks.aws_eks_addon.this[\"coredns\"]"
+  check_addon_state "$cluster_name" "eks-pod-identity-agent" "${module_prefix}.module.eks.aws_eks_addon.before_compute[\"eks-pod-identity-agent\"]"
+  check_addon_state "$cluster_name" "kube-proxy" "${module_prefix}.module.eks.aws_eks_addon.this[\"kube-proxy\"]"
+  check_addon_state "$cluster_name" "vpc-cni" "${module_prefix}.module.eks.aws_eks_addon.before_compute[\"vpc-cni\"]"
 
   local pod_identity_id=""
   pod_identity_id="$(list_or_empty aws_with_profile eks list-pod-identity-associations \
@@ -293,14 +310,14 @@ check_rds() {
 
 check_cluster \
   "$monolith_cluster_name" \
-  'module.monolith_cluster.module.eks.aws_eks_addon.this["eks-pod-identity-agent"]' \
+  'module.monolith_cluster' \
   'module.monolith_cluster.aws_eks_pod_identity_association.k6_runner' \
   'module.monolith_cluster.module.eks.module.eks_managed_node_group["app_nodes"].aws_eks_node_group.this[0]' \
   'module.monolith_cluster.module.eks.module.eks_managed_node_group["testing_nodes"].aws_eks_node_group.this[0]'
 
 check_cluster \
   "$msa_cluster_name" \
-  'module.msa_cluster.module.eks.aws_eks_addon.this["eks-pod-identity-agent"]' \
+  'module.msa_cluster' \
   'module.msa_cluster.aws_eks_pod_identity_association.k6_runner' \
   'module.msa_cluster.module.eks.module.eks_managed_node_group["app_nodes"].aws_eks_node_group.this[0]' \
   'module.msa_cluster.module.eks.module.eks_managed_node_group["testing_nodes"].aws_eks_node_group.this[0]'

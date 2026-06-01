@@ -874,7 +874,7 @@ illustrative `t3.xlarge` totals are no longer valid for budgeting.
 
 | Component | Per cluster | Two clusters |
 |---|---|---|
-| EKS control plane | $0.10 | $0.20 |
+| EKS control plane, Standard Support | $0.10 | $0.20 |
 | app-nodes (2× c8i.2xlarge) | recalculate live | recalculate live |
 | testing-nodes (1× c8i-flex.large) | ~$0.09 | ~$0.18 |
 | RDS (db.t3.micro) | recalculate live | recalculate live |

@@ -31,6 +31,8 @@ module "sequential_cluster" {
   cluster_name                         = var.sequential_cluster_name
   architecture                         = "benchmark"
   project                              = var.project
+  cluster_version                      = var.cluster_version
+  cluster_support_type                 = var.cluster_support_type
   vpc_id                               = local.vpc_id
   private_subnet_ids                   = local.private_subnet_ids
   k6_runner_role_arn                   = local.k6_runner_role_arn

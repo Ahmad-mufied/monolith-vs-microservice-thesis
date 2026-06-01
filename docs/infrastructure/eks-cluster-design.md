@@ -89,7 +89,41 @@ window in benchmark metadata.
 
 ---
 
-## 4. Node Groups
+## 4. EKS Cluster Configuration
+
+### 4.1 Kubernetes Version and Support Policy
+
+Benchmark clusters should be created on an Amazon EKS Kubernetes version that
+is in Standard Support at the time of the measured run. The Terraform default
+is:
+
+```text
+cluster_version      : 1.34
+cluster_support_type : STANDARD
+```
+
+`cluster_support_type=STANDARD` is intentional. It prevents a cluster from
+silently remaining in paid EKS Extended Support after the selected Kubernetes
+minor version leaves Standard Support. Before every final measured run, check
+the live AWS EKS version lifecycle table and update `cluster_version` when the
+repository default is no longer in Standard Support.
+
+The reusable Terraform module manages these EKS add-ons explicitly:
+
+```text
+vpc-cni
+coredns
+kube-proxy
+eks-pod-identity-agent
+```
+
+Control plane version, managed node group version, and add-on versions are
+separate upgrade concerns. Do not run benchmark workloads while any of those
+components are being upgraded.
+
+---
+
+### 4.2 Node Groups
 
 Each cluster has two node groups:
 
@@ -226,7 +260,7 @@ older `t3.xlarge`.
 
 | Component | Per cluster | Two clusters |
 |---|---|---|
-| EKS control plane | $0.10 | $0.20 |
+| EKS control plane, Standard Support | $0.10 | $0.20 |
 | app-nodes (2× c8i.2xlarge) | recalculate live | recalculate live |
 | testing-nodes (1× c8i-flex.large) | $0.09 | $0.18 |
 | RDS db.t3.micro | recalculate live | recalculate live |

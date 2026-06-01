@@ -85,6 +85,19 @@ fi
 if [[ -n "$cluster_status" && "$cluster_status" != "None" ]]; then
   if [[ "$state_tracks_cluster" == "true" ]]; then
     print_status "OK" "Sequential cluster exists and is tracked: $cluster_name ($cluster_status)"
+    for addon_name in vpc-cni coredns kube-proxy eks-pod-identity-agent; do
+      addon_status="$(aws_with_profile eks describe-addon \
+        --region "$aws_region" \
+        --cluster-name "$cluster_name" \
+        --addon-name "$addon_name" \
+        --query 'addon.status' \
+        --output text 2>/dev/null || true)"
+      if [[ -n "$addon_status" && "$addon_status" != "None" ]]; then
+        print_status "OK" "Sequential addon exists: $cluster_name/$addon_name ($addon_status)"
+      else
+        print_status "REVIEW" "Sequential addon not found yet: $cluster_name/$addon_name"
+      fi
+    done
   else
     print_status "BLOCKED" "Sequential cluster exists in AWS but is not tracked in state: $cluster_name ($cluster_status)"
     blocked=1
