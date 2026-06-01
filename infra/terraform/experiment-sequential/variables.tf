@@ -10,6 +10,28 @@ variable "project" {
   default     = "skripsi"
 }
 
+variable "cluster_version" {
+  description = "Kubernetes minor version for the sequential EKS benchmark cluster"
+  type        = string
+  default     = "1.34"
+
+  validation {
+    condition     = can(regex("^1\\.[0-9]+$", var.cluster_version)) && !startswith(var.cluster_version, "REPLACE_WITH_")
+    error_message = "cluster_version must be a Kubernetes minor version such as 1.34."
+  }
+}
+
+variable "cluster_support_type" {
+  description = "EKS upgrade policy support type for the sequential benchmark cluster"
+  type        = string
+  default     = "STANDARD"
+
+  validation {
+    condition     = contains(["STANDARD", "EXTENDED"], var.cluster_support_type)
+    error_message = "cluster_support_type must be STANDARD or EXTENDED."
+  }
+}
+
 variable "sequential_cluster_name" {
   description = "Single EKS cluster name for sequential benchmark execution"
   type        = string

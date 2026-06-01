@@ -102,9 +102,14 @@ runner secret during EKS benchmark setup.
 - if an existing `k6-runner.eks.env` still contains the legacy weak value
   `Password123!`, `make env-init-eks` rotates it automatically
 
-`terraform.experiment.env` also stores the operator CIDR allowlist used to
-restrict the public EKS Kubernetes API endpoint.
+`terraform.experiment.env` also stores the EKS version policy and the operator
+CIDR allowlist used to restrict the public EKS Kubernetes API endpoint.
 
+- `CLUSTER_VERSION` defaults to `1.34`; re-check the live AWS EKS version
+  lifecycle table before final measured runs and update this value when the
+  default is no longer in Standard Support
+- `CLUSTER_SUPPORT_TYPE` defaults to `STANDARD` so new benchmark clusters do
+  not silently stay in paid EKS Extended Support
 - `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE` defaults to `auto` for the
   generated helper flow
 - when the source is `auto`, `make env-init-eks` attempts to detect the current
@@ -129,6 +134,8 @@ These files are intended to make EKS setup repeatable:
 - `make eks-render-tfvars` renders Terraform `terraform.tfvars` from the
   `env/terraform.*.env` files without writing `DB_PASSWORD` into
   `infra/terraform/experiment/terraform.tfvars`
+- rendered experiment tfvars include `cluster_version` and
+  `cluster_support_type` for both parallel and sequential stacks
 - `bash scripts/terraform-experiment.sh ...` and the Makefile Terraform targets
   source `env/terraform.experiment.env` and inject `TF_VAR_db_password` at
   runtime for the experiment stack
