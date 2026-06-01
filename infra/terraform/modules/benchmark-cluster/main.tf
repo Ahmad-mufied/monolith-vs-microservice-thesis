@@ -23,7 +23,11 @@ module "eks" {
   version = "~> 20.0"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.31"
+  cluster_version = var.cluster_version
+
+  cluster_upgrade_policy = {
+    support_type = var.cluster_support_type
+  }
 
   vpc_id     = var.vpc_id
   subnet_ids = var.private_subnet_ids
@@ -32,11 +36,23 @@ module "eks" {
   cluster_endpoint_private_access      = true
   cluster_endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
 
-  # Enable EKS Pod Identity
   enable_cluster_creator_admin_permissions = true
 
   cluster_addons = {
-    eks-pod-identity-agent = {}
+    coredns = {
+      most_recent = true
+    }
+    eks-pod-identity-agent = {
+      before_compute = true
+      most_recent    = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      before_compute = true
+      most_recent    = true
+    }
   }
 
   eks_managed_node_groups = {

@@ -431,13 +431,13 @@ kubectl --context=msa describe job k6-benchmark-microservices -n benchmark
 AWS_PROFILE=terraform-process aws eks describe-cluster \
   --region ap-southeast-1 \
   --name skripsi-monolith \
-  --query 'cluster.{status:status,version:version,endpoint:endpoint}' \
+  --query 'cluster.{status:status,version:version,upgradePolicy:upgradePolicy,endpoint:endpoint}' \
   --output table
 
 AWS_PROFILE=terraform-process aws eks describe-cluster \
   --region ap-southeast-1 \
   --name skripsi-msa \
-  --query 'cluster.{status:status,version:version,endpoint:endpoint}' \
+  --query 'cluster.{status:status,version:version,upgradePolicy:upgradePolicy,endpoint:endpoint}' \
   --output table
 
 AWS_PROFILE=terraform-process aws eks list-nodegroups \
@@ -463,9 +463,29 @@ AWS_PROFILE=terraform-process aws eks list-addons \
 AWS_PROFILE=terraform-process aws eks describe-addon \
   --region ap-southeast-1 \
   --cluster-name skripsi-msa \
-  --addon-name eks-pod-identity-agent \
+  --addon-name vpc-cni \
   --query 'addon.{status:status,version:addonVersion,health:health}' \
   --output json
+```
+
+Expected Terraform-managed add-ons:
+
+```text
+vpc-cni
+coredns
+kube-proxy
+eks-pod-identity-agent
+```
+
+Check managed node group versions:
+
+```bash
+AWS_PROFILE=terraform-process aws eks describe-nodegroup \
+  --region ap-southeast-1 \
+  --cluster-name skripsi-msa \
+  --nodegroup-name app-nodes \
+  --query 'nodegroup.{status:status,version:version,releaseVersion:releaseVersion,health:health}' \
+  --output table
 ```
 
 ### Auto Scaling Groups behind EKS node groups

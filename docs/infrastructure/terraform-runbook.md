@@ -52,6 +52,45 @@ aws login
 make terraform-auth-check
 ```
 
+### EKS Version and Support Preflight
+
+Before applying cost-heavy EKS resources, confirm the configured Kubernetes
+version is still in Amazon EKS Standard Support. The repository default is:
+
+```text
+cluster_version      = "1.34"
+cluster_support_type = "STANDARD"
+```
+
+AWS support windows change over time, so re-check the live AWS EKS Kubernetes
+version lifecycle table before final measured runs. If the default version is
+no longer in Standard Support, update `cluster_version` in both experiment
+stacks before applying.
+
+For existing clusters, inspect live version and support policy:
+
+```bash
+AWS_PROFILE=terraform-process aws eks describe-cluster \
+  --region ap-southeast-1 \
+  --name skripsi-monolith \
+  --query 'cluster.{version:version,status:status,upgradePolicy:upgradePolicy}' \
+  --output table
+
+AWS_PROFILE=terraform-process aws eks describe-cluster \
+  --region ap-southeast-1 \
+  --name skripsi-msa \
+  --query 'cluster.{version:version,status:status,upgradePolicy:upgradePolicy}' \
+  --output table
+```
+
+Sequential mode uses `skripsi-benchmark` instead. The expected support policy
+is `upgradePolicy.supportType=STANDARD`.
+
+When upgrading an existing cluster, move one Kubernetes minor version at a
+time, then update managed node groups and EKS add-ons before running benchmark
+workloads. Review the Terraform plan at each step and stop if it proposes
+unrelated replacement of VPC, RDS, node groups, or security groups.
+
 For interrupted apply or destroy recovery, use:
 
 ```bash
@@ -67,7 +106,7 @@ critical benchmark resources:
 - EKS clusters
 - EKS managed node groups
 - EKS pod identity associations
-- EKS `eks-pod-identity-agent` add-on
+- EKS add-ons
 - RDS instances
 
 Expected status classes:

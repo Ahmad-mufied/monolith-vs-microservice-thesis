@@ -35,6 +35,8 @@ module "monolith_cluster" {
   cluster_name                         = var.monolith_cluster_name
   architecture                         = "monolith"
   project                              = var.project
+  cluster_version                      = var.cluster_version
+  cluster_support_type                 = var.cluster_support_type
   vpc_id                               = local.vpc_id
   private_subnet_ids                   = local.private_subnet_ids
   k6_runner_role_arn                   = local.k6_runner_role_arn
@@ -51,6 +53,8 @@ module "msa_cluster" {
   cluster_name                         = var.msa_cluster_name
   architecture                         = "msa"
   project                              = var.project
+  cluster_version                      = var.cluster_version
+  cluster_support_type                 = var.cluster_support_type
   vpc_id                               = local.vpc_id
   private_subnet_ids                   = local.private_subnet_ids
   k6_runner_role_arn                   = local.k6_runner_role_arn

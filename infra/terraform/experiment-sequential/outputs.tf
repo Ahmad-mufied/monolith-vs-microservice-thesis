@@ -2,6 +2,14 @@ output "sequential_cluster_name" {
   value = module.sequential_cluster.cluster_name
 }
 
+output "sequential_cluster_version" {
+  value = module.sequential_cluster.cluster_version
+}
+
+output "sequential_cluster_support_type" {
+  value = module.sequential_cluster.cluster_support_type
+}
+
 output "sequential_rds_endpoint" {
   value = module.sequential_cluster.rds_endpoint
 }
