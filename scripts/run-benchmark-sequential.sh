@@ -58,6 +58,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
+case "$SCENARIO" in
+  login|create-transaction|enriched-transactions|mixed-workload|sync-items) ;;
+  *)
+    echo "ERROR: unsupported SCENARIO '$SCENARIO'" >&2
+    exit 1
+    ;;
+esac
+
+if ! [[ "$TARGET_RPS" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: TARGET_RPS must be a non-negative integer, got '$TARGET_RPS'" >&2
+  exit 1
+fi
+
 case "$ARCHITECTURE" in
   monolith)
     JOB_NAME="k6-benchmark-monolith"
@@ -152,6 +165,9 @@ if grep -Eq 'REPLACE_WITH_ECR_IMAGE|replace-me' <<<"$rendered_manifest"; then
 fi
 
 kubectl --context="$SEQUENTIAL_CONTEXT" delete job "$JOB_NAME" -n benchmark --ignore-not-found
+if kubectl --context="$SEQUENTIAL_CONTEXT" get job "$JOB_NAME" -n benchmark >/dev/null 2>&1; then
+  kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=delete "job/${JOB_NAME}" -n benchmark --timeout=120s
+fi
 kubectl --context="$SEQUENTIAL_CONTEXT" apply -f - <<EOF
 $rendered_manifest
 EOF
