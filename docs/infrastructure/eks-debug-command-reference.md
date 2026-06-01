@@ -431,7 +431,7 @@ kubectl --context=msa describe job k6-benchmark-microservices -n benchmark
 AWS_PROFILE=terraform-process aws eks describe-cluster \
   --region ap-southeast-1 \
   --name skripsi-monolith \
-  --query 'cluster.{status:status,version:version,endpoint:endpoint}' \
+  --query 'cluster.{status:status,version:version,upgradePolicy:upgradePolicy,endpoint:endpoint}' \
   --output table
 
 AWS_PROFILE=terraform-process aws eks describe-cluster \
