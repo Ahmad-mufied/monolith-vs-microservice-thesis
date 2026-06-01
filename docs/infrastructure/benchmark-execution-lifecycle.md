@@ -3,7 +3,7 @@
 ## 1. Purpose
 
 This document defines the benchmark execution lifecycle for the thesis
-experiment on AWS EKS.
+experiment.
 
 It covers:
 
@@ -16,6 +16,10 @@ It covers:
 The goal is to keep benchmark runs clean, repeatable, and easy to analyze
 without mixing results from different executions.
 
+The final thesis environment uses Hetzner Cloud Kubernetes. Older EKS-specific
+examples remain relevant only as historical operator workflows and are not the
+source of final thesis results.
+
 ## 2. Final Decision
 
 The benchmark uses two cleanup levels:
@@ -25,7 +29,8 @@ Per k6 execution cleanup
 = reset dataset and seed again before k6 starts
 
 Per experiment lifecycle cleanup
-= destroy EKS and RDS after all benchmark results are uploaded to S3
+= destroy the benchmark infrastructure after all benchmark results are uploaded
+  to S3
 ```
 
 Important rules:
@@ -36,8 +41,7 @@ Important rules:
 - use an explicit inter-case delay between measured suite cases when the next case
   should start from a stable system state,
 - upload k6 results to S3 before running the next execution or destroying infrastructure,
-- do not run `make eks-destroy-confirmed` or
-  `make eks-sequential-destroy-confirmed` until all expected result files are
+- do not run provider destroy commands until all expected result files are
   present in S3.
 
 ## 3. Infrastructure Lifecycle
@@ -46,28 +50,25 @@ An experiment lifecycle starts with:
 
 ```text
 build/push images
--> render EKS manifests with IMAGE_TAG
--> aws login
--> make terraform-auth-check
--> make eks-apply                  # parallel mode
-   or make eks-sequential-apply    # sequential mode
+-> render provider manifests with IMAGE_TAG
+-> authenticate to the active provider
+-> apply infrastructure
 ```
 
 This provisions the selected benchmark infrastructure:
 
-- EKS cluster or clusters,
-- node groups,
-- RDS PostgreSQL,
-- IAM roles / IRSA / EKS Pod Identity,
-- networking and security groups,
+- Kubernetes cluster or clusters,
+- app and testing compute pools,
+- PostgreSQL 18,
+- benchmark upload credentials,
+- networking and security controls,
 - supporting Kubernetes resources when managed by IaC.
 
 An experiment lifecycle ends with:
 
 ```text
-aws login
--> make terraform-auth-check
--> make eks-destroy-confirmed or make eks-sequential-destroy-confirmed
+verify results in S3
+-> destroy the benchmark infrastructure
 ```
 
 When RDS is included in the destroy plan, all database state is removed:
@@ -84,10 +85,9 @@ This is intentional for a fully clean experiment lifecycle.
 Use this flow when starting from a new IaC-provisioned environment:
 
 ```text
-aws login
--> make terraform-auth-check
--> make eks-apply or make eks-sequential-apply
--> create EKS and RDS
+authenticate to the active provider
+-> apply infrastructure
+-> create Kubernetes and PostgreSQL
 -> run database bootstrap job
 -> run migration job
 -> run reset job
@@ -97,7 +97,7 @@ aws login
 -> run k6 job
 -> upload result files to S3
 -> verify result files in S3
-> make eks-destroy-confirmed after all benchmark executions are complete
+-> destroy infrastructure after all benchmark executions are complete
 ```
 
 Migration and seed have different responsibilities:
@@ -112,8 +112,8 @@ Migration and seed have different responsibilities:
 
 ## 5. Rerun Flow Without Destroying Infrastructure
 
-If a k6 execution finishes and the infrastructure is still alive, do not destroy
-EKS or RDS just to rerun the same scenario.
+If a k6 execution finishes and the infrastructure is still alive, do not
+destroy the cluster or PostgreSQL just to rerun the same scenario.
 
 Use this flow instead:
 
@@ -139,7 +139,7 @@ Do not run k6 again directly against data mutated by the previous k6 execution.
 
 ## 6. Migration Behavior
 
-Migration jobs may be run again after EKS is recreated or after app schema
+Migration jobs may be run again after the cluster is recreated or after app schema
 changes.
 
 Goose stores migration state in the database, so rerunning migration against an

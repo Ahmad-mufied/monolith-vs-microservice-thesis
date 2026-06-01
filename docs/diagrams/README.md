@@ -10,13 +10,16 @@ thesis writing.
 
 | Diagram | Purpose |
 |---|---|
-| [`cloud-architecture.md`](cloud-architecture.md) | Parallel and sequential AWS EKS, RDS, S3, ECR, Datadog, and operator topology |
-| [`sequential-parallel-topology.md`](sequential-parallel-topology.md) | Parallel vs sequential EKS benchmark topology, switching, and metadata flow |
+| [`cloud-architecture.md`](cloud-architecture.md) | Historical AWS-oriented infrastructure topology retained for engineering reference |
+| [`sequential-parallel-topology.md`](sequential-parallel-topology.md) | Historical AWS-oriented parallel vs sequential topology retained for engineering reference |
 | [`architecture-comparison.md`](architecture-comparison.md) | Side-by-side monolith and microservices runtime comparison |
 | [`benchmark-lifecycle.md`](benchmark-lifecycle.md) | End-to-end benchmark execution lifecycle |
 | [`login-sequence.md`](login-sequence.md) | Benchmark 1 login request flow |
 | [`create-transaction-sequence.md`](create-transaction-sequence.md) | Benchmark 2 create transaction request flow |
 | [`enriched-transactions-sequence.md`](enriched-transactions-sequence.md) | Benchmark 3 enriched transaction read flow |
+
+For final thesis writing, prefer the Hetzner-oriented infrastructure documents
+under `docs/infrastructure/` when describing the active benchmark environment.
 
 ## Rendering
 

@@ -1,0 +1,28 @@
+#cloud-config
+package_update: true
+packages:
+  - curl
+  - jq
+  - ca-certificates
+runcmd:
+  - mkdir -p /etc/rancher/k3s
+  - |
+    public_ipv4="$(curl -fsS http://169.254.169.254/hetzner/v1/metadata/public-ipv4 || true)"
+    if [ -z "$public_ipv4" ]; then
+      public_ipv4="$(hostname -I | awk '{print $1}')"
+    fi
+    cat >/etc/rancher/k3s/config.yaml <<'EOF'
+    token: "${k3s_token}"
+    node-label:
+      - "node-role=control-plane"
+    node-taint:
+      - "node-role.kubernetes.io/control-plane=:NoSchedule"
+    tls-san:
+      - "${cluster_name}"
+      - "__PUBLIC_IPV4__"
+    disable:
+      - traefik
+    EOF
+    sed -i "s/__PUBLIC_IPV4__/$public_ipv4/g" /etc/rancher/k3s/config.yaml
+  - curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable sh -
+  - kubectl wait --for=condition=Ready node --all --timeout=300s

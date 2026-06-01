@@ -13,6 +13,12 @@ if [ -f env/aws-benchmark.env ]; then
   set +a
 fi
 
+if [ "${CLOUD_PROVIDER:-aws}" = "hetzner" ] && [ -f env/hetzner.env ]; then
+  set -a
+  source env/hetzner.env
+  set +a
+fi
+
 if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
   set -a
   source env/image-tag.eks.env
@@ -26,6 +32,8 @@ SCALING_MODE="${SCALING_MODE:-fixed}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
+DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
+CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
 RENDER_ROOT="$(mktemp -d)"
 
 cleanup() {
@@ -123,9 +131,15 @@ echo "  context       : $CONTEXT"
 echo "  architecture  : $ARCHITECTURE"
 echo "  scaling_mode  : $SCALING_MODE"
 echo "  image_tag     : $IMAGE_TAG"
+echo "  provider      : $CLOUD_PROVIDER"
 echo ""
 
-IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+if [ "$CLOUD_PROVIDER" = "hetzner" ]; then
+  : "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required for CLOUD_PROVIDER=hetzner}"
+  IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-hetzner-manifests.sh >/dev/null
+else
+  IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+fi
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 
 $K8S apply -f deployments/k8s/namespaces/local.yaml

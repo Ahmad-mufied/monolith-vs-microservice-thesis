@@ -28,6 +28,12 @@ This document complements:
 - [Scaling Mode Strategy](./scaling-mode-strategy.md)
 - [Datadog Resource Overhead](../infrastructure/datadog-resource-overhead.md)
 
+The final thesis benchmark path follows the same measurement-first rule, but it
+does not reuse the historical EKS `15800m CPU / 27648Mi memory` ceiling.
+Hetzner app-node capacity is measured live after provisioning, then the
+generated CPU and memory quota is applied equally to monolith and
+microservices. See `docs/infrastructure/hetzner-cloud-architecture.md`.
+
 The resource-configuration document explains **how** the application budget is
 split between services and scaling modes. This document explains **how the
 total budget itself is derived**.
@@ -114,10 +120,9 @@ The measured always-on pod overhead includes:
 
 Examples:
 
-- `aws-node`
-- `kube-proxy`
+- CNI / overlay agents
+- `kube-proxy` or equivalent networking helpers
 - `coredns`
-- `eks-pod-identity-agent`
 - `datadog` DaemonSet pods
 - `datadog-cluster-agent`
 
@@ -161,7 +166,17 @@ This keeps the application ceiling specific to the resource pool that hosts:
 
 ## 4. Live Measurement Basis
 
-The current benchmark environment uses, per architecture:
+This section has two roles:
+
+- explain the general method that applies to the final Hetzner benchmark path,
+- preserve the historical EKS example that originally motivated the quota
+  derivation.
+
+For the final thesis dataset, use the live Hetzner measurement outputs under
+`env/hetzner-resource-baseline.env` and `env/hetzner-resource-baseline.json`
+instead of the historical EKS sample values below.
+
+Historical EKS sample environment:
 
 - `2` app nodes of type `c8i.2xlarge`
 - `1` testing node of type `c8i-flex.large`

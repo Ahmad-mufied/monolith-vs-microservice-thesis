@@ -25,10 +25,10 @@ The runtime architecture comparison is independent from the benchmark
 execution topology. The same monolith and microservices implementations can be
 measured in:
 
-- parallel mode, where each architecture runs on its own EKS cluster at the
-  same wall-clock time, or
+- parallel mode, where each architecture runs on its own Kubernetes cluster at
+  the same wall-clock time, or
 - sequential mode, where one architecture at a time runs on a single reusable
-  EKS cluster because account quota is constrained.
+  Kubernetes cluster.
 
 Execution mode must not change the external API, dataset, migration behavior,
 resource ceiling, or application request path.
