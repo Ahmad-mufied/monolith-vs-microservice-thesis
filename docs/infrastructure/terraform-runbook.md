@@ -32,6 +32,50 @@ Do not migrate AWS Terraform state to Hetzner. The providers manage different
 resource identities, so mixing state would create unnecessary state corruption
 risk.
 
+## Vultr VKE Path
+
+The Vultr path is additive and uses separate Terraform state:
+
+```text
+infra/terraform/vultr-shared
+infra/terraform/vultr-experiment-sequential
+infra/terraform/vultr-experiment
+```
+
+Use these targets for Vultr:
+
+```bash
+make env-init-vultr
+make vultr-render-tfvars
+make vultr-shared-apply
+make vultr-parallel-apply
+make vultr-setup-contexts-parallel
+make vultr-measure-resource-baseline
+```
+
+The full Vultr execution flow is documented in
+`docs/infrastructure/vultr-vke-runbook.md`. Configuration details are in
+`docs/infrastructure/vultr-configuration-reference.md`; topology and network
+mechanism are in `docs/infrastructure/vultr-cloud-architecture.md`.
+
+Sequential fallback:
+
+```bash
+make vultr-sequential-apply
+make vultr-setup-context-sequential
+```
+
+Destroy remains guarded by S3 verification:
+
+```bash
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-parallel-destroy-confirmed
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-sequential-destroy-confirmed
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-shared-destroy-confirmed
+```
+
+VKE currently uses legacy Vultr VPC Networks, not VPC 2.0. Do not migrate the
+Vultr VKE stack to VPC 2.0.
+
 ## 1. Purpose
 
 Step-by-step guide for provisioning and destroying the benchmark

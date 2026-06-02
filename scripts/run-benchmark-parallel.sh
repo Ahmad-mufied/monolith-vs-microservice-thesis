@@ -13,11 +13,8 @@ if [ -f env/aws-benchmark.env ]; then
   set +a
 fi
 
-if [ "${CLOUD_PROVIDER:-aws}" = "hetzner" ] && [ -f env/hetzner.env ]; then
-  set -a
-  source env/hetzner.env
-  set +a
-fi
+source scripts/lib/cloud-provider.sh
+load_cloud_provider_env
 
 if [ -n "$explicit_aws_region" ]; then
   AWS_REGION="$explicit_aws_region"
@@ -140,12 +137,7 @@ run_parallel_preflight() {
 
 run_parallel_preflight "parallel benchmark bootstrap"
 
-if [ "$CLOUD_PROVIDER" = "hetzner" ]; then
-  : "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required for CLOUD_PROVIDER=hetzner}"
-  IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-hetzner-manifests.sh >/dev/null
-else
-  IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
-fi
+render_provider_manifests "$RENDER_ROOT"
 MONOLITH_MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml"
 MICROSERVICES_MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml"
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
@@ -164,13 +156,24 @@ patch_and_apply() {
   local architecture="$4"
   local resources_json
   local rendered_manifest
+  local terraform_stack
+  local cluster_name
+  local provider_region
+  local infra_json
 
   resources_json="$(resources_configuration_json "$architecture" "$SCALING_MODE")"
+  terraform_stack="$(provider_parallel_stack_name)"
+  cluster_name="$(provider_default_cluster_name "$architecture")"
+  provider_region="${VULTR_REGION:-$AWS_REGION}"
+  infra_json="{\"provider\":\"${CLOUD_PROVIDER}\",\"region\":\"${provider_region}\",\"cluster\":\"${cluster_name}\",\"app_node_pool\":\"app-nodes\",\"testing_node_pool\":\"testing-nodes\",\"postgres_version\":\"18\",\"execution_mode\":\"parallel\"}"
   rendered_manifest="$(
     sed \
       -e "/name: K6_SCRIPT/{n; s|value:.*|value: ${SCENARIO}.js|}" \
       -e "/name: K6_PROFILE/{n; s|value:.*|value: ${K6_PROFILE}|}" \
       -e "/name: ARCHITECTURE/{n; s|value:.*|value: ${architecture}|}" \
+      -e "/name: EXECUTION_MODE/{n; s|value:.*|value: parallel|}" \
+      -e "/name: TERRAFORM_STACK/{n; s|value:.*|value: ${terraform_stack}|}" \
+      -e "/name: CLUSTER_NAME/{n; s|value:.*|value: ${cluster_name}|}" \
       -e "/name: SCENARIO_NAME/{n; s|value:.*|value: ${SCENARIO}|}" \
       -e "/name: TARGET_RPS/{n; s|value:.*|value: \"${TARGET_RPS}\"|}" \
       -e "/name: RUN_ID/{n; s|value:.*|value: ${RUN_ID}|}" \
@@ -179,6 +182,7 @@ patch_and_apply() {
       -e "/name: DATADOG_ENABLED/{n; s|value:.*|value: \"${DATADOG_ENABLED}\"|}" \
       -e "/name: DATADOG_ENV/{n; s|value:.*|value: ${DATADOG_ENV}|}" \
       -e "/name: S3_URI/{n; s|value:.*|value: ${s3_uri}|}" \
+      -e "/name: INFRA_CONFIGURATION_JSON/{n; s|value:.*|value: '${infra_json}'|}" \
       -e "/name: RESOURCES_CONFIGURATION_JSON/{n; s|value:.*|value: '${resources_json}'|}" \
       "$manifest"
   )"

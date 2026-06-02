@@ -17,6 +17,8 @@ if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
   set +a
 fi
 
+source scripts/lib/cloud-provider.sh
+load_cloud_provider_env
 source scripts/lib/resource-configuration.sh
 source scripts/lib/benchmark-preflight.sh
 
@@ -39,6 +41,8 @@ RUN_ID="${RUN_ID:-}"
 ATTEMPT="${ATTEMPT:-attempt-01}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
+CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
+DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 SEQUENTIAL_CONTEXT="${SEQUENTIAL_CONTEXT:-benchmark}"
 SUITE_WORKDIR="$(mktemp -d)"
@@ -219,11 +223,24 @@ if [ -z "$K6_PROFILE" ]; then
   fi
 fi
 
+case "$SCALING_MODE:$K6_PROFILE" in
+  fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa) ;;
+  fixed:hpa)
+    echo "ERROR: K6_PROFILE=hpa must not be used with SCALING_MODE=fixed." >&2
+    exit 1
+    ;;
+  hpa:steady|hpa:ramp|hpa:smoke)
+    echo "ERROR: SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment." >&2
+    exit 1
+    ;;
+esac
+
 if [ -z "$RUN_ID" ]; then
+  run_prefix="$(provider_default_run_prefix sequential)"
   if [ -n "$EXPERIMENT_NAME" ]; then
-    RUN_ID="eks-sequential-${SCALING_MODE}-${EXPERIMENT_NAME}"
+    RUN_ID="${run_prefix}-${SCALING_MODE}-${EXPERIMENT_NAME}"
   else
-    RUN_ID="eks-sequential-${SCALING_MODE}-$(date +%Y%m%d-%H%M)"
+    RUN_ID="${run_prefix}-${SCALING_MODE}-$(date +%Y%m%d-%H%M)"
   fi
 fi
 
@@ -239,11 +256,13 @@ if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
   BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_or_die "$S3_BUCKET" "sequential suite bootstrap" "false"
 fi
 
-IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" OUTPUT_DIR="$RENDER_ROOT" bash scripts/render-eks-manifests.sh >/dev/null
+render_provider_manifests "$RENDER_ROOT"
 bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
 
 manifest_path="$SUITE_WORKDIR/manifest.json"
 jq -n \
+  --arg provider "$CLOUD_PROVIDER" \
+  --arg terraform_stack "$(provider_sequential_stack_name)" \
   --arg run_id "$RUN_ID" \
   --arg attempt "$ATTEMPT" \
   --arg scaling_mode "$SCALING_MODE" \
@@ -255,7 +274,7 @@ jq -n \
   --arg started_at_utc "$SUITE_STARTED_AT_UTC" \
   --argjson architecture_order "$(words_json_array "$ARCHITECTURE_ORDER")" \
   --argjson scenario_rps_matrix "$(matrix_json)" \
-  '{execution_mode:"sequential", terraform_stack:"experiment-sequential", run_id:$run_id, attempt:$attempt, scaling_mode:$scaling_mode, k6_profile:$k6_profile, test_duration:$test_duration, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, architecture_order:$architecture_order, scenario_rps_matrix:$scenario_rps_matrix, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc}' \
+  '{provider:$provider, execution_mode:"sequential", terraform_stack:$terraform_stack, run_id:$run_id, attempt:$attempt, scaling_mode:$scaling_mode, k6_profile:$k6_profile, test_duration:$test_duration, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, architecture_order:$architecture_order, scenario_rps_matrix:$scenario_rps_matrix, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc}' \
   > "$manifest_path"
 aws s3 cp "$manifest_path" "${S3_RUN_URI}/_suite/manifest.json" >/dev/null
 
@@ -273,7 +292,7 @@ for architecture in $ARCHITECTURE_ORDER; do
   architecture_index=$((architecture_index + 1))
   phase_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "=== Sequential Architecture: ${architecture} ==="
-  ARCHITECTURE="$architecture" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" bash scripts/deploy-sequential-architecture.sh
+  ARCHITECTURE="$architecture" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" CLOUD_PROVIDER="$CLOUD_PROVIDER" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" bash scripts/deploy-sequential-architecture.sh
 
   completed_architecture_cases=0
   while IFS=$'\t' read -r scenario scenario_rps_levels; do
@@ -307,6 +326,8 @@ for architecture in $ARCHITECTURE_ORDER; do
       DATADOG_ENV="$DATADOG_ENV" \
       AWS_REGION="$AWS_REGION" \
       ECR_NAMESPACE="$ECR_NAMESPACE" \
+      CLOUD_PROVIDER="$CLOUD_PROVIDER" \
+      DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
       bash scripts/run-benchmark-sequential.sh
       case_exit_code=$?
       set -e
@@ -358,6 +379,8 @@ if [ "$suite_failed" -ne 0 ]; then
 fi
 
 jq -s \
+  --arg provider "$CLOUD_PROVIDER" \
+  --arg terraform_stack "$(provider_sequential_stack_name)" \
   --arg run_id "$RUN_ID" \
   --arg attempt "$ATTEMPT" \
   --arg suite_status "$suite_status" \
@@ -368,12 +391,12 @@ jq -s \
   --argjson inter_case_delay_seconds "$INTER_CASE_DELAY" \
   --argjson architecture_switch_delay_seconds "$ARCHITECTURE_SWITCH_DELAY" \
   --slurpfile phases "$PHASES_JSONL" \
-  '{execution_mode:"sequential", terraform_stack:"experiment-sequential", run_id:$run_id, attempt:$attempt, suite_status:$suite_status, architecture_order:$architecture_order, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc, finished_at_utc:$finished_at_utc, architecture_phases:$phases, cases:.}' \
+  '{provider:$provider, execution_mode:"sequential", terraform_stack:$terraform_stack, run_id:$run_id, attempt:$attempt, suite_status:$suite_status, architecture_order:$architecture_order, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc, finished_at_utc:$finished_at_utc, architecture_phases:$phases, cases:.}' \
   "$CASES_JSONL" > "$summary_path"
 aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary.json" >/dev/null
 
 if [ "$AUTO_DESTROY_CONFIRMED" = "true" ]; then
-  make eks-sequential-destroy-confirmed
+  make "$(provider_sequential_destroy_target)"
 fi
 
 echo "=== Sequential Benchmark Suite Complete ==="

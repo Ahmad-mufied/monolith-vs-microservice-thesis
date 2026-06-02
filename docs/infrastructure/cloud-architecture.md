@@ -37,6 +37,16 @@ Hub public images replace ECR for Hetzner runs. See
 `docs/infrastructure/hetzner-cloud-architecture.md` and
 `docs/infrastructure/hetzner-benchmark-runbook.md`.
 
+An additive Vultr VKE path is available for high-vCPU benchmark execution when
+Hetzner quota is blocked or Vultr credit/quota is preferable. Vultr provides
+VKE app/testing worker pools, Vultr Compute PostgreSQL nodes, and legacy Vultr
+VPC networking. AWS S3 remains the benchmark artifact store and Docker Hub
+public images replace ECR for Vultr runs. See
+`docs/infrastructure/vultr-cloud-architecture.md`,
+`docs/infrastructure/vultr-configuration-reference.md`,
+`docs/infrastructure/vultr-vke-runbook.md`, and
+`docs/diagrams/vultr-vke-topology.md`.
+
 ---
 
 ## 2. Architectural Goal
