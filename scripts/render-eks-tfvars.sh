@@ -9,7 +9,7 @@ required_files=(
 
 for file in "${required_files[@]}"; do
   if [[ ! -f "$file" ]]; then
-    echo "missing $file; run: make env-init PLATFORM=eks EXECUTION_MODE=<parallel|sequential>" >&2
+    echo "missing $file; run: make env-init PLATFORM=eks EXECUTION_MODE=parallel or EXECUTION_MODE=sequential" >&2
     exit 1
   fi
 done

@@ -4,7 +4,7 @@ umask 077
 
 env_file="env/hetzner.env"
 if [ ! -f "$env_file" ]; then
-  echo "missing $env_file; run: make env-init PLATFORM=hetzner EXECUTION_MODE=<parallel|sequential>" >&2
+  echo "missing $env_file; run: make env-init PLATFORM=hetzner EXECUTION_MODE=parallel or EXECUTION_MODE=sequential" >&2
   exit 1
 fi
 
