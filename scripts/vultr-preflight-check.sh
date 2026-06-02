@@ -11,10 +11,11 @@ set -a
 source "$env_file"
 set +a
 
+source scripts/lib/vultr-s3-credentials.sh
+load_vultr_s3_credentials
+
 : "${VULTR_API_KEY:?VULTR_API_KEY must be set in env/vultr.env}"
 : "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE must be set in env/vultr.env}"
-: "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID must be set in env/vultr.env}"
-: "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY must be set in env/vultr.env}"
 : "${AWS_REGION:?AWS_REGION must be set in env/vultr.env}"
 : "${S3_BUCKET:?S3_BUCKET must be set in env/vultr.env}"
 
@@ -28,8 +29,23 @@ echo "  region          : ${VULTR_REGION:-sgp}"
 echo "  dockerhub_ns    : $DOCKERHUB_NAMESPACE"
 echo "  s3_bucket       : $S3_BUCKET"
 
-aws sts get-caller-identity >/dev/null
-aws s3api head-bucket --bucket "$S3_BUCKET" >/dev/null
+if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+  echo "ERROR: Vultr k6 S3 writer credentials are not available." >&2
+  echo "Fix: run 'make aws-s3-writer-apply' or set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY manually in env/vultr.env." >&2
+  exit 1
+fi
+
+aws_env=(
+  "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
+  "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
+  "AWS_REGION=$AWS_REGION"
+)
+if [ -n "${AWS_SESSION_TOKEN:-}" ]; then
+  aws_env+=("AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN")
+fi
+
+env "${aws_env[@]}" aws sts get-caller-identity >/dev/null
+env "${aws_env[@]}" aws s3api head-bucket --bucket "$S3_BUCKET" >/dev/null
 
 if [ -f env/vultr-resource-baseline.env ]; then
   source env/vultr-resource-baseline.env
@@ -48,4 +64,3 @@ for repo in monolith api-gateway auth-service item-service transaction-service s
 done
 
 echo "Vultr preflight passed"
-

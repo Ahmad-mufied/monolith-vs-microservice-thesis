@@ -22,10 +22,11 @@ AWS_REGION
 S3_BUCKET
 ```
 
-The AWS S3 writer credentials are created by `infra/terraform/shared`. The
-Hetzner secret creation scripts read them from Terraform output when
+The AWS S3 writer credentials are created by `infra/terraform/aws-s3-writer`.
+The Hetzner secret creation scripts read them from Terraform output when
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are not set manually in
-`env/hetzner.env`.
+`env/hetzner.env`. `make hetzner-sequential-apply` and
+`make hetzner-parallel-apply` run `make aws-s3-writer-apply` first.
 
 ## 2. Publish Images
 

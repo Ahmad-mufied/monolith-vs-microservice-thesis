@@ -16,8 +16,8 @@ load_hetzner_s3_credentials
 
 : "${HCLOUD_TOKEN:?HCLOUD_TOKEN must be set in env/hetzner.env}"
 : "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE must be set in env/hetzner.env}"
-: "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID must be set in env/hetzner.env or Terraform shared output hetzner_k6_s3_access_key_id}"
-: "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY must be set in env/hetzner.env or Terraform shared output hetzner_k6_s3_secret_access_key}"
+: "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID must be set in env/hetzner.env, Terraform aws-s3-writer output hetzner_k6_s3_access_key_id, or legacy shared output hetzner_k6_s3_access_key_id}"
+: "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY must be set in env/hetzner.env, Terraform aws-s3-writer output hetzner_k6_s3_secret_access_key, or legacy shared output hetzner_k6_s3_secret_access_key}"
 : "${AWS_REGION:?AWS_REGION must be set in env/hetzner.env}"
 : "${S3_BUCKET:?S3_BUCKET must be set in env/hetzner.env}"
 

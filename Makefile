@@ -839,6 +839,7 @@ DATADOG_ENV ?= benchmark
 
 .PHONY: terraform-fmt
 terraform-fmt:
+	cd infra/terraform/aws-s3-writer && terraform fmt -recursive
 	cd infra/terraform/shared && terraform fmt -recursive
 	cd infra/terraform/experiment && terraform fmt -recursive
 	cd infra/terraform/experiment-sequential && terraform fmt -recursive
@@ -1019,6 +1020,8 @@ eks-render-tfvars:
 
 
 terraform-validate:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh validate
 	cd infra/terraform/shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
 	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
 	cd infra/terraform/experiment-sequential && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
@@ -1052,6 +1055,21 @@ terraform-recovery-fix-tainted-nodegroups:
 .PHONY: terraform-recovery-fix-tainted-nodegroups-apply
 terraform-recovery-fix-tainted-nodegroups-apply:
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-recovery-fix-tainted-nodegroups.sh --apply
+
+.PHONY: aws-s3-writer-plan
+aws-s3-writer-plan:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh plan -out=tfplan
+
+.PHONY: aws-s3-writer-apply
+aws-s3-writer-apply:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh apply
+
+.PHONY: aws-s3-writer-destroy-confirmed
+aws-s3-writer-destroy-confirmed:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh init
+	S3_BENCHMARK_DATA_VERIFIED=true TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh destroy
 
 .PHONY: eks-shared-apply
 eks-shared-apply:
@@ -1173,7 +1191,7 @@ hetzner-sequential-plan:
 	bash scripts/terraform-hetzner.sh sequential plan -out=tfplan
 
 .PHONY: hetzner-sequential-apply
-hetzner-sequential-apply:
+hetzner-sequential-apply: aws-s3-writer-apply
 	bash scripts/terraform-hetzner.sh sequential init
 	bash scripts/terraform-hetzner.sh sequential apply
 
@@ -1187,7 +1205,7 @@ hetzner-parallel-plan:
 	bash scripts/terraform-hetzner.sh parallel plan -out=tfplan
 
 .PHONY: hetzner-parallel-apply
-hetzner-parallel-apply:
+hetzner-parallel-apply: aws-s3-writer-apply
 	bash scripts/terraform-hetzner.sh parallel init
 	bash scripts/terraform-hetzner.sh parallel apply
 
@@ -1263,7 +1281,7 @@ vultr-sequential-plan:
 	bash scripts/terraform-vultr.sh sequential plan -out=tfplan
 
 .PHONY: vultr-sequential-apply
-vultr-sequential-apply:
+vultr-sequential-apply: aws-s3-writer-apply
 	bash scripts/terraform-vultr.sh sequential init
 	bash scripts/terraform-vultr.sh sequential apply
 
@@ -1277,7 +1295,7 @@ vultr-parallel-plan:
 	bash scripts/terraform-vultr.sh parallel plan -out=tfplan
 
 .PHONY: vultr-parallel-apply
-vultr-parallel-apply:
+vultr-parallel-apply: aws-s3-writer-apply
 	bash scripts/terraform-vultr.sh parallel init
 	bash scripts/terraform-vultr.sh parallel apply
 

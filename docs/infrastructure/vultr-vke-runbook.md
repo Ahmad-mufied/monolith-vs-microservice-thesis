@@ -111,12 +111,24 @@ VULTR_API_KEY=...
 DOCKERHUB_NAMESPACE=ahmadryzen
 AWS_REGION=ap-southeast-1
 S3_BUCKET=...
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
 POSTGRES_PASSWORD=...
 OPERATOR_CIDRS=<your-public-ip>/32
 OPERATOR_SSH_PUBLIC_KEY='ssh-ed25519 ...'
 ```
+
+Do not run `make eks-shared-apply` for Vultr S3 upload credentials. Vultr uses
+the separate AWS S3 writer stack:
+
+```bash
+make aws-s3-writer-plan
+make aws-s3-writer-apply
+```
+
+`make vultr-sequential-apply` and `make vultr-parallel-apply` run
+`aws-s3-writer-apply` first, so the normal apply flow ensures the writer exists
+before the cluster is created. Manual `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY` in `env/vultr.env` are still supported as a fallback,
+but they should not be the default path.
 
 Recommended defaults for thesis-sized Vultr tests:
 
@@ -146,8 +158,9 @@ Notes:
 - VKE currently uses legacy Vultr VPC Networks in this implementation, not VPC
   2.0. Keep the PostgreSQL VM attached to the same legacy VPC as the VKE
   cluster.
-- `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are only for k6 S3 uploads
-  from Vultr. Scope them narrowly to the benchmark results bucket or prefix.
+- AWS S3 upload credentials are only for k6 uploads from Vultr. The Terraform
+  writer policy is limited to `s3://<bucket>/experiments/*`; keep manual
+  fallback credentials scoped the same way.
 
 ## Phase 2 - Build, Push, Verify, and Pin Images
 

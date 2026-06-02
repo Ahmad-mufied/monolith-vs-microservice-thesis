@@ -3,9 +3,9 @@
 ## Hetzner Hybrid Benchmark Secrets
 
 The Hetzner benchmark path does not have EKS Pod Identity. For v1, Terraform
-creates a least-privilege AWS IAM user in `infra/terraform/shared` and k6
-receives that user's S3 credentials through the `benchmark/k6-runner-secret`
-Kubernetes Secret.
+creates a least-privilege AWS IAM user in `infra/terraform/aws-s3-writer` and
+k6 receives that user's S3 credentials through the
+`benchmark/k6-runner-secret` Kubernetes Secret.
 
 Required `env/hetzner.env` values:
 
@@ -22,8 +22,9 @@ S3_BUCKET
 outputs:
 
 ```bash
-terraform -chdir=infra/terraform/shared output -raw hetzner_k6_s3_access_key_id
-terraform -chdir=infra/terraform/shared output -raw hetzner_k6_s3_secret_access_key
+make aws-s3-writer-apply
+terraform -chdir=infra/terraform/aws-s3-writer output -raw hetzner_k6_s3_access_key_id
+terraform -chdir=infra/terraform/aws-s3-writer output -raw hetzner_k6_s3_secret_access_key
 ```
 
 Rules:
@@ -31,8 +32,8 @@ Rules:
 - Hetzner hybrid benchmark is the only exception in this repository where AWS
   access keys may be present in `env/hetzner.env` and the
   `benchmark/k6-runner-secret`. Those credentials must be scoped to the
-  benchmark bucket or prefix. The shared Terraform stack enforces access only
-  under `s3://<bucket>/experiments/*`.
+  benchmark bucket or prefix. The `aws-s3-writer` Terraform stack enforces
+  access only under `s3://<bucket>/experiments/*`.
 - PostgreSQL accepts private-network traffic only.
 - Docker Hub public images must never contain secrets, kubeconfigs, `.tfstate`,
   `.tfvars`, or local env files.
@@ -48,6 +49,19 @@ AWS S3 upload credentials through `benchmark/k6-runner-secret`, created by:
 make vultr-create-secrets
 make vultr-create-secrets-sequential
 ```
+
+Preferred path:
+
+```bash
+make aws-s3-writer-apply
+terraform -chdir=infra/terraform/aws-s3-writer output -raw vultr_k6_s3_access_key_id
+terraform -chdir=infra/terraform/aws-s3-writer output -raw vultr_k6_s3_secret_access_key
+```
+
+`make vultr-sequential-apply` and `make vultr-parallel-apply` run
+`make aws-s3-writer-apply` first, so the standard Vultr apply flow prepares the
+S3 writer before creating cluster infrastructure. Manual `AWS_ACCESS_KEY_ID`
+and `AWS_SECRET_ACCESS_KEY` values in `env/vultr.env` remain a fallback only.
 
 Application secrets reuse the current Kubernetes Secret names consumed by the
 EKS manifests. PostgreSQL URLs point to Vultr private VPC IPs from Terraform

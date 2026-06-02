@@ -37,8 +37,8 @@ flow.
 | `DOCKERHUB_NAMESPACE` | `ahmadryzen` | Render/deploy/benchmark | Uses Docker Hub public images. |
 | `AWS_REGION` | `ap-southeast-1` | S3 upload | Region of benchmark result bucket. |
 | `S3_BUCKET` | `skripsi-benchmark-results` | S3 upload | Existing AWS S3 bucket. |
-| `AWS_ACCESS_KEY_ID` | `***` | k6 S3 upload | Scope to benchmark bucket/prefix. |
-| `AWS_SECRET_ACCESS_KEY` | `***` | k6 S3 upload | Scope to benchmark bucket/prefix. |
+| `AWS_ACCESS_KEY_ID` | `***` | k6 S3 upload | Optional fallback. Preferred path is `infra/terraform/aws-s3-writer` output. |
+| `AWS_SECRET_ACCESS_KEY` | `***` | k6 S3 upload | Optional fallback. Preferred path is `infra/terraform/aws-s3-writer` output. |
 | `OPERATOR_CIDRS` | `36.85.120.10/32` | PostgreSQL SSH firewall | Avoid `0.0.0.0/0`. |
 | `OPERATOR_SSH_PUBLIC_KEY` | `ssh-ed25519 ...` | PostgreSQL VM SSH | Public key only. |
 
@@ -46,12 +46,14 @@ flow.
 
 | Stack | Path | Creates | Destroy target |
 |---|---|---|---|
+| AWS S3 writer | `infra/terraform/aws-s3-writer` | IAM user/access key/policy for external k6 uploads to the existing AWS S3 bucket. | `make aws-s3-writer-destroy-confirmed` |
 | Shared | `infra/terraform/vultr-shared` | Legacy VPC, SSH key, PostgreSQL firewall group. | `make vultr-shared-destroy-confirmed` |
 | Parallel | `infra/terraform/vultr-experiment` | Two VKE clusters and two PostgreSQL VMs. | `make vultr-parallel-destroy-confirmed` |
 | Sequential | `infra/terraform/vultr-experiment-sequential` | One VKE cluster and one PostgreSQL VM. | `make vultr-sequential-destroy-confirmed` |
 
-State separation is intentional. Do not move resources between AWS, Hetzner,
-and Vultr Terraform states.
+State separation is intentional. Do not use `infra/terraform/shared` for
+Vultr S3-only credentials because that stack also owns AWS/EKS shared
+networking and budget resources.
 
 ## Make Target Reference
 
