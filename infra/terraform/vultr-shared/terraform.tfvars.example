@@ -1,0 +1,7 @@
+project                 = "skripsi"
+region                  = "sgp"
+vpc_subnet              = "10.20.0.0"
+vpc_subnet_mask         = 16
+operator_cidrs          = ["203.0.113.10/32"]
+operator_ssh_public_key = "ssh-ed25519 AAAA... operator@example"
+

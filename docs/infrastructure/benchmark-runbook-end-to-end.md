@@ -6,6 +6,11 @@ This runbook covers every step required to run the thesis benchmark from a
 fresh AWS account to completed k6 results in S3. It is written for the
 researcher, thesis reviewer, or anyone reproducing the experiment.
 
+For the Vultr VKE infrastructure path, use
+`docs/infrastructure/vultr-vke-runbook.md` as the primary execution runbook.
+That path still stores benchmark artifacts in AWS S3, but compute, Kubernetes,
+PostgreSQL VM nodes, and private networking are provisioned on Vultr.
+
 Estimated total time: 3–4 hours (including infrastructure provisioning).
 
 ---
@@ -124,9 +129,15 @@ Choose the experiment topology before applying cost-heavy resources:
 |---|---|---|---|
 | Parallel | you need aligned Datadog time-series and have enough quota | `infra/terraform/experiment` | `monolith`, `msa` |
 | Sequential | account quota or budget only allows one active benchmark stack | `infra/terraform/experiment-sequential` | `benchmark` |
+| Vultr parallel | you need high-vCPU Vultr VKE execution with aligned Datadog windows | `infra/terraform/vultr-experiment` | `monolith`, `msa` |
+| Vultr sequential | Vultr quota or budget only allows one active benchmark cluster | `infra/terraform/vultr-experiment-sequential` | `benchmark` |
 
 The shared stack is common to both modes. Under a 24-vCPU quota, avoid keeping
 parallel and sequential experiment stacks active at the same time.
+
+For Vultr, apply `infra/terraform/vultr-shared` first, then either the Vultr
+parallel or Vultr sequential stack. Do not mix AWS, Hetzner, and Vultr
+Terraform state.
 
 ### Step 2.0 — Confirm EKS Version Support
 

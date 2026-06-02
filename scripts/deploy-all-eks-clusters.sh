@@ -7,11 +7,8 @@ if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
   set +a
 fi
 
-if [ "${CLOUD_PROVIDER:-aws}" = "hetzner" ] && [ -f env/hetzner.env ]; then
-  set -a
-  source env/hetzner.env
-  set +a
-fi
+source scripts/lib/cloud-provider.sh
+load_cloud_provider_env
 
 SCALING_MODE="${SCALING_MODE:-fixed}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
@@ -20,6 +17,11 @@ ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
 CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
 DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
 
+case "$SCALING_MODE" in
+  fixed|hpa) ;;
+  *) echo "ERROR: unsupported SCALING_MODE '$SCALING_MODE' (expected: fixed|hpa)" >&2; exit 1 ;;
+esac
+
 for context in monolith msa; do
   if ! kubectl config get-contexts "$context" >/dev/null 2>&1; then
     echo "missing kubectl context '$context'; run: make eks-setup-contexts" >&2
@@ -27,7 +29,7 @@ for context in monolith msa; do
   fi
 done
 
-echo "=== Deploying both EKS architectures ==="
+echo "=== Deploying both benchmark architectures ==="
 echo "  scaling_mode : $SCALING_MODE"
 echo "  image_tag    : $IMAGE_TAG"
 echo "  provider     : $CLOUD_PROVIDER"
@@ -52,4 +54,4 @@ CLOUD_PROVIDER="$CLOUD_PROVIDER" \
 bash scripts/deploy-msa-cluster.sh
 
 echo ""
-echo "Both EKS architectures deployed with SCALING_MODE=$SCALING_MODE"
+echo "Both benchmark architectures deployed with SCALING_MODE=$SCALING_MODE"
