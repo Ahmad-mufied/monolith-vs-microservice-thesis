@@ -16,6 +16,9 @@ for env_file in env/vultr.env env/hetzner.env env/terraform.shared.env; do
   fi
 done
 
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+export AWS_PROFILE="$terraform_aws_profile"
+
 project="${explicit_project:-${PROJECT:-skripsi}}"
 aws_region="${explicit_aws_region:-${AWS_REGION:-ap-southeast-1}}"
 s3_results_bucket="${explicit_s3_bucket:-${S3_RESULTS_BUCKET:-${S3_BUCKET:-}}}"
@@ -49,4 +52,4 @@ echo "  project    : $project"
 echo "  s3_bucket  : $s3_results_bucket"
 echo ""
 
-AWS_PROFILE="$terraform_aws_profile" terraform -chdir="$terraform_dir" "$@"
+terraform -chdir="$terraform_dir" "$@"
