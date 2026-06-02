@@ -135,7 +135,11 @@ benchmark_k6_runner_password="Password123!"
 k6_runner_file="$(resolve_app_env_file k6-runner || true)"
 k6_runner_email="$(read_env_value "${k6_runner_file:-env/k6-runner.app.env}" ADMIN_USER_EMAIL)"
 k6_runner_email="${k6_runner_email:-benchmark-user-001@example.com}"
-k6_runner_password="$(read_env_value "${k6_runner_file:-env/k6-runner.app.env}" ADMIN_USER_PASSWORD)"
+k6_runner_password_current="$(read_env_value "${k6_runner_file:-env/k6-runner.app.env}" ADMIN_USER_PASSWORD)"
+k6_runner_password="$k6_runner_password_current"
+if is_invalid_k6_benchmark_password "$k6_runner_password_current"; then
+  k6_runner_password="$benchmark_k6_runner_password"
+fi
 
 write_if_missing "env/datadog.shared.env" "DATADOG_API_KEY=replace-me
 DATADOG_SITE=datadoghq.com"
@@ -181,9 +185,9 @@ SERVICE_NAME=transaction-service
 ITEM_SERVICE_ADDR=item-service.msa.svc.cluster.local:50052"
 
 write_if_missing "env/k6-runner.app.env" "ADMIN_USER_EMAIL=${k6_runner_email}
-ADMIN_USER_PASSWORD=${benchmark_k6_runner_password}"
+ADMIN_USER_PASSWORD=${k6_runner_password}"
 
-if is_invalid_k6_benchmark_password "$k6_runner_password" || [[ "$k6_runner_password" != "$benchmark_k6_runner_password" ]]; then
+if is_invalid_k6_benchmark_password "$k6_runner_password_current"; then
   write_or_update_env_value "env/k6-runner.app.env" "ADMIN_USER_PASSWORD" "$benchmark_k6_runner_password"
 fi
 
