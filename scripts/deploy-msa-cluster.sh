@@ -9,6 +9,10 @@ DATADOG_SITE_EXPLICIT_OVERRIDE=""
 if [ "${DATADOG_SITE+x}" = "x" ]; then
   DATADOG_SITE_EXPLICIT_OVERRIDE="$DATADOG_SITE"
 fi
+DATADOG_API_KEY_EXPLICIT_OVERRIDE=""
+if [ "${DATADOG_API_KEY+x}" = "x" ]; then
+  DATADOG_API_KEY_EXPLICIT_OVERRIDE="$DATADOG_API_KEY"
+fi
 
 if [ -f env/aws-benchmark.env ]; then
   set -a
@@ -156,6 +160,9 @@ if [ -n "$datadog_env_file" ]; then
   set -a
   source "$datadog_env_file"
   set +a
+fi
+if [ -n "$DATADOG_API_KEY_EXPLICIT_OVERRIDE" ]; then
+  DATADOG_API_KEY="$DATADOG_API_KEY_EXPLICIT_OVERRIDE"
 fi
 if [ -n "$DATADOG_SITE_EXPLICIT_OVERRIDE" ]; then
   DATADOG_SITE="$DATADOG_SITE_EXPLICIT_OVERRIDE"
