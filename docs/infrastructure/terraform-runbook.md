@@ -522,14 +522,15 @@ terraform apply
 Optional helper flow:
 
 ```bash
-make env-init-app
-make env-init-eks
+make env-init PLATFORM=eks EXECUTION_MODE=parallel
 make eks-render-tfvars
 make terraform-auth-check
 ```
 
 This renders `infra/terraform/aws-shared/terraform.tfvars` from
-`env/terraform.shared.env`.
+`env/terraform.shared.env`. `make env-init ...` is the operator-facing command;
+it dispatches through `env/operator-profile.env` and then calls the lower-level
+provider helpers.
 
 Note the outputs:
 
@@ -573,8 +574,7 @@ For laptop-driven operation, set the public EKS API endpoint allowlist to the
 current operator IP before rendering tfvars:
 
 ```bash
-make env-init-app
-make env-init-eks
+make env-init PLATFORM=eks EXECUTION_MODE=parallel
 # Edit env/terraform.experiment.env:
 #   CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=manual          # optional for custom/static CIDRs
 #   CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS=<operator-public-ip>/32
@@ -585,12 +585,12 @@ The benchmark cluster module keeps the private endpoint enabled and only uses
 the public endpoint as a restricted operator entry path. Do not use
 `0.0.0.0/0`.
 
-By default, `make env-init-eks` uses `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=auto`
-and attempts to detect the current operator public IP automatically. If the
-detected IP changes later, re-running `make env-init-eks` refreshes the CIDR
-before you render tfvars again. If the autodetect helper receives a malformed
-non-IP response, it now fails instead of writing an invalid CIDR value into the
-env file.
+By default, `make env-init PLATFORM=eks EXECUTION_MODE=parallel` uses
+`CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=auto` and attempts to detect the
+current operator public IP automatically. If the detected IP changes later,
+re-running that consolidated command refreshes the CIDR before you render
+tfvars again. If the autodetect helper receives a malformed non-IP response, it
+now fails instead of writing an invalid CIDR value into the env file.
 
 If the clusters already exist and your operator public IP later changes, update
 `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS`, rerender tfvars, and run

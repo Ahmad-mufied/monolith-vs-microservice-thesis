@@ -19,7 +19,7 @@ flowchart TB
     budget["Budget shutdown guardrail<br/>parallel + sequential resource names"]
   end
 
-  operator -->|"make env-init-app<br/>make env-init-eks<br/>make eks-render-tfvars"| shared
+  operator -->|"make env-init PLATFORM=eks EXECUTION_MODE=parallel<br/>or EXECUTION_MODE=sequential<br/>then make eks-render-tfvars"| shared
   operator -->|"make ecr-push-all IMAGE_TAG=..."| ecr
 
   subgraph modeChoice["Choose exactly one active experiment topology under tight quota"]
@@ -119,10 +119,10 @@ flowchart TB
 - `INTER_CASE_DELAY` separates cases inside the same architecture phase.
 - `ARCHITECTURE_SWITCH_DELAY` separates monolith and microservices phases for
   cleaner Datadog resource windows.
-- Do not keep both `experiment` and `experiment-sequential` stacks active under
+- Do not keep both `aws-parallel` and `aws-sequential` stacks active under
   tight vCPU quota unless quota and cost have been explicitly reviewed.
-- Destroy an experiment stack only after expected S3 artifacts have been
-  verified.
+- Destroy an active Terraform benchmark stack only after expected S3 artifacts
+  have been verified.
 
 ## Switching Summary
 

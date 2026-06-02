@@ -54,8 +54,7 @@ Recommended bootstrap:
 
 ```bash
 aws login
-make env-init-app
-make env-init-eks
+make env-init PLATFORM=eks EXECUTION_MODE=sequential
 make eks-render-tfvars
 make ecr-push-all IMAGE_TAG=$(git rev-parse --short HEAD)
 make eks-shared-apply

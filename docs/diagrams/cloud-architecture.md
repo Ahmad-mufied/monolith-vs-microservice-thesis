@@ -160,5 +160,6 @@ flowchart TB
 - Parallel mode isolates monolith and microservices by cluster and RDS instance.
 - Sequential mode isolates benchmark phases by scaling the inactive architecture
   to zero before migration, seed, and k6 execution.
-- Do not keep both experiment stacks active under a constrained vCPU quota; use
-  the switching flow in `docs/diagrams/sequential-parallel-topology.md`.
+- Do not keep both `aws-parallel` and `aws-sequential` active under a
+  constrained vCPU quota; use the switching flow in
+  `docs/diagrams/sequential-parallel-topology.md`.

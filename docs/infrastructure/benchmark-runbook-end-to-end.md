@@ -183,14 +183,15 @@ cp terraform.tfvars.example terraform.tfvars
 Optional helper flow:
 
 ```bash
-make env-init-app
-make env-init-eks
+make env-init PLATFORM=eks EXECUTION_MODE=parallel
 make eks-render-tfvars
 make terraform-auth-check
 ```
 
 This renders `infra/terraform/aws-shared/terraform.tfvars` from
-`env/terraform.shared.env`.
+`env/terraform.shared.env`. The consolidated command reads
+`env/operator-profile.env`, then runs the lower-level helper steps needed for
+AWS.
 
 ```bash
 make eks-shared-apply
@@ -222,8 +223,8 @@ placeholder in `env/terraform.experiment.env` with your current operator public
 IP CIDR, for example `203.0.113.10/32`. For a single laptop operator this is
 normally a `/32`. Do not use `0.0.0.0/0`.
 
-By default, `make env-init-eks` now attempts to detect the current operator
-public IP automatically and writes it with
+By default, `make env-init PLATFORM=eks EXECUTION_MODE=parallel` now attempts
+to detect the current operator public IP automatically and writes it with
 `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=auto`. If you want to pin a custom
 CIDR list instead, change the source to `manual` and maintain the CIDR value
 yourself.
@@ -315,8 +316,7 @@ Secrets must be created in each cluster before deploying applications.
 Optional helper flow before creating secrets:
 
 ```bash
-make env-init-app
-make env-init-eks
+make env-init PLATFORM=eks EXECUTION_MODE=parallel
 make eks-render-tfvars
 make terraform-auth-check
 ```

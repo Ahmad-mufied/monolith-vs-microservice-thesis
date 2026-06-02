@@ -172,10 +172,12 @@ Only `*.example.env` files should be committed.
 Current repository helper flow for EKS:
 
 ```text
+env-init PLATFORM=eks EXECUTION_MODE=parallel|sequential
+  -> reads env/operator-profile.env and dispatches the operator flow
 env-init-app
-  -> creates provider-neutral app env files under env/*.app.env
+  -> lower-level helper that creates provider-neutral app env files under env/*.app.env
 env-init-eks
-  -> creates local helper env files under env/
+  -> lower-level helper that creates AWS helper env files under env/
 eks-render-tfvars
   -> renders infra/terraform/*/terraform.tfvars
 terraform-auth-check
