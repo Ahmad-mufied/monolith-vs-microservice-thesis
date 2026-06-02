@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source scripts/lib/shared-env.sh
+
 url_encode() {
   command -v jq >/dev/null 2>&1 || {
     echo "jq is required to URL-encode database credentials" >&2
@@ -13,9 +15,16 @@ read_env_value() {
   grep -E "^${2}=" "$1" | head -n 1 | cut -d= -f2- || true
 }
 
-for file in env/hetzner.env env/api-gateway.eks.env env/auth-service.eks.env env/k6-runner.eks.env; do
+api_gateway_env_file="$(resolve_app_env_file api-gateway || true)"
+auth_service_env_file="$(resolve_app_env_file auth-service || true)"
+k6_runner_env_file="$(resolve_app_env_file k6-runner || true)"
+api_gateway_env_file="${api_gateway_env_file:-env/api-gateway.app.env}"
+auth_service_env_file="${auth_service_env_file:-env/auth-service.app.env}"
+k6_runner_env_file="${k6_runner_env_file:-env/k6-runner.app.env}"
+
+for file in env/hetzner.env "$api_gateway_env_file" "$auth_service_env_file" "$k6_runner_env_file"; do
   [ -f "$file" ] || {
-    echo "missing $file; run: make env-init-eks and make env-init-hetzner" >&2
+    echo "missing $file; run: make env-init-app and make env-init-hetzner" >&2
     exit 1
   }
 done
@@ -33,18 +42,18 @@ load_hetzner_s3_credentials
 : "${AWS_REGION:?AWS_REGION must be set in env/hetzner.env}"
 : "${S3_BUCKET:?S3_BUCKET must be set in env/hetzner.env}"
 
-postgres_ip="$(terraform -chdir=infra/terraform/hetzner-experiment output -raw msa_postgres_private_ip)"
+postgres_ip="$(terraform -chdir=infra/terraform/hetzner-parallel output -raw msa_postgres_private_ip)"
 encoded_db_password="$(url_encode "$POSTGRES_PASSWORD")"
 K8S="kubectl --context=msa"
-api_jwt_secret="$(read_env_value env/api-gateway.eks.env JWT_SECRET)"
-auth_jwt_secret="$(read_env_value env/auth-service.eks.env JWT_SECRET)"
-admin_user_email="$(read_env_value env/k6-runner.eks.env ADMIN_USER_EMAIL)"
-admin_user_password="$(read_env_value env/k6-runner.eks.env ADMIN_USER_PASSWORD)"
+api_jwt_secret="$(read_env_value "$api_gateway_env_file" JWT_SECRET)"
+auth_jwt_secret="$(read_env_value "$auth_service_env_file" JWT_SECRET)"
+admin_user_email="$(read_env_value "$k6_runner_env_file" ADMIN_USER_EMAIL)"
+admin_user_password="$(read_env_value "$k6_runner_env_file" ADMIN_USER_PASSWORD)"
 
-: "${api_jwt_secret:?JWT_SECRET must be set in env/api-gateway.eks.env}"
-: "${auth_jwt_secret:?JWT_SECRET must be set in env/auth-service.eks.env}"
-: "${admin_user_email:?ADMIN_USER_EMAIL must be set in env/k6-runner.eks.env}"
-: "${admin_user_password:?ADMIN_USER_PASSWORD must be set in env/k6-runner.eks.env}"
+: "${api_jwt_secret:?JWT_SECRET must be set in ${api_gateway_env_file}}"
+: "${auth_jwt_secret:?JWT_SECRET must be set in ${auth_service_env_file}}"
+: "${admin_user_email:?ADMIN_USER_EMAIL must be set in ${k6_runner_env_file}}"
+: "${admin_user_password:?ADMIN_USER_PASSWORD must be set in ${k6_runner_env_file}}"
 
 $K8S create namespace benchmark --dry-run=client -o yaml | $K8S apply -f -
 $K8S create namespace msa --dry-run=client -o yaml | $K8S apply -f -

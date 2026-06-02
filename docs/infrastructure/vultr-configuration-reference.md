@@ -48,10 +48,10 @@ flow.
 |---|---|---|---|
 | AWS S3 writer | `infra/terraform/aws-s3-writer` | IAM user/access key/policy for external k6 uploads to the existing AWS S3 bucket. | `make aws-s3-writer-destroy-confirmed` |
 | Shared | `infra/terraform/vultr-shared` | Legacy VPC, SSH key, PostgreSQL firewall group. | `make vultr-shared-destroy-confirmed` |
-| Parallel | `infra/terraform/vultr-experiment` | Two VKE clusters and two PostgreSQL VMs. | `make vultr-parallel-destroy-confirmed` |
-| Sequential | `infra/terraform/vultr-experiment-sequential` | One VKE cluster and one PostgreSQL VM. | `make vultr-sequential-destroy-confirmed` |
+| Parallel | `infra/terraform/vultr-parallel` | Two VKE clusters and two PostgreSQL VMs. | `make vultr-parallel-destroy-confirmed` |
+| Sequential | `infra/terraform/vultr-sequential` | One VKE cluster and one PostgreSQL VM. | `make vultr-sequential-destroy-confirmed` |
 
-State separation is intentional. Do not use `infra/terraform/shared` for
+State separation is intentional. Do not use `infra/terraform/aws-shared` for
 Vultr S3-only credentials because that stack also owns AWS/EKS shared
 networking and budget resources.
 
@@ -195,7 +195,7 @@ Vultr benchmark runs should record:
 provider=vultr
 region=<VULTR_REGION>
 execution_mode=parallel or sequential
-terraform_stack=vultr-experiment or vultr-experiment-sequential
+terraform_stack=vultr-parallel or vultr-sequential
 cluster=<active VKE cluster name>
 app_node_pool=app-nodes
 testing_node_pool=testing-nodes

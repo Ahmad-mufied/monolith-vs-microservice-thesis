@@ -66,18 +66,18 @@ render_provider_manifests() {
 
 provider_parallel_stack_name() {
   case "${CLOUD_PROVIDER:-aws}" in
-    aws) printf 'experiment' ;;
-    hetzner) printf 'hetzner-experiment' ;;
-    vultr) printf 'vultr-experiment' ;;
+    aws) printf 'aws-parallel' ;;
+    hetzner) printf 'hetzner-parallel' ;;
+    vultr) printf 'vultr-parallel' ;;
     *) echo "ERROR: unsupported CLOUD_PROVIDER '${CLOUD_PROVIDER:-}'" >&2; return 1 ;;
   esac
 }
 
 provider_sequential_stack_name() {
   case "${CLOUD_PROVIDER:-aws}" in
-    aws) printf 'experiment-sequential' ;;
-    hetzner) printf 'hetzner-experiment-sequential' ;;
-    vultr) printf 'vultr-experiment-sequential' ;;
+    aws) printf 'aws-sequential' ;;
+    hetzner) printf 'hetzner-sequential' ;;
+    vultr) printf 'vultr-sequential' ;;
     *) echo "ERROR: unsupported CLOUD_PROVIDER '${CLOUD_PROVIDER:-}'" >&2; return 1 ;;
   esac
 }

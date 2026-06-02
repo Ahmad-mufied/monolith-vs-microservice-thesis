@@ -35,7 +35,7 @@ MONOLITH_PORT ?= 8080
 API_GATEWAY_PORT ?= 8080
 DATADOG_NAMESPACE ?= datadog
 DATADOG_RELEASE ?= datadog
-DATADOG_SITE ?= $(shell if [ -f env/datadog.eks.env ]; then grep -E '^DATADOG_SITE=' env/datadog.eks.env | head -n 1 | cut -d= -f2-; else printf '%s' 'datadoghq.com'; fi)
+DATADOG_SITE ?= $(shell if [ -f env/datadog.shared.env ]; then grep -E '^DATADOG_SITE=' env/datadog.shared.env | head -n 1 | cut -d= -f2-; elif [ -f env/datadog.eks.env ]; then grep -E '^DATADOG_SITE=' env/datadog.eks.env | head -n 1 | cut -d= -f2-; else printf '%s' 'datadoghq.com'; fi)
 DATADOG_CHART_VERSION ?= 3.134.0
 TERRAFORM_AWS_PROFILE ?= terraform-process
 
@@ -51,8 +51,8 @@ TRANSACTION_SERVICE_ENV := env/transaction-service.env
 AWS_BENCHMARK_ENV := env/aws-benchmark.env
 TERRAFORM_SHARED_ENV := env/terraform.shared.env
 TERRAFORM_EXPERIMENT_ENV := env/terraform.experiment.env
-DATADOG_EKS_ENV := env/datadog.eks.env
-EKS_IMAGE_TAG_ENV := env/image-tag.eks.env
+DATADOG_SHARED_ENV := env/datadog.shared.env
+SHARED_IMAGE_TAG_ENV := env/image-tag.env
 
 # =========================
 # Tooling
@@ -71,13 +71,32 @@ GOSEC_INSTALL ?= go install github.com/securego/gosec/v2/cmd/gosec@latest
 help:
 	@echo "Available commands:"
 	@echo ""
-	@echo "Development:"
+	@echo "Operator Workflow:"
+	@echo "  make env-init PLATFORM=<eks|hetzner|vultr> EXECUTION_MODE=<parallel|sequential>"
+	@echo "  make profile-show"
+	@echo "  make render-tfvars"
+	@echo "  make shared-plan"
+	@echo "  make shared-apply"
+	@echo "  make experiment-plan"
+	@echo "  make experiment-apply"
+	@echo "  make setup-contexts"
+	@echo "  make create-secrets"
+	@echo "  make preflight-check"
+	@echo "  make measure-resource-baseline"
+	@echo "  make render-manifests IMAGE_TAG=<tag>"
+	@echo "  make deploy-workloads SCALING_MODE=<fixed|hpa> [ARCHITECTURE=monolith|microservices]"
+	@echo "  make verify-live-mode SCALING_MODE=<fixed|hpa> [ARCHITECTURE=monolith|microservices]"
+	@echo "  make run-benchmark-case SCENARIO=<name> TARGET_RPS=<rps> RUN_ID=<id> SCALING_MODE=<fixed|hpa> [ARCHITECTURE=monolith|microservices]"
+	@echo "  make run-benchmark-suite SCALING_MODE=<fixed|hpa> EXPERIMENT_NAME=<name>"
+	@echo "  make experiment-destroy-confirmed"
+	@echo "  make shared-destroy-confirmed"
+	@echo ""
+	@echo "Local Development:"
 	@echo "  make env-init-base"
 	@echo "  make env-init-datadog-minikube"
+	@echo "  make env-init-app"
 	@echo "  make env-init-monolith"
 	@echo "  make env-init-microservices"
-	@echo "  make env-init-eks"
-	@echo "  make env-init-hetzner"
 	@echo "  make fmt"
 	@echo "  make test"
 	@echo "  make lint"
@@ -89,124 +108,25 @@ help:
 	@echo "  make tidy"
 	@echo "  make proto"
 	@echo ""
-	@echo "Run locally with go run:"
-	@echo "  make run-monolith"
-	@echo "  make run-monolith-local"
-	@echo "  make run-api-gateway"
-	@echo "  make run-auth-service"
-	@echo "  make run-item-service"
-	@echo "  make run-transaction-service"
-	@echo "  make run-api-gateway-local"
-	@echo "  make run-auth-service-local"
-	@echo "  make run-item-service-local"
-	@echo "  make run-transaction-service-local"
-	@echo ""
-	@echo "Docker Compose:"
-	@echo "  make compose-db-up"
-	@echo "  make compose-monolith-up"
-	@echo "  make compose-microservices-up"
-	@echo "  make compose-down"
-	@echo ""
-	@echo "Migration:"
-	@echo "  make migrate-monolith-local"
-	@echo "  make migrate-monolith"
-	@echo "  make migrate-microservices"
-	@echo "  make migrate-microservices-local"
-	@echo ""
-	@echo "Seed and Reset:"
-	@echo "  make reset-monolith-data"
-	@echo "  make seed-monolith-data DATASET=smoke"
-	@echo "  make seed-monolith-data DATASET=benchmark"
-	@echo "  make prepare-monolith-enrichment-data DATASET=smoke"
-	@echo "  make prepare-monolith-enrichment-data DATASET=benchmark"
-	@echo "  make reset-microservices-data"
-	@echo "  make seed-microservices-data DATASET=smoke"
-	@echo "  make seed-microservices-data DATASET=benchmark"
-	@echo "  make prepare-microservices-enrichment-data DATASET=smoke"
-	@echo "  make prepare-microservices-enrichment-data DATASET=benchmark"
-	@echo ""
-	@echo "Minikube:"
-	@echo "  make minikube-start"
-	@echo "  make minikube-stop"
-	@echo "  make minikube-delete"
-	@echo "  make minikube-load-monolith"
-	@echo "  make minikube-load-microservices"
-	@echo "  make minikube-deploy-postgres"
-	@echo "  make minikube-sync-postgres-password  # internal recovery step"
-	@echo "  make minikube-db-bootstrap"
-	@echo "  make minikube-migrate-monolith"
-	@echo "  make minikube-reset-monolith-data"
-	@echo "  make minikube-seed-monolith-smoke"
-	@echo "  make minikube-seed-monolith-benchmark"
-	@echo "  make minikube-bootstrap-monolith-smoke"
-	@echo "  make minikube-bootstrap-monolith-benchmark"
-	@echo "  make minikube-prepare-monolith-enrichment-smoke"
-	@echo "  make minikube-prepare-monolith-enrichment-benchmark"
-	@echo "  make minikube-bootstrap-monolith-enrichment-smoke"
-	@echo "  make minikube-bootstrap-monolith-enrichment-benchmark"
-	@echo "  make minikube-deploy-monolith"
-	@echo "  make minikube-migrate-microservices"
-	@echo "  make minikube-reset-microservices-data"
-	@echo "  make minikube-seed-microservices-smoke"
-	@echo "  make minikube-seed-microservices-benchmark"
-	@echo "  make minikube-bootstrap-microservices-smoke"
-	@echo "  make minikube-bootstrap-microservices-benchmark"
-	@echo "  make minikube-prepare-microservices-enrichment-smoke"
-	@echo "  make minikube-prepare-microservices-enrichment-benchmark"
-	@echo "  make minikube-bootstrap-microservices-enrichment-smoke"
-	@echo "  make minikube-bootstrap-microservices-enrichment-benchmark"
-	@echo "  make minikube-deploy-microservices"
-	@echo "  make minikube-port-forward-monolith"
-	@echo "  make minikube-port-forward-api-gateway"
-	@echo "  make minikube-load-images"
-	@echo "  make minikube-deploy-monolith-hpa"
-	@echo "  make minikube-deploy-microservices-hpa"
-	@echo "  make datadog-secret"
-	@echo "  make datadog-install-minikube"
-	@echo "  make datadog-install-eks-monolith"
-	@echo "  make datadog-install-eks-msa"
-	@echo "  make datadog-status"
-	@echo "  make datadog-uninstall"
-	@echo "  make ecr-check-tag"
-	@echo "  make eks-show-image-tag"
-	@echo "  make eks-pin-image-tag IMAGE_TAG=<tag>"
-	@echo "  make eks-unpin-image-tag"
-	@echo "  make eks-render-manifests"
-	@echo "  make eks-render-tfvars"
-	@echo "  make terraform-auth-check"
-	@echo "  make benchmark-preflight-check"
-	@echo "  make terraform-recovery-check"
-	@echo "  make terraform-sequential-recovery-check"
-	@echo "  make terraform-recovery-fix-tainted-nodegroups      # dry-run safe untaint suggestions"
-	@echo "  make terraform-recovery-fix-tainted-nodegroups-apply # untaint active healthy node groups"
-	@echo "  make eks-prepare-enrichment-benchmark"
-	@echo "  make run-benchmark-suite SCALING_MODE=fixed EXPERIMENT_NAME=rq1-final TEST_DURATION=5m INTER_CASE_DELAY=120 AUTO_DESTROY_CONFIRMED=true SCENARIO_RPS_MATRIX=\"login:100,120,140,160,180,200;create-transaction:100,150,200,250,300,400,500;enriched-transactions:100,150,200,250,300,400,500\""
-	@echo "  make run-benchmark-suite-sequential SCALING_MODE=fixed ARCHITECTURE_ORDER=\"monolith microservices\" EXPERIMENT_NAME=rq1-fixed-sequential TEST_DURATION=5m INTER_CASE_DELAY=120 ARCHITECTURE_SWITCH_DELAY=300 SCENARIO_RPS_MATRIX=\"login:100,120,140;create-transaction:100,150,200;enriched-transactions:100,150,200\""
-	@echo "  # Optional login extension after the primary matrix:"
-	@echo "  make run-benchmark-suite SCALING_MODE=fixed EXPERIMENT_NAME=rq1-login-extension TEST_DURATION=5m INTER_CASE_DELAY=90 SCENARIOS=\"login\" RPS_LEVELS=\"225 250\""
-	@echo "  make eks-create-secrets"
-	@echo "  make create-eks-secrets-monolith"
-	@echo "  make create-eks-secrets-microservices"
-	@echo "  make eks-deploy-all"
-	@echo "  make eks-deploy-all-fixed"
-	@echo "  make eks-deploy-all-hpa"
-	@echo "  make hetzner-render-tfvars"
-	@echo "  make hetzner-shared-apply"
-	@echo "  make hetzner-sequential-apply"
-	@echo "  make hetzner-setup-context-sequential"
-	@echo "  make hetzner-create-secrets-sequential"
-	@echo "  make hetzner-measure-resource-baseline"
-	@echo "  make hetzner-deploy-sequential-architecture ARCHITECTURE=monolith SCALING_MODE=fixed"
-	@echo "  make run-benchmark-sequential-hetzner ARCHITECTURE=monolith SCENARIO=login TARGET_RPS=100 RUN_ID=hetzner-smoke"
+	@echo "Images:"
+	@echo "  make show-image-tag"
+	@echo "  make pin-image-tag IMAGE_TAG=<tag>"
+	@echo "  make unpin-image-tag"
 	@echo "  make dockerhub-push-all DOCKERHUB_NAMESPACE=<namespace>"
-	@echo "  make create-local-postgres-secrets"
-	@echo "  make create-local-secrets"
-	@echo "  make create-local-secrets-microservices"
+	@echo "  make ecr-push-all IMAGE_TAG=<tag>"
 	@echo ""
 
 # =========================
 # Local Env
 # =========================
+
+.PHONY: env-init
+env-init:
+	@PLATFORM="$(PLATFORM)" EXECUTION_MODE="$(EXECUTION_MODE)" bash scripts/env-init.sh
+
+.PHONY: profile-show
+profile-show:
+	@bash scripts/operator-dispatch.sh profile-show
 
 .PHONY: env-init-base
 env-init-base:
@@ -215,6 +135,10 @@ env-init-base:
 .PHONY: env-init-datadog-minikube
 env-init-datadog-minikube:
 	bash scripts/env-init-datadog-minikube.sh
+
+.PHONY: env-init-app
+env-init-app:
+	bash scripts/env-init-app.sh
 
 .PHONY: env-init-monolith
 env-init-monolith: env-init-base
@@ -225,7 +149,7 @@ env-init-microservices: env-init-base
 	bash scripts/env-init-microservices.sh
 
 .PHONY: env-init-eks
-env-init-eks:
+env-init-eks: env-init-app
 	bash scripts/env-init-eks.sh
 
 .PHONY: env-init-hetzner
@@ -236,9 +160,65 @@ env-init-hetzner:
 env-init-vultr:
 	bash scripts/env-init-vultr.sh
 
+.PHONY: render-tfvars
+render-tfvars:
+	bash scripts/operator-dispatch.sh render-tfvars
+
+.PHONY: shared-plan
+shared-plan:
+	bash scripts/operator-dispatch.sh shared-plan
+
+.PHONY: shared-apply
+shared-apply:
+	bash scripts/operator-dispatch.sh shared-apply
+
+.PHONY: shared-destroy-confirmed
+shared-destroy-confirmed:
+	bash scripts/operator-dispatch.sh shared-destroy-confirmed
+
+.PHONY: experiment-plan
+experiment-plan:
+	bash scripts/operator-dispatch.sh experiment-plan
+
+.PHONY: experiment-apply
+experiment-apply:
+	bash scripts/operator-dispatch.sh experiment-apply
+
+.PHONY: experiment-destroy-confirmed
+experiment-destroy-confirmed:
+	bash scripts/operator-dispatch.sh experiment-destroy-confirmed
+
+.PHONY: setup-contexts
+setup-contexts:
+	bash scripts/operator-dispatch.sh setup-contexts
+
+.PHONY: create-secrets
+create-secrets:
+	bash scripts/operator-dispatch.sh create-secrets
+
+.PHONY: preflight-check
+preflight-check:
+	bash scripts/operator-dispatch.sh preflight-check
+
 .PHONY: benchmark-preflight-check
 benchmark-preflight-check:
-	bash scripts/benchmark-preflight-check.sh
+	bash scripts/operator-dispatch.sh preflight-check
+
+.PHONY: measure-resource-baseline
+measure-resource-baseline:
+	bash scripts/operator-dispatch.sh measure-resource-baseline
+
+.PHONY: render-manifests
+render-manifests:
+	bash scripts/operator-dispatch.sh render-manifests
+
+.PHONY: verify-live-mode
+verify-live-mode:
+	SCALING_MODE=$(SCALING_MODE) EXECUTION_MODE=$(EXECUTION_MODE) ARCHITECTURE=$(ARCHITECTURE) bash scripts/operator-dispatch.sh verify-live-mode
+
+.PHONY: deploy-workloads
+deploy-workloads:
+	ARCHITECTURE=$(ARCHITECTURE) SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) bash scripts/operator-dispatch.sh deploy-workloads
 
 # =========================
 # Go Development
@@ -840,15 +820,15 @@ DATADOG_ENV ?= benchmark
 .PHONY: terraform-fmt
 terraform-fmt:
 	cd infra/terraform/aws-s3-writer && terraform fmt -recursive
-	cd infra/terraform/shared && terraform fmt -recursive
-	cd infra/terraform/experiment && terraform fmt -recursive
-	cd infra/terraform/experiment-sequential && terraform fmt -recursive
+	cd infra/terraform/aws-shared && terraform fmt -recursive
+	cd infra/terraform/aws-parallel && terraform fmt -recursive
+	cd infra/terraform/aws-sequential && terraform fmt -recursive
 	cd infra/terraform/hetzner-shared && terraform fmt -recursive
-	cd infra/terraform/hetzner-experiment-sequential && terraform fmt -recursive
-	cd infra/terraform/hetzner-experiment && terraform fmt -recursive
+	cd infra/terraform/hetzner-sequential && terraform fmt -recursive
+	cd infra/terraform/hetzner-parallel && terraform fmt -recursive
 	cd infra/terraform/vultr-shared && terraform fmt -recursive
-	cd infra/terraform/vultr-experiment-sequential && terraform fmt -recursive
-	cd infra/terraform/vultr-experiment && terraform fmt -recursive
+	cd infra/terraform/vultr-sequential && terraform fmt -recursive
+	cd infra/terraform/vultr-parallel && terraform fmt -recursive
 
 # =========================
 # AWS Persistent Resources (one-time setup)
@@ -919,30 +899,44 @@ ecr-check-tag:
 # ECR Image Build and Push
 # =========================
 
-IMAGE_TAG ?= $(shell if [ -f $(EKS_IMAGE_TAG_ENV) ]; then grep -E '^IMAGE_TAG=' $(EKS_IMAGE_TAG_ENV) | head -n 1 | cut -d= -f2-; else git rev-parse --short HEAD; fi)
+IMAGE_TAG ?= $(shell if [ -f $(SHARED_IMAGE_TAG_ENV) ]; then grep -E '^IMAGE_TAG=' $(SHARED_IMAGE_TAG_ENV) | head -n 1 | cut -d= -f2-; elif [ -f env/image-tag.eks.env ]; then grep -E '^IMAGE_TAG=' env/image-tag.eks.env | head -n 1 | cut -d= -f2-; else git rev-parse --short HEAD; fi)
 
-.PHONY: eks-show-image-tag
-eks-show-image-tag:
+.PHONY: show-image-tag
+show-image-tag:
 	@echo "IMAGE_TAG=$(IMAGE_TAG)"
-	@if [ -f $(EKS_IMAGE_TAG_ENV) ]; then \
-		echo "source=$(EKS_IMAGE_TAG_ENV)"; \
+	@if [ -f $(SHARED_IMAGE_TAG_ENV) ]; then \
+		echo "source=$(SHARED_IMAGE_TAG_ENV)"; \
+	elif [ -f env/image-tag.eks.env ]; then \
+		echo "source=env/image-tag.eks.env (legacy)"; \
 	else \
 		echo "source=git rev-parse --short HEAD"; \
 	fi
 
-.PHONY: eks-pin-image-tag
-eks-pin-image-tag:
+.PHONY: pin-image-tag
+pin-image-tag:
 	@if [ -z "$(IMAGE_TAG)" ]; then \
 		echo "IMAGE_TAG is required" >&2; \
 		exit 1; \
 	fi
-	@printf 'IMAGE_TAG=%s\n' "$(IMAGE_TAG)" > $(EKS_IMAGE_TAG_ENV)
-	@echo "Pinned EKS deploy IMAGE_TAG=$(IMAGE_TAG) in $(EKS_IMAGE_TAG_ENV)"
+	@printf 'IMAGE_TAG=%s\n' "$(IMAGE_TAG)" > $(SHARED_IMAGE_TAG_ENV)
+	@echo "Pinned deploy IMAGE_TAG=$(IMAGE_TAG) in $(SHARED_IMAGE_TAG_ENV)"
+
+.PHONY: unpin-image-tag
+unpin-image-tag:
+	rm -f $(SHARED_IMAGE_TAG_ENV)
+	@echo "Removed pinned deploy image tag file $(SHARED_IMAGE_TAG_ENV)"
+
+.PHONY: eks-show-image-tag
+eks-show-image-tag:
+	@$(MAKE) show-image-tag
+
+.PHONY: eks-pin-image-tag
+eks-pin-image-tag:
+	@$(MAKE) pin-image-tag IMAGE_TAG="$(IMAGE_TAG)"
 
 .PHONY: eks-unpin-image-tag
 eks-unpin-image-tag:
-	rm -f $(EKS_IMAGE_TAG_ENV)
-	@echo "Removed pinned EKS deploy image tag file $(EKS_IMAGE_TAG_ENV)"
+	@$(MAKE) unpin-image-tag
 
 .PHONY: ecr-push-all
 ecr-push-all: aws-ecr-login
@@ -1022,22 +1016,22 @@ eks-render-tfvars:
 terraform-validate:
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh init
 	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh validate
-	cd infra/terraform/shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
-	cd infra/terraform/experiment && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
-	cd infra/terraform/experiment-sequential && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
+	cd infra/terraform/aws-shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
+	cd infra/terraform/aws-parallel && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
+	cd infra/terraform/aws-sequential && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
 	cd infra/terraform/hetzner-shared && terraform validate
-	cd infra/terraform/hetzner-experiment-sequential && terraform validate
-	cd infra/terraform/hetzner-experiment && terraform validate
+	cd infra/terraform/hetzner-sequential && terraform validate
+	cd infra/terraform/hetzner-parallel && terraform validate
 	cd infra/terraform/vultr-shared && terraform validate
-	cd infra/terraform/vultr-experiment-sequential && terraform validate
-	cd infra/terraform/vultr-experiment && terraform validate
+	cd infra/terraform/vultr-sequential && terraform validate
+	cd infra/terraform/vultr-parallel && terraform validate
 
 .PHONY: terraform-auth-check
 terraform-auth-check:
 	@echo "Running terraform init for experiment auth check with AWS profile '$(TERRAFORM_AWS_PROFILE)'..."
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh init -input=false
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-parallel.sh init -input=false
 	@echo "Running terraform plan for experiment auth check with AWS profile '$(TERRAFORM_AWS_PROFILE)'..."
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh plan -input=false -lock=false -no-color >/dev/null
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-parallel.sh plan -input=false -lock=false -no-color >/dev/null
 	@echo "Terraform auth check passed with AWS profile '$(TERRAFORM_AWS_PROFILE)'"
 
 .PHONY: terraform-recovery-check
@@ -1073,26 +1067,26 @@ aws-s3-writer-destroy-confirmed:
 
 .PHONY: eks-shared-apply
 eks-shared-apply:
-	cd infra/terraform/shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform apply
+	cd infra/terraform/aws-shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform apply
 
 .PHONY: eks-shared-destroy
 eks-shared-destroy:
-	cd infra/terraform/shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform destroy
+	cd infra/terraform/aws-shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform init && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform destroy
 
 .PHONY: eks-apply
 eks-apply:
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh init
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh apply
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-parallel.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-parallel.sh apply
 
 .PHONY: eks-plan
 eks-plan:
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh init
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh plan -out=tfplan
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-parallel.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-parallel.sh plan -out=tfplan
 
 .PHONY: eks-destroy
 eks-destroy:
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh init
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-experiment.sh destroy
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-parallel.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-parallel.sh destroy
 
 .PHONY: eks-destroy-confirmed
 eks-destroy-confirmed:
@@ -1100,18 +1094,18 @@ eks-destroy-confirmed:
 
 .PHONY: eks-sequential-plan
 eks-sequential-plan:
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh init
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh plan -out=tfplan
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-sequential.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-sequential.sh plan -out=tfplan
 
 .PHONY: eks-sequential-apply
 eks-sequential-apply:
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh init
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh apply
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-sequential.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-sequential.sh apply
 
 .PHONY: eks-sequential-destroy
 eks-sequential-destroy:
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh init
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-sequential.sh destroy
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-sequential.sh init
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-sequential.sh destroy
 
 .PHONY: eks-sequential-destroy-confirmed
 eks-sequential-destroy-confirmed:
@@ -1366,6 +1360,25 @@ run-benchmark-parallel:
 	DATADOG_ENV=$(DATADOG_ENV) \
 	bash scripts/run-benchmark-parallel.sh
 
+.PHONY: run-benchmark-case
+run-benchmark-case:
+	ARCHITECTURE=$(ARCHITECTURE) \
+	SCENARIO=$(SCENARIO) \
+	TARGET_RPS=$(TARGET_RPS) \
+	RUN_ID=$(RUN_ID) \
+	ATTEMPT=$(ATTEMPT) \
+	SCALING_MODE=$(SCALING_MODE) \
+	K6_PROFILE=$(K6_PROFILE) \
+	TEST_DURATION=$(TEST_DURATION) \
+	S3_BUCKET=$(S3_BUCKET) \
+	DATADOG_ENABLED=$(DATADOG_ENABLED) \
+	DATADOG_ENV=$(DATADOG_ENV) \
+	ARCHITECTURE_ORDER="$(ARCHITECTURE_ORDER)" \
+	AWS_REGION=$(AWS_REGION) \
+	ECR_NAMESPACE=$(ECR_NAMESPACE) \
+	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) \
+	bash scripts/operator-dispatch.sh run-benchmark-case
+
 .PHONY: run-benchmark-suite
 run-benchmark-suite:
 	SCALING_MODE=$(SCALING_MODE) \
@@ -1383,7 +1396,9 @@ run-benchmark-suite:
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
 	AWS_REGION=$(AWS_REGION) \
-	bash scripts/run-benchmark-suite.sh
+	ECR_NAMESPACE=$(ECR_NAMESPACE) \
+	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) \
+	bash scripts/operator-dispatch.sh run-benchmark-suite
 
 .PHONY: run-benchmark-sequential
 run-benchmark-sequential:

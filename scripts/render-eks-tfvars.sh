@@ -9,7 +9,7 @@ required_files=(
 
 for file in "${required_files[@]}"; do
   if [[ ! -f "$file" ]]; then
-    echo "missing $file; run: make env-init-eks" >&2
+    echo "missing $file; run: make env-init PLATFORM=eks EXECUTION_MODE=parallel or EXECUTION_MODE=sequential" >&2
     exit 1
   fi
 done
@@ -122,7 +122,7 @@ format_hcl_string_list() {
 cluster_endpoint_public_access_cidrs_hcl="$(format_hcl_cidr_list "$cluster_endpoint_public_access_cidrs")"
 budget_alert_emails_hcl="$(format_hcl_string_list "$budget_alert_emails")"
 
-cat > infra/terraform/shared/terraform.tfvars <<EOF
+cat > infra/terraform/aws-shared/terraform.tfvars <<EOF
 aws_region        = "${shared_aws_region}"
 project           = "${shared_project}"
 monolith_cluster_name = "${monolith_cluster_name}"
@@ -136,7 +136,7 @@ budget_threshold_percent = ${budget_threshold_percent}
 budget_alert_emails      = ${budget_alert_emails_hcl}
 EOF
 
-cat > infra/terraform/experiment/terraform.tfvars <<EOF
+cat > infra/terraform/aws-parallel/terraform.tfvars <<EOF
 aws_region  = "${experiment_aws_region}"
 project     = "${experiment_project}"
 monolith_cluster_name = "${monolith_cluster_name}"
@@ -147,7 +147,7 @@ cluster_endpoint_public_access_cidrs = ${cluster_endpoint_public_access_cidrs_hc
 db_instance_class = "${experiment_db_instance_class}"
 EOF
 
-cat > infra/terraform/experiment-sequential/terraform.tfvars <<EOF
+cat > infra/terraform/aws-sequential/terraform.tfvars <<EOF
 aws_region  = "${experiment_aws_region}"
 project     = "${experiment_project}"
 sequential_cluster_name = "${sequential_cluster_name}"
@@ -158,6 +158,6 @@ db_instance_class = "${experiment_db_instance_class}"
 EOF
 
 echo "Rendered Terraform tfvars files:"
-echo "  infra/terraform/shared/terraform.tfvars"
-echo "  infra/terraform/experiment/terraform.tfvars"
-echo "  infra/terraform/experiment-sequential/terraform.tfvars"
+echo "  infra/terraform/aws-shared/terraform.tfvars"
+echo "  infra/terraform/aws-parallel/terraform.tfvars"
+echo "  infra/terraform/aws-sequential/terraform.tfvars"

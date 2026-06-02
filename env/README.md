@@ -18,13 +18,13 @@ Generated files:
 - `aws-benchmark.env`
 - `terraform.shared.env`
 - `terraform.experiment.env`
-- `datadog.eks.env`
-- `monolith.eks.env`
-- `api-gateway.eks.env`
-- `auth-service.eks.env`
-- `item-service.eks.env`
-- `transaction-service.eks.env`
-- `k6-runner.eks.env`
+- `datadog.shared.env`
+- `monolith.app.env`
+- `api-gateway.app.env`
+- `auth-service.app.env`
+- `item-service.app.env`
+- `transaction-service.app.env`
+- `k6-runner.app.env`
 - `api-gateway.env`
 - `auth-service.env`
 - `item-service.env`
@@ -46,6 +46,12 @@ For local monolith env files, run:
 make env-init-monolith
 ```
 
+For provider-neutral benchmark app env files, run:
+
+```bash
+make env-init-app
+```
+
 For AWS EKS helper env files, run:
 
 ```bash
@@ -65,42 +71,46 @@ make env-init-eks
 - `monolith.env`
 - `db-bootstrap.env`
 
+`make env-init-app` creates the provider-neutral benchmark app env files:
+
+- `datadog.shared.env`
+- `monolith.app.env`
+- `api-gateway.app.env`
+- `auth-service.app.env`
+- `item-service.app.env`
+- `transaction-service.app.env`
+- `k6-runner.app.env`
+
 `make env-init-eks` creates AWS benchmark helper env files:
 
 - `aws-benchmark.env`
 - `terraform.shared.env`
 - `terraform.experiment.env`
-- `datadog.eks.env`
-- `monolith.eks.env`
-- `api-gateway.eks.env`
-- `auth-service.eks.env`
-- `item-service.eks.env`
-- `transaction-service.eks.env`
-- `k6-runner.eks.env`
 
 `aws-benchmark.env` stores shared benchmark and AWS helper values such as
 `AWS_REGION`, `S3_BUCKET`, and `ECR_NAMESPACE`.
 
-`datadog.eks.env` stores Datadog-specific EKS values, including:
+`datadog.shared.env` stores shared Datadog values, including:
 
 - `DATADOG_API_KEY`
 - `DATADOG_SITE`
 
 Optional file:
 
-- `image-tag.eks.env`
+- `image-tag.env`
 
-When present, `image-tag.eks.env` pins the default EKS deployment `IMAGE_TAG`
-for Make targets and deploy scripts. This is useful when you want to keep
-deploying an existing ECR image tag across unrelated local commits.
+When present, `image-tag.env` pins the default deployment `IMAGE_TAG` for Make
+targets and deploy scripts. This is useful when you want to keep deploying an
+existing image tag across unrelated local commits.
 
-`k6-runner.eks.env` stores the benchmark admin credentials used by the k6
-runner secret during EKS benchmark setup.
+`k6-runner.app.env` stores the benchmark admin credentials used by the k6
+runner secret during benchmark setup.
 
 - `ADMIN_USER_EMAIL` defaults to `benchmark-user-001@example.com`
 - `ADMIN_USER_PASSWORD` is generated automatically as a strong random hex value
-- if an existing `k6-runner.eks.env` still contains the legacy weak value
-  `Password123!`, `make env-init-eks` rotates it automatically
+- if an existing legacy `k6-runner.eks.env` still contains the old weak value
+  `Password123!`, `make env-init-app` migrates it into the neutral file and
+  preserves the benchmark default password expected by the current repo flow
 
 `terraform.experiment.env` also stores the EKS version policy and the operator
 CIDR allowlist used to restrict the public EKS Kubernetes API endpoint.
@@ -133,16 +143,25 @@ These files are intended to make EKS setup repeatable:
 
 - `make eks-render-tfvars` renders Terraform `terraform.tfvars` from the
   `env/terraform.*.env` files without writing `DB_PASSWORD` into
-  `infra/terraform/experiment/terraform.tfvars`
+  `infra/terraform/aws-parallel/terraform.tfvars`
 - rendered experiment tfvars include `cluster_version` and
   `cluster_support_type` for both parallel and sequential stacks
-- `bash scripts/terraform-experiment.sh ...` and the Makefile Terraform targets
+- `bash scripts/terraform-aws-parallel.sh ...` and the Makefile Terraform targets
   source `env/terraform.experiment.env` and inject `TF_VAR_db_password` at
   runtime for the experiment stack
 - `make create-eks-secrets-monolith` creates monolith cluster secrets from the
-  EKS env files
+  neutral app env files plus EKS Terraform env files
 - `make create-eks-secrets-microservices` creates microservices cluster
-  secrets from the EKS env files
+  secrets from the neutral app env files plus EKS Terraform env files
+
+Legacy compatibility:
+
+- the repo still accepts legacy files such as `monolith.eks.env`,
+  `datadog.eks.env`, and `image-tag.eks.env` as fallback input
+- when a neutral file such as `monolith.app.env` already exists, it becomes
+  the source of truth
+- the legacy file names are deprecated and should only remain as temporary
+  compatibility helpers during migration
 
 The non-compose microservices env files use `localhost` and are intended for
 `go run` from the host.

@@ -13,13 +13,13 @@ flowchart TB
   s3["Amazon S3 results bucket<br/>experiments/{run_id}/..."]
   datadog["Datadog SaaS<br/>metrics, traces, logs"]
 
-  subgraph shared["Shared Terraform stack: infra/terraform/shared"]
+  subgraph shared["Shared Terraform stack: infra/terraform/aws-shared"]
     vpc["Shared VPC<br/>private app/RDS subnets<br/>public ELB/NAT subnets"]
     k6Role["IAM role: skripsi-k6-runner<br/>EKS Pod Identity for S3 upload"]
     budget["Budget shutdown guardrail<br/>parallel + sequential resource names"]
   end
 
-  operator -->|"make env-init-eks<br/>make eks-render-tfvars"| shared
+  operator -->|"make env-init PLATFORM=eks EXECUTION_MODE=parallel<br/>or EXECUTION_MODE=sequential<br/>then make eks-render-tfvars"| shared
   operator -->|"make ecr-push-all IMAGE_TAG=..."| ecr
 
   subgraph modeChoice["Choose exactly one active experiment topology under tight quota"]
@@ -29,7 +29,7 @@ flowchart TB
 
   shared --> modeChoice
 
-  subgraph parallel["Parallel experiment stack: infra/terraform/experiment"]
+  subgraph parallel["Parallel experiment stack: infra/terraform/aws-parallel"]
     monoCluster["EKS: skripsi-monolith<br/>kubectl context: monolith"]
     monoApp["namespace: mono<br/>monolith deployment<br/>Resource ceiling: 15800m CPU / 27648Mi"]
     monoBench["namespace: benchmark<br/>k6 job: k6-benchmark-monolith"]
@@ -43,7 +43,7 @@ flowchart TB
     msaDD["namespace: datadog<br/>cluster_name=skripsi-msa"]
   end
 
-  subgraph sequential["Sequential experiment stack: infra/terraform/experiment-sequential"]
+  subgraph sequential["Sequential experiment stack: infra/terraform/aws-sequential"]
     seqCluster["EKS: skripsi-benchmark<br/>kubectl context: benchmark"]
     seqMono["namespace: mono<br/>monolith deployment<br/>active only during monolith phase"]
     seqMsa["namespace: msa<br/>api-gateway, auth-service,<br/>item-service, transaction-service<br/>active only during microservices phase"]
@@ -119,10 +119,10 @@ flowchart TB
 - `INTER_CASE_DELAY` separates cases inside the same architecture phase.
 - `ARCHITECTURE_SWITCH_DELAY` separates monolith and microservices phases for
   cleaner Datadog resource windows.
-- Do not keep both `experiment` and `experiment-sequential` stacks active under
+- Do not keep both `aws-parallel` and `aws-sequential` stacks active under
   tight vCPU quota unless quota and cost have been explicitly reviewed.
-- Destroy an experiment stack only after expected S3 artifacts have been
-  verified.
+- Destroy an active Terraform benchmark stack only after expected S3 artifacts
+  have been verified.
 
 ## Switching Summary
 

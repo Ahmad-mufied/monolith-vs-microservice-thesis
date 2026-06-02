@@ -2,6 +2,8 @@
 # Run one k6 benchmark job for one architecture on the sequential cluster.
 set -euo pipefail
 
+source scripts/lib/shared-env.sh
+
 explicit_aws_region="${AWS_REGION:-}"
 explicit_ecr_namespace="${ECR_NAMESPACE:-}"
 explicit_s3_bucket="${S3_BUCKET:-}"
@@ -25,9 +27,10 @@ if [ -n "$explicit_s3_bucket" ]; then
   S3_BUCKET="$explicit_s3_bucket"
 fi
 
-if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
+image_tag_env_file="$(resolve_image_tag_env_file || true)"
+if [ -z "${IMAGE_TAG:-}" ] && [ -n "$image_tag_env_file" ]; then
   set -a
-  source env/image-tag.eks.env
+  source "$image_tag_env_file"
   set +a
 fi
 

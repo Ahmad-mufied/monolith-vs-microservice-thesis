@@ -4,10 +4,10 @@ set -euo pipefail
 env_file="env/terraform.experiment.env"
 terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
 terraform_command="${1:-}"
-tf_dir="infra/terraform/experiment-sequential"
+tf_dir="infra/terraform/aws-sequential"
 
 if [[ ! -f "$env_file" ]]; then
-  echo "missing $env_file; run: make env-init-eks" >&2
+  echo "missing $env_file; run: make env-init PLATFORM=eks EXECUTION_MODE=sequential" >&2
   exit 1
 fi
 

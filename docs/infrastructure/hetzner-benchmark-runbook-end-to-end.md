@@ -43,8 +43,8 @@ Choose the benchmark topology before provisioning.
 
 | Topology | Use when | Terraform stack | Kubernetes contexts |
 |---|---|---|---|
-| Sequential | one architecture active at a time, simpler final-thesis execution, lower concurrent cost | `infra/terraform/hetzner-experiment-sequential` | `benchmark` |
-| Parallel | monolith and microservices active at the same time, aligned Datadog time-series | `infra/terraform/hetzner-experiment` | `monolith`, `msa` |
+| Sequential | one architecture active at a time, simpler final-thesis execution, lower concurrent cost | `infra/terraform/hetzner-sequential` | `benchmark` |
+| Parallel | monolith and microservices active at the same time, aligned Datadog time-series | `infra/terraform/hetzner-parallel` | `monolith`, `msa` |
 
 Shared infrastructure is common to both:
 
@@ -109,26 +109,26 @@ make terraform-auth-check
 Required repository-side env/bootstrap files:
 
 ```bash
-make env-init-eks
+make env-init-app
 make env-init-hetzner
 ```
 
 Why both?
 
-- `env-init-eks` prepares the shared app/benchmark env files still reused by
-  the Hetzner scripts,
+- `env-init-app` prepares the shared app/benchmark env files reused by the
+  Hetzner scripts,
 - `env-init-hetzner` prepares the Hetzner-specific infrastructure env file.
 
 Expected generated files after initialization:
 
 ```text
 env/hetzner.env
-env/monolith.eks.env
-env/api-gateway.eks.env
-env/auth-service.eks.env
-env/item-service.eks.env
-env/transaction-service.eks.env
-env/k6-runner.eks.env
+env/monolith.app.env
+env/api-gateway.app.env
+env/auth-service.app.env
+env/item-service.app.env
+env/transaction-service.app.env
+env/k6-runner.app.env
 ```
 
 ---
@@ -286,8 +286,8 @@ This writes:
 
 ```text
 infra/terraform/hetzner-shared/terraform.tfvars
-infra/terraform/hetzner-experiment-sequential/terraform.tfvars
-infra/terraform/hetzner-experiment/terraform.tfvars
+infra/terraform/hetzner-sequential/terraform.tfvars
+infra/terraform/hetzner-parallel/terraform.tfvars
 ```
 
 Fail-fast behavior already included:
@@ -360,7 +360,7 @@ make hetzner-sequential-plan
 Expected sequential outputs after apply:
 
 ```bash
-terraform -chdir=infra/terraform/hetzner-experiment-sequential output
+terraform -chdir=infra/terraform/hetzner-sequential output
 ```
 
 Key outputs to note:
@@ -385,7 +385,7 @@ make hetzner-parallel-plan
 Expected parallel outputs after apply:
 
 ```bash
-terraform -chdir=infra/terraform/hetzner-experiment output
+terraform -chdir=infra/terraform/hetzner-parallel output
 ```
 
 Key outputs to note:
@@ -515,7 +515,7 @@ kubectl --context=msa get secrets -n benchmark
 If secret creation fails, check these first:
 
 - `env/hetzner.env` exists,
-- the `.eks.env` app files exist,
+- the `.app.env` app files exist,
 - the sequential or parallel Terraform stack has already been applied,
 - AWS S3 credentials are either present in env or available from
   `infra/terraform/aws-s3-writer` outputs.
@@ -962,7 +962,7 @@ Additional suite guidance:
 ### Case A — Fresh Sequential Thesis Run from Zero
 
 ```bash
-make env-init-eks
+make env-init-app
 make env-init-hetzner
 make dockerhub-push-all DOCKERHUB_NAMESPACE=<namespace> IMAGE_TAG=$IMAGE_TAG
 make hetzner-render-tfvars
@@ -1202,8 +1202,8 @@ The target Terraform stack is either not applied yet or the wrong stack/mode
 was selected. Re-check:
 
 ```bash
-terraform -chdir=infra/terraform/hetzner-experiment-sequential output
-terraform -chdir=infra/terraform/hetzner-experiment output
+terraform -chdir=infra/terraform/hetzner-sequential output
+terraform -chdir=infra/terraform/hetzner-parallel output
 ```
 
 ### `OPERATOR_CIDRS` rejected during tfvars render
@@ -1302,13 +1302,13 @@ Safe recovery:
 1. rerun:
 
 ```bash
-make env-init-eks
+make env-init-app
 make env-init-hetzner
 ```
 
 2. recheck:
    - `env/hetzner.env`
-   - app `.eks.env` files
+   - app `.app.env` files
    - `POSTGRES_PASSWORD`
    - `OPERATOR_CIDRS`
    - `OPERATOR_SSH_PUBLIC_KEY`
@@ -1375,8 +1375,8 @@ Safe recovery:
 
 ```bash
 terraform -chdir=infra/terraform/hetzner-shared output
-terraform -chdir=infra/terraform/hetzner-experiment-sequential output
-terraform -chdir=infra/terraform/hetzner-experiment output
+terraform -chdir=infra/terraform/hetzner-sequential output
+terraform -chdir=infra/terraform/hetzner-parallel output
 ```
 
 3. rerun the same apply target:
@@ -1446,7 +1446,7 @@ Symptoms:
 - `make hetzner-create-secrets-sequential` fails,
 - missing `postgres_private_ip`,
 - missing AWS S3 credentials,
-- missing `.eks.env` files.
+- missing `.app.env` files.
 
 Safe recovery:
 
@@ -1750,7 +1750,7 @@ Recommended explicit checkpoints:
 Minimal command outline:
 
 ```bash
-make env-init-eks
+make env-init-app
 make env-init-hetzner
 make dockerhub-push-all DOCKERHUB_NAMESPACE=<namespace> IMAGE_TAG=$IMAGE_TAG
 make hetzner-render-tfvars

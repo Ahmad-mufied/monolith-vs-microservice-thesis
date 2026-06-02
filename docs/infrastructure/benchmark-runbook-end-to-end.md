@@ -127,10 +127,10 @@ Choose the experiment topology before applying cost-heavy resources:
 
 | Mode | Use when | Terraform stack | Contexts |
 |---|---|---|---|
-| Parallel | you need aligned Datadog time-series and have enough quota | `infra/terraform/experiment` | `monolith`, `msa` |
-| Sequential | account quota or budget only allows one active benchmark stack | `infra/terraform/experiment-sequential` | `benchmark` |
-| Vultr parallel | you need high-vCPU Vultr VKE execution with aligned Datadog windows | `infra/terraform/vultr-experiment` | `monolith`, `msa` |
-| Vultr sequential | Vultr quota or budget only allows one active benchmark cluster | `infra/terraform/vultr-experiment-sequential` | `benchmark` |
+| Parallel | you need aligned Datadog time-series and have enough quota | `infra/terraform/aws-parallel` | `monolith`, `msa` |
+| Sequential | account quota or budget only allows one active benchmark stack | `infra/terraform/aws-sequential` | `benchmark` |
+| Vultr parallel | you need high-vCPU Vultr VKE execution with aligned Datadog windows | `infra/terraform/vultr-parallel` | `monolith`, `msa` |
+| Vultr sequential | Vultr quota or budget only allows one active benchmark cluster | `infra/terraform/vultr-sequential` | `benchmark` |
 
 The shared stack is common to both modes. Under a 24-vCPU quota, avoid keeping
 parallel and sequential experiment stacks active at the same time.
@@ -175,7 +175,7 @@ Sequential mode uses `skripsi-benchmark`. The expected support policy is
 ### Step 2.1 — Apply Shared Infrastructure (VPC + IAM)
 
 ```bash
-cd infra/terraform/shared
+cd infra/terraform/aws-shared
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars: set s3_results_bucket to the bucket name from Step 1.1
 ```
@@ -183,37 +183,39 @@ cp terraform.tfvars.example terraform.tfvars
 Optional helper flow:
 
 ```bash
-make env-init-eks
+make env-init PLATFORM=eks EXECUTION_MODE=parallel
 make eks-render-tfvars
 make terraform-auth-check
 ```
 
-This renders `infra/terraform/shared/terraform.tfvars` from
-`env/terraform.shared.env`.
+This renders `infra/terraform/aws-shared/terraform.tfvars` from
+`env/terraform.shared.env`. The consolidated command reads
+`env/operator-profile.env`, then runs the lower-level helper steps needed for
+AWS.
 
 ```bash
 make eks-shared-apply
 
-AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/shared output
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/aws-shared output
 # vpc_id, private_subnet_ids, k6_runner_role_arn
 ```
 
 ### Step 2.2 — Apply Parallel Experiment Clusters (Two EKS + Two RDS)
 
 ```bash
-cd infra/terraform/experiment
+cd infra/terraform/aws-parallel
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars:
 #   cluster_endpoint_public_access_cidrs = ["<operator-public-ip>/32"]
 ```
 
 If you used the helper flow above, `make eks-render-tfvars` also renders
-`infra/terraform/experiment/terraform.tfvars` from
+`infra/terraform/aws-parallel/terraform.tfvars` from
 `env/terraform.experiment.env`.
 
 `DB_PASSWORD` remains in `env/terraform.experiment.env` and is passed to the
 experiment Terraform stack at runtime through `TF_VAR_db_password`; it is not
-written into `infra/terraform/experiment/terraform.tfvars`.
+written into `infra/terraform/aws-parallel/terraform.tfvars`.
 
 Before rendering experiment tfvars, replace the generated
 `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS=REPLACE_WITH_OPERATOR_PUBLIC_IP_CIDR`
@@ -221,8 +223,8 @@ placeholder in `env/terraform.experiment.env` with your current operator public
 IP CIDR, for example `203.0.113.10/32`. For a single laptop operator this is
 normally a `/32`. Do not use `0.0.0.0/0`.
 
-By default, `make env-init-eks` now attempts to detect the current operator
-public IP automatically and writes it with
+By default, `make env-init PLATFORM=eks EXECUTION_MODE=parallel` now attempts
+to detect the current operator public IP automatically and writes it with
 `CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=auto`. If you want to pin a custom
 CIDR list instead, change the source to `manual` and maintain the CIDR value
 yourself.
@@ -239,13 +241,13 @@ updated in place.
 make eks-apply
 # Takes approximately 15-20 minutes
 
-AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment output
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/aws-parallel output
 # monolith_cluster_name, monolith_rds_endpoint
 # msa_cluster_name, msa_rds_endpoint
 ```
 
 `experiment` reads shared outputs from the local state file at
-`infra/terraform/shared/terraform.tfstate`. Apply `shared` first, then
+`infra/terraform/aws-shared/terraform.tfstate`. Apply `shared` first, then
 `experiment`, from the same laptop.
 
 ### Step 2.2b — Apply Sequential Experiment Cluster (One EKS + One RDS)
@@ -257,7 +259,7 @@ make terraform-sequential-recovery-check
 make eks-sequential-plan
 make eks-sequential-apply
 
-AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment-sequential output
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/aws-sequential output
 # sequential_cluster_name, sequential_rds_endpoint
 ```
 
@@ -314,7 +316,7 @@ Secrets must be created in each cluster before deploying applications.
 Optional helper flow before creating secrets:
 
 ```bash
-make env-init-eks
+make env-init PLATFORM=eks EXECUTION_MODE=parallel
 make eks-render-tfvars
 make terraform-auth-check
 ```
@@ -341,7 +343,7 @@ make eks-create-secrets-sequential
 ### Step 4.1 — Monolith Cluster Secrets
 
 ```bash
-MONOLITH_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment output -raw monolith_rds_endpoint)
+MONOLITH_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/aws-parallel output -raw monolith_rds_endpoint)
 DB_PASSWORD="<same password from env/terraform.experiment.env>"
 DB_PASSWORD_URI_ENCODED=$(printf '%s' "$DB_PASSWORD" | jq -sRr @uri)
 JWT_SECRET="<generate: openssl rand -hex 32>"
@@ -388,7 +390,7 @@ kubectl --context=monolith create secret generic k6-runner-secret \
 ### Step 4.2 — MSA Cluster Secrets
 
 ```bash
-MSA_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment output -raw msa_rds_endpoint)
+MSA_RDS=$(AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/aws-parallel output -raw msa_rds_endpoint)
 DB_PASSWORD="<same password>"
 DB_PASSWORD_URI_ENCODED=$(printf '%s' "$DB_PASSWORD" | jq -sRr @uri)
 JWT_SECRET="<same JWT secret>"

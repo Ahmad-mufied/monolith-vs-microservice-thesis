@@ -17,7 +17,7 @@ esac
 
 env_file="env/hetzner.env"
 if [ ! -f "$env_file" ]; then
-  echo "missing $env_file; run: make env-init-hetzner" >&2
+  echo "missing $env_file; run: make env-init PLATFORM=hetzner EXECUTION_MODE=<parallel|sequential>" >&2
   exit 1
 fi
 
@@ -29,9 +29,9 @@ set +a
 
 terraform_dir="infra/terraform/hetzner-${stack}"
 if [ "$stack" = "sequential" ]; then
-  terraform_dir="infra/terraform/hetzner-experiment-sequential"
+  terraform_dir="infra/terraform/hetzner-sequential"
 elif [ "$stack" = "parallel" ]; then
-  terraform_dir="infra/terraform/hetzner-experiment"
+  terraform_dir="infra/terraform/hetzner-parallel"
 fi
 
 terraform_command="${1:-}"

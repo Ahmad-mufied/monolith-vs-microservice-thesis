@@ -32,7 +32,7 @@ flowchart TB
       k6Role["Shared IAM role<br/>skripsi-k6-runner<br/>EKS Pod Identity"]
 
       subgraph vpc["Shared VPC<br/>private app/RDS subnets, public ELB/NAT subnets"]
-        subgraph experimentTf["Parallel stack: infra/terraform/experiment"]
+        subgraph experimentTf["Parallel stack: infra/terraform/aws-parallel"]
           subgraph monoCluster["EKS cluster: skripsi-monolith"]
             monoAppNodes["app-nodes<br/>2 x c8i.2xlarge<br/>node-group=app"]
             monoTesting["testing-nodes<br/>1 x c8i-flex.large<br/>node-group=testing<br/>taint workload=benchmark"]
@@ -108,7 +108,7 @@ flowchart TB
       k6Role["Shared IAM role<br/>skripsi-k6-runner<br/>EKS Pod Identity"]
 
       subgraph vpc["Shared VPC<br/>private app/RDS subnets, public ELB/NAT subnets"]
-        subgraph sequentialTf["Sequential stack: infra/terraform/experiment-sequential"]
+        subgraph sequentialTf["Sequential stack: infra/terraform/aws-sequential"]
           subgraph benchmarkCluster["EKS cluster: skripsi-benchmark"]
             seqAppNodes["app-nodes<br/>2 x c8i.2xlarge<br/>node-group=app"]
             seqTesting["testing-nodes<br/>1 x c8i-flex.large<br/>node-group=testing<br/>taint workload=benchmark"]
@@ -154,11 +154,12 @@ flowchart TB
 
 - S3 and ECR are persistent resources and are not destroyed by Terraform.
 - VPC and the k6 IAM role come from the shared Terraform stack.
-- Parallel mode uses `infra/terraform/experiment`; sequential mode uses
-  `infra/terraform/experiment-sequential`.
+- Parallel mode uses `infra/terraform/aws-parallel`; sequential mode uses
+  `infra/terraform/aws-sequential`.
 - Application pods run on `app-nodes`; k6 runner jobs run on `testing-nodes`.
 - Parallel mode isolates monolith and microservices by cluster and RDS instance.
 - Sequential mode isolates benchmark phases by scaling the inactive architecture
   to zero before migration, seed, and k6 execution.
-- Do not keep both experiment stacks active under a constrained vCPU quota; use
-  the switching flow in `docs/diagrams/sequential-parallel-topology.md`.
+- Do not keep both `aws-parallel` and `aws-sequential` active under a
+  constrained vCPU quota; use the switching flow in
+  `docs/diagrams/sequential-parallel-topology.md`.

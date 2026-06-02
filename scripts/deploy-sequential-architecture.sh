@@ -2,9 +2,17 @@
 # Deploy exactly one architecture on the single sequential EKS cluster.
 set -euo pipefail
 
+source scripts/lib/shared-env.sh
+
 DATADOG_SITE_EXPLICIT_OVERRIDE=""
 if [ "${DATADOG_SITE+x}" = "x" ]; then
   DATADOG_SITE_EXPLICIT_OVERRIDE="$DATADOG_SITE"
+fi
+DATADOG_API_KEY_EXPLICIT_OVERRIDE_SET="0"
+DATADOG_API_KEY_EXPLICIT_OVERRIDE_VALUE=""
+if [ "${DATADOG_API_KEY+x}" = "x" ]; then
+  DATADOG_API_KEY_EXPLICIT_OVERRIDE_SET="1"
+  DATADOG_API_KEY_EXPLICIT_OVERRIDE_VALUE="$DATADOG_API_KEY"
 fi
 
 if [ -f env/aws-benchmark.env ]; then
@@ -16,9 +24,10 @@ fi
 source scripts/lib/cloud-provider.sh
 load_cloud_provider_env
 
-if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
+image_tag_env_file="$(resolve_image_tag_env_file || true)"
+if [ -z "${IMAGE_TAG:-}" ] && [ -n "$image_tag_env_file" ]; then
   set -a
-  source env/image-tag.eks.env
+  source "$image_tag_env_file"
   set +a
 fi
 
@@ -97,10 +106,14 @@ scale_down_microservices() {
 install_datadog_if_configured() {
   DATADOG_API_KEY="${DATADOG_API_KEY:-}"
   DATADOG_CHART_VERSION="${DATADOG_CHART_VERSION:-3.134.0}"
-  if [ -f env/datadog.eks.env ]; then
+  datadog_env_file="$(resolve_datadog_env_file || true)"
+  if [ -n "$datadog_env_file" ]; then
     set -a
-    source env/datadog.eks.env
+    source "$datadog_env_file"
     set +a
+  fi
+  if [ "$DATADOG_API_KEY_EXPLICIT_OVERRIDE_SET" = "1" ]; then
+    DATADOG_API_KEY="$DATADOG_API_KEY_EXPLICIT_OVERRIDE_VALUE"
   fi
   if [ -n "$DATADOG_SITE_EXPLICIT_OVERRIDE" ]; then
     DATADOG_SITE="$DATADOG_SITE_EXPLICIT_OVERRIDE"

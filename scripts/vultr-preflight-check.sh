@@ -3,7 +3,7 @@ set -euo pipefail
 
 env_file="env/vultr.env"
 if [ ! -f "$env_file" ]; then
-  echo "missing $env_file; run: make env-init-vultr" >&2
+  echo "missing $env_file; run: make env-init PLATFORM=vultr EXECUTION_MODE=<parallel|sequential>" >&2
   exit 1
 fi
 

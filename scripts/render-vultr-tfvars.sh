@@ -4,7 +4,7 @@ umask 077
 
 env_file="env/vultr.env"
 if [ ! -f "$env_file" ]; then
-  echo "missing $env_file; run: make env-init-vultr" >&2
+  echo "missing $env_file; run: make env-init PLATFORM=vultr EXECUTION_MODE=parallel or EXECUTION_MODE=sequential" >&2
   exit 1
 fi
 
@@ -68,7 +68,7 @@ operator_cidrs          = ${operator_cidrs_hcl}
 operator_ssh_public_key = "${OPERATOR_SSH_PUBLIC_KEY}"
 EOF
 
-cat > infra/terraform/vultr-experiment/terraform.tfvars <<EOF
+cat > infra/terraform/vultr-parallel/terraform.tfvars <<EOF
 project                   = "${PROJECT:-skripsi}"
 region                    = "${VULTR_REGION:-sgp}"
 kubernetes_version        = "${VULTR_KUBERNETES_VERSION:-v1.33.0+1}"
@@ -80,7 +80,7 @@ postgres_plan             = "${VULTR_POSTGRES_PLAN:-vc2-4c-8gb}"
 postgres_os_id            = ${VULTR_POSTGRES_OS_ID:-1743}
 EOF
 
-cat > infra/terraform/vultr-experiment-sequential/terraform.tfvars <<EOF
+cat > infra/terraform/vultr-sequential/terraform.tfvars <<EOF
 project                   = "${PROJECT:-skripsi}"
 region                    = "${VULTR_REGION:-sgp}"
 kubernetes_version        = "${VULTR_KUBERNETES_VERSION:-v1.33.0+1}"

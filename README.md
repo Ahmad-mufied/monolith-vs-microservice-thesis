@@ -204,13 +204,18 @@ tokens, or operator-specific values.
 make env-init-base
 make env-init-monolith
 make env-init-microservices
-make env-init-eks
+make env-init PLATFORM=eks EXECUTION_MODE=parallel
 ```
 
 Useful references:
 
 - [`env/README.md`](env/README.md)
 - [`docs/infrastructure/secret-management.md`](docs/infrastructure/secret-management.md)
+
+For benchmark operators, `make env-init ...` is the primary entry point. It
+dispatches through `env/operator-profile.env` and then updates the provider
+helper files plus shared `env/*.app.env` inputs that later feed secret creation
+and Terraform rendering.
 
 ## Local Development
 
@@ -313,7 +318,7 @@ make ecr-push-all IMAGE_TAG=$IMAGE_TAG
 make eks-render-manifests IMAGE_TAG=$IMAGE_TAG
 
 # Terraform env and auth
-make env-init-eks
+make env-init PLATFORM=eks EXECUTION_MODE=parallel
 make eks-render-tfvars
 make terraform-auth-check
 
@@ -338,6 +343,8 @@ make run-benchmark-parallel \
 Quota-constrained alternative:
 
 ```bash
+make env-init PLATFORM=eks EXECUTION_MODE=sequential
+make eks-render-tfvars
 make eks-sequential-apply
 make eks-setup-context-sequential
 make eks-create-secrets-sequential

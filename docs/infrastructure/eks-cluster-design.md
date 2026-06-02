@@ -319,7 +319,7 @@ make eks-sequential-apply
 ```
 
 Both stacks use local Terraform state. The `experiment` stack reads shared
-outputs from `infra/terraform/shared/terraform.tfstate` via
+outputs from `infra/terraform/aws-shared/terraform.tfstate` via
 `terraform_remote_state` with the `local` backend. Both stacks must be
 applied from the same laptop.
 

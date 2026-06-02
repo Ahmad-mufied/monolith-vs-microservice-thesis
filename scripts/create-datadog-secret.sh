@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source scripts/lib/shared-env.sh
+
 namespace="${DATADOG_NAMESPACE:-datadog}"
 secret_name="${DATADOG_SECRET_NAME:-datadog-secret}"
 site="${DATADOG_SITE:-datadoghq.com}"
@@ -17,9 +19,10 @@ has_non_placeholder_datadog_api_key() {
   return 0
 }
 
-if [[ -z "${DATADOG_API_KEY:-}" && -f env/datadog.eks.env ]]; then
+datadog_env_file="$(resolve_datadog_env_file || true)"
+if [[ -z "${DATADOG_API_KEY:-}" && -n "$datadog_env_file" ]]; then
   set -a
-  source env/datadog.eks.env
+  source "$datadog_env_file"
   set +a
   site="${DATADOG_SITE:-$site}"
 fi

@@ -4,7 +4,7 @@ umask 077
 
 env_file="env/hetzner.env"
 if [ ! -f "$env_file" ]; then
-  echo "missing $env_file; run: make env-init-hetzner" >&2
+  echo "missing $env_file; run: make env-init PLATFORM=hetzner EXECUTION_MODE=parallel or EXECUTION_MODE=sequential" >&2
   exit 1
 fi
 
@@ -71,7 +71,7 @@ operator_ssh_public_key = "${OPERATOR_SSH_PUBLIC_KEY}"
 network_zone            = "${HCLOUD_NETWORK_ZONE:-ap-southeast}"
 EOF
 
-cat > infra/terraform/hetzner-experiment-sequential/terraform.tfvars <<EOF
+cat > infra/terraform/hetzner-sequential/terraform.tfvars <<EOF
 hcloud_token              = "${HCLOUD_TOKEN}"
 project                   = "${PROJECT:-skripsi}"
 location                  = "${HCLOUD_LOCATION:-sin}"
@@ -82,7 +82,7 @@ testing_server_type       = "${HETZNER_TESTING_SERVER_TYPE:-ccx23}"
 postgres_server_type      = "${HETZNER_POSTGRES_SERVER_TYPE:-ccx33}"
 EOF
 
-cat > infra/terraform/hetzner-experiment/terraform.tfvars <<EOF
+cat > infra/terraform/hetzner-parallel/terraform.tfvars <<EOF
 hcloud_token              = "${HCLOUD_TOKEN}"
 project                   = "${PROJECT:-skripsi}"
 location                  = "${HCLOUD_LOCATION:-sin}"

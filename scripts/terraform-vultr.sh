@@ -17,7 +17,7 @@ esac
 
 env_file="env/vultr.env"
 if [ ! -f "$env_file" ]; then
-  echo "missing $env_file; run: make env-init-vultr" >&2
+  echo "missing $env_file; run: make env-init PLATFORM=vultr EXECUTION_MODE=<parallel|sequential>" >&2
   exit 1
 fi
 
@@ -30,9 +30,9 @@ export VULTR_API_KEY
 
 terraform_dir="infra/terraform/vultr-${stack}"
 if [ "$stack" = "sequential" ]; then
-  terraform_dir="infra/terraform/vultr-experiment-sequential"
+  terraform_dir="infra/terraform/vultr-sequential"
 elif [ "$stack" = "parallel" ]; then
-  terraform_dir="infra/terraform/vultr-experiment"
+  terraform_dir="infra/terraform/vultr-parallel"
 fi
 
 terraform_command="${1:-}"
@@ -55,4 +55,3 @@ echo "  dir   : $terraform_dir"
 echo ""
 
 terraform -chdir="$terraform_dir" "$@"
-

@@ -13,8 +13,8 @@ terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
 aws_region="${AWS_REGION:-ap-southeast-1}"
 cluster_name="${SEQUENTIAL_CLUSTER_NAME:-skripsi-benchmark}"
 rds_identifier="${cluster_name}-postgres"
-tf_shared_dir="infra/terraform/shared"
-tf_sequential_dir="infra/terraform/experiment-sequential"
+tf_shared_dir="infra/terraform/aws-shared"
+tf_sequential_dir="infra/terraform/aws-sequential"
 
 terraform_with_profile() {
   AWS_PROFILE="$terraform_aws_profile" terraform "$@"
@@ -126,4 +126,4 @@ if [[ "$blocked" -ne 0 ]]; then
 fi
 
 echo "Next:"
-echo "  TERRAFORM_AWS_PROFILE=$terraform_aws_profile bash scripts/terraform-sequential.sh plan -input=false -lock=false -no-color"
+echo "  TERRAFORM_AWS_PROFILE=$terraform_aws_profile bash scripts/terraform-aws-sequential.sh plan -input=false -lock=false -no-color"
