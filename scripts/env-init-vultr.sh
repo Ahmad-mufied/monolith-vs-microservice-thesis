@@ -72,14 +72,21 @@ write_or_update_env_value() {
 }
 
 detect_ssh_public_key() {
-  local key_path
+  local key_path key_line
   if command -v ssh-add >/dev/null 2>&1; then
-    ssh-add -L 2>/dev/null | awk 'NR==1 {print; exit}' && return 0
+    key_line="$(ssh-add -L 2>/dev/null | awk '/^(ssh-ed25519|ssh-rsa|ecdsa-sha2-)/ {print; exit}' || true)"
+    if [ -n "$key_line" ]; then
+      printf '%s\n' "$key_line"
+      return 0
+    fi
   fi
   for key_path in "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/id_rsa.pub"; do
     if [ -f "$key_path" ]; then
-      cat "$key_path"
-      return 0
+      key_line="$(awk '/^(ssh-ed25519|ssh-rsa|ecdsa-sha2-)/ {print; exit}' "$key_path")"
+      if [ -n "$key_line" ]; then
+        printf '%s\n' "$key_line"
+        return 0
+      fi
     fi
   done
   return 1
