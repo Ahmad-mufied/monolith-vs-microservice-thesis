@@ -1068,6 +1068,7 @@ aws-s3-writer-apply:
 
 .PHONY: aws-s3-writer-destroy-confirmed
 aws-s3-writer-destroy-confirmed:
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh init
 	S3_BENCHMARK_DATA_VERIFIED=true TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/terraform-aws-s3-writer.sh destroy
 
 .PHONY: eks-shared-apply
