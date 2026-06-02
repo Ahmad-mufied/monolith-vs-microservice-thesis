@@ -29,14 +29,23 @@ echo "  region          : ${VULTR_REGION:-sgp}"
 echo "  dockerhub_ns    : $DOCKERHUB_NAMESPACE"
 echo "  s3_bucket       : $S3_BUCKET"
 
-aws sts get-caller-identity >/dev/null
-aws s3api head-bucket --bucket "$S3_BUCKET" >/dev/null
-
 if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
   echo "ERROR: Vultr k6 S3 writer credentials are not available." >&2
   echo "Fix: run 'make aws-s3-writer-apply' or set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY manually in env/vultr.env." >&2
   exit 1
 fi
+
+aws_env=(
+  "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
+  "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
+  "AWS_REGION=$AWS_REGION"
+)
+if [ -n "${AWS_SESSION_TOKEN:-}" ]; then
+  aws_env+=("AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN")
+fi
+
+env "${aws_env[@]}" aws sts get-caller-identity >/dev/null
+env "${aws_env[@]}" aws s3api head-bucket --bucket "$S3_BUCKET" >/dev/null
 
 if [ -f env/vultr-resource-baseline.env ]; then
   source env/vultr-resource-baseline.env
