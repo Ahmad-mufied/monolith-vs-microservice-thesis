@@ -20,15 +20,21 @@ auth_service_env_file="$(resolve_app_env_file auth-service || true)"
 item_service_env_file="$(resolve_app_env_file item-service || true)"
 transaction_service_env_file="$(resolve_app_env_file transaction-service || true)"
 k6_runner_env_file="$(resolve_app_env_file k6-runner || true)"
+monolith_env_file="${monolith_env_file:-env/monolith.app.env}"
+api_gateway_env_file="${api_gateway_env_file:-env/api-gateway.app.env}"
+auth_service_env_file="${auth_service_env_file:-env/auth-service.app.env}"
+item_service_env_file="${item_service_env_file:-env/item-service.app.env}"
+transaction_service_env_file="${transaction_service_env_file:-env/transaction-service.app.env}"
+k6_runner_env_file="${k6_runner_env_file:-env/k6-runner.app.env}"
 
 required_files=(
-  "${monolith_env_file:-env/monolith.app.env}"
-  "${api_gateway_env_file:-env/api-gateway.app.env}"
-  "${auth_service_env_file:-env/auth-service.app.env}"
-  "${item_service_env_file:-env/item-service.app.env}"
-  "${transaction_service_env_file:-env/transaction-service.app.env}"
+  "$monolith_env_file"
+  "$api_gateway_env_file"
+  "$auth_service_env_file"
+  "$item_service_env_file"
+  "$transaction_service_env_file"
   env/terraform.experiment.env
-  "${k6_runner_env_file:-env/k6-runner.app.env}"
+  "$k6_runner_env_file"
 )
 
 for file in "${required_files[@]}"; do

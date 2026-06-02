@@ -18,8 +18,11 @@ read_env_value() {
 api_gateway_env_file="$(resolve_app_env_file api-gateway || true)"
 auth_service_env_file="$(resolve_app_env_file auth-service || true)"
 k6_runner_env_file="$(resolve_app_env_file k6-runner || true)"
+api_gateway_env_file="${api_gateway_env_file:-env/api-gateway.app.env}"
+auth_service_env_file="${auth_service_env_file:-env/auth-service.app.env}"
+k6_runner_env_file="${k6_runner_env_file:-env/k6-runner.app.env}"
 
-for file in env/hetzner.env "${api_gateway_env_file:-env/api-gateway.app.env}" "${auth_service_env_file:-env/auth-service.app.env}" "${k6_runner_env_file:-env/k6-runner.app.env}"; do
+for file in env/hetzner.env "$api_gateway_env_file" "$auth_service_env_file" "$k6_runner_env_file"; do
   [ -f "$file" ] || {
     echo "missing $file; run: make env-init-app and make env-init-hetzner" >&2
     exit 1

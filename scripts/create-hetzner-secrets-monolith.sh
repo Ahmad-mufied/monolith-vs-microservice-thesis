@@ -17,8 +17,10 @@ read_env_value() {
 
 monolith_env_file="$(resolve_app_env_file monolith || true)"
 k6_runner_env_file="$(resolve_app_env_file k6-runner || true)"
+monolith_env_file="${monolith_env_file:-env/monolith.app.env}"
+k6_runner_env_file="${k6_runner_env_file:-env/k6-runner.app.env}"
 
-for file in env/hetzner.env "${monolith_env_file:-env/monolith.app.env}" "${k6_runner_env_file:-env/k6-runner.app.env}"; do
+for file in env/hetzner.env "$monolith_env_file" "$k6_runner_env_file"; do
   [ -f "$file" ] || {
     echo "missing $file; run: make env-init-app and make env-init-hetzner" >&2
     exit 1
