@@ -146,6 +146,13 @@ write_or_update_env_value "$env_file" "OPERATOR_CIDRS_SOURCE" "$operator_cidr_so
 write_or_update_env_value "$env_file" "OPERATOR_SSH_PUBLIC_KEY" "$operator_ssh_key"
 write_or_update_env_value "$env_file" "OPERATOR_SSH_PUBLIC_KEY_SOURCE" "$operator_ssh_key_source"
 
+current_vultr_api_key="$(read_env_value "$env_file" VULTR_API_KEY)"
+current_dockerhub_namespace="$(read_env_value "$env_file" DOCKERHUB_NAMESPACE)"
+
 echo "Vultr env initialization complete"
 echo "  file: $env_file"
-echo "  next: edit VULTR_API_KEY and DOCKERHUB_NAMESPACE if they are still placeholders"
+if [ "$current_vultr_api_key" = "replace-me" ] || [ "$current_dockerhub_namespace" = "replace-me" ]; then
+  echo "  next: edit VULTR_API_KEY and DOCKERHUB_NAMESPACE if they are still placeholders"
+else
+  echo "  next: source env/vultr.env, then run make vultr-preflight-check"
+fi
