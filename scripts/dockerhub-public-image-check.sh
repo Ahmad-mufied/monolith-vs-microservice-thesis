@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ -z "${DOCKERHUB_NAMESPACE:-}" ]; then
+  for env_file in env/vultr.env env/hetzner.env; do
+    if [ -f "$env_file" ]; then
+      set -a
+      source "$env_file"
+      set +a
+      break
+    fi
+  done
+fi
+
 namespace="${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}"
 image_tag="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 
