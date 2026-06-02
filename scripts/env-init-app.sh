@@ -93,16 +93,6 @@ migrate_if_missing() {
   echo "migrated $legacy -> $preferred"
 }
 
-jwt_secret_file="$(resolve_app_env_file monolith || true)"
-jwt_secret="$(read_env_value "${jwt_secret_file:-env/monolith.app.env}" JWT_SECRET)"
-jwt_secret="${jwt_secret:-$(random_hex 32)}"
-
-benchmark_k6_runner_password="Password123!"
-k6_runner_file="$(resolve_app_env_file k6-runner || true)"
-k6_runner_email="$(read_env_value "${k6_runner_file:-env/k6-runner.app.env}" ADMIN_USER_EMAIL)"
-k6_runner_email="${k6_runner_email:-benchmark-user-001@example.com}"
-k6_runner_password="$(read_env_value "${k6_runner_file:-env/k6-runner.app.env}" ADMIN_USER_PASSWORD)"
-
 migrate_if_missing "env/datadog.shared.env" "env/datadog.eks.env"
 migrate_if_missing "env/monolith.app.env" "env/monolith.eks.env"
 migrate_if_missing "env/api-gateway.app.env" "env/api-gateway.eks.env"
@@ -110,6 +100,42 @@ migrate_if_missing "env/auth-service.app.env" "env/auth-service.eks.env"
 migrate_if_missing "env/item-service.app.env" "env/item-service.eks.env"
 migrate_if_missing "env/transaction-service.app.env" "env/transaction-service.eks.env"
 migrate_if_missing "env/k6-runner.app.env" "env/k6-runner.eks.env"
+
+resolve_shared_jwt_secret() {
+  local service env_file jwt_secret
+
+  for service in monolith api-gateway auth-service; do
+    env_file="$(resolve_app_env_file "$service" || true)"
+    case "$service" in
+      monolith)
+        env_file="${env_file:-env/monolith.app.env}"
+        ;;
+      api-gateway)
+        env_file="${env_file:-env/api-gateway.app.env}"
+        ;;
+      auth-service)
+        env_file="${env_file:-env/auth-service.app.env}"
+        ;;
+    esac
+
+    jwt_secret="$(read_env_value "$env_file" JWT_SECRET)"
+    if [[ -n "$jwt_secret" ]]; then
+      printf '%s\n' "$jwt_secret"
+      return 0
+    fi
+  done
+
+  return 0
+}
+
+jwt_secret="$(resolve_shared_jwt_secret)"
+jwt_secret="${jwt_secret:-$(random_hex 32)}"
+
+benchmark_k6_runner_password="Password123!"
+k6_runner_file="$(resolve_app_env_file k6-runner || true)"
+k6_runner_email="$(read_env_value "${k6_runner_file:-env/k6-runner.app.env}" ADMIN_USER_EMAIL)"
+k6_runner_email="${k6_runner_email:-benchmark-user-001@example.com}"
+k6_runner_password="$(read_env_value "${k6_runner_file:-env/k6-runner.app.env}" ADMIN_USER_PASSWORD)"
 
 write_if_missing "env/datadog.shared.env" "DATADOG_API_KEY=replace-me
 DATADOG_SITE=datadoghq.com"
