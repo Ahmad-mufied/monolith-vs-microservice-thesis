@@ -42,6 +42,37 @@ Parallel mode is the default target for final benchmark runs. Sequential mode
 is valid for smoke tests, quota-constrained iteration, and fallback execution,
 but its metadata must be interpreted as separate time windows.
 
+Quick decision guide:
+
+| Case | Recommended path |
+|---|---|
+| First real integration test | Sequential smoke first, then parallel smoke |
+| Final thesis run with enough quota | Parallel fixed suite, then parallel HPA suite |
+| Vultr quota cannot create both clusters | Sequential fixed/HPA suites |
+| Image or secret changes during debugging | Redeploy the affected mode before rerunning k6 |
+| Resource baseline file is missing | Measure live allocatable capacity before render/deploy |
+| S3 upload is not verified | Do not destroy experiment resources yet |
+
+The safest operator flow is:
+
+```text
+env init
+-> source env
+-> build and push one pinned image tag
+-> preflight
+-> render tfvars
+-> shared apply
+-> sequential or parallel apply
+-> setup context
+-> create secrets
+-> measure resource baseline
+-> deploy fixed or HPA
+-> smoke
+-> full suite
+-> verify S3
+-> guarded destroy
+```
+
 ## Phase 0 - Local Prerequisites
 
 Install and verify these tools:
@@ -66,31 +97,7 @@ Datadog API key      : optional but expected for measured thesis runs
 Do not commit local env files, generated `terraform.tfvars`, kubeconfigs,
 Terraform state, or secret values.
 
-## Phase 1 - Build and Push Images
-
-Vultr uses Docker Hub public images. Build and push the same image tag for all
-deployables before provisioning or deployment:
-
-```bash
-IMAGE_TAG=$(git rev-parse --short HEAD)
-DOCKERHUB_NAMESPACE=ahmadryzen
-
-make docker-build-all IMAGE_TAG="$IMAGE_TAG"
-make dockerhub-push-all IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
-```
-
-If the repository does not have a combined Docker Hub push target in your local
-branch, push each image using the existing Docker commands and keep the same
-`IMAGE_TAG` for every service, seed runner, and k6 runner.
-
-Validation:
-
-```bash
-docker pull "docker.io/$DOCKERHUB_NAMESPACE/monolith:$IMAGE_TAG"
-docker pull "docker.io/$DOCKERHUB_NAMESPACE/k6-runner:$IMAGE_TAG"
-```
-
-## Phase 2 - Initialize Local Vultr Env
+## Phase 1 - Initialize and Load Local Vultr Env
 
 Create the local Vultr env file:
 
@@ -123,6 +130,20 @@ VULTR_TESTING_NODE_PLAN=vc2-4c-8gb
 VULTR_POSTGRES_PLAN=vc2-4c-8gb
 ```
 
+Load the env file into the current shell before running Make targets that need
+Docker Hub, AWS, or Vultr values:
+
+```bash
+set -a
+source env/vultr.env
+set +a
+```
+
+This matters because scripts can source `env/vultr.env`, but Make variable
+expansion such as `DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE)` only sees values
+already exported in the shell. If you open a new terminal, run the `source`
+block again or pass the variables explicitly in the command.
+
 Notes:
 
 - `OPERATOR_CIDRS` is used for PostgreSQL SSH firewall access. Keep it as a
@@ -132,6 +153,83 @@ Notes:
   cluster.
 - `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are only for k6 S3 uploads
   from Vultr. Scope them narrowly to the benchmark results bucket or prefix.
+
+## Phase 2 - Build, Push, Verify, and Pin Images
+
+Vultr uses Docker Hub public images. Build and push the same image tag for all
+deployables before provisioning or deployment.
+
+Choose one tag and keep it for the whole integration test:
+
+```bash
+export IMAGE_TAG="vultr-main-$(git rev-parse --short HEAD)"
+echo "$IMAGE_TAG"
+```
+
+For final thesis runs, prefer a stable explicit tag:
+
+```bash
+export IMAGE_TAG=thesis-vultr-20260602
+```
+
+Build all local images:
+
+```bash
+make docker-build-all IMAGE_TAG="$IMAGE_TAG"
+```
+
+Push every required image to Docker Hub public:
+
+```bash
+make dockerhub-push-all IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+```
+
+The `dockerhub-push-all` target pushes:
+
+```text
+monolith
+api-gateway
+auth-service
+item-service
+transaction-service
+seed-runner
+k6-runner
+```
+
+Verify every image tag exists before provisioning expensive resources:
+
+```bash
+for repo in monolith api-gateway auth-service item-service transaction-service seed-runner k6-runner; do
+  docker manifest inspect "docker.io/${DOCKERHUB_NAMESPACE}/${repo}:${IMAGE_TAG}" >/dev/null
+done
+```
+
+Pin the tag for this operator session:
+
+```bash
+make eks-pin-image-tag IMAGE_TAG="$IMAGE_TAG"
+make eks-show-image-tag
+```
+
+Although the target name still says `eks`, the pin file is shared by the
+provider-aware deploy and benchmark scripts. Passing `IMAGE_TAG="$IMAGE_TAG"`
+explicitly is still the clearest pattern for final runs.
+
+Rules for image tags:
+
+- Use one `IMAGE_TAG` for all deployables in one benchmark session.
+- Do not rebuild a different commit into the same tag during a measured run.
+- If the code changes, create a new tag, push all images again, redeploy, and
+  verify the live image tag before rerunning k6.
+- Do not rely on implicit `HEAD` for thesis data collection.
+
+If the image push fails:
+
+1. rerun `make dockerhub-push-all` with the same `IMAGE_TAG`,
+2. rerun the `docker manifest inspect` loop,
+3. redeploy only after all seven images are visible on Docker Hub.
+
+## Phase 3 - Preflight and Render Terraform Inputs
 
 Run preflight before any cost-heavy action:
 
@@ -144,9 +242,8 @@ Expected behavior:
 - fails if `env/vultr.env` is missing
 - fails if required secrets are empty
 - fails if critical placeholders remain
+- checks that Docker Hub images for the selected `IMAGE_TAG` are accessible
 - warns if resource baseline measurement has not been captured yet
-
-## Phase 3 - Render Terraform Inputs
 
 Render Vultr `terraform.tfvars` files from `env/vultr.env`:
 
@@ -165,10 +262,21 @@ infra/terraform/vultr-experiment-sequential/terraform.tfvars
 Do not commit these files. They may contain local operator CIDRs and sensitive
 database configuration.
 
+After a stack has been initialized by its `make vultr-*-plan` target, validate
+the Vultr Terraform directories directly when you need a static check:
+
+```bash
+terraform -chdir=infra/terraform/vultr-shared validate
+terraform -chdir=infra/terraform/vultr-experiment validate
+terraform -chdir=infra/terraform/vultr-experiment-sequential validate
+```
+
 ## Phase 4 - Apply Shared Infrastructure
 
 The shared stack creates the Vultr legacy VPC, operator SSH key, and PostgreSQL
 firewall group.
+
+Always inspect the reviewed plan before apply:
 
 ```bash
 make vultr-shared-plan
@@ -190,45 +298,21 @@ ssh_key_ids
 postgres_firewall_group_id
 ```
 
-## Phase 5A - Apply Parallel Clusters
+## Phase 5 - Choose and Apply an Experiment Stack
 
-Parallel mode creates two isolated VKE clusters and two PostgreSQL VMs:
+Choose exactly one path for the first integration pass:
 
-Cost guardrail: this stack intentionally provisions both architecture clusters
-at the same time so Datadog and k6 windows align. With the default plans, app
-nodes, testing nodes, and PostgreSQL VMs are created for both monolith and MSA.
-Use sequential mode instead when quota, credit, or budget cannot support the
-full parallel topology, and destroy promptly after S3 results are verified.
+| Path | Commands | Use case |
+|---|---|---|
+| Sequential | `vultr-sequential-plan`, `vultr-sequential-apply` | lowest cost and easiest first smoke |
+| Parallel | `vultr-parallel-plan`, `vultr-parallel-apply` | final thesis mode with aligned wall-clock windows |
 
-```bash
-make vultr-parallel-plan
-make vultr-parallel-apply
-```
+Do not keep parallel and sequential stacks active together unless the quota and
+budget impact is intentional.
 
-Expected resources:
+### Case A - Sequential First Smoke
 
-```text
-skripsi-vultr-monolith  : app pool + testing pool + monolith PostgreSQL VM
-skripsi-vultr-msa       : app pool + testing pool + MSA PostgreSQL VM
-```
-
-Configure local kubeconfig contexts:
-
-```bash
-make vultr-setup-contexts-parallel
-kubectl config get-contexts monolith msa
-```
-
-Smoke-check the clusters:
-
-```bash
-kubectl --context=monolith get nodes -o wide
-kubectl --context=msa get nodes -o wide
-```
-
-## Phase 5B - Apply Sequential Fallback Cluster
-
-Use sequential mode only when quota or cost constraints prevent parallel mode:
+Use this path for the first manual integration test:
 
 ```bash
 make vultr-sequential-plan
@@ -244,8 +328,31 @@ Expected resources:
 skripsi-vultr-benchmark : app pool + testing pool + one PostgreSQL VM
 ```
 
-Do not keep parallel and sequential stacks active together unless the quota and
-budget impact is intentional.
+### Case B - Parallel Thesis Run
+
+Parallel mode creates two isolated VKE clusters and two PostgreSQL VMs:
+
+Cost guardrail: this stack intentionally provisions both architecture clusters
+at the same time so Datadog and k6 windows align. With the default plans, app
+nodes, testing nodes, and PostgreSQL VMs are created for both monolith and MSA.
+Use sequential mode instead when quota, credit, or budget cannot support the
+full parallel topology, and destroy promptly after S3 results are verified.
+
+```bash
+make vultr-parallel-plan
+make vultr-parallel-apply
+make vultr-setup-contexts-parallel
+kubectl config get-contexts monolith msa
+kubectl --context=monolith get nodes -o wide
+kubectl --context=msa get nodes -o wide
+```
+
+Expected resources:
+
+```text
+skripsi-vultr-monolith  : app pool + testing pool + monolith PostgreSQL VM
+skripsi-vultr-msa       : app pool + testing pool + MSA PostgreSQL VM
+```
 
 ## Phase 6 - Create Kubernetes Secrets
 
@@ -583,11 +690,192 @@ shared VPC or firewall group.
 
 ## Troubleshooting
 
+Use this order when a command fails:
+
+1. read the first failing command and stderr, not only the final `make` error,
+2. confirm the selected mode: `parallel` uses `monolith` and `msa`, sequential
+   uses `benchmark`,
+3. confirm the selected `IMAGE_TAG` and `DOCKERHUB_NAMESPACE`,
+4. check Terraform outputs before debugging Kubernetes secrets,
+5. check pod events before application logs,
+6. verify S3 artifacts before any destroy.
+
+Quick status bundle:
+
+```bash
+make eks-show-image-tag
+make vultr-preflight-check
+terraform -chdir=infra/terraform/vultr-shared output
+kubectl config get-contexts monolith msa benchmark
+kubectl --context=benchmark get pods -A
+```
+
+For parallel, replace the last command with:
+
+```bash
+kubectl --context=monolith get pods -A
+kubectl --context=msa get pods -A
+```
+
+### `DOCKERHUB_NAMESPACE` is empty or still `replace-me`
+
+Cause:
+
+```text
+env/vultr.env exists, but the current shell has not exported it before running
+a Make target that expands DOCKERHUB_NAMESPACE.
+```
+
+Check:
+
+```bash
+grep '^DOCKERHUB_NAMESPACE=' env/vultr.env
+printf '%s\n' "$DOCKERHUB_NAMESPACE"
+```
+
+Fix:
+
+```bash
+set -a
+source env/vultr.env
+set +a
+make vultr-preflight-check
+```
+
+### Docker image push or pull fails
+
+Check whether the tag exists for all required images:
+
+```bash
+for repo in monolith api-gateway auth-service item-service transaction-service seed-runner k6-runner; do
+  docker manifest inspect "docker.io/${DOCKERHUB_NAMESPACE}/${repo}:${IMAGE_TAG}" >/dev/null \
+    && printf 'OK %s\n' "$repo" \
+    || printf 'MISSING %s\n' "$repo"
+done
+```
+
+Fix:
+
+```bash
+make dockerhub-push-all IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+make vultr-preflight-check
+```
+
+If pods are already running with the wrong tag, redeploy the affected mode with
+the correct `IMAGE_TAG`.
+
 ### Dedicated CPU or instance quota is not enough
 
 Use sequential mode, reduce the RPS matrix for smoke testing, or request a
 Vultr limit increase. Do not silently change only one architecture's node size
 or resource quota.
+
+Check Terraform failure details:
+
+```bash
+terraform -chdir=infra/terraform/vultr-experiment plan
+terraform -chdir=infra/terraform/vultr-experiment-sequential plan
+```
+
+If parallel apply fails because quota is not enough, destroy any partially
+created parallel resources after checking the plan/state, then use sequential:
+
+```bash
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-parallel-destroy-confirmed
+make vultr-sequential-plan
+make vultr-sequential-apply
+```
+
+Do not destroy shared resources unless no experiment stack still depends on the
+shared VPC and firewall group.
+
+### Terraform plan or apply fails before creating clusters
+
+Check env and rendered tfvars:
+
+```bash
+make vultr-preflight-check
+make vultr-render-tfvars
+terraform -chdir=infra/terraform/vultr-shared validate
+terraform -chdir=infra/terraform/vultr-experiment validate
+terraform -chdir=infra/terraform/vultr-experiment-sequential validate
+```
+
+Common fixes:
+
+| Symptom | Fix |
+|---|---|
+| `VULTR_API_KEY` missing | fill `env/vultr.env`, source it, rerun render |
+| `OPERATOR_CIDRS` missing | set your public IP as `/32`, rerun render |
+| `POSTGRES_PASSWORD` missing | set it in `env/vultr.env`; do not put it in tfvars |
+| provider not initialized | rerun the relevant `make vultr-*-plan` target |
+| plan wants unexpected resources | stop and inspect `terraform.tfvars` before apply |
+
+### Kubeconfig context setup fails
+
+Check Terraform outputs:
+
+```bash
+terraform -chdir=infra/terraform/vultr-experiment output
+terraform -chdir=infra/terraform/vultr-experiment-sequential output
+```
+
+Fix for parallel:
+
+```bash
+make vultr-setup-contexts-parallel
+kubectl --context=monolith get nodes
+kubectl --context=msa get nodes
+```
+
+Fix for sequential:
+
+```bash
+make vultr-setup-context-sequential
+kubectl --context=benchmark get nodes
+```
+
+If Terraform output does not contain kubeconfig values, the experiment stack is
+not applied successfully yet.
+
+### Secret creation fails
+
+Check missing env files first:
+
+```bash
+ls env/vultr.env env/monolith.eks.env env/api-gateway.eks.env env/auth-service.eks.env env/item-service.eks.env env/transaction-service.eks.env env/k6-runner.eks.env
+```
+
+If any reused app env file is missing:
+
+```bash
+make env-init-eks
+```
+
+Then rerun the mode-specific secret creation:
+
+```bash
+make vultr-create-secrets-sequential
+```
+
+For parallel:
+
+```bash
+make vultr-create-secrets
+```
+
+Validate:
+
+```bash
+kubectl --context=benchmark get secret -A
+```
+
+For parallel:
+
+```bash
+kubectl --context=monolith get secret -A
+kubectl --context=msa get secret -A
+```
 
 ### `make vultr-render-manifests` fails on missing baseline
 
@@ -601,6 +889,50 @@ For sequential:
 
 ```bash
 VULTR_CONTEXT=benchmark make vultr-measure-resource-baseline
+```
+
+If measurement fails, check that app nodes are ready:
+
+```bash
+kubectl --context=benchmark get nodes --show-labels
+kubectl --context=benchmark describe nodes
+```
+
+For parallel:
+
+```bash
+kubectl --context=monolith get nodes --show-labels
+VULTR_CONTEXT=monolith make vultr-measure-resource-baseline
+```
+
+Do not bypass the baseline for measured thesis runs.
+
+### Deployment rollout fails
+
+Start with events, then logs:
+
+```bash
+kubectl --context=benchmark get pods -A -o wide
+kubectl --context=benchmark get events -A --sort-by=.lastTimestamp
+kubectl --context=benchmark describe pod -n mono <pod-name>
+kubectl --context=benchmark logs -n mono deploy/monolith --tail=100
+```
+
+Common fixes:
+
+| Symptom | Fix |
+|---|---|
+| `ImagePullBackOff` | verify Docker Hub tag, then redeploy with the expected `IMAGE_TAG` |
+| `CreateContainerConfigError` | check Kubernetes secret names and env keys |
+| migration job failed | inspect job logs, fix DB URL or migration error, redeploy |
+| seed job failed | inspect seed logs, reset/reseed by rerunning deploy |
+| pods pending | check node labels, taints, resource requests, and quota |
+
+Parallel contexts:
+
+```bash
+kubectl --context=monolith get pods -A -o wide
+kubectl --context=msa get pods -A -o wide
 ```
 
 ### k6 cannot upload to S3
@@ -618,6 +950,15 @@ Verify that the AWS credentials can write to the benchmark bucket:
 AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... aws s3 ls "s3://$S3_BUCKET/"
 ```
 
+If the k6 job completed but S3 is empty, inspect job logs:
+
+```bash
+kubectl --context=benchmark get jobs -n benchmark
+kubectl --context=benchmark logs -n benchmark job/<k6-job-name> --tail=200
+```
+
+For parallel, inspect the matching architecture context.
+
 ### Application cannot reach PostgreSQL
 
 Check private IP outputs and secret-generated URLs:
@@ -630,6 +971,9 @@ kubectl --context=monolith logs -n mono deploy/monolith --tail=100
 ```
 
 The PostgreSQL VM and VKE cluster must be attached to the same legacy Vultr VPC.
+
+If only one architecture fails in parallel mode, compare the PostgreSQL outputs
+and secrets for `monolith` and `msa` before changing infrastructure.
 
 ### Fixed/HPA mode looks wrong
 
@@ -646,3 +990,67 @@ For HPA:
 SCALING_MODE=hpa make vultr-deploy-all IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
 SCALING_MODE=hpa EXECUTION_MODE=parallel make vultr-verify-live-mode
 ```
+
+For sequential:
+
+```bash
+ARCHITECTURE=monolith SCALING_MODE=hpa make vultr-deploy-sequential-architecture IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+ARCHITECTURE=monolith SCALING_MODE=hpa EXECUTION_MODE=sequential make vultr-verify-live-mode
+```
+
+If HPA exists but metrics are unknown:
+
+```bash
+kubectl --context=benchmark get apiservice v1beta1.metrics.k8s.io
+kubectl --context=benchmark get pods -n kube-system | rg metrics-server
+kubectl --context=benchmark top pods -A
+```
+
+Install or wait for metrics-server through the deployment script before running
+HPA benchmarks.
+
+### Benchmark result is `INVALID` or `TIMEOUT`
+
+Classify the failure before rerunning:
+
+| Result | Meaning | Next action |
+|---|---|---|
+| `INVALID` | app, seed, secret, or infra problem affected the test | fix root cause and rerun the same attempt with a new attempt id |
+| `TIMEOUT` | k6 job or target endpoint did not complete in time | inspect job logs, pod readiness, and service endpoint |
+| threshold failed at high RPS | valid overload signal if app and k6 behaved correctly | keep result and mark as overload/stress behavior |
+
+Checks:
+
+```bash
+kubectl --context=benchmark get jobs -n benchmark
+kubectl --context=benchmark get pods -n benchmark -o wide
+kubectl --context=benchmark logs -n benchmark job/<k6-job-name> --tail=200
+aws s3 ls "s3://$S3_BUCKET/experiments/<run_id>/" --recursive
+```
+
+Use a new `ATTEMPT` for reruns so previous artifacts remain auditable.
+
+### Destroy is blocked or unsafe
+
+Destroy is intentionally guarded. Verify S3 first:
+
+```bash
+aws s3 ls "s3://$S3_BUCKET/experiments/<run_id>/" --recursive
+```
+
+Then choose the matching stack:
+
+```bash
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-sequential-destroy-confirmed
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-parallel-destroy-confirmed
+```
+
+Destroy shared last:
+
+```bash
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-shared-destroy-confirmed
+```
+
+If destroy fails, rerun `terraform plan` in the same stack and inspect whether
+the remaining dependency belongs to shared or experiment state before deleting
+anything manually in the Vultr dashboard.
