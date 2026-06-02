@@ -177,7 +177,8 @@ Adjust them only if you intentionally want a different thesis baseline.
 The preferred flow is:
 
 - create the S3 bucket if it does not exist yet,
-- create or reuse the AWS S3 writer credentials from `infra/terraform/shared`,
+- create or reuse the AWS S3 writer credentials from
+  `infra/terraform/aws-s3-writer`,
 - let the Hetzner secret scripts read those credentials from Terraform outputs,
 - avoid manually copying secrets unless you intentionally want to override them.
 
@@ -190,13 +191,13 @@ make aws-create-s3
 If you want Terraform to create the Hetzner S3 writer credentials for you:
 
 ```bash
-make eks-shared-apply
+make aws-s3-writer-apply
 ```
 
 This means the normal flow is:
 
 ```text
-AWS shared terraform apply
+AWS S3 writer terraform apply
 -> outputs contain hetzner_k6_s3_access_key_id / hetzner_k6_s3_secret_access_key
 -> create-hetzner-secrets*.sh reads them automatically
 ```
@@ -493,7 +494,8 @@ Sequential secret map:
 | `msa` | `transaction-service-secret` | transaction DB and downstream address config |
 
 If `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are absent in
-`env/hetzner.env`, the scripts try the Terraform shared outputs automatically.
+`env/hetzner.env`, the scripts try the Terraform `aws-s3-writer` outputs
+automatically.
 
 Quick verification:
 
@@ -516,7 +518,7 @@ If secret creation fails, check these first:
 - the `.eks.env` app files exist,
 - the sequential or parallel Terraform stack has already been applied,
 - AWS S3 credentials are either present in env or available from
-  `infra/terraform/shared` outputs.
+  `infra/terraform/aws-s3-writer` outputs.
 
 ---
 
@@ -1184,11 +1186,11 @@ destroy command with the variable set exactly to `true`.
 
 Resolve with one of these:
 
-1. apply the AWS shared stack so Terraform outputs the Hetzner S3 writer
+1. apply the AWS S3 writer stack so Terraform outputs the Hetzner S3 writer
    credentials:
 
 ```bash
-make eks-shared-apply
+make aws-s3-writer-apply
 ```
 
 2. or set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` manually in
@@ -1450,11 +1452,11 @@ Safe recovery:
 
 1. confirm the required env files exist.
 2. confirm the relevant Terraform stack has already been applied.
-3. if using Terraform-managed AWS credentials, ensure the AWS shared stack is
+3. if using Terraform-managed AWS credentials, ensure the AWS S3 writer stack is
    applied:
 
 ```bash
-make eks-shared-apply
+make aws-s3-writer-apply
 ```
 
 4. rerun the secret target:

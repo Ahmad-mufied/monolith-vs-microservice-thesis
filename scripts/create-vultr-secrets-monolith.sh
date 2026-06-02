@@ -44,6 +44,8 @@ source scripts/lib/vultr-s3-credentials.sh
 load_vultr_s3_credentials
 
 : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in env/vultr.env}"
+: "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID must be set in env/vultr.env or Terraform aws-s3-writer output vultr_k6_s3_access_key_id}"
+: "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY must be set in env/vultr.env or Terraform aws-s3-writer output vultr_k6_s3_secret_access_key}"
 : "${AWS_REGION:?AWS_REGION must be set in env/vultr.env}"
 : "${S3_BUCKET:?S3_BUCKET must be set in env/vultr.env}"
 
