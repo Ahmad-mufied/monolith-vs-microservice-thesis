@@ -739,10 +739,10 @@ Rules:
 
 - S3 result buckets and ECR repositories are persistent resources created by
   operator commands, not destroyed by experiment Terraform teardown.
-- `experiment/` and `experiment-sequential/` both read outputs from
-  `shared/terraform.tfstate`.
-- Use `scripts/terraform-experiment.sh` for parallel mode and
-  `scripts/terraform-sequential.sh` for sequential mode so required variables
+- `aws-parallel/` and `aws-sequential/` both read outputs from
+  `aws-shared/terraform.tfstate`.
+- Use `scripts/terraform-aws-parallel.sh` for parallel mode and
+  `scripts/terraform-aws-sequential.sh` for sequential mode so required variables
   such as `TF_VAR_db_password` are injected consistently.
 - Do not keep both experiment stacks active when the AWS account is constrained
   to a 24 vCPU quota.
@@ -812,9 +812,11 @@ scripts/
 ├── deploy-msa-cluster.sh
 ├── deploy-sequential-architecture.sh
 ├── eks-update-manifests.sh
+├── env-init-app.sh
 ├── env-init-base.sh
 ├── env-init-datadog-minikube.sh
 ├── env-init-eks.sh
+├── env-init.sh
 ├── env-init-monolith.sh
 ├── env-init-microservices.sh
 ├── go-mod-tidy-all.sh
@@ -828,10 +830,14 @@ scripts/
 ├── run-benchmark-suite-sequential.sh
 ├── setup-eks-contexts.sh
 ├── setup-eks-contexts-sequential.sh
-├── terraform-experiment.sh
+├── operator-dispatch.sh
+├── lib/
+│   ├── operator-profile.sh
+│   └── shared-env.sh
+├── terraform-aws-parallel.sh
 ├── terraform-recovery-check.sh
 ├── terraform-recovery-fix-tainted-nodegroups.sh
-├── terraform-sequential.sh
+├── terraform-aws-sequential.sh
 ├── terraform-sequential-recovery-check.sh
 └── validate-eks-assets.sh
 ```

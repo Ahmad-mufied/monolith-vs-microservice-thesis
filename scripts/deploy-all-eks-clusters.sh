@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
+source scripts/lib/shared-env.sh
+
+image_tag_env_file="$(resolve_image_tag_env_file || true)"
+if [ -z "${IMAGE_TAG:-}" ] && [ -n "$image_tag_env_file" ]; then
   set -a
-  source env/image-tag.eks.env
+  source "$image_tag_env_file"
   set +a
 fi
 

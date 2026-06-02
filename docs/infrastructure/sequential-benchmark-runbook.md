@@ -22,7 +22,7 @@ shared Terraform stack
   -> NAT
   -> k6 S3 upload IAM role
 
-experiment-sequential Terraform stack
+aws-sequential Terraform stack
   -> EKS cluster: skripsi-benchmark
   -> RDS: skripsi-benchmark-postgres
 
@@ -54,6 +54,7 @@ Recommended bootstrap:
 
 ```bash
 aws login
+make env-init-app
 make env-init-eks
 make eks-render-tfvars
 make ecr-push-all IMAGE_TAG=$(git rev-parse --short HEAD)
@@ -106,12 +107,12 @@ make eks-create-secrets-sequential
 The helper reads:
 
 ```text
-env/monolith.eks.env
-env/api-gateway.eks.env
-env/auth-service.eks.env
-env/item-service.eks.env
-env/transaction-service.eks.env
-env/k6-runner.eks.env
+env/monolith.app.env
+env/api-gateway.app.env
+env/auth-service.app.env
+env/item-service.app.env
+env/transaction-service.app.env
+env/k6-runner.app.env
 env/terraform.experiment.env
 ```
 
@@ -193,7 +194,7 @@ Each attempt metadata includes:
 
 ```text
 execution_mode=sequential
-terraform_stack=experiment-sequential
+terraform_stack=aws-sequential
 cluster_name=skripsi-benchmark
 architecture_order=<configured order>
 ```
@@ -299,7 +300,7 @@ make eks-sequential-destroy-confirmed
 The raw wrapper also accepts:
 
 ```bash
-S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-sequential.sh destroy
+S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-aws-sequential.sh destroy
 ```
 
 Without `S3_BENCHMARK_DATA_VERIFIED=true`, destroy is blocked.

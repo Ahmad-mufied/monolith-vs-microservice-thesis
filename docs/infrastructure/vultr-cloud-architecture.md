@@ -11,8 +11,8 @@ The active implementation is in:
 
 ```text
 infra/terraform/vultr-shared
-infra/terraform/vultr-experiment
-infra/terraform/vultr-experiment-sequential
+infra/terraform/vultr-parallel
+infra/terraform/vultr-sequential
 infra/terraform/modules/vultr-vke-benchmark-cluster
 scripts/*vultr*.sh
 scripts/lib/cloud-provider.sh
@@ -82,7 +82,7 @@ Vultr region: sgp
   Operator SSH key
   PostgreSQL firewall group
 
-  Experiment stack: infra/terraform/vultr-experiment
+  Experiment stack: infra/terraform/vultr-parallel
   ------------------------------------------------------------
 
   +-----------------------------------+     +-----------------------------------+
@@ -130,7 +130,7 @@ Vultr region: sgp
   Operator SSH key
   PostgreSQL firewall group
 
-  Sequential stack: infra/terraform/vultr-experiment-sequential
+  Sequential stack: infra/terraform/vultr-sequential
   ------------------------------------------------------------
 
   +-------------------------------------------------------------+

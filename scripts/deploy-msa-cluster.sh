@@ -3,6 +3,8 @@
 # Run after terraform apply and setup-eks-contexts.sh.
 set -euo pipefail
 
+source scripts/lib/shared-env.sh
+
 DATADOG_SITE_EXPLICIT_OVERRIDE=""
 if [ "${DATADOG_SITE+x}" = "x" ]; then
   DATADOG_SITE_EXPLICIT_OVERRIDE="$DATADOG_SITE"
@@ -17,9 +19,10 @@ fi
 source scripts/lib/cloud-provider.sh
 load_cloud_provider_env
 
-if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
+image_tag_env_file="$(resolve_image_tag_env_file || true)"
+if [ -z "${IMAGE_TAG:-}" ] && [ -n "$image_tag_env_file" ]; then
   set -a
-  source env/image-tag.eks.env
+  source "$image_tag_env_file"
   set +a
 fi
 
@@ -148,9 +151,10 @@ done
 # Datadog
 DATADOG_API_KEY="${DATADOG_API_KEY:-}"
 DATADOG_CHART_VERSION="${DATADOG_CHART_VERSION:-3.134.0}"
-if [ -f env/datadog.eks.env ]; then
+datadog_env_file="$(resolve_datadog_env_file || true)"
+if [ -n "$datadog_env_file" ]; then
   set -a
-  source env/datadog.eks.env
+  source "$datadog_env_file"
   set +a
 fi
 if [ -n "$DATADOG_SITE_EXPLICIT_OVERRIDE" ]; then

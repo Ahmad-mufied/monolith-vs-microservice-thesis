@@ -6,10 +6,10 @@ examples? Use
 
 ## 1. Prepare Environment
 
-Initialize the existing app env files and the Hetzner env file:
+Initialize the provider-neutral app env files and the Hetzner env file:
 
 ```bash
-make env-init-eks
+make env-init-app
 make env-init-hetzner
 ```
 

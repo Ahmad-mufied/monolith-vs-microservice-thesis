@@ -4,7 +4,7 @@ set -euo pipefail
 terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
 aws_region="${AWS_REGION:-ap-southeast-1}"
 project_prefix="${PROJECT_PREFIX:-skripsi}"
-tf_experiment_dir="infra/terraform/experiment"
+tf_experiment_dir="infra/terraform/aws-parallel"
 apply=false
 
 usage() {
@@ -176,7 +176,7 @@ check_and_fix "$msa_cluster_name" 'module.msa_cluster.module.eks.module.eks_mana
 if [[ "$apply" == "true" ]]; then
   echo
   echo "Next:"
-  echo "  TERRAFORM_AWS_PROFILE=$terraform_aws_profile bash scripts/terraform-experiment.sh plan -input=false -lock=false -no-color"
+  echo "  TERRAFORM_AWS_PROFILE=$terraform_aws_profile bash scripts/terraform-aws-parallel.sh plan -input=false -lock=false -no-color"
 else
   echo
   echo "Dry-run only. Re-run with --apply to untaint safe active node groups."

@@ -5,7 +5,7 @@ context="${VULTR_CONTEXT:-benchmark}"
 export VULTR_CONTEXT="$context"
 
 err_file="$(mktemp)"
-if ! postgres_ip="$(terraform -chdir=infra/terraform/vultr-experiment-sequential output -raw postgres_private_ip 2>"$err_file")"; then
+if ! postgres_ip="$(terraform -chdir=infra/terraform/vultr-sequential output -raw postgres_private_ip 2>"$err_file")"; then
   echo "ERROR: failed to read sequential PostgreSQL private IP from Terraform output 'postgres_private_ip'" >&2
   sed 's/^/  terraform: /' "$err_file" >&2
   rm -f "$err_file"

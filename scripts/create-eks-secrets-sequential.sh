@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source scripts/lib/shared-env.sh
+
 url_encode() {
   local string="$1"
 
@@ -12,19 +14,26 @@ url_encode() {
   printf '%s' "$string" | jq -sRr @uri
 }
 
+monolith_env_file="$(resolve_app_env_file monolith || true)"
+api_gateway_env_file="$(resolve_app_env_file api-gateway || true)"
+auth_service_env_file="$(resolve_app_env_file auth-service || true)"
+item_service_env_file="$(resolve_app_env_file item-service || true)"
+transaction_service_env_file="$(resolve_app_env_file transaction-service || true)"
+k6_runner_env_file="$(resolve_app_env_file k6-runner || true)"
+
 required_files=(
-  env/monolith.eks.env
-  env/api-gateway.eks.env
-  env/auth-service.eks.env
-  env/item-service.eks.env
-  env/transaction-service.eks.env
+  "${monolith_env_file:-env/monolith.app.env}"
+  "${api_gateway_env_file:-env/api-gateway.app.env}"
+  "${auth_service_env_file:-env/auth-service.app.env}"
+  "${item_service_env_file:-env/item-service.app.env}"
+  "${transaction_service_env_file:-env/transaction-service.app.env}"
   env/terraform.experiment.env
-  env/k6-runner.eks.env
+  "${k6_runner_env_file:-env/k6-runner.app.env}"
 )
 
 for file in "${required_files[@]}"; do
   if [[ ! -f "$file" ]]; then
-    echo "missing $file; run: make env-init-eks" >&2
+    echo "missing $file; run: make env-init-app and make env-init-eks" >&2
     exit 1
   fi
 done
@@ -36,55 +45,55 @@ read_env_value() {
 }
 
 db_password="$(read_env_value env/terraform.experiment.env DB_PASSWORD)"
-admin_user_email="$(read_env_value env/k6-runner.eks.env ADMIN_USER_EMAIL)"
-admin_user_password="$(read_env_value env/k6-runner.eks.env ADMIN_USER_PASSWORD)"
+admin_user_email="$(read_env_value "$k6_runner_env_file" ADMIN_USER_EMAIL)"
+admin_user_password="$(read_env_value "$k6_runner_env_file" ADMIN_USER_PASSWORD)"
 
-monolith_app_env="$(read_env_value env/monolith.eks.env APP_ENV)"
-monolith_app_port="$(read_env_value env/monolith.eks.env APP_PORT)"
-monolith_service_name="$(read_env_value env/monolith.eks.env SERVICE_NAME)"
-monolith_jwt_secret="$(read_env_value env/monolith.eks.env JWT_SECRET)"
-monolith_pool_max="$(read_env_value env/monolith.eks.env DB_POOL_MAX_CONNS)"
-monolith_pool_min="$(read_env_value env/monolith.eks.env DB_POOL_MIN_CONNS)"
-monolith_pool_lifetime="$(read_env_value env/monolith.eks.env DB_POOL_MAX_CONN_LIFETIME)"
-monolith_pool_idle="$(read_env_value env/monolith.eks.env DB_POOL_MAX_CONN_IDLE_TIME)"
-monolith_db_ping_timeout="$(read_env_value env/monolith.eks.env DB_PING_TIMEOUT)"
-monolith_read_header_timeout="$(read_env_value env/monolith.eks.env HTTP_READ_HEADER_TIMEOUT)"
-monolith_read_timeout="$(read_env_value env/monolith.eks.env HTTP_READ_TIMEOUT)"
-monolith_write_timeout="$(read_env_value env/monolith.eks.env HTTP_WRITE_TIMEOUT)"
-monolith_idle_timeout="$(read_env_value env/monolith.eks.env HTTP_IDLE_TIMEOUT)"
-monolith_shutdown_timeout="$(read_env_value env/monolith.eks.env HTTP_SHUTDOWN_TIMEOUT)"
-monolith_max_header_bytes="$(read_env_value env/monolith.eks.env HTTP_MAX_HEADER_BYTES)"
-monolith_bcrypt_cost="$(read_env_value env/monolith.eks.env BCRYPT_COST)"
+monolith_app_env="$(read_env_value "$monolith_env_file" APP_ENV)"
+monolith_app_port="$(read_env_value "$monolith_env_file" APP_PORT)"
+monolith_service_name="$(read_env_value "$monolith_env_file" SERVICE_NAME)"
+monolith_jwt_secret="$(read_env_value "$monolith_env_file" JWT_SECRET)"
+monolith_pool_max="$(read_env_value "$monolith_env_file" DB_POOL_MAX_CONNS)"
+monolith_pool_min="$(read_env_value "$monolith_env_file" DB_POOL_MIN_CONNS)"
+monolith_pool_lifetime="$(read_env_value "$monolith_env_file" DB_POOL_MAX_CONN_LIFETIME)"
+monolith_pool_idle="$(read_env_value "$monolith_env_file" DB_POOL_MAX_CONN_IDLE_TIME)"
+monolith_db_ping_timeout="$(read_env_value "$monolith_env_file" DB_PING_TIMEOUT)"
+monolith_read_header_timeout="$(read_env_value "$monolith_env_file" HTTP_READ_HEADER_TIMEOUT)"
+monolith_read_timeout="$(read_env_value "$monolith_env_file" HTTP_READ_TIMEOUT)"
+monolith_write_timeout="$(read_env_value "$monolith_env_file" HTTP_WRITE_TIMEOUT)"
+monolith_idle_timeout="$(read_env_value "$monolith_env_file" HTTP_IDLE_TIMEOUT)"
+monolith_shutdown_timeout="$(read_env_value "$monolith_env_file" HTTP_SHUTDOWN_TIMEOUT)"
+monolith_max_header_bytes="$(read_env_value "$monolith_env_file" HTTP_MAX_HEADER_BYTES)"
+monolith_bcrypt_cost="$(read_env_value "$monolith_env_file" BCRYPT_COST)"
 
-api_gateway_jwt_secret="$(read_env_value env/api-gateway.eks.env JWT_SECRET)"
-api_gateway_app_env="$(read_env_value env/api-gateway.eks.env APP_ENV)"
-api_gateway_http_port="$(read_env_value env/api-gateway.eks.env HTTP_PORT)"
-api_gateway_service_name="$(read_env_value env/api-gateway.eks.env SERVICE_NAME)"
-api_gateway_auth_service_addr="$(read_env_value env/api-gateway.eks.env AUTH_SERVICE_ADDR)"
-api_gateway_item_service_addr="$(read_env_value env/api-gateway.eks.env ITEM_SERVICE_ADDR)"
-api_gateway_transaction_service_addr="$(read_env_value env/api-gateway.eks.env TRANSACTION_SERVICE_ADDR)"
+api_gateway_jwt_secret="$(read_env_value "$api_gateway_env_file" JWT_SECRET)"
+api_gateway_app_env="$(read_env_value "$api_gateway_env_file" APP_ENV)"
+api_gateway_http_port="$(read_env_value "$api_gateway_env_file" HTTP_PORT)"
+api_gateway_service_name="$(read_env_value "$api_gateway_env_file" SERVICE_NAME)"
+api_gateway_auth_service_addr="$(read_env_value "$api_gateway_env_file" AUTH_SERVICE_ADDR)"
+api_gateway_item_service_addr="$(read_env_value "$api_gateway_env_file" ITEM_SERVICE_ADDR)"
+api_gateway_transaction_service_addr="$(read_env_value "$api_gateway_env_file" TRANSACTION_SERVICE_ADDR)"
 
-auth_service_app_env="$(read_env_value env/auth-service.eks.env APP_ENV)"
-auth_service_grpc_port="$(read_env_value env/auth-service.eks.env GRPC_PORT)"
-auth_service_name="$(read_env_value env/auth-service.eks.env SERVICE_NAME)"
-auth_service_jwt_secret="$(read_env_value env/auth-service.eks.env JWT_SECRET)"
-auth_service_bcrypt_cost="$(read_env_value env/auth-service.eks.env BCRYPT_COST)"
+auth_service_app_env="$(read_env_value "$auth_service_env_file" APP_ENV)"
+auth_service_grpc_port="$(read_env_value "$auth_service_env_file" GRPC_PORT)"
+auth_service_name="$(read_env_value "$auth_service_env_file" SERVICE_NAME)"
+auth_service_jwt_secret="$(read_env_value "$auth_service_env_file" JWT_SECRET)"
+auth_service_bcrypt_cost="$(read_env_value "$auth_service_env_file" BCRYPT_COST)"
 
-item_service_app_env="$(read_env_value env/item-service.eks.env APP_ENV)"
-item_service_grpc_port="$(read_env_value env/item-service.eks.env GRPC_PORT)"
-item_service_name="$(read_env_value env/item-service.eks.env SERVICE_NAME)"
+item_service_app_env="$(read_env_value "$item_service_env_file" APP_ENV)"
+item_service_grpc_port="$(read_env_value "$item_service_env_file" GRPC_PORT)"
+item_service_name="$(read_env_value "$item_service_env_file" SERVICE_NAME)"
 
-transaction_service_app_env="$(read_env_value env/transaction-service.eks.env APP_ENV)"
-transaction_service_grpc_port="$(read_env_value env/transaction-service.eks.env GRPC_PORT)"
-transaction_service_name="$(read_env_value env/transaction-service.eks.env SERVICE_NAME)"
-transaction_service_item_service_addr="$(read_env_value env/transaction-service.eks.env ITEM_SERVICE_ADDR)"
+transaction_service_app_env="$(read_env_value "$transaction_service_env_file" APP_ENV)"
+transaction_service_grpc_port="$(read_env_value "$transaction_service_env_file" GRPC_PORT)"
+transaction_service_name="$(read_env_value "$transaction_service_env_file" SERVICE_NAME)"
+transaction_service_item_service_addr="$(read_env_value "$transaction_service_env_file" ITEM_SERVICE_ADDR)"
 
 : "${db_password:?DB_PASSWORD must be set in env/terraform.experiment.env}"
-: "${admin_user_email:?ADMIN_USER_EMAIL must be set in env/k6-runner.eks.env}"
-: "${admin_user_password:?ADMIN_USER_PASSWORD must be set in env/k6-runner.eks.env}"
-: "${monolith_jwt_secret:?JWT_SECRET must be set in env/monolith.eks.env}"
-: "${api_gateway_jwt_secret:?JWT_SECRET must be set in env/api-gateway.eks.env}"
-: "${auth_service_jwt_secret:?JWT_SECRET must be set in env/auth-service.eks.env}"
+: "${admin_user_email:?ADMIN_USER_EMAIL must be set in ${k6_runner_env_file}}"
+: "${admin_user_password:?ADMIN_USER_PASSWORD must be set in ${k6_runner_env_file}}"
+: "${monolith_jwt_secret:?JWT_SECRET must be set in ${monolith_env_file}}"
+: "${api_gateway_jwt_secret:?JWT_SECRET must be set in ${api_gateway_env_file}}"
+: "${auth_service_jwt_secret:?JWT_SECRET must be set in ${auth_service_env_file}}"
 
 terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
 terraform_with_profile() {
@@ -126,7 +135,7 @@ create_secret_from_pairs() {
     --dry-run=client -o yaml | $K8S apply -f -
 }
 
-sequential_rds="$(terraform_with_profile -chdir=infra/terraform/experiment-sequential output -raw sequential_rds_endpoint)"
+sequential_rds="$(terraform_with_profile -chdir=infra/terraform/aws-sequential output -raw sequential_rds_endpoint)"
 encoded_db_password="$(url_encode "$db_password")"
 context="${SEQUENTIAL_CONTEXT:-benchmark}"
 K8S="kubectl --context=${context}"

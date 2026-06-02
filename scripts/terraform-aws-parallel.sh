@@ -6,7 +6,7 @@ terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
 terraform_command="${1:-}"
 
 if [[ ! -f "$env_file" ]]; then
-  echo "missing $env_file; run: make env-init-eks" >&2
+  echo "missing $env_file; run: make env-init PLATFORM=eks EXECUTION_MODE=parallel" >&2
   exit 1
 fi
 
@@ -28,4 +28,4 @@ fi
 
 AWS_PROFILE="$terraform_aws_profile" \
 TF_VAR_db_password="${DB_PASSWORD:-}" \
-terraform -chdir=infra/terraform/experiment "$@"
+terraform -chdir=infra/terraform/aws-parallel "$@"

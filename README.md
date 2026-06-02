@@ -204,6 +204,7 @@ tokens, or operator-specific values.
 make env-init-base
 make env-init-monolith
 make env-init-microservices
+make env-init-app
 make env-init-eks
 ```
 
@@ -313,6 +314,7 @@ make ecr-push-all IMAGE_TAG=$IMAGE_TAG
 make eks-render-manifests IMAGE_TAG=$IMAGE_TAG
 
 # Terraform env and auth
+make env-init-app
 make env-init-eks
 make eks-render-tfvars
 make terraform-auth-check

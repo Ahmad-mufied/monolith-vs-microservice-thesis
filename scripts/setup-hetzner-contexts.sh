@@ -36,11 +36,11 @@ fetch_kubeconfig() {
 
 case "$mode" in
   sequential)
-    fetch_kubeconfig infra/terraform/hetzner-experiment-sequential control_plane_public_ip benchmark
+    fetch_kubeconfig infra/terraform/hetzner-sequential control_plane_public_ip benchmark
     ;;
   parallel)
-    fetch_kubeconfig infra/terraform/hetzner-experiment monolith_control_plane_public_ip monolith
-    fetch_kubeconfig infra/terraform/hetzner-experiment msa_control_plane_public_ip msa
+    fetch_kubeconfig infra/terraform/hetzner-parallel monolith_control_plane_public_ip monolith
+    fetch_kubeconfig infra/terraform/hetzner-parallel msa_control_plane_public_ip msa
     ;;
   *)
     echo "HETZNER_MODE must be sequential or parallel" >&2

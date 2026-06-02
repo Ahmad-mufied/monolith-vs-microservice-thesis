@@ -27,7 +27,7 @@ function automatically.
 
 ## Configuration
 
-All configuration is in `infra/terraform/shared/terraform.tfvars`:
+All configuration is in `infra/terraform/aws-shared/terraform.tfvars`:
 
 ```hcl
 budget_amount            = 30    # monthly USD limit

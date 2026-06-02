@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source scripts/lib/shared-env.sh
+
 url_encode() {
   local string="$1"
 
@@ -12,36 +14,39 @@ url_encode() {
   printf '%s' "$string" | jq -sRr @uri
 }
 
+monolith_env_file="$(resolve_app_env_file monolith || true)"
+k6_runner_env_file="$(resolve_app_env_file k6-runner || true)"
+
 required_files=(
-  env/monolith.eks.env
+  "${monolith_env_file:-env/monolith.app.env}"
   env/terraform.experiment.env
-  env/k6-runner.eks.env
+  "${k6_runner_env_file:-env/k6-runner.app.env}"
 )
 
 for file in "${required_files[@]}"; do
   if [[ ! -f "$file" ]]; then
-    echo "missing $file; run: make env-init-eks" >&2
+    echo "missing $file; run: make env-init-app and make env-init-eks" >&2
     exit 1
   fi
 done
 
 set -a
-source env/monolith.eks.env
+source "$monolith_env_file"
 source env/terraform.experiment.env
-source env/k6-runner.eks.env
+source "$k6_runner_env_file"
 set +a
 
 : "${DB_PASSWORD:?DB_PASSWORD must be set in env/terraform.experiment.env}"
-: "${JWT_SECRET:?JWT_SECRET must be set in env/monolith.eks.env}"
-: "${ADMIN_USER_EMAIL:?ADMIN_USER_EMAIL must be set in env/k6-runner.eks.env}"
-: "${ADMIN_USER_PASSWORD:?ADMIN_USER_PASSWORD must be set in env/k6-runner.eks.env}"
+: "${JWT_SECRET:?JWT_SECRET must be set in ${monolith_env_file}}"
+: "${ADMIN_USER_EMAIL:?ADMIN_USER_EMAIL must be set in ${k6_runner_env_file}}"
+: "${ADMIN_USER_PASSWORD:?ADMIN_USER_PASSWORD must be set in ${k6_runner_env_file}}"
 
 terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
 terraform_with_profile() {
   AWS_PROFILE="$terraform_aws_profile" terraform "$@"
 }
 
-MONOLITH_RDS="$(terraform_with_profile -chdir=infra/terraform/experiment output -raw monolith_rds_endpoint)"
+MONOLITH_RDS="$(terraform_with_profile -chdir=infra/terraform/aws-parallel output -raw monolith_rds_endpoint)"
 encoded_db_password="$(url_encode "$DB_PASSWORD")"
 K8S="kubectl --context=monolith"
 

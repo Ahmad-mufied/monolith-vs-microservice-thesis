@@ -7,8 +7,8 @@ Terraform state:
 
 ```text
 infra/terraform/hetzner-shared
-infra/terraform/hetzner-experiment-sequential
-infra/terraform/hetzner-experiment
+infra/terraform/hetzner-sequential
+infra/terraform/hetzner-parallel
 ```
 
 Use these targets for Hetzner:
@@ -38,8 +38,8 @@ The Vultr path is additive and uses separate Terraform state:
 
 ```text
 infra/terraform/vultr-shared
-infra/terraform/vultr-experiment-sequential
-infra/terraform/vultr-experiment
+infra/terraform/vultr-sequential
+infra/terraform/vultr-parallel
 ```
 
 Use these targets for Vultr:
@@ -240,8 +240,8 @@ as tainted because it did not observe a clean completion.
 The recovery script prints the exact command. Example:
 
 ```bash
-AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment untaint 'module.msa_cluster.module.eks.module.eks_managed_node_group["app_nodes"].aws_eks_node_group.this[0]'
-AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment untaint 'module.msa_cluster.module.eks.module.eks_managed_node_group["testing_nodes"].aws_eks_node_group.this[0]'
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/aws-parallel untaint 'module.msa_cluster.module.eks.module.eks_managed_node_group["app_nodes"].aws_eks_node_group.this[0]'
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/aws-parallel untaint 'module.msa_cluster.module.eks.module.eks_managed_node_group["testing_nodes"].aws_eks_node_group.this[0]'
 ```
 
 The repository also includes a focused helper for this specific recovery case.
@@ -302,14 +302,14 @@ AWS_PROFILE=terraform-process aws autoscaling describe-scaling-activities \
 5. Plan through the repository wrapper.
 
 The experiment stack needs `DB_PASSWORD`, which is injected by
-`scripts/terraform-experiment.sh` from `env/terraform.experiment.env`. A direct
-`terraform -chdir=infra/terraform/experiment plan` can fail with `No value for
+`scripts/terraform-aws-parallel.sh` from `env/terraform.experiment.env`. A direct
+`terraform -chdir=infra/terraform/aws-parallel plan` can fail with `No value for
 required variable "db_password"`.
 
 Use:
 
 ```bash
-TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-experiment.sh plan -input=false -lock=false -no-color
+TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-aws-parallel.sh plan -input=false -lock=false -no-color
 ```
 
 Expected recovery outcomes:
@@ -324,7 +324,7 @@ Expected recovery outcomes:
 If the reviewed plan is small and expected:
 
 ```bash
-TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-experiment.sh apply
+TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-aws-parallel.sh apply
 ```
 
 For recovery automation where the plan is already reviewed and contains only
@@ -335,7 +335,7 @@ unknown drift.
 
 ```bash
 make terraform-recovery-check
-TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-experiment.sh plan -input=false -lock=false -no-color
+TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-aws-parallel.sh plan -input=false -lock=false -no-color
 ```
 
 Healthy final result:
@@ -364,11 +364,11 @@ classify the recovery path before changing state.
 | AWS auth expired | `ExpiredTokenException`, `UnrecognizedClientException`, `AccessDenied`, or recovery check `BLOCKED` | Manual | Run `aws login`, then `make terraform-auth-check`, then rerun `make terraform-recovery-check`. Do not edit state while auth is stale. |
 | Resource still being created or deleted | recovery check reports `IN_PROGRESS`; EKS/RDS/add-on is not ready yet | Manual wait + inspect | Wait and rerun `make terraform-recovery-check`. If node groups stay stuck, inspect ASG scaling activities with `aws autoscaling describe-scaling-activities`. |
 | Node group is tainted but healthy in AWS | recovery check reports `REVIEW` and says the active node group is tainted | Script available | Run `make terraform-recovery-fix-tainted-nodegroups` for dry-run. If it reports the node group is `ACTIVE` with zero health issues, run `make terraform-recovery-fix-tainted-nodegroups-apply`, then run the wrapper plan. |
-| Terraform state tracks a resource missing in AWS | recovery check reports `STALE_IN_STATE` | Manual review | Confirm the resource is truly gone in AWS. If Terraform should forget it, run the suggested `terraform state rm` command, then plan through `scripts/terraform-experiment.sh`. |
+| Terraform state tracks a resource missing in AWS | recovery check reports `STALE_IN_STATE` | Manual review | Confirm the resource is truly gone in AWS. If Terraform should forget it, run the suggested `terraform state rm` command, then plan through `scripts/terraform-aws-parallel.sh`. |
 | AWS has a resource but Terraform state does not track it | AWS CLI shows the resource, but `terraform state list` has no matching address | Manual import | Do not recreate blindly. Import the resource into the correct Terraform address, then plan. Import IDs are resource-specific, so verify the module address and provider import format first. |
 | Terraform state lock remains after crash | `Error acquiring the state lock` | Manual review | Confirm no Terraform process is still running. Retry once. If the lock is truly stale, run `terraform force-unlock <LOCK_ID>` for the affected stack. Do not force-unlock while another apply/destroy is running. |
 | Plan wants to replace or destroy large resources | plan shows `-/+`, `must be replaced`, or unexpected `destroy` | Manual review | Stop before approving. Check whether the resource is tainted, whether config changed, and whether AWS live state is healthy. Use `untaint` only for healthy tainted resources; otherwise reconcile the real drift. |
-| Direct experiment plan asks for `db_password` | `No value for required variable "db_password"` | Use wrapper | Run `TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-experiment.sh plan -input=false -lock=false -no-color`. The wrapper injects `TF_VAR_db_password` from `env/terraform.experiment.env`. |
+| Direct experiment plan asks for `db_password` | `No value for required variable "db_password"` | Use wrapper | Run `TERRAFORM_AWS_PROFILE=terraform-process bash scripts/terraform-aws-parallel.sh plan -input=false -lock=false -no-color`. The wrapper injects `TF_VAR_db_password` from `env/terraform.experiment.env`. |
 | Node group fails because of quota or capacity | ASG scaling activity shows `VcpuLimitExceeded`, insufficient capacity, launch failure, or subnet/IP issue | Manual infra fix | Fix the AWS-side blocker first: quota, instance type, subnet capacity, or launch settings. Then rerun recovery check and plan. Do not edit Terraform state to hide a real AWS provisioning failure. |
 
 Current helper coverage:
@@ -407,14 +407,14 @@ Quick verification checklist for the `shared` stack before applying a new
 aws login
 make terraform-auth-check
 make terraform-recovery-check
-AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/shared plan -input=false -lock=false
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/aws-shared plan -input=false -lock=false
 ```
 
 Healthy expected outcome:
 
 - `make terraform-auth-check` passes
 - `make terraform-recovery-check` reports `shared` as `OK`
-- `terraform plan` for `infra/terraform/shared` returns `No changes`
+- `terraform plan` for `infra/terraform/aws-shared` returns `No changes`
 
 If the `shared` plan is not clean, stop before `make eks-apply` and reconcile
 the shared stack first.
@@ -508,7 +508,7 @@ Why this is separate from `experiment`:
   - RDS instances
 
 ```bash
-cd infra/terraform/shared
+cd infra/terraform/aws-shared
 
 # Copy and fill in variables
 cp terraform.tfvars.example terraform.tfvars
@@ -522,12 +522,13 @@ terraform apply
 Optional helper flow:
 
 ```bash
+make env-init-app
 make env-init-eks
 make eks-render-tfvars
 make terraform-auth-check
 ```
 
-This renders `infra/terraform/shared/terraform.tfvars` from
+This renders `infra/terraform/aws-shared/terraform.tfvars` from
 `env/terraform.shared.env`.
 
 Note the outputs:
@@ -538,7 +539,7 @@ AWS_PROFILE=terraform-process terraform output
 ```
 
 This workflow assumes a single operator runs Terraform from the same laptop.
-The resulting local state file at `infra/terraform/shared/terraform.tfstate`
+The resulting local state file at `infra/terraform/aws-shared/terraform.tfstate`
 becomes the source of truth consumed by the `experiment` stack.
 
 ---
@@ -548,30 +549,31 @@ becomes the source of truth consumed by the `experiment` stack.
 ### 6.1 Parallel topology: two EKS clusters and two RDS instances
 
 ```bash
-cd infra/terraform/experiment
+cd infra/terraform/aws-parallel
 
 # Copy and fill in variables
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars:
 #   cluster_endpoint_public_access_cidrs = ["<operator-public-ip>/32"]
 
-AWS_PROFILE=terraform-process bash ../../../scripts/terraform-experiment.sh init
-AWS_PROFILE=terraform-process bash ../../../scripts/terraform-experiment.sh plan
-AWS_PROFILE=terraform-process bash ../../../scripts/terraform-experiment.sh apply
+AWS_PROFILE=terraform-process bash ../../../scripts/terraform-aws-parallel.sh init
+AWS_PROFILE=terraform-process bash ../../../scripts/terraform-aws-parallel.sh plan
+AWS_PROFILE=terraform-process bash ../../../scripts/terraform-aws-parallel.sh apply
 ```
 
 If you use the helper flow above, `make eks-render-tfvars` also renders
-`infra/terraform/experiment/terraform.tfvars` from
+`infra/terraform/aws-parallel/terraform.tfvars` from
 `env/terraform.experiment.env`.
 
 `DB_PASSWORD` stays in `env/terraform.experiment.env` and is injected into
 Terraform at runtime through `TF_VAR_db_password`. It is no longer rendered
-into `infra/terraform/experiment/terraform.tfvars`.
+into `infra/terraform/aws-parallel/terraform.tfvars`.
 
 For laptop-driven operation, set the public EKS API endpoint allowlist to the
 current operator IP before rendering tfvars:
 
 ```bash
+make env-init-app
 make env-init-eks
 # Edit env/terraform.experiment.env:
 #   CLUSTER_ENDPOINT_PUBLIC_ACCESS_CIDRS_SOURCE=manual          # optional for custom/static CIDRs
@@ -633,7 +635,7 @@ RDS: skripsi-benchmark-postgres
 The Terraform stack lives at:
 
 ```text
-infra/terraform/experiment-sequential
+infra/terraform/aws-sequential
 ```
 
 Apply through the wrapper so `DB_PASSWORD` is injected consistently and drift
@@ -648,7 +650,7 @@ make eks-sequential-apply
 Verify outputs:
 
 ```bash
-AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/experiment-sequential output
+AWS_PROFILE=terraform-process terraform -chdir=infra/terraform/aws-sequential output
 # sequential_cluster_name, sequential_rds_endpoint
 # sequential_kubeconfig_command
 ```
@@ -879,7 +881,7 @@ make eks-sequential-destroy-confirmed
 # WARNING: this removes the VPC and IAM roles.
 # ECR repositories and the S3 results bucket are manual resources outside Terraform.
 # Benchmark results remain safe in S3 after this command.
-cd infra/terraform/shared
+cd infra/terraform/aws-shared
 AWS_PROFILE=terraform-process terraform destroy
 ```
 

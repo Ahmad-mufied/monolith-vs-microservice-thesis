@@ -35,8 +35,8 @@ provisioning                   : Terraform
 
 | Mode | Terraform stack | Kubernetes contexts | Use when |
 |---|---|---|---|
-| Parallel | `infra/terraform/vultr-experiment` | `monolith`, `msa` | Preferred thesis mode because monolith and MSA run in the same wall-clock benchmark window. |
-| Sequential | `infra/terraform/vultr-experiment-sequential` | `benchmark` | Fallback when Vultr quota or budget cannot support two full clusters at the same time. |
+| Parallel | `infra/terraform/vultr-parallel` | `monolith`, `msa` | Preferred thesis mode because monolith and MSA run in the same wall-clock benchmark window. |
+| Sequential | `infra/terraform/vultr-sequential` | `benchmark` | Fallback when Vultr quota or budget cannot support two full clusters at the same time. |
 
 Parallel mode is the default target for final benchmark runs. Sequential mode
 is valid for smoke tests, quota-constrained iteration, and fallback execution,
@@ -263,8 +263,8 @@ Generated files:
 
 ```text
 infra/terraform/vultr-shared/terraform.tfvars
-infra/terraform/vultr-experiment/terraform.tfvars
-infra/terraform/vultr-experiment-sequential/terraform.tfvars
+infra/terraform/vultr-parallel/terraform.tfvars
+infra/terraform/vultr-sequential/terraform.tfvars
 ```
 
 Do not commit these files. They may contain local operator CIDRs and sensitive
@@ -275,8 +275,8 @@ the Vultr Terraform directories directly when you need a static check:
 
 ```bash
 terraform -chdir=infra/terraform/vultr-shared validate
-terraform -chdir=infra/terraform/vultr-experiment validate
-terraform -chdir=infra/terraform/vultr-experiment-sequential validate
+terraform -chdir=infra/terraform/vultr-parallel validate
+terraform -chdir=infra/terraform/vultr-sequential validate
 ```
 
 ## Phase 4 - Apply Shared Infrastructure
@@ -391,7 +391,8 @@ IPs. If a script says an EKS env file is missing, run the existing env init
 flow first:
 
 ```bash
-make env-init-eks
+make env-init-app
+make env-init-vultr
 ```
 
 Validation:
@@ -617,7 +618,7 @@ SCALING_MODE=hpa K6_PROFILE=hpa make run-benchmark-suite-sequential-vultr \
 ```
 
 The sequential suite records `execution_mode=sequential`,
-`terraform_stack=vultr-experiment-sequential`, and active architecture metadata.
+`terraform_stack=vultr-sequential`, and active architecture metadata.
 
 ## Phase 13 - Verify Results in S3
 
@@ -652,7 +653,7 @@ Confirm these fields before considering the run valid:
 provider=vultr
 execution_mode=parallel or sequential
 scaling_mode=fixed or hpa
-terraform_stack=vultr-experiment or vultr-experiment-sequential
+terraform_stack=vultr-parallel or vultr-sequential
 image_tag=<expected tag>
 app_resource_quota=<measurement-derived quota>
 ```
@@ -774,8 +775,8 @@ or resource quota.
 Check Terraform failure details:
 
 ```bash
-terraform -chdir=infra/terraform/vultr-experiment plan
-terraform -chdir=infra/terraform/vultr-experiment-sequential plan
+terraform -chdir=infra/terraform/vultr-parallel plan
+terraform -chdir=infra/terraform/vultr-sequential plan
 ```
 
 If parallel apply fails because quota is not enough, destroy any partially
@@ -798,8 +799,8 @@ Check env and rendered tfvars:
 make vultr-preflight-check
 make vultr-render-tfvars
 terraform -chdir=infra/terraform/vultr-shared validate
-terraform -chdir=infra/terraform/vultr-experiment validate
-terraform -chdir=infra/terraform/vultr-experiment-sequential validate
+terraform -chdir=infra/terraform/vultr-parallel validate
+terraform -chdir=infra/terraform/vultr-sequential validate
 ```
 
 Common fixes:
@@ -817,8 +818,8 @@ Common fixes:
 Check Terraform outputs:
 
 ```bash
-terraform -chdir=infra/terraform/vultr-experiment output
-terraform -chdir=infra/terraform/vultr-experiment-sequential output
+terraform -chdir=infra/terraform/vultr-parallel output
+terraform -chdir=infra/terraform/vultr-sequential output
 ```
 
 Fix for parallel:
@@ -844,13 +845,14 @@ not applied successfully yet.
 Check missing env files first:
 
 ```bash
-ls env/vultr.env env/monolith.eks.env env/api-gateway.eks.env env/auth-service.eks.env env/item-service.eks.env env/transaction-service.eks.env env/k6-runner.eks.env
+ls env/vultr.env env/monolith.app.env env/api-gateway.app.env env/auth-service.app.env env/item-service.app.env env/transaction-service.app.env env/k6-runner.app.env
 ```
 
 If any reused app env file is missing:
 
 ```bash
-make env-init-eks
+make env-init-app
+make env-init-vultr
 ```
 
 Then rerun the mode-specific secret creation:
@@ -965,7 +967,7 @@ For parallel, inspect the matching architecture context.
 Check private IP outputs and secret-generated URLs:
 
 ```bash
-terraform -chdir=infra/terraform/vultr-experiment output
+terraform -chdir=infra/terraform/vultr-parallel output
 kubectl --context=monolith get secret app-secret -n mono
 kubectl --context=monolith get pods -n mono
 kubectl --context=monolith logs -n mono deploy/monolith --tail=100

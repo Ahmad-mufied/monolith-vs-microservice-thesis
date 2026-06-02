@@ -2,7 +2,7 @@
 
 load_hetzner_s3_credentials() {
   local writer_dir="${TERRAFORM_AWS_S3_WRITER_DIR:-infra/terraform/aws-s3-writer}"
-  local shared_dir="${TERRAFORM_AWS_SHARED_DIR:-infra/terraform/shared}"
+  local shared_dir="${TERRAFORM_AWS_SHARED_DIR:-infra/terraform/aws-shared}"
   local terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
   local access_key_id="${AWS_ACCESS_KEY_ID:-}"
   local secret_access_key="${AWS_SECRET_ACCESS_KEY:-}"

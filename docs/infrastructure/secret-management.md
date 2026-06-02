@@ -172,6 +172,8 @@ Only `*.example.env` files should be committed.
 Current repository helper flow for EKS:
 
 ```text
+env-init-app
+  -> creates provider-neutral app env files under env/*.app.env
 env-init-eks
   -> creates local helper env files under env/
 eks-render-tfvars

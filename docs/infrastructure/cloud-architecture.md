@@ -69,8 +69,8 @@ windows together during analysis.
 
 Sequential mode intentionally gives up this wall-clock alignment to stay within
 smaller vCPU quota. Its metadata records `execution_mode=sequential`,
-`architecture_order`, `terraform_stack=experiment-sequential`, and the active
-cluster name so analysis can compare the explicit time windows instead.
+`architecture_order`, `terraform_stack=aws-sequential`, and the active cluster
+name so analysis can compare the explicit time windows instead.
 
 ### 2.3 Equivalent resource ceiling
 
@@ -86,9 +86,9 @@ for RQ2 (resource efficiency).
 The benchmark runs in one AWS region (`ap-southeast-1`) and uses one shared
 VPC. The repository supports two explicit infrastructure modes:
 
-- **Parallel mode** uses `infra/terraform/experiment` and runs two isolated EKS
+- **Parallel mode** uses `infra/terraform/aws-parallel` and runs two isolated EKS
   clusters plus two isolated RDS instances side by side.
-- **Sequential mode** uses `infra/terraform/experiment-sequential` and runs one
+- **Sequential mode** uses `infra/terraform/aws-sequential` and runs one
   EKS cluster plus one RDS instance, with only one architecture active at a
   time.
 
@@ -109,14 +109,14 @@ AWS account: ap-southeast-1
   ECR: skripsi/* images
   S3 : benchmark result bucket
 
-  Terraform shared stack: infra/terraform/shared
+  Terraform shared stack: infra/terraform/aws-shared
   ------------------------------------------------------------
   Shared VPC
   Shared private subnets for EKS nodes and RDS
   Shared public subnets for ELB and NAT
   Shared k6 runner IAM role
 
-  Terraform experiment stack: infra/terraform/experiment
+  Terraform experiment stack: infra/terraform/aws-parallel
   ------------------------------------------------------------
 
   +-------------------------------+     +-------------------------------+
@@ -183,14 +183,14 @@ AWS account: ap-southeast-1
   ECR: skripsi/* images
   S3 : benchmark result bucket
 
-  Terraform shared stack: infra/terraform/shared
+  Terraform shared stack: infra/terraform/aws-shared
   ------------------------------------------------------------
   Shared VPC
   Shared private subnets for EKS nodes and RDS
   Shared public subnets for ELB and NAT
   Shared k6 runner IAM role
 
-  Terraform sequential stack: infra/terraform/experiment-sequential
+  Terraform sequential stack: infra/terraform/aws-sequential
   ------------------------------------------------------------
 
   +-----------------------------------------------------------+
@@ -279,14 +279,14 @@ before a benchmark and destroyed afterwards.
 
 | Resource | Created by | Lives across teardown |
 |---|---|---|
-| VPC, subnets, NAT, route tables | `infra/terraform/shared` | No |
-| IAM role for k6 runner S3 access | `infra/terraform/shared` | No |
-| EKS cluster — monolith | `infra/terraform/experiment` | No |
-| EKS cluster — msa | `infra/terraform/experiment` | No |
-| RDS instance — monolith | `infra/terraform/experiment` | No |
-| RDS instance — msa | `infra/terraform/experiment` | No |
-| EKS cluster — sequential benchmark | `infra/terraform/experiment-sequential` | No |
-| RDS instance — sequential benchmark | `infra/terraform/experiment-sequential` | No |
+| VPC, subnets, NAT, route tables | `infra/terraform/aws-shared` | No |
+| IAM role for k6 runner S3 access | `infra/terraform/aws-shared` | No |
+| EKS cluster — monolith | `infra/terraform/aws-parallel` | No |
+| EKS cluster — msa | `infra/terraform/aws-parallel` | No |
+| RDS instance — monolith | `infra/terraform/aws-parallel` | No |
+| RDS instance — msa | `infra/terraform/aws-parallel` | No |
+| EKS cluster — sequential benchmark | `infra/terraform/aws-sequential` | No |
+| RDS instance — sequential benchmark | `infra/terraform/aws-sequential` | No |
 
 Rationale: clusters and databases are expensive to keep idle. They should
 exist only during active benchmark sessions. Terraform handles them as a
@@ -1038,7 +1038,7 @@ When the budget threshold is reached, the Lambda function automatically:
 
 This reduces monthly idle cost to approximately $3–4 (stopped RDS storage, S3, and ECR).
 
-Configuration is in `infra/terraform/shared/terraform.tfvars`:
+Configuration is in `infra/terraform/aws-shared/terraform.tfvars`:
 
 ```hcl
 budget_amount            = 30
