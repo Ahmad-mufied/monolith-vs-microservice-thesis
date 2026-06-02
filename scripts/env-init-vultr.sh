@@ -154,5 +154,5 @@ echo "  file: $env_file"
 if [ "$current_vultr_api_key" = "replace-me" ] || [ "$current_dockerhub_namespace" = "replace-me" ]; then
   echo "  next: edit VULTR_API_KEY and DOCKERHUB_NAMESPACE if they are still placeholders"
 else
-  echo "  next: source env/vultr.env, then run make vultr-preflight-check"
+  echo "  next: run make vultr-preflight-check"
 fi

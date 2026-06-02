@@ -57,7 +57,6 @@ The safest operator flow is:
 
 ```text
 env init
--> source env
 -> build and push one pinned image tag
 -> preflight
 -> render tfvars
@@ -97,7 +96,7 @@ Datadog API key      : optional but expected for measured thesis runs
 Do not commit local env files, generated `terraform.tfvars`, kubeconfigs,
 Terraform state, or secret values.
 
-## Phase 1 - Initialize and Load Local Vultr Env
+## Phase 1 - Initialize Local Vultr Env
 
 Create the local Vultr env file:
 
@@ -130,19 +129,15 @@ VULTR_TESTING_NODE_PLAN=vc2-4c-8gb
 VULTR_POSTGRES_PLAN=vc2-4c-8gb
 ```
 
-Load the env file into the current shell before running Make targets that need
-Docker Hub, AWS, or Vultr values:
+The normal Vultr `make` flow auto-loads `env/vultr.env`, so you do not need to
+run a manual shell `source` step before each command:
 
 ```bash
-set -a
-source env/vultr.env
-set +a
+make vultr-preflight-check
 ```
 
-This matters because scripts can source `env/vultr.env`, but Make variable
-expansion such as `DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE)` only sees values
-already exported in the shell. If you open a new terminal, run the `source`
-block again or pass the variables explicitly in the command.
+Manual export is still optional when you want to inspect or override variables
+interactively, but it is no longer required for the standard Vultr workflow.
 
 Notes:
 
@@ -181,7 +176,7 @@ make docker-build-all IMAGE_TAG="$IMAGE_TAG"
 Push every required image to Docker Hub public:
 
 ```bash
-make dockerhub-push-all IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+make dockerhub-push-all IMAGE_TAG="$IMAGE_TAG"
 ```
 
 The `dockerhub-push-all` target pushes:
@@ -200,7 +195,7 @@ Verify every image tag exists before provisioning expensive resources:
 
 ```bash
 for repo in monolith api-gateway auth-service item-service transaction-service seed-runner k6-runner; do
-  docker manifest inspect "docker.io/${DOCKERHUB_NAMESPACE}/${repo}:${IMAGE_TAG}" >/dev/null
+  docker manifest inspect "docker.io/$(grep '^DOCKERHUB_NAMESPACE=' env/vultr.env | cut -d= -f2- | tr -d \"'\")/${repo}:${IMAGE_TAG}" >/dev/null
 done
 ```
 
@@ -436,7 +431,7 @@ be documented in benchmark metadata.
 Manual smoke render:
 
 ```bash
-IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" make vultr-render-manifests
+IMAGE_TAG="$IMAGE_TAG" make vultr-render-manifests
 ```
 
 The renderer must fail if `env/vultr-resource-baseline.env` is missing, unless
@@ -457,7 +452,7 @@ stale AWS/ECR metadata that must not appear in Vultr manifests
 Deploy both architecture clusters in fixed-replica mode:
 
 ```bash
-SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
+SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" \
   make vultr-deploy-all
 ```
 
@@ -481,7 +476,7 @@ Expected:
 Switching from fixed to HPA is a redeploy event:
 
 ```bash
-SCALING_MODE=hpa IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
+SCALING_MODE=hpa IMAGE_TAG="$IMAGE_TAG" \
   make vultr-deploy-all
 ```
 
@@ -508,7 +503,7 @@ Kubernetes objects. Always redeploy and verify after switching fixed/HPA mode.
 Deploy one architecture at a time in the `benchmark` context:
 
 ```bash
-ARCHITECTURE=monolith SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
+ARCHITECTURE=monolith SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" \
   make vultr-deploy-sequential-architecture
 
 SCALING_MODE=fixed EXECUTION_MODE=sequential ARCHITECTURE=monolith \
@@ -518,7 +513,7 @@ SCALING_MODE=fixed EXECUTION_MODE=sequential ARCHITECTURE=monolith \
 Then, after the monolith run is complete and results are verified, switch:
 
 ```bash
-ARCHITECTURE=microservices SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
+ARCHITECTURE=microservices SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" \
   make vultr-deploy-sequential-architecture
 
 SCALING_MODE=fixed EXECUTION_MODE=sequential ARCHITECTURE=microservices \
@@ -534,11 +529,11 @@ Run smoke tests before a long suite. Parallel examples:
 ```bash
 SCALING_MODE=fixed K6_PROFILE=smoke make run-benchmark-parallel-vultr \
   SCENARIO=login TARGET_RPS=100 RUN_ID=vultr-parallel-fixed-smoke ATTEMPT=attempt-01 \
-  IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+  IMAGE_TAG="$IMAGE_TAG"
 
 SCALING_MODE=hpa K6_PROFILE=hpa make run-benchmark-parallel-vultr \
   SCENARIO=login TARGET_RPS=100 RUN_ID=vultr-parallel-hpa-smoke ATTEMPT=attempt-01 \
-  IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+  IMAGE_TAG="$IMAGE_TAG"
 ```
 
 Sequential examples:
@@ -546,11 +541,11 @@ Sequential examples:
 ```bash
 ARCHITECTURE=monolith SCALING_MODE=fixed K6_PROFILE=smoke make run-benchmark-sequential-vultr \
   SCENARIO=login TARGET_RPS=100 RUN_ID=vultr-seq-mono-fixed-smoke ATTEMPT=attempt-01 \
-  IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+  IMAGE_TAG="$IMAGE_TAG"
 
 ARCHITECTURE=microservices SCALING_MODE=fixed K6_PROFILE=smoke make run-benchmark-sequential-vultr \
   SCENARIO=login TARGET_RPS=100 RUN_ID=vultr-seq-msa-fixed-smoke ATTEMPT=attempt-01 \
-  IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+  IMAGE_TAG="$IMAGE_TAG"
 ```
 
 Interpret results:
@@ -570,7 +565,6 @@ Fixed suite:
 SCALING_MODE=fixed K6_PROFILE=steady make run-benchmark-suite-vultr \
   EXPERIMENT_NAME=rq1-fixed-vultr \
   IMAGE_TAG="$IMAGE_TAG" \
-  DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
   SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000"
 ```
 
@@ -580,7 +574,6 @@ HPA suite:
 SCALING_MODE=hpa K6_PROFILE=hpa make run-benchmark-suite-vultr \
   EXPERIMENT_NAME=rq2-hpa-vultr \
   IMAGE_TAG="$IMAGE_TAG" \
-  DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
   SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000"
 ```
 
@@ -597,7 +590,6 @@ SCALING_MODE=fixed K6_PROFILE=steady make run-benchmark-suite-sequential-vultr \
   ARCHITECTURE_ORDER="monolith,microservices" \
   EXPERIMENT_NAME=rq1-fixed-vultr-sequential \
   IMAGE_TAG="$IMAGE_TAG" \
-  DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
   SCENARIO_RPS_MATRIX="login:1000,2500;create-transaction:1000,2500;enriched-transactions:1000,2500"
 ```
 
@@ -608,7 +600,6 @@ SCALING_MODE=hpa K6_PROFILE=hpa make run-benchmark-suite-sequential-vultr \
   ARCHITECTURE_ORDER="monolith,microservices" \
   EXPERIMENT_NAME=rq2-hpa-vultr-sequential \
   IMAGE_TAG="$IMAGE_TAG" \
-  DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
   SCENARIO_RPS_MATRIX="login:1000,2500;create-transaction:1000,2500;enriched-transactions:1000,2500"
 ```
 
@@ -736,9 +727,6 @@ printf '%s\n' "$DOCKERHUB_NAMESPACE"
 Fix:
 
 ```bash
-set -a
-source env/vultr.env
-set +a
 make vultr-preflight-check
 ```
 
@@ -757,7 +745,7 @@ done
 Fix:
 
 ```bash
-make dockerhub-push-all IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+make dockerhub-push-all IMAGE_TAG="$IMAGE_TAG"
 make vultr-preflight-check
 ```
 
@@ -805,7 +793,7 @@ Common fixes:
 
 | Symptom | Fix |
 |---|---|
-| `VULTR_API_KEY` missing | fill `env/vultr.env`, source it, rerun render |
+| `VULTR_API_KEY` missing | fill `env/vultr.env`, then rerun preflight and render |
 | `OPERATOR_CIDRS` missing | set your public IP as `/32`, rerun render |
 | `POSTGRES_PASSWORD` missing | set it in `env/vultr.env`; do not put it in tfvars |
 | provider not initialized | rerun the relevant `make vultr-*-plan` target |
@@ -980,21 +968,21 @@ and secrets for `monolith` and `msa` before changing infrastructure.
 Redeploy with the intended mode and run verifier:
 
 ```bash
-SCALING_MODE=fixed make vultr-deploy-all IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+SCALING_MODE=fixed make vultr-deploy-all IMAGE_TAG="$IMAGE_TAG"
 SCALING_MODE=fixed EXECUTION_MODE=parallel make vultr-verify-live-mode
 ```
 
 For HPA:
 
 ```bash
-SCALING_MODE=hpa make vultr-deploy-all IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+SCALING_MODE=hpa make vultr-deploy-all IMAGE_TAG="$IMAGE_TAG"
 SCALING_MODE=hpa EXECUTION_MODE=parallel make vultr-verify-live-mode
 ```
 
 For sequential:
 
 ```bash
-ARCHITECTURE=monolith SCALING_MODE=hpa make vultr-deploy-sequential-architecture IMAGE_TAG="$IMAGE_TAG" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE"
+ARCHITECTURE=monolith SCALING_MODE=hpa make vultr-deploy-sequential-architecture IMAGE_TAG="$IMAGE_TAG"
 ARCHITECTURE=monolith SCALING_MODE=hpa EXECUTION_MODE=sequential make vultr-verify-live-mode
 ```
 

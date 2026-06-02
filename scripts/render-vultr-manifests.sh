@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG is required}"
-DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}"
-VULTR_RESOURCE_BASELINE_ENV="${VULTR_RESOURCE_BASELINE_ENV:-env/vultr-resource-baseline.env}"
-SKIP_VULTR_RESOURCE_BASELINE="${SKIP_VULTR_RESOURCE_BASELINE:-false}"
-
 if [ -f env/vultr.env ]; then
   set -a
   source env/vultr.env
   set +a
 fi
+
+if [ -z "${IMAGE_TAG:-}" ] && [ -f env/image-tag.eks.env ]; then
+  set -a
+  source env/image-tag.eks.env
+  set +a
+fi
+
+IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG is required}"
+DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}"
+VULTR_RESOURCE_BASELINE_ENV="${VULTR_RESOURCE_BASELINE_ENV:-env/vultr-resource-baseline.env}"
+SKIP_VULTR_RESOURCE_BASELINE="${SKIP_VULTR_RESOURCE_BASELINE:-false}"
 
 if [ "$SKIP_VULTR_RESOURCE_BASELINE" != "true" ]; then
   if [ ! -f "$VULTR_RESOURCE_BASELINE_ENV" ]; then
@@ -149,4 +155,3 @@ bash scripts/validate-rendered-provider-assets.sh vultr "$OUTPUT_DIR"
 
 trap - ERR
 echo "$OUTPUT_DIR"
-

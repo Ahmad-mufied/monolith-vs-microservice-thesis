@@ -965,25 +965,36 @@ ecr-push-all: aws-ecr-login
 
 .PHONY: dockerhub-push-all
 dockerhub-push-all:
-	@if [ -z "$(DOCKERHUB_NAMESPACE)" ] || [ "$(DOCKERHUB_NAMESPACE)" = "replace-me" ]; then \
-		echo "DOCKERHUB_NAMESPACE must be set to your Docker Hub namespace" >&2; \
+	@set -euo pipefail; \
+	namespace="$(DOCKERHUB_NAMESPACE)"; \
+	if [ -z "$$namespace" ] || [ "$$namespace" = "replace-me" ]; then \
+		for env_file in env/vultr.env env/hetzner.env; do \
+			if [ -f "$$env_file" ]; then \
+				set -a; source "$$env_file"; set +a; \
+				namespace="$${DOCKERHUB_NAMESPACE:-}"; \
+				[ -n "$$namespace" ] && [ "$$namespace" != "replace-me" ] && break; \
+			fi; \
+		done; \
+	fi; \
+	if [ -z "$$namespace" ] || [ "$$namespace" = "replace-me" ]; then \
+		echo "DOCKERHUB_NAMESPACE must be set explicitly or provided by env/vultr.env or env/hetzner.env" >&2; \
 		exit 1; \
-	fi
-	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/monolith:$(IMAGE_TAG) -f monolith/Dockerfile .
-	docker push docker.io/$(DOCKERHUB_NAMESPACE)/monolith:$(IMAGE_TAG)
-	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/api-gateway:$(IMAGE_TAG) -f microservices/api-gateway/Dockerfile .
-	docker push docker.io/$(DOCKERHUB_NAMESPACE)/api-gateway:$(IMAGE_TAG)
-	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/auth-service:$(IMAGE_TAG) -f microservices/auth-service/Dockerfile .
-	docker push docker.io/$(DOCKERHUB_NAMESPACE)/auth-service:$(IMAGE_TAG)
-	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/item-service:$(IMAGE_TAG) -f microservices/item-service/Dockerfile .
-	docker push docker.io/$(DOCKERHUB_NAMESPACE)/item-service:$(IMAGE_TAG)
-	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/transaction-service:$(IMAGE_TAG) -f microservices/transaction-service/Dockerfile .
-	docker push docker.io/$(DOCKERHUB_NAMESPACE)/transaction-service:$(IMAGE_TAG)
-	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/seed-runner:$(IMAGE_TAG) -f seed/Dockerfile .
-	docker push docker.io/$(DOCKERHUB_NAMESPACE)/seed-runner:$(IMAGE_TAG)
-	docker build -t docker.io/$(DOCKERHUB_NAMESPACE)/k6-runner:$(IMAGE_TAG) -f k6/runner/Dockerfile .
-	docker push docker.io/$(DOCKERHUB_NAMESPACE)/k6-runner:$(IMAGE_TAG)
-	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/dockerhub-public-image-check.sh
+	fi; \
+	docker build -t docker.io/$$namespace/monolith:$(IMAGE_TAG) -f monolith/Dockerfile .; \
+	docker push docker.io/$$namespace/monolith:$(IMAGE_TAG); \
+	docker build -t docker.io/$$namespace/api-gateway:$(IMAGE_TAG) -f microservices/api-gateway/Dockerfile .; \
+	docker push docker.io/$$namespace/api-gateway:$(IMAGE_TAG); \
+	docker build -t docker.io/$$namespace/auth-service:$(IMAGE_TAG) -f microservices/auth-service/Dockerfile .; \
+	docker push docker.io/$$namespace/auth-service:$(IMAGE_TAG); \
+	docker build -t docker.io/$$namespace/item-service:$(IMAGE_TAG) -f microservices/item-service/Dockerfile .; \
+	docker push docker.io/$$namespace/item-service:$(IMAGE_TAG); \
+	docker build -t docker.io/$$namespace/transaction-service:$(IMAGE_TAG) -f microservices/transaction-service/Dockerfile .; \
+	docker push docker.io/$$namespace/transaction-service:$(IMAGE_TAG); \
+	docker build -t docker.io/$$namespace/seed-runner:$(IMAGE_TAG) -f seed/Dockerfile .; \
+	docker push docker.io/$$namespace/seed-runner:$(IMAGE_TAG); \
+	docker build -t docker.io/$$namespace/k6-runner:$(IMAGE_TAG) -f k6/runner/Dockerfile .; \
+	docker push docker.io/$$namespace/k6-runner:$(IMAGE_TAG); \
+	DOCKERHUB_NAMESPACE="$$namespace" IMAGE_TAG="$(IMAGE_TAG)" bash scripts/dockerhub-public-image-check.sh
 
 .PHONY: eks-render-manifests eks-update-manifests
 eks-render-manifests eks-update-manifests:
@@ -1305,7 +1316,7 @@ vultr-render-manifests:
 	RENDER_DIR="$$(mktemp -d)"; \
 	trap 'rm -rf "$$RENDER_DIR"' EXIT; \
 	echo "Rendering Vultr manifests to $$RENDER_DIR"; \
-	IMAGE_TAG=$(IMAGE_TAG) DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) OUTPUT_DIR="$$RENDER_DIR" bash scripts/render-vultr-manifests.sh >/dev/null; \
+	IMAGE_TAG=$(IMAGE_TAG) OUTPUT_DIR="$$RENDER_DIR" bash scripts/render-vultr-manifests.sh >/dev/null; \
 	bash scripts/validate-eks-assets.sh deploy "$$RENDER_DIR"; \
 	bash scripts/validate-rendered-provider-assets.sh vultr "$$RENDER_DIR"; \
 	echo "Vultr manifests rendered and validated successfully"
@@ -1316,7 +1327,7 @@ vultr-deploy-sequential-architecture:
 
 .PHONY: vultr-deploy-all
 vultr-deploy-all:
-	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/dockerhub-public-image-check.sh
+	IMAGE_TAG=$(IMAGE_TAG) bash scripts/dockerhub-public-image-check.sh
 	CLOUD_PROVIDER=vultr SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-all-eks-clusters.sh
 
 .PHONY: vultr-verify-live-mode
