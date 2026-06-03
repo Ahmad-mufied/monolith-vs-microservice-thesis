@@ -41,6 +41,16 @@ resource "vultr_firewall_rule" "postgres_private" {
   notes             = "PostgreSQL private VPC access only"
 }
 
+resource "vultr_firewall_rule" "postgres_ssh_private" {
+  firewall_group_id = vultr_firewall_group.postgres.id
+  protocol          = "tcp"
+  ip_type           = "v4"
+  subnet            = var.vpc_subnet
+  subnet_size       = var.vpc_subnet_mask
+  port              = "22"
+  notes             = "SSH private VPC access only"
+}
+
 resource "vultr_firewall_rule" "postgres_ssh_operator" {
   for_each = toset(local.operator_ipv4_cidrs)
 
