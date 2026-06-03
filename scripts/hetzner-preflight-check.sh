@@ -45,7 +45,7 @@ aws sts get-caller-identity >/dev/null
 AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
 AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
 AWS_REGION="$AWS_REGION" \
-aws s3api head-bucket --bucket "$S3_BUCKET" >/dev/null
+aws s3api list-objects-v2 --bucket "$S3_BUCKET" --prefix "experiments/" --max-items 1 >/dev/null
 
 for context in $contexts; do
   kubectl --context="$context" get nodes >/dev/null

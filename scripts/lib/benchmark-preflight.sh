@@ -32,7 +32,7 @@ benchmark_preflight_check() {
     return 1
   fi
 
-  if ! aws s3api head-bucket --bucket "$s3_bucket" >/dev/null 2>"$s3_error_file"; then
+  if ! aws s3api list-objects-v2 --bucket "$s3_bucket" --prefix "experiments/" --max-items 1 >/dev/null 2>"$s3_error_file"; then
     echo "ERROR: S3 access check failed for bucket '${s3_bucket}' during ${context_label}." >&2
     cat "$s3_error_file" >&2
     echo "Fix: confirm the benchmark bucket exists and the current AWS session can read it before continuing." >&2

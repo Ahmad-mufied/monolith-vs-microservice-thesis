@@ -45,7 +45,7 @@ if [ -n "${AWS_SESSION_TOKEN:-}" ]; then
 fi
 
 env "${aws_env[@]}" aws sts get-caller-identity >/dev/null
-env "${aws_env[@]}" aws s3api head-bucket --bucket "$S3_BUCKET" >/dev/null
+env "${aws_env[@]}" aws s3api list-objects-v2 --bucket "$S3_BUCKET" --prefix "experiments/" --max-items 1 >/dev/null
 
 if [ -f env/vultr-resource-baseline.env ]; then
   source env/vultr-resource-baseline.env
