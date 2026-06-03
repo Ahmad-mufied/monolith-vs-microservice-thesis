@@ -88,7 +88,7 @@ $K8S create namespace benchmark --dry-run=client -o yaml | $K8S apply -f -
 $K8S create namespace mono --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic db-bootstrap-env --namespace benchmark \
-  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${postgres_ip}:5432/bootstrap?sslmode=require" \
+  --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${postgres_ip}:5432/postgres?sslmode=require" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic monolith-env --namespace mono \
