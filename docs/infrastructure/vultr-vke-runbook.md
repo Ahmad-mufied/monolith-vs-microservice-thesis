@@ -164,6 +164,11 @@ Notes:
 
 ## Phase 2 - Build, Push, Verify, and Pin Images
 
+> [!TIP]
+> **Automated CI/CD Build and Push Alternative**
+> Instead of building and pushing images locally, you can use the configured GitHub Actions workflow. Every merge or push to `main` will automatically build and push all 7 images to Docker Hub using the Git short commit SHA as the tag.
+> Refer to [github-actions-dockerhub.md](file:///mnt/Cons/Amikom/semester/Semester%207/Skrips/experimen/april/code/monolith-vs-microservice-thesis/docs/deployment/github-actions-dockerhub.md) for setup and credentials configuration.
+
 Vultr uses Docker Hub public images. Build and push the same image tag for all
 deployables before provisioning or deployment.
 
