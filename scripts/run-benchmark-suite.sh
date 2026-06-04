@@ -407,7 +407,7 @@ case_timing_source_from_architecture_sources() {
   local source
 
   for source in "$@"; do
-    if [ "$source" != "attempt_metadata" ]; then
+    if [ "$source" != "attempt_metadata" ] && [ "$source" != "datadog_artifact" ]; then
       all_attempt_metadata=false
     fi
     if [ "$source" != "orchestrator" ] && [ "$source" != "attempt_metadata_partial" ]; then

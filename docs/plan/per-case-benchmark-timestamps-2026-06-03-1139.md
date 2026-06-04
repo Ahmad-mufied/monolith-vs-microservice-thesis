@@ -143,13 +143,14 @@ Timing source labels:
 Per-architecture level (under `architectures.<name>`):
 
 - `attempt_metadata` — both timestamps came from metadata (Datadog window)
+- `datadog_artifact` — both timestamps came from datadog-time-window.json
 - `attempt_metadata_partial` — start from metadata `timestamp_utc`, end from
   orchestrator wall-clock
 - `orchestrator` — both timestamps came from orchestrator wall-clock
 
 Case-level aggregated:
 
-- `attempt_metadata` — all architectures used full metadata
+- `attempt_metadata` — all architectures used full metadata (attempt_metadata or datadog_artifact)
 - `orchestrator` — all architectures used orchestrator-based timing (includes
   `attempt_metadata_partial` which depends on orchestrator for end timestamp)
 - `mixed` — at least one architecture used full metadata AND at least one used

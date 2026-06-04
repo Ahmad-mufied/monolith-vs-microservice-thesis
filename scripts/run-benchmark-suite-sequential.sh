@@ -153,7 +153,7 @@ normalize_case_timing_source() {
   local source="$1"
 
   case "$source" in
-    attempt_metadata)
+    attempt_metadata|datadog_artifact)
       printf 'attempt_metadata'
       ;;
     attempt_metadata_partial|orchestrator)

@@ -982,13 +982,14 @@ Interpret timing fields as follows:
   window for that benchmark case
 - `architectures` breaks the case window down per architecture
 - case-level `timing_source` values:
-  - `attempt_metadata` — all architectures used full metadata (Datadog window)
+  - `attempt_metadata` — all architectures used full metadata (Datadog window via attempt_metadata or datadog_artifact)
   - `orchestrator` — all architectures used orchestrator-based timing (includes
     cases where metadata only had `timestamp_utc` without Datadog window)
   - `mixed` — at least one architecture used full metadata AND at least one used
     fallback
 - per-architecture `timing_source` values (under `architectures.<name>`):
   - `attempt_metadata` — both timestamps from metadata (Datadog window)
+  - `datadog_artifact` — both timestamps from secondary datadog-time-window.json
   - `attempt_metadata_partial` — start from metadata `timestamp_utc`, end from
     orchestrator
   - `orchestrator` — both timestamps from orchestrator wall-clock

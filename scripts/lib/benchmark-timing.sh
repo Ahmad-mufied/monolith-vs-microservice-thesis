@@ -51,38 +51,41 @@ resolve_attempt_timing_json() {
     warn_benchmark_timing "$label" "metadata.json could not be fetched from ${s3_uri}; falling back"
   fi
 
+  if datadog_json="$(fetch_benchmark_timing_s3_artifact "$s3_uri" datadog-time-window.json)"; then
+    if jq -e . >/dev/null 2>&1 <<<"$datadog_json"; then
+      datadog_valid=true
+    else
+      warn_benchmark_timing "$label" "datadog-time-window.json is not valid JSON; ignoring artifact"
+      datadog_json=""
+    fi
+  fi
+
   if [ "$metadata_valid" = true ]; then
     start="$(jq -r '.datadog.time_window_start // empty' <<<"$metadata_json")"
     finish="$(jq -r '.datadog.time_window_end // empty' <<<"$metadata_json")"
-
     if [ -n "$start" ] && [ -n "$finish" ]; then
       source="attempt_metadata"
-    else
-      if datadog_json="$(fetch_benchmark_timing_s3_artifact "$s3_uri" datadog-time-window.json)"; then
-        if jq -e . >/dev/null 2>&1 <<<"$datadog_json"; then
-          datadog_valid=true
-        else
-          warn_benchmark_timing "$label" "datadog-time-window.json is not valid JSON; ignoring artifact"
-          datadog_json=""
-        fi
-      fi
-
-      if [ "$datadog_valid" = true ]; then
-        start="${start:-$(jq -r '.time_window_start // empty' <<<"$datadog_json")}"
-        finish="${finish:-$(jq -r '.time_window_end // empty' <<<"$datadog_json")}"
-        if [ -n "$start" ] && [ -n "$finish" ]; then
-          source="attempt_metadata"
-        fi
-      fi
     fi
+  fi
 
-    if [ "$source" != "attempt_metadata" ]; then
-      start="$(jq -r '.timestamp_utc // empty' <<<"$metadata_json")"
-      if [ -n "$start" ]; then
-        finish="$fallback_end"
-        source="attempt_metadata_partial"
-        warn_benchmark_timing "$label" "using metadata timestamp_utc plus orchestrator finish time"
-      fi
+  if [ "$source" != "attempt_metadata" ] && [ "$datadog_valid" = true ]; then
+    local d_start
+    local d_finish
+    d_start="$(jq -r '.time_window_start // empty' <<<"$datadog_json")"
+    d_finish="$(jq -r '.time_window_end // empty' <<<"$datadog_json")"
+    if [ -n "$d_start" ] && [ -n "$d_finish" ]; then
+      start="$d_start"
+      finish="$d_finish"
+      source="datadog_artifact"
+    fi
+  fi
+
+  if [ "$source" != "attempt_metadata" ] && [ "$source" != "datadog_artifact" ] && [ "$metadata_valid" = true ]; then
+    start="$(jq -r '.timestamp_utc // empty' <<<"$metadata_json")"
+    if [ -n "$start" ]; then
+      finish="$fallback_end"
+      source="attempt_metadata_partial"
+      warn_benchmark_timing "$label" "using metadata timestamp_utc plus orchestrator finish time"
     fi
   fi
 
