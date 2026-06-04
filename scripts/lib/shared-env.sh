@@ -70,3 +70,54 @@ resolve_datadog_env_file() {
 resolve_image_tag_env_file() {
   resolve_env_file "env/image-tag.env" "env/image-tag.eks.env" "shared image tag env"
 }
+
+# Robust kubectl wrapper with retries for transient connection/DNS issues
+kubectl() {
+  local max_attempts=3
+  local attempt=1
+  local delay=3
+  local exit_code=0
+
+  # We use a temporary file to capture stderr so we can inspect it and print it correctly
+  local stderr_tmp
+  stderr_tmp="$(mktemp)"
+
+  while [ $attempt -le $max_attempts ]; do
+    # Run the real kubectl command, redirecting stderr to a temp file, preserving stdout
+    command kubectl "$@" 2>"$stderr_tmp"
+    exit_code=$?
+
+    if [ $exit_code -eq 0 ]; then
+      cat "$stderr_tmp" >&2
+      rm -f "$stderr_tmp"
+      return 0
+    fi
+
+    # Inspect stderr for transient network/DNS issues
+    local stderr_content
+    stderr_content="$(cat "$stderr_tmp")"
+    
+    # We always print the stderr to the actual stderr
+    echo "$stderr_content" >&2
+
+    # Check if the error is a transient/connection issue
+    if [[ "$stderr_content" =~ "dial tcp" ]] || \
+       [[ "$stderr_content" =~ "lookup" ]] || \
+       [[ "$stderr_content" =~ "connection refused" ]] || \
+       [[ "$stderr_content" =~ "timeout" ]] || \
+       [[ "$stderr_content" =~ "EOF" ]]; then
+      
+      if [ $attempt -lt $max_attempts ]; then
+        echo "WARNING: Transient kubectl failure detected (exit code: $exit_code). Retrying in ${delay}s (Attempt ${attempt}/${max_attempts})..." >&2
+        sleep "$delay"
+        attempt=$((attempt + 1))
+        continue
+      fi
+    fi
+
+    # For other errors or if we exhausted attempts, clean up and exit
+    rm -f "$stderr_tmp"
+    return $exit_code
+  done
+}
+export -f kubectl
