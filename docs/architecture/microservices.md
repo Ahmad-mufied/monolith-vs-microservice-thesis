@@ -85,10 +85,12 @@ from more than one service.
 The microservices system runs on Kubernetes as multiple Deployments.
 
 In parallel benchmark mode these Deployments run on the dedicated
-`skripsi-msa` EKS cluster. In sequential benchmark mode they run in the `msa`
-namespace on `skripsi-benchmark` while the monolith namespace is scaled down.
-The API Gateway, gRPC call graph, database-per-service model, resource ceiling,
-and benchmark semantics remain the same in both modes.
+`skripsi-msa` EKS cluster (or `skripsi-vultr-msa` VKE cluster on Vultr). In
+sequential benchmark mode they run in the `msa` namespace on `skripsi-benchmark`
+(or `skripsi-vultr-benchmark` on Vultr) while the monolith namespace is scaled
+down. The API Gateway, gRPC call graph, database-per-service model, resource
+ceiling, and benchmark semantics remain the same in both modes and on both
+infrastructure providers.
 
 ```text
 +----------------------------------------------------------+

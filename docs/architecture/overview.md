@@ -540,6 +540,74 @@ Node placement:
 - k6 runner runs on `testing-nodes`,
 - Datadog Agent runs as DaemonSet on monitored nodes.
 
+### 9.1 Active Implementation: Vultr
+
+The active implementation uses Vultr instead of AWS EKS and Amazon RDS.
+The application code, benchmark scripts, and external API contract remain
+identical. Only the infrastructure hosting platform differs.
+
+Main components (Vultr):
+
+- Vultr Kubernetes Engine (VKE) for Kubernetes,
+- PostgreSQL 18 on Vultr Compute VM (self-managed, cloud-init provisioned),
+- Docker Hub for container images,
+- AWS S3 for benchmark result storage (unchanged),
+- Datadog SaaS for observability (unchanged),
+- Terraform with vultr/vultr provider (~> 2.31).
+
+Infrastructure mapping:
+
+| Component | AWS (Original) | Vultr (Active) |
+|---|---|---|
+| Kubernetes | Amazon EKS | Vultr VKE |
+| Database | Amazon RDS PostgreSQL 18 | PostgreSQL 18 on Compute VM |
+| Container registry | Amazon ECR | Docker Hub |
+| Networking | AWS VPC | Vultr Legacy VPC |
+| Provisioning | Terraform AWS provider | Terraform Vultr provider |
+
+High-level Vultr deployment topology in parallel mode:
+
+```text
+Vultr Region: sgp (Singapore)
+
+Vultr Legacy VPC (10.20.0.0/16)
+├── VKE: skripsi-vultr-monolith
+│   ├── app-nodes (2 x voc-c-16c-32gb-300s)  -> mono namespace
+│   ├── testing-nodes (1 x vc2-4c-8gb)        -> benchmark namespace
+│   └── PostgreSQL VM                          -> mono_db
+│
+└── VKE: skripsi-vultr-msa
+    ├── app-nodes (2 x voc-c-16c-32gb-300s)  -> msa namespace
+    ├── testing-nodes (1 x vc2-4c-8gb)        -> benchmark namespace
+    └── PostgreSQL VM                          -> auth_db, item_db, transaction_db
+
+External services:
+  Docker Hub: container images
+  AWS S3: benchmark artifacts
+  Datadog SaaS: metrics, traces, logs
+```
+
+High-level Vultr deployment topology in sequential mode:
+
+```text
+Vultr Region: sgp (Singapore)
+
+Vultr Legacy VPC (10.20.0.0/16)
+└── VKE: skripsi-vultr-benchmark
+    ├── app-nodes (2 x voc-c-16c-32gb-300s)  -> one active architecture at a time
+    ├── testing-nodes (1 x vc2-4c-8gb)        -> benchmark namespace
+    └── PostgreSQL VM                          -> mono_db, auth_db, item_db, transaction_db
+
+Sequential phase 1:
+  mono namespace active, msa scaled down
+
+Sequential phase 2:
+  msa namespace active, mono scaled down
+```
+
+For the complete Vultr infrastructure reference, see:
+`docs/infrastructure/vultr-complete-architecture.md`.
+
 ---
 
 ## 10. Resource and Autoscaling Overview

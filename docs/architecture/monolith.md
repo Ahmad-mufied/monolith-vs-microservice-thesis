@@ -101,10 +101,12 @@ mono_db
 ```
 
 In parallel benchmark mode this topology runs on the dedicated
-`skripsi-monolith` EKS cluster. In sequential benchmark mode it runs in the
-`mono` namespace on `skripsi-benchmark` while the microservices namespace is
-scaled down. The monolith request path, database name, resource ceiling, and
-benchmark semantics remain the same in both modes.
+`skripsi-monolith` EKS cluster (or `skripsi-vultr-monolith` VKE cluster on
+Vultr). In sequential benchmark mode it runs in the `mono` namespace on
+`skripsi-benchmark` (or `skripsi-vultr-benchmark` on Vultr) while the
+microservices namespace is scaled down. The monolith request path, database
+name, resource ceiling, and benchmark semantics remain the same in both modes
+and on both infrastructure providers.
 
 This request path is intentionally linear. A client request reaches the
 monolith over HTTP, the monolith executes all relevant application logic

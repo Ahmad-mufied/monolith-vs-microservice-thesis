@@ -1,17 +1,15 @@
 # Cloud Architecture Diagram
 
-This document keeps the AWS topology diagrams for both supported benchmark
-execution modes in one place:
+This document contains topology diagrams for both the original AWS EKS plan
+and the active Vultr implementation.
 
-- **Parallel mode** provisions two isolated EKS clusters and two isolated RDS
-  instances so monolith and microservices can run at the same wall-clock time.
-- **Sequential mode** provisions one EKS cluster and one RDS instance, then runs
-  monolith and microservices one after another for quota-constrained accounts.
+Both infrastructure paths preserve the same application resource ceiling. The
+difference is the hosting platform, not the benchmark API contract or workload
+semantics.
 
-Both modes preserve the same application resource ceiling. The difference is
-the execution topology, not the benchmark API contract or workload semantics.
+---
 
-## Parallel Mode
+## AWS EKS — Parallel Mode (Original Plan)
 
 Use this mode when the AWS account has enough vCPU quota for both architecture
 stacks to be active together. It gives the cleanest Datadog time-series overlay
@@ -85,7 +83,7 @@ flowchart TB
   msaDD --> datadog
 ```
 
-## Sequential Mode
+## AWS EKS — Sequential Mode (Original Plan)
 
 Use this mode when the AWS account cannot keep both full architecture stacks
 active at once, for example with a 24 vCPU quota. The same cluster hosts both
@@ -150,7 +148,7 @@ flowchart TB
   seqDD --> datadog
 ```
 
-## Notes
+## AWS Notes
 
 - S3 and ECR are persistent resources and are not destroyed by Terraform.
 - VPC and the k6 IAM role come from the shared Terraform stack.
@@ -163,3 +161,125 @@ flowchart TB
 - Do not keep both `aws-parallel` and `aws-sequential` active under a
   constrained vCPU quota; use the switching flow in
   `docs/diagrams/sequential-parallel-topology.md`.
+
+---
+
+## Vultr VKE — Parallel Mode (Active Implementation)
+
+The active implementation uses Vultr VKE instead of Amazon EKS, and
+self-managed PostgreSQL on Vultr Compute VM instead of Amazon RDS.
+
+```mermaid
+flowchart TB
+  operator["Operator laptop<br/>kubectl, terraform, make"]
+  dockerhub["Docker Hub<br/>public benchmark images"]
+  datadog["Datadog SaaS<br/>metrics, traces, logs"]
+  s3["AWS S3<br/>benchmark artifacts"]
+
+  subgraph vultr["Vultr account - sgp (Singapore)"]
+    subgraph shared["Shared stack: infra/terraform/vultr-shared"]
+      vpc["Legacy VPC Network<br/>10.20.0.0/16"]
+      ssh["Operator SSH key"]
+      fw["PostgreSQL firewall group"]
+    end
+
+    subgraph parallel["Parallel stack: infra/terraform/vultr-parallel"]
+      subgraph monoCluster["VKE: skripsi-vultr-monolith"]
+        monoAppNodes["app-nodes<br/>2 x voc-c-16c-32gb-300s<br/>node-group=app"]
+        monoTesting["testing-nodes<br/>1 x vc2-4c-8gb<br/>node-group=testing<br/>taint workload=benchmark"]
+        monoNs["namespace: mono<br/>monolith pod(s)"]
+        monoBench["namespace: benchmark<br/>k6 runner job"]
+        monoDD["Datadog Agent DaemonSet"]
+      end
+
+      monoPg["Vultr Compute VM<br/>PostgreSQL 18<br/>mono_db"]
+
+      subgraph msaCluster["VKE: skripsi-vultr-msa"]
+        msaAppNodes["app-nodes<br/>2 x voc-c-16c-32gb-300s<br/>node-group=app"]
+        msaTesting["testing-nodes<br/>1 x vc2-4c-8gb<br/>node-group=testing<br/>taint workload=benchmark"]
+        msaNs["namespace: msa<br/>api-gateway, auth-service,<br/>item-service, transaction-service"]
+        msaBench["namespace: benchmark<br/>k6 runner job"]
+        msaDD["Datadog Agent DaemonSet"]
+      end
+
+      msaPg["Vultr Compute VM<br/>PostgreSQL 18<br/>auth_db, item_db, transaction_db"]
+    end
+  end
+
+  operator -->|"terraform apply / destroy"| parallel
+  operator -->|"docker push"| dockerhub
+  operator -->|"kubectl deploy"| monoCluster
+  operator -->|"kubectl deploy"| msaCluster
+
+  dockerhub -->|"pull app images"| monoNs
+  dockerhub -->|"pull service images"| msaNs
+  dockerhub -->|"pull k6 image"| monoBench
+  dockerhub -->|"pull k6 image"| msaBench
+
+  monoNs -->|"pgx via VPC private IP"| monoPg
+  msaNs -->|"pgx via VPC private IP"| msaPg
+
+  monoBench -->|"HTTP load"| monoNs
+  msaBench -->|"HTTP load"| msaNs
+
+  monoBench -->|"upload results"| s3
+  msaBench -->|"upload results"| s3
+
+  monoDD --> datadog
+  msaDD --> datadog
+  monoNs -->|"APM traces"| monoDD
+  msaNs -->|"APM traces"| msaDD
+```
+
+## Vultr VKE — Sequential Mode (Active Fallback)
+
+```mermaid
+flowchart TB
+  operator["Operator laptop"]
+  dockerhub["Docker Hub"]
+  datadog["Datadog SaaS"]
+  s3["AWS S3"]
+
+  subgraph vultr["Vultr account - sgp"]
+    subgraph shared["Shared stack"]
+      vpc["Legacy VPC Network<br/>10.20.0.0/16"]
+      fw["PostgreSQL firewall group"]
+    end
+
+    subgraph sequential["Sequential stack: infra/terraform/vultr-sequential"]
+      subgraph benchmarkCluster["VKE: skripsi-vultr-benchmark"]
+        appPool["app-nodes<br/>2 x voc-c-16c-32gb-300s<br/>node-group=app"]
+        testPool["testing-nodes<br/>1 x vc2-4c-8gb<br/>node-group=testing<br/>taint workload=benchmark"]
+        monoNs["namespace: mono<br/>active during monolith phase"]
+        msaNs["namespace: msa<br/>active during MSA phase"]
+        benchNs["namespace: benchmark<br/>k6 + bootstrap jobs"]
+        agent["Datadog Agent DaemonSet"]
+      end
+
+      pgVm["Vultr Compute VM<br/>PostgreSQL 18<br/>mono_db, auth_db,<br/>item_db, transaction_db"]
+    end
+  end
+
+  operator -->|"terraform apply"| sequential
+  operator -->|"docker push"| dockerhub
+  operator -->|"deploy one arch at a time"| benchmarkCluster
+
+  dockerhub -->|"pull images"| benchmarkCluster
+
+  monoNs -->|"pgx via VPC during monolith phase"| pgVm
+  msaNs -->|"pgx via VPC during MSA phase"| pgVm
+
+  benchNs -->|"HTTP load: monolith phase"| monoNs
+  benchNs -->|"HTTP load: MSA phase"| msaNs
+  benchNs -->|"upload results"| s3
+  agent --> datadog
+```
+
+## Vultr Notes
+
+- Docker Hub replaces Amazon ECR for container images.
+- PostgreSQL runs on Vultr Compute VM (self-managed) instead of Amazon RDS.
+- Vultr Legacy VPC (not VPC 2.0) is used because VKE requires it.
+- PostgreSQL is accessed via VPC private IP only (not publicly exposed).
+- AWS S3 and Datadog SaaS remain unchanged.
+- For the complete Vultr reference, see `docs/infrastructure/vultr-complete-architecture.md`.
