@@ -23,16 +23,14 @@ Final RQ2:
 
 ```text
 How does CPU and memory resource efficiency compare between monolithic and
-microservices architectures when handling equivalent workloads in a
-cloud-native environment based on Kubernetes orchestration?
+microservices architectures?
 ```
 
 Indonesian thesis version:
 
 ```text
 Bagaimana perbandingan efisiensi penggunaan sumber daya CPU dan memori antara
-arsitektur monolitik dan mikroservis dalam menangani beban kerja yang setara
-pada lingkungan cloud-native berbasis orkestrasi Kubernetes?
+arsitektur monolitik dan mikroservis?
 ```
 
 ---
@@ -63,13 +61,18 @@ RQ1 = client-observed performance
 RQ2 = resource cost needed to produce that performance
 ```
 
+Final thesis evidence should come from the Vultr Kubernetes Engine (VKE)
+benchmark environment. CPU and memory comparisons from local, EKS, or other
+provider runs must not be mixed with final Vultr VKE evidence unless explicitly
+labeled as non-final or historical.
+
 Diagram:
 
 ```text
 +-------------------+
 | RQ1               |
-| latency, RPS,     |
-| error rate        |
+| latency, target   |
+| RPS achievement   |
 +---------+---------+
           |
           v
@@ -99,9 +102,9 @@ and memory usage while maintaining valid and stable performance.
 Stable performance means:
 
 ```text
-achieved RPS is close to target RPS
+throughput achievement is close to target RPS
 p90/p95 latency is stable
-error rate is low
+error rate is low as validation evidence
 dropped iterations are low
 checks pass
 ```
@@ -137,6 +140,7 @@ Derived metrics:
 RPS per CPU core
 CPU core-seconds per 1000 successful requests
 Memory MiB per 1000 achieved RPS
+throughput achievement per resource ceiling
 ```
 
 Supporting metrics:
@@ -150,6 +154,11 @@ pod count
 pod restart count
 Datadog trace latency per service
 ```
+
+Error rate, checks rate, and dropped iterations remain validation inputs from
+RQ1. They are not primary RQ2 metrics, but they prevent false efficiency claims
+when an architecture used fewer resources because it did not process the target
+workload correctly.
 
 ---
 
@@ -380,6 +389,11 @@ Diagram:
 
 HPA is not the primary RQ2 metric. It is a supporting mechanism for explaining resource usage and scaling behavior.
 
+Fixed-replica mode is the primary RQ2 comparison mode because it isolates CPU
+and memory usage under a static deployment configuration. HPA-enabled mode is a
+supporting experiment used to explain whether autoscaling changes the
+performance-resource trade-off.
+
 Mechanism:
 
 ```text
@@ -439,6 +453,13 @@ But HPA does not replace CPU/memory analysis.
 
 The experiment must clearly label whether it uses fixed replicas or HPA.
 
+For the final thesis analysis:
+
+```text
+fixed-replica mode = primary RQ1/RQ2 comparison
+HPA-enabled mode   = supporting autoscaling analysis
+```
+
 ### 11.1 Fixed Replica Mode
 
 Characteristics:
@@ -460,7 +481,7 @@ easier architecture comparison
 Suitable for:
 
 ```text
-resource efficiency under fixed resource allocation
+primary resource efficiency comparison under fixed resource allocation
 ```
 
 ### 11.2 HPA-Enabled Mode
@@ -481,6 +502,12 @@ shows Kubernetes autoscaling behavior
 shows MSA granular scaling
 ```
 
+Suitable for:
+
+```text
+supporting analysis of autoscaling behavior and trade-off changes
+```
+
 Risks:
 
 ```text
@@ -492,8 +519,8 @@ results cannot be mixed with fixed-replica results without explicit labeling
 Rule:
 
 ```text
-Do not mix fixed-replica and HPA-enabled results in the same main comparison
-without clear labels.
+Do not mix fixed-replica and HPA-enabled results in the same primary comparison.
+Use HPA results as a separately labeled supporting analysis.
 ```
 
 If HPA is enabled, it must be applied consistently for both architectures.
@@ -754,12 +781,12 @@ during the scaling process. This should be explained as autoscaling behavior.
 
 ### 17.1 Resource Summary Table
 
-| Scenario | Architecture | Target RPS | Achieved RPS | Error Rate | p95 Latency | Avg CPU | P95 CPU | Avg Memory | P95 Memory |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| login | monolith | ... | ... | ... | ... | ... | ... | ... | ... |
-| login | microservices | ... | ... | ... | ... | ... | ... | ... | ... |
-| create-transaction | monolith | ... | ... | ... | ... | ... | ... | ... | ... |
-| create-transaction | microservices | ... | ... | ... | ... | ... | ... | ... | ... |
+| Scenario | Architecture | Target RPS | Achieved RPS | Achievement % | p95 Latency | Validation Status | Avg CPU | P95 CPU | Avg Memory | P95 Memory |
+|---|---|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| login | monolith | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| login | microservices | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| create-transaction | monolith | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| create-transaction | microservices | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 
 ### 17.2 Efficiency Metrics Table
 
@@ -797,7 +824,8 @@ during the scaling process. This should be explained as autoscaling behavior.
 CPU total: monolith vs microservices
 memory total: monolith vs microservices
 p95 latency: monolith vs microservices
-error rate: monolith vs microservices
+throughput achievement: monolith vs microservices
+error rate as validation evidence
 pod count: monolith vs microservices
 ```
 
@@ -807,7 +835,7 @@ pod count: monolith vs microservices
 monolith CPU
 monolith memory
 monolith p95 latency
-monolith error rate
+monolith error rate as validation evidence
 monolith current vs desired replicas
 slow traces
 ```
@@ -830,7 +858,7 @@ namespace CPU/memory total
 target RPS
 achieved RPS
 p95 latency
-error rate
+error rate as validation evidence
 CPU utilization
 HPA desired replicas
 HPA current replicas
@@ -946,16 +974,18 @@ collectively provide one application behavior.
 
 ```text
 CPU and memory usage are interpreted together with achieved RPS, latency
-percentiles, error rate, and dropped iterations. Therefore, an architecture is
-not considered more efficient only because it uses lower resources if it fails
-to sustain the target workload or produces a high error rate.
+percentiles, error rate, checks rate, and dropped iterations. Therefore, an
+architecture is not considered more efficient only because it uses lower
+resources if it fails to sustain the target workload or produces invalid
+responses.
 ```
 
 ```text
 When HPA is enabled, current replicas, desired replicas, and scale events are
 recorded as supporting metrics. These metrics explain how Kubernetes adjusts
 application capacity under increasing load. However, the primary RQ2 comparison
-is still based on aggregate CPU and memory usage at the architecture level.
+is still based on fixed-replica aggregate CPU and memory usage at the
+architecture level. HPA results are reported separately as supporting evidence.
 ```
 
 ---
@@ -1007,7 +1037,7 @@ different dataset version
 different environment
 fixed-replica vs HPA-enabled without note
 Datadog-enabled vs Datadog-disabled without note
-Minikube result vs EKS final result
+Minikube result vs Vultr VKE final result
 different resource ceiling
 invalid k6 run vs valid k6 run
 ```
@@ -1086,7 +1116,7 @@ calculate RPS per CPU core
 calculate CPU core-seconds per 1000 requests
 calculate memory per 1000 RPS
 explain MSA service-level breakdown
-explain HPA behavior if enabled
+explain HPA behavior separately when enabled
 conclude resource efficiency
 ```
 
@@ -1149,14 +1179,15 @@ Efficiency is evaluated using:
 ```text
 aggregate CPU
 aggregate memory
+throughput achievement against target RPS
 achieved RPS
 latency percentiles
-error rate
-dropped iterations
+error rate as validation
+dropped iterations as validation
 RPS per CPU core
 CPU core-seconds per 1000 requests
 memory MiB per 1000 RPS
-HPA behavior when enabled
+HPA behavior as supporting evidence when enabled
 ```
 
 Final RQ2 conclusion should answer:

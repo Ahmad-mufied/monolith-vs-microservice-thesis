@@ -31,19 +31,29 @@ RQ1 focuses on external performance:
 
 ```text
 latency
-achieved RPS
-error rate
+throughput achievement against target RPS
+achieved RPS as supporting calculation input
+error rate as validation metric
 dropped iterations
 ```
 
 RQ2 focuses on resource efficiency:
 
 ```text
-CPU usage
-memory usage
-derived efficiency metrics
+architecture-level CPU usage
+architecture-level memory usage
+derived efficiency metrics tied to valid k6 results
+microservices service breakdown as supporting explanation
 HPA behavior as supporting evidence
 ```
+
+Fixed-replica mode is the primary comparison mode for both research questions.
+HPA mode is a supporting experiment used to explain autoscaling behavior and
+whether the observed trade-offs change when Kubernetes is allowed to scale pods.
+
+Final thesis measurements use Vultr Kubernetes Engine (VKE) as the managed
+Kubernetes environment. The RQ definitions remain cloud-native and
+Kubernetes-based, but final Chapter 4 evidence should come from Vultr VKE runs.
 
 ## Source-of-Truth Policy
 

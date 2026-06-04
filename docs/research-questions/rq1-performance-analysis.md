@@ -22,16 +22,15 @@ Final RQ1:
 
 ```text
 How does the performance of monolithic and microservices architectures compare
-when handling equivalent workloads in a cloud-native environment based on
-Kubernetes orchestration, based on latency, throughput, and error rate?
+based on latency and throughput achievement against the configured target RPS
+when handling equivalent workloads in a cloud-native Kubernetes environment?
 ```
 
 Indonesian thesis version:
 
 ```text
-Bagaimana perbandingan kinerja arsitektur monolitik dan mikroservis dalam
-menangani beban kerja yang setara pada lingkungan cloud-native berbasis
-orkestrasi Kubernetes berdasarkan latency, throughput, dan error rate?
+Bagaimana perbandingan kinerja arsitektur monolitik dan mikroservis berdasarkan
+latency dan tingkat ketercapaian throughput terhadap target RPS?
 ```
 
 ---
@@ -70,6 +69,10 @@ S3 artifacts
 = reproducibility record
 ```
 
+Final thesis evidence should come from the Vultr Kubernetes Engine (VKE)
+benchmark environment. Other environments can be used for development,
+calibration, or historical comparison only when explicitly labeled.
+
 Diagram:
 
 ```text
@@ -87,8 +90,9 @@ Diagram:
           v
 +-------------------+
 | k6 result         |
-| latency, RPS,     |
-| error rate        |
+| latency,          |
+| target RPS        |
+| achievement       |
 +---------+---------+
           |
           v
@@ -114,11 +118,12 @@ In this research, application performance is defined as:
 
 ```text
 The ability of the system to handle an equivalent external workload with low
-latency, stable achieved throughput, low error rate, and minimal dropped
-iterations.
+latency and high throughput achievement against the configured target RPS.
 ```
 
-Performance is not determined by one metric only.
+Performance is not determined by one metric only. Error rate, dropped
+iterations, and checks rate are validation metrics: they determine whether a run
+is trustworthy enough to compare, but they are not the main RQ1 outcome.
 
 Examples:
 
@@ -137,8 +142,9 @@ Therefore, RQ1 must be interpreted using a metric group:
 
 ```text
 latency
-throughput
-error rate
+throughput achievement against target RPS
+achieved RPS
+error rate as validation
 dropped iterations
 checks rate
 ```
@@ -174,9 +180,10 @@ p90 and p95 are more useful than average latency because they show the
 experience of slower requests and reveal tail latency.
 ```
 
-### 5.2 Throughput / Achieved RPS
+### 5.2 Throughput Achievement Against Target RPS
 
-Throughput is the number of requests successfully processed within a time interval.
+Throughput achievement measures how closely the observed request rate matches
+the configured target RPS.
 
 In k6 arrival-rate scenarios, the intended load is:
 
@@ -184,7 +191,7 @@ In k6 arrival-rate scenarios, the intended load is:
 TARGET_RPS
 ```
 
-However, the actual load must be verified through:
+The actual load must be verified through:
 
 ```text
 achieved RPS
@@ -194,9 +201,22 @@ iterations
 
 A run is not automatically valid only because `TARGET_RPS` was configured.
 
+Recommended derived metric:
+
+```text
+throughput_achievement_pct = achieved RPS / target RPS x 100
+```
+
+Interpretation:
+
+```text
+Higher is better, as long as error rate, dropped iterations, and checks remain
+within the accepted validation thresholds.
+```
+
 ### 5.3 Error Rate
 
-Primary metric:
+Validation metric:
 
 ```text
 http_req_failed
@@ -241,12 +261,10 @@ A high checks rate confirms that requests returned valid expected responses.
 Recommended interpretation order:
 
 ```text
-1. Was the target RPS achieved?
-2. Was the error rate low?
-3. Were dropped iterations within the accepted threshold?
-4. Were checks successful?
-5. How did p90/p95 latency compare?
-6. Were results stable across attempts?
+1. Is the run valid? (error rate, dropped iterations, checks, artifacts)
+2. Was the target RPS achieved?
+3. How did p90/p95 latency compare?
+4. Were results stable across attempts?
 ```
 
 This prevents misleading conclusions.
@@ -328,8 +346,9 @@ Primary metrics:
 
 ```text
 p90/p95 latency
+throughput achievement against target RPS
 achieved RPS
-error rate
+error rate as validation
 checks rate
 ```
 
@@ -400,8 +419,9 @@ Primary metrics:
 
 ```text
 p90/p95 latency
+throughput achievement against target RPS
 achieved RPS
-error rate
+error rate as validation
 dropped iterations
 ```
 
@@ -489,8 +509,9 @@ Primary metrics:
 
 ```text
 p90/p95 latency
+throughput achievement against target RPS
 achieved RPS
-error rate
+error rate as validation
 checks rate
 ```
 
@@ -689,18 +710,21 @@ However, RQ1 is still answered primarily using:
 
 ```text
 latency
+throughput achievement against target RPS
 achieved RPS
-error rate
-dropped iterations
+error rate as validation
+dropped iterations as validation
 ```
 
 If HPA is enabled, results must be labeled as:
 
 ```text
-performance under autoscaling-enabled Kubernetes environment
+supporting performance result under autoscaling-enabled Kubernetes environment
 ```
 
-Do not mix fixed-replica results and HPA-enabled results without explicit labeling.
+Fixed-replica mode is the primary RQ1 comparison mode. HPA-enabled results are
+supporting evidence and must not be mixed into the primary fixed-replica
+comparison without explicit labeling.
 
 ---
 
@@ -746,8 +770,8 @@ But final RQ1 performance tables should still use k6 as the primary source.
 
 ### 16.1 Main Performance Comparison Table
 
-| Scenario | Architecture | Target RPS | Achieved RPS | p90 Latency | p95 Latency | Error Rate | Dropped Iterations | Verdict |
-|---|---|---:|---:|---:|---:|---:|---:|---|
+| Scenario | Architecture | Target RPS | Achieved RPS | Achievement % | p90 Latency | p95 Latency | Validation Status | Verdict |
+|---|---|---:|---:|---:|---:|---:|---|---|
 | login | monolith | ... | ... | ... | ... | ... | ... | ... |
 | login | microservices | ... | ... | ... | ... | ... | ... | ... |
 | create-transaction | monolith | ... | ... | ... | ... | ... | ... | ... |
@@ -757,17 +781,17 @@ But final RQ1 performance tables should still use k6 as the primary source.
 
 ### 16.2 Attempt-Level Table
 
-| Scenario | Architecture | Attempt | Target RPS | Achieved RPS | p90 | p95 | Error Rate | Dropped Iterations |
-|---|---|---|---:|---:|---:|---:|---:|---:|
-| login | monolith | attempt-01 | ... | ... | ... | ... | ... | ... |
-| login | microservices | attempt-01 | ... | ... | ... | ... | ... | ... |
+| Scenario | Architecture | Attempt | Target RPS | Achieved RPS | Achievement % | p90 | p95 | Error Rate | Dropped Iterations |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| login | monolith | attempt-01 | ... | ... | ... | ... | ... | ... | ... |
+| login | microservices | attempt-01 | ... | ... | ... | ... | ... | ... | ... |
 
 ### 16.3 Aggregated Table
 
-| Scenario | Architecture | Mean p95 | Median p95 | Std Dev p95 | Mean Error Rate | Mean Achieved RPS |
-|---|---|---:|---:|---:|---:|---:|
-| login | monolith | ... | ... | ... | ... | ... |
-| login | microservices | ... | ... | ... | ... | ... |
+| Scenario | Architecture | Mean p95 | Median p95 | Std Dev p95 | Mean Achievement % | Mean Achieved RPS | Validation Status |
+|---|---|---:|---:|---:|---:|---:|---|
+| login | monolith | ... | ... | ... | ... | ... | ... |
+| login | microservices | ... | ... | ... | ... | ... | ... |
 
 Recommended rule:
 
@@ -785,9 +809,8 @@ Primary RQ1 graphs:
 ```text
 p95 latency comparison per scenario
 p90 latency comparison per scenario
-achieved RPS comparison per scenario
-error rate comparison per scenario
-dropped iterations comparison per scenario
+throughput achievement comparison per scenario
+achieved RPS vs target RPS per scenario
 ```
 
 Supporting graphs:
@@ -795,7 +818,8 @@ Supporting graphs:
 ```text
 latency over time
 request rate over time
-error rate over time
+error rate over time as validation evidence
+dropped iterations over time as validation evidence
 trace waterfall examples
 ```
 
@@ -851,12 +875,14 @@ actually executed.
 
 ```text
 Application performance is evaluated using k6 from the client perspective.
-The primary metrics are p90 latency, p95 latency, achieved request rate, error
-rate, and dropped iterations. The benchmark uses equivalent external workloads
-for monolith and microservices, including the same endpoint scenario, target
-RPS, duration, dataset version, and number of attempts. k6 output is treated as
-the primary source of performance results, while Datadog is used to explain
-internal service behavior, traces, and possible bottlenecks.
+The primary metrics are p90 latency, p95 latency, and throughput achievement
+against the configured target RPS. Error rate, checks rate, and dropped
+iterations are recorded as validation metrics to ensure that compared runs are
+usable. The benchmark uses equivalent external workloads for monolith and
+microservices, including the same endpoint scenario, target RPS, duration,
+dataset version, and number of attempts. k6 output is treated as the primary
+source of performance results, while Datadog is used to explain internal service
+behavior, traces, and possible bottlenecks.
 ```
 
 ```text
@@ -900,7 +926,7 @@ different dataset version
 different environment
 Datadog-enabled vs Datadog-disabled without note
 fixed-replica vs HPA-enabled without note
-Minikube result vs EKS final benchmark result
+Minikube result vs Vultr VKE final benchmark result
 run with high dropped_iterations vs valid run
 ```
 
@@ -951,10 +977,9 @@ Analysis:
 
 ```text
 validate run
-compare achieved RPS
-compare error rate
-compare dropped iterations
+compare throughput achievement against target RPS
 compare p90/p95 latency
+use error rate, checks, and dropped iterations as validation
 use Datadog to explain internal cause
 conclude performance difference
 ```
@@ -1003,9 +1028,10 @@ Primary evidence:
 ```text
 p90 latency
 p95 latency
+throughput achievement against target RPS
 achieved RPS
-error rate
-dropped iterations
+error rate as validation
+dropped iterations as validation
 checks rate
 ```
 
@@ -1022,6 +1048,6 @@ Datadog supports interpretation, but k6 remains the primary benchmark source.
 Final conclusion should answer:
 
 ```text
-Which architecture delivered more stable and lower-latency performance under
-equivalent workload conditions?
+Which architecture delivered lower latency and better throughput achievement
+against the target RPS under equivalent workload conditions?
 ```
