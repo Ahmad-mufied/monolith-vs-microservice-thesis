@@ -349,20 +349,81 @@ for architecture in $ARCHITECTURE_ORDER; do
   while IFS=$'\t' read -r scenario scenario_rps_levels; do
     [ -z "$scenario" ] && continue
 
-    if [ "$scenario" = "login" ]; then
+    # Check if we can skip the setup for this scenario (if all its target RPS levels are already in S3)
+    skip_scenario_setup=true
+    for target_rps in $scenario_rps_levels; do
+      case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
+      if ! aws s3 ls "${case_s3_uri}/result-status.json" >/dev/null 2>&1; then
+        skip_scenario_setup=false
+        break
+      fi
+    done
+
+    if [ "$scenario" = "login" ] && [ "$skip_scenario_setup" = "false" ]; then
       reset_seed_active "$architecture"
     fi
-    if [ "$scenario" = "enriched-transactions" ]; then
+    if [ "$scenario" = "enriched-transactions" ] && [ "$skip_scenario_setup" = "false" ]; then
       reset_seed_active "$architecture"
       prepare_enrichment_active "$architecture"
     fi
 
     for target_rps in $scenario_rps_levels; do
+      case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
+
+      echo "Checking if case already exists in S3: ${architecture}/${scenario}/${target_rps}rps"
+      result_status_json="$(aws s3 cp "${case_s3_uri}/result-status.json" - 2>/dev/null || true)"
+      if [ -n "$result_status_json" ] && jq -e . >/dev/null 2>&1 <<<"$result_status_json"; then
+        echo "=== Case already completed in S3: ${architecture}/${scenario}/${target_rps}rps (SKIPPING RUN) ==="
+        k6_exit_code="$(jq -r '.k6_exit_code // "null"' <<<"$result_status_json")"
+        s3_exit_code="$(jq -r '.s3_exit_code // "null"' <<<"$result_status_json")"
+        classification_hint="$(jq -r '.classification_hint // "unknown"' <<<"$result_status_json")"
+        
+        # Download thresholds.json if it exists to classify properly
+        thresholds_json="$(aws s3 cp "${case_s3_uri}/thresholds.json" - 2>/dev/null || true)"
+        
+        case_exit_code=0
+        if [ "$s3_exit_code" != "0" ] || [ "$classification_hint" = "runtime_failed" ] || { [ "$k6_exit_code" != "null" ] && [ "$k6_exit_code" != "0" ] && [ "$k6_exit_code" != "99" ]; }; then
+          case_exit_code=1
+        elif [ -n "$thresholds_json" ] && jq -e '[.. | objects | select(has("ok")) | .ok] | any(. == false)' >/dev/null 2>&1 <<<"$thresholds_json"; then
+          case_exit_code=1
+        elif [ "$k6_exit_code" = "0" ] && [ -n "$thresholds_json" ] && jq -e '[.. | objects | select(has("ok")) | .ok] | all(. == true)' >/dev/null 2>&1 <<<"$thresholds_json"; then
+          case_exit_code=0
+        elif [ "$classification_hint" = "threshold_failed" ]; then
+          case_exit_code=1
+        fi
+        
+        case_timing_json="$(
+          sequential_case_timing_json \
+            "$architecture" \
+            "$case_s3_uri" \
+            "2026-06-04T00:00:00Z" \
+            "2026-06-04T00:00:00Z"
+        )"
+        
+        case_status="pass"
+        if [ "$case_exit_code" -ne 0 ]; then
+          case_status="non_pass"
+          suite_failed=1
+        fi
+
+        jq -cn \
+          --arg architecture "$architecture" \
+          --arg scenario "$scenario" \
+          --argjson target_rps "$target_rps" \
+          --arg status "$case_status" \
+          --argjson exit_code "$case_exit_code" \
+          --arg s3_uri "$case_s3_uri" \
+          --argjson timing "$case_timing_json" \
+          '{architecture:$architecture, scenario:$scenario, target_rps:$target_rps, status:$status, exit_code:$exit_code, s3_uri:$s3_uri} + $timing' >> "$CASES_JSONL"
+          
+        completed_architecture_cases=$((completed_architecture_cases + 1))
+        continue
+      fi
+
       if [ "$scenario" = "create-transaction" ] || [ "$scenario" = "sync-items" ]; then
         reset_seed_active "$architecture"
       fi
 
-      case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
       case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       set +e
       ARCHITECTURE="$architecture" \
