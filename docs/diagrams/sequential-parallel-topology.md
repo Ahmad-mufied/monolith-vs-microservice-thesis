@@ -116,6 +116,9 @@ flowchart TB
   for each scenario/RPS case.
 - Sequential mode runs one architecture phase at a time on the `benchmark`
   context and records `architecture_phases` in the suite summary.
+- Both suite modes also record per-case timing windows in `_suite/summary.json`
+  so each scenario/RPS case can be correlated without opening every attempt
+  folder individually.
 - `INTER_CASE_DELAY` separates cases inside the same architecture phase.
 - `ARCHITECTURE_SWITCH_DELAY` separates monolith and microservices phases for
   cleaner Datadog resource windows.

@@ -24,6 +24,7 @@ source scripts/lib/cloud-provider.sh
 load_cloud_provider_env
 source scripts/lib/resource-configuration.sh
 source scripts/lib/benchmark-preflight.sh
+source scripts/lib/benchmark-timing.sh
 
 SCALING_MODE="${SCALING_MODE:-fixed}"
 TEST_DURATION="${TEST_DURATION:-5m}"
@@ -146,6 +147,53 @@ matrix_json() {
     | map(select(length > 0))
     | map(split("\t") as $parts | {scenario:$parts[0], rps_levels:(($parts[1] // "") | split(" ") | map(select(length > 0) | tonumber))})
   ' < "$MATRIX_TSV"
+}
+
+normalize_case_timing_source() {
+  local source="$1"
+
+  case "$source" in
+    attempt_metadata|datadog_artifact)
+      printf 'attempt_metadata'
+      ;;
+    attempt_metadata_partial|orchestrator)
+      printf 'orchestrator'
+      ;;
+    *)
+      printf 'mixed'
+      ;;
+  esac
+}
+
+sequential_case_timing_json() {
+  local architecture="$1"
+  local s3_uri="$2"
+  local case_started_at_utc="$3"
+  local case_finished_at_utc="$4"
+  local attempt_timing_json
+  local case_timing_source
+
+  attempt_timing_json="$(
+    resolve_attempt_timing_json \
+      "$s3_uri" \
+      "$case_started_at_utc" \
+      "$case_finished_at_utc" \
+      "sequential ${architecture} ${s3_uri##*/}"
+  )"
+  case_timing_source="$(normalize_case_timing_source "$(jq -r '.timing_source' <<<"$attempt_timing_json")")"
+
+  jq -cn \
+    --arg architecture "$architecture" \
+    --arg timing_source "$case_timing_source" \
+    --argjson timing "$attempt_timing_json" \
+    '{
+      started_at_utc: $timing.started_at_utc,
+      finished_at_utc: $timing.finished_at_utc,
+      timing_source: $timing_source,
+      architectures: {
+        ($architecture): $timing
+      }
+    }'
 }
 
 scale_down_active() {
@@ -314,6 +362,8 @@ for architecture in $ARCHITECTURE_ORDER; do
         reset_seed_active "$architecture"
       fi
 
+      case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
+      case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       set +e
       ARCHITECTURE="$architecture" \
       ARCHITECTURE_ORDER="$ARCHITECTURE_ORDER" \
@@ -334,6 +384,14 @@ for architecture in $ARCHITECTURE_ORDER; do
       bash scripts/run-benchmark-sequential.sh
       case_exit_code=$?
       set -e
+      case_finished_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      case_timing_json="$(
+        sequential_case_timing_json \
+          "$architecture" \
+          "$case_s3_uri" \
+          "$case_started_at_utc" \
+          "$case_finished_at_utc"
+      )"
 
       case_status="pass"
       if [ "$case_exit_code" -ne 0 ]; then
@@ -347,8 +405,9 @@ for architecture in $ARCHITECTURE_ORDER; do
         --argjson target_rps "$target_rps" \
         --arg status "$case_status" \
         --argjson exit_code "$case_exit_code" \
-        --arg s3_uri "${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}" \
-        '{architecture:$architecture, scenario:$scenario, target_rps:$target_rps, status:$status, exit_code:$exit_code, s3_uri:$s3_uri}' >> "$CASES_JSONL"
+        --arg s3_uri "$case_s3_uri" \
+        --argjson timing "$case_timing_json" \
+        '{architecture:$architecture, scenario:$scenario, target_rps:$target_rps, status:$status, exit_code:$exit_code, s3_uri:$s3_uri} + $timing' >> "$CASES_JSONL"
 
       completed_architecture_cases=$((completed_architecture_cases + 1))
       if [ "$INTER_CASE_DELAY" != "0" ] && [ "$completed_architecture_cases" -lt "$total_cases" ]; then

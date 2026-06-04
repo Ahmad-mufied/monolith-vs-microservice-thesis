@@ -32,6 +32,7 @@ source scripts/lib/cloud-provider.sh
 load_cloud_provider_env
 source scripts/lib/resource-configuration.sh
 source scripts/lib/benchmark-preflight.sh
+source scripts/lib/benchmark-timing.sh
 
 SCALING_MODE="${SCALING_MODE:-fixed}"
 TEST_DURATION="${TEST_DURATION:-5m}"
@@ -400,6 +401,109 @@ scenario_rps_matrix_json() {
   ' < "$SUITE_MATRIX_TSV"
 }
 
+case_timing_source_from_architecture_sources() {
+  local all_attempt_metadata=true
+  local all_orchestrator=true
+  local source
+
+  for source in "$@"; do
+    if [ "$source" != "attempt_metadata" ] && [ "$source" != "datadog_artifact" ]; then
+      all_attempt_metadata=false
+    fi
+    if [ "$source" != "orchestrator" ] && [ "$source" != "attempt_metadata_partial" ]; then
+      all_orchestrator=false
+    fi
+  done
+
+  if [ "$all_attempt_metadata" = true ]; then
+    printf 'attempt_metadata'
+    return 0
+  fi
+
+  if [ "$all_orchestrator" = true ]; then
+    printf 'orchestrator'
+    return 0
+  fi
+
+  printf 'mixed'
+}
+
+parallel_case_timing_json() {
+  local scenario="$1"
+  local target_rps="$2"
+  local case_started_at_utc="$3"
+  local case_finished_at_utc="$4"
+  local monolith_uri="${S3_RUN_URI}/monolith/${scenario}/${target_rps}rps/${ATTEMPT}"
+  local microservices_uri="${S3_RUN_URI}/microservices/${scenario}/${target_rps}rps/${ATTEMPT}"
+  local monolith_timing_json
+  local microservices_timing_json
+  local monolith_started_at_utc
+  local monolith_finished_at_utc
+  local monolith_timing_source
+  local microservices_started_at_utc
+  local microservices_finished_at_utc
+  local microservices_timing_source
+  local case_started_from_attempts
+  local case_finished_from_attempts
+  local case_timing_source
+
+  monolith_timing_json="$(
+    resolve_attempt_timing_json \
+      "$monolith_uri" \
+      "$case_started_at_utc" \
+      "$case_finished_at_utc" \
+      "parallel ${scenario} ${target_rps}rps monolith"
+  )"
+  microservices_timing_json="$(
+    resolve_attempt_timing_json \
+      "$microservices_uri" \
+      "$case_started_at_utc" \
+      "$case_finished_at_utc" \
+      "parallel ${scenario} ${target_rps}rps microservices"
+  )"
+
+  monolith_started_at_utc="$(jq -r '.started_at_utc' <<<"$monolith_timing_json")"
+  monolith_finished_at_utc="$(jq -r '.finished_at_utc' <<<"$monolith_timing_json")"
+  monolith_timing_source="$(jq -r '.timing_source' <<<"$monolith_timing_json")"
+  microservices_started_at_utc="$(jq -r '.started_at_utc' <<<"$microservices_timing_json")"
+  microservices_finished_at_utc="$(jq -r '.finished_at_utc' <<<"$microservices_timing_json")"
+  microservices_timing_source="$(jq -r '.timing_source' <<<"$microservices_timing_json")"
+
+  case_started_from_attempts="$(
+    jq -nr \
+      --arg monolith "$monolith_started_at_utc" \
+      --arg microservices "$microservices_started_at_utc" \
+      '[ $monolith, $microservices ] | sort | .[0]'
+  )"
+  case_finished_from_attempts="$(
+    jq -nr \
+      --arg monolith "$monolith_finished_at_utc" \
+      --arg microservices "$microservices_finished_at_utc" \
+      '[ $monolith, $microservices ] | sort | .[1]'
+  )"
+  case_timing_source="$(
+    case_timing_source_from_architecture_sources \
+      "$monolith_timing_source" \
+      "$microservices_timing_source"
+  )"
+
+  jq -cn \
+    --arg started_at_utc "${case_started_from_attempts:-$case_started_at_utc}" \
+    --arg finished_at_utc "${case_finished_from_attempts:-$case_finished_at_utc}" \
+    --arg timing_source "$case_timing_source" \
+    --argjson monolith "$monolith_timing_json" \
+    --argjson microservices "$microservices_timing_json" \
+    '{
+      started_at_utc: $started_at_utc,
+      finished_at_utc: $finished_at_utc,
+      timing_source: $timing_source,
+      architectures: {
+        monolith: $monolith,
+        microservices: $microservices
+      }
+    }'
+}
+
 next_attempt_from_s3() {
   local run_uri="$1"
   local scenario_filter="${2:-}"
@@ -753,6 +857,7 @@ append_case_summary() {
   local target_rps="$2"
   local status="$3"
   local exit_code="$4"
+  local timing_json="$5"
 
   jq -cn \
     --arg scenario "$scenario" \
@@ -761,6 +866,7 @@ append_case_summary() {
     --argjson exit_code "$exit_code" \
     --arg monolith_uri "${S3_RUN_URI}/monolith/${scenario}/${target_rps}rps/${ATTEMPT}" \
     --arg microservices_uri "${S3_RUN_URI}/microservices/${scenario}/${target_rps}rps/${ATTEMPT}" \
+    --argjson timing "$timing_json" \
     '{
       scenario: $scenario,
       target_rps: $target_rps,
@@ -768,7 +874,7 @@ append_case_summary() {
       exit_code: $exit_code,
       monolith_s3_uri: $monolith_uri,
       microservices_s3_uri: $microservices_uri
-    }' >> "$SUITE_CASES_JSONL"
+    } + $timing' >> "$SUITE_CASES_JSONL"
 }
 
 upload_suite_summary() {
@@ -923,17 +1029,26 @@ while IFS=$'\t' read -r scenario scenario_rps_levels; do
       reset_and_seed_benchmark_data
     fi
 
+    case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     set +e
     run_parallel_case "$scenario" "$target_rps"
     case_exit_code=$?
     set -e
+    case_finished_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    case_timing_json="$(
+      parallel_case_timing_json \
+        "$scenario" \
+        "$target_rps" \
+        "$case_started_at_utc" \
+        "$case_finished_at_utc"
+    )"
 
     if [ "$case_exit_code" -ne 0 ]; then
       suite_failed=1
-      append_case_summary "$scenario" "$target_rps" "non_pass" "$case_exit_code"
+      append_case_summary "$scenario" "$target_rps" "non_pass" "$case_exit_code" "$case_timing_json"
       echo "Suite case did not finish with PASS. Continuing to preserve remaining matrix coverage."
     else
-      append_case_summary "$scenario" "$target_rps" "pass" "$case_exit_code"
+      append_case_summary "$scenario" "$target_rps" "pass" "$case_exit_code" "$case_timing_json"
     fi
 
     completed_cases=$((completed_cases + 1))
