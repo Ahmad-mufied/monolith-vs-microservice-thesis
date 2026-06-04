@@ -24,3 +24,6 @@ runcmd:
   - systemctl restart postgresql
   - sudo -u postgres psql -v ON_ERROR_STOP=1 -f /root/init-postgres.sql
   - shred -u /root/init-postgres.sql || rm -f /root/init-postgres.sql
+  - ufw allow 22/tcp
+  - ufw allow 5432/tcp
+  - ufw reload || true

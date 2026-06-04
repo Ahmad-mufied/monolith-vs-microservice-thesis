@@ -17,6 +17,17 @@ write_kubeconfig() {
   terraform -chdir="$stack" output -raw "$output_name" | base64 -d > "$path"
   umask "$old_umask"
   chmod 600 "$path"
+
+  if [ -f "$HOME/.kube/config" ]; then
+    local old_cluster
+    old_cluster="$(KUBECONFIG="$HOME/.kube/config" kubectl config view -o jsonpath="{.contexts[?(@.name=='$context')].context.cluster}" 2>/dev/null || true)"
+    KUBECONFIG="$HOME/.kube/config" kubectl config delete-context "$context" >/dev/null 2>&1 || true
+    KUBECONFIG="$HOME/.kube/config" kubectl config delete-user admin >/dev/null 2>&1 || true
+    if [ -n "$old_cluster" ]; then
+      KUBECONFIG="$HOME/.kube/config" kubectl config delete-cluster "$old_cluster" >/dev/null 2>&1 || true
+    fi
+  fi
+
   KUBECONFIG="$path" kubectl config rename-context "$(KUBECONFIG="$path" kubectl config current-context)" "$context" >/dev/null 2>&1 || true
   KUBECONFIG="$path" kubectl --context="$context" get nodes >/dev/null
 
