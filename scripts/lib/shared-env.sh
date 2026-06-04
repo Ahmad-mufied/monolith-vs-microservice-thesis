@@ -83,9 +83,8 @@ kubectl() {
   stderr_tmp="$(mktemp)"
 
   while [ $attempt -le $max_attempts ]; do
-    # Run the real kubectl command, redirecting stderr to a temp file, preserving stdout
-    command kubectl "$@" 2>"$stderr_tmp"
-    exit_code=$?
+    exit_code=0
+    command kubectl "$@" 2>"$stderr_tmp" || exit_code=$?
 
     if [ $exit_code -eq 0 ]; then
       cat "$stderr_tmp" >&2
