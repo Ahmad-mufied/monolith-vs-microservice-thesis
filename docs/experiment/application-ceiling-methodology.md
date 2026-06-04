@@ -168,12 +168,12 @@ This keeps the application ceiling specific to the resource pool that hosts:
 
 This section has two roles:
 
-- explain the general method that applies to the final Hetzner benchmark path,
+- explain the general method that applies to the final Vultr VKE benchmark path,
 - preserve the historical EKS example that originally motivated the quota
   derivation.
 
-For the final thesis dataset, use the live Hetzner measurement outputs under
-`env/hetzner-resource-baseline.env` and `env/hetzner-resource-baseline.json`
+For the final thesis dataset, use the live Vultr measurement outputs under
+`env/vultr-resource-baseline.env` and `env/vultr-resource-baseline.json`
 instead of the historical EKS sample values below.
 
 Historical EKS sample environment:

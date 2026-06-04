@@ -80,7 +80,7 @@ Helm is preferred over hand-written DaemonSet manifests because:
 
 - it follows Datadog's recommended Kubernetes installation path,
 - it reduces manual YAML drift,
-- it keeps Minikube and EKS installation similar,
+- it keeps Minikube and cloud Kubernetes installation similar,
 - it allows environment-specific values files,
 - it is easier to upgrade later.
 
@@ -887,13 +887,12 @@ api-gateway
 -> item-service
 ```
 
-## 12. AWS EKS Runbook
+## 12. Final Vultr VKE and Historical EKS Notes
 
-EKS is the final benchmark target. Parallel mode uses two separate EKS clusters
-— one for monolith and one for MSA — each with its own Datadog Helm values file
-and `cluster_name` tag. Sequential mode uses one EKS cluster
-(`skripsi-benchmark`) and switches the active architecture phase inside that
-cluster.
+Vultr Kubernetes Engine (VKE) is the final benchmark target. Historical AWS EKS
+values files and install targets are still useful as implementation references,
+but EKS telemetry must not be mixed with final Vultr VKE thesis evidence unless
+it is explicitly labeled as historical.
 
 Install Datadog on monolith cluster:
 

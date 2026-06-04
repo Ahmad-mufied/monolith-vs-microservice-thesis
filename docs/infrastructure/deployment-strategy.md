@@ -14,7 +14,7 @@ The deployment strategy is split into three levels:
 ```text
 Level 1: Docker Compose
 Level 2: Minikube
-Level 3: Hetzner Cloud Kubernetes
+Level 3: Vultr Kubernetes Engine (VKE)
 ```
 
 Each level has a different purpose.
@@ -23,7 +23,7 @@ Docker Compose is used for local development and functional validation.
 
 Minikube is used for local Kubernetes dry-run.
 
-Hetzner Cloud Kubernetes is used for the final benchmark environment.
+Vultr Kubernetes Engine (VKE) is used for the final benchmark environment.
 
 ---
 
@@ -34,8 +34,8 @@ Final decision:
 ```text
 Local development       : Docker Compose
 Local Kubernetes dry-run: Minikube
-Final benchmark         : Hetzner Cloud Kubernetes
-Database final          : PostgreSQL 18 on dedicated Hetzner compute
+Final benchmark         : Vultr Kubernetes Engine (VKE)
+Database final          : PostgreSQL 18 on dedicated Vultr Compute VM
 Result storage final    : Amazon S3
 Observability final     : Datadog
 ```
@@ -54,12 +54,12 @@ Result upload : Amazon S3
 Important rule:
 
 ```text
-Only Hetzner Cloud benchmark results are used as final thesis experiment
+Only Vultr VKE benchmark results are used as final thesis experiment
 results.
 ```
 
 Docker Compose and Minikube are used to reduce implementation risk before the
-final Hetzner experiment.
+final Vultr VKE experiment.
 
 ---
 
@@ -142,11 +142,12 @@ Not suitable for:
 
 Reason:
 
-Minikube does not represent the final AWS EKS environment. It usually runs locally and shares resources with the developer machine.
+Minikube does not represent the final Vultr VKE environment. It usually runs
+locally and shares resources with the developer machine.
 
 ---
 
-### 3.3 Level 3: AWS EKS
+### 3.3 Level 3: Vultr VKE
 
 Purpose:
 
@@ -157,7 +158,10 @@ Purpose:
 - collect Datadog telemetry,
 - store benchmark results in S3.
 
-AWS EKS is the final experiment environment.
+Vultr VKE is the final experiment environment. Historical AWS EKS and Hetzner
+paths may remain in the repository as alternate operator workflows, but they are
+not the final Chapter 4 evidence source unless explicitly labeled as
+historical/non-final.
 
 Suitable for:
 
@@ -165,11 +169,11 @@ Suitable for:
 - final benchmark
 - thesis Chapter 4 data
 - Datadog monitoring
-- RDS PostgreSQL 18 integration
+- PostgreSQL 18 on Vultr Compute VM integration
 - S3 result upload
 - ResourceQuota validation
 - HPA behavior observation
-- app node group and testing node group validation
+- app node pool and testing node pool validation
 ```
 
 ---
@@ -183,7 +187,7 @@ Use the following sequence:
 2. Run with GoLand or Makefile
 3. Validate with Docker Compose
 4. Validate Kubernetes manifests with Minikube
-5. Deploy to AWS EKS for final benchmark
+5. Deploy to Vultr VKE for final benchmark
 ```
 
 Detailed flow:
@@ -201,7 +205,7 @@ Docker Compose functional test
 Minikube Kubernetes dry-run
     |
     v
-AWS EKS final benchmark
+Vultr VKE final benchmark
 ```
 
 ---
@@ -533,16 +537,17 @@ tolerations:
 
 ---
 
-## 12. AWS EKS Final Strategy
+## 12. Vultr VKE Final Strategy
 
-AWS EKS is the final benchmark environment.
+Vultr VKE is the final benchmark environment.
 
-EKS components:
+Vultr final benchmark components:
 
 ```text
-- EKS cluster
-- app node group
-- testing node group
+- VKE cluster
+- app node pool
+- testing node pool
+- PostgreSQL 18 on Vultr Compute VM
 - application namespaces
 - HPA
 - ResourceQuota
@@ -1654,7 +1659,7 @@ and cleanup commands is docs/development/run-monolith-local.md.
 Final result source:
 
 ```text
-AWS EKS benchmark runs only
+Vultr VKE benchmark runs only
 ```
 
 Not final result:
@@ -1744,7 +1749,7 @@ local development and functional validation
 Minikube:
 local Kubernetes dry-run
 
-AWS EKS:
+Vultr VKE:
 final benchmark environment
 ```
 
@@ -1759,7 +1764,7 @@ Seed Jobs insert benchmark datasets.
 Application runs as Deployment.
 k6 runs as benchmark Job.
 Results are uploaded to S3.
-Only EKS results are used as final thesis data.
+Only Vultr VKE results are used as final thesis data.
 ```
 
 This layered strategy keeps development simple while preserving a reliable final experimental environment.

@@ -16,9 +16,9 @@ It covers:
 The goal is to keep benchmark runs clean, repeatable, and easy to analyze
 without mixing results from different executions.
 
-The final thesis environment uses Hetzner Cloud Kubernetes. Older EKS-specific
-examples remain relevant only as historical operator workflows and are not the
-source of final thesis results.
+The final thesis environment uses Vultr Kubernetes Engine (VKE). Older
+EKS-specific and Hetzner-specific examples remain relevant only as historical
+or alternate operator workflows and are not the source of final thesis results.
 
 ## 2. Final Decision
 
@@ -71,7 +71,8 @@ verify results in S3
 -> destroy the benchmark infrastructure
 ```
 
-When RDS is included in the destroy plan, all database state is removed:
+When the provider database host is included in the destroy plan, all database
+state is removed:
 
 - database schema,
 - Goose migration history,

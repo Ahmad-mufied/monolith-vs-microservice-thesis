@@ -86,8 +86,8 @@ Choose scaling mode before deploying:
 
 | Goal | Scaling mode | K6_PROFILE |
 |---|---|---|
-| RQ1 clean comparison | `fixed` | `steady` |
-| RQ2 + HPA behavior | `hpa` | `hpa` |
+| Primary RQ1/RQ2 comparison | `fixed` | `steady` |
+| Supporting HPA behavior analysis | `hpa` | `hpa` |
 
 Deploy with the selected mode:
 

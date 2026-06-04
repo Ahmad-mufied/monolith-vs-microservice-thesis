@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The `k6/` directory contains benchmark scripts, reusable k6 helpers, local/EKS runner support, and sample runtime data for the thesis benchmark.
+The `k6/` directory contains benchmark scripts, reusable k6 helpers, local/cloud runner support, and sample runtime data for the thesis benchmark.
 
 The benchmark compares the same REST API behavior under two runtime architectures:
 
@@ -16,11 +16,13 @@ The scripts are designed to be driven by environment variables so the same sourc
 ```text
 local Docker Compose
 local Kubernetes / Minikube
-EKS dry run
-EKS final benchmark
+cloud dry run
+Vultr VKE final benchmark
 ```
 
-Final thesis benchmark data should be collected from EKS.
+Final thesis benchmark data should be collected from Vultr Kubernetes Engine
+(VKE). EKS, Hetzner, Minikube, and Docker Compose results are useful only when
+explicitly labeled as development, calibration, or historical evidence.
 
 ---
 
@@ -220,9 +222,9 @@ Set `K6_PROFILE` to control the executor behavior.
 | Profile | k6 Executor | Use Case |
 |---|---|---|
 | `smoke` | `per-vu-iterations` | Deployment validation |
-| `steady` | `constant-arrival-rate` | Fixed-mode benchmark (RQ1) |
+| `steady` | `constant-arrival-rate` | Fixed-mode benchmark (primary RQ1/RQ2 comparison) |
 | `ramp` | `ramping-arrival-rate` | Exploratory / calibration |
-| `hpa` | `ramping-arrival-rate` | HPA-mode benchmark (RQ2) |
+| `hpa` | `ramping-arrival-rate` | HPA-mode supporting autoscaling analysis |
 
 Default:
 

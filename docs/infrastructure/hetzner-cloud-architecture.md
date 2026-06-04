@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This document describes the Hetzner Cloud benchmark path used for the final
-thesis benchmark environment.
+This document describes the Hetzner Cloud benchmark path kept as an alternate
+or historical benchmark environment. It is not the final thesis benchmark path.
 
 The benchmark semantics remain unchanged:
 
@@ -15,12 +15,13 @@ The benchmark semantics remain unchanged:
 
 Only the infrastructure substrate changes.
 
-Final-thesis decision:
+Current final-thesis decision:
 
-- Bab 4 uses Hetzner Cloud as the single benchmark environment.
-- Historical EKS preparation and partial runs are not part of the final thesis
-  dataset.
-- All fixed and HPA measurements must therefore be rerun fully in Hetzner.
+- Bab 4 final evidence uses Vultr Kubernetes Engine (VKE).
+- Historical EKS and Hetzner preparation or partial runs are not part of the
+  final thesis dataset unless explicitly labeled as non-final evidence.
+- If Hetzner is used again, fixed and HPA measurements must be rerun fully in
+  Hetzner and reported separately from Vultr VKE results.
 
 ## Provider Split
 

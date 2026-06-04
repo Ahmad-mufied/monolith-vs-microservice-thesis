@@ -866,12 +866,13 @@ serve different parts of the research:
 
 | Goal | `SCALING_MODE` | `K6_PROFILE` | Deployment mode source |
 |---|---|---|---|
-| RQ1 + RQ2 core (clean) | `fixed` | `steady` | `overlays/fixed` |
-| RQ1 + RQ2 with HPA narrative | `hpa` | `hpa` | `overlays/hpa` |
+| Primary RQ1/RQ2 comparison | `fixed` | `steady` | `overlays/fixed` |
+| Supporting HPA behavior narrative | `hpa` | `hpa` | `overlays/hpa` |
 
 In fixed mode, the cluster runs with one pod per workload unit. CPU and
-memory are observable via Datadog and answer RQ2 cleanly. Latency, RPS,
-and error rate from k6 answer RQ1 cleanly.
+memory are observable via Datadog and answer RQ2 cleanly. Latency and
+throughput achievement from k6 answer RQ1 cleanly, while error rate and dropped
+iterations validate whether the run can be compared.
 
 In HPA mode, the cluster autoscales each Deployment based on CPU
 utilization. This adds another dimension: RQ2 can include the granular

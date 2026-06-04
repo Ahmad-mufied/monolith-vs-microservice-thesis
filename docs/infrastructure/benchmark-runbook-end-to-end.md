@@ -774,9 +774,10 @@ This makes the suite call `make eks-destroy-confirmed` after
 `_suite/summary.json` is uploaded. Use it only when you do not need to inspect
 the live cluster after the suite finishes.
 
-### Phase 6.3 — HPA Mode Primary Matrix
+### Phase 6.3 — HPA Mode Supporting Matrix
 
-HPA mode is the primary autoscaling behavior comparison for RQ2. Redeploy both
+HPA mode is a supporting autoscaling behavior comparison for the final thesis.
+The primary RQ1/RQ2 comparison remains fixed-replica mode. Redeploy both
 application stacks with HPA overlays before running the suite. Do not reuse a
 fixed-mode deployment by changing only `SCALING_MODE` on the runner.
 
@@ -1157,7 +1158,7 @@ kubectl --context=monolith run pg-test \
 | `DATADOG_API_KEY=<key> make datadog-install-eks-msa` | Install Datadog on MSA cluster |
 | `make run-benchmark-parallel SCENARIO=login TARGET_RPS=1000 RUN_ID=... S3_BUCKET=...` | Run parallel benchmark |
 | `make run-benchmark-suite SCALING_MODE=fixed SCENARIOS="login create-transaction enriched-transactions" RPS_LEVELS="1000 2500 5000 7500 10000"` | Run primary fixed-mode matrix |
-| `make run-benchmark-suite SCALING_MODE=hpa SCENARIOS="login create-transaction enriched-transactions" RPS_LEVELS="1000 2500 5000 7500 10000"` | Run primary HPA-mode matrix |
+| `make run-benchmark-suite SCALING_MODE=hpa SCENARIOS="login create-transaction enriched-transactions" RPS_LEVELS="1000 2500 5000 7500 10000"` | Run supporting HPA-mode matrix |
 | `make run-benchmark-suite-sequential SCALING_MODE=fixed ARCHITECTURE_ORDER="monolith microservices" ARCHITECTURE_SWITCH_DELAY=300` | Run one architecture at a time on the sequential cluster with a consistent Datadog separation gap |
 | `make eks-destroy-confirmed` | Destroy experiment clusters and RDS after confirming benchmark artifacts are safe in S3 |
 | `make eks-sequential-destroy-confirmed` | Destroy sequential cluster and RDS after confirming benchmark artifacts are safe in S3 |
@@ -1169,8 +1170,8 @@ kubectl --context=monolith run pg-test \
 
 | Goal | `SCALING_MODE` | `K6_PROFILE` | Manifest applied |
 |---|---|---|---|
-| RQ1 clean comparison | `fixed` | `steady` | `overlays/fixed` |
-| RQ2 + HPA behavior | `hpa` | `hpa` | `overlays/hpa` |
+| Primary RQ1/RQ2 comparison | `fixed` | `steady` | `overlays/fixed` |
+| Supporting HPA behavior analysis | `hpa` | `hpa` | `overlays/hpa` |
 
 The benchmark runners now fail fast when this pairing is violated or when the
 live cluster state does not match the expected fixed/HPA mode. This prevents

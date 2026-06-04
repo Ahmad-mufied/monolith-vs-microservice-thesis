@@ -7,7 +7,7 @@ to completed benchmark artifacts in S3 and safe teardown.
 
 It is written for:
 
-- the thesis author running the final experiment,
+- the thesis author or operator running the alternate Hetzner experiment,
 - an operator reproducing the Hetzner environment,
 - a reviewer who needs to understand the exact execution flow.
 
@@ -16,10 +16,12 @@ This document is the detailed Hetzner counterpart to the shorter
 
 Final-thesis scope:
 
-- Hetzner Cloud is the final benchmark environment,
+- Vultr VKE is the final benchmark environment,
+- Hetzner Cloud is retained as an alternate/historical benchmark path,
 - Docker Hub public images are used for Hetzner runs,
 - AWS S3 is used only for benchmark artifact storage,
-- monolith and microservices must both be rerun fully in Hetzner,
+- monolith and microservices must both be rerun fully in Hetzner if Hetzner is
+  used as a separately labeled non-final comparison,
 - `fixed` and `hpa` are treated as separate deployment states.
 
 What this runbook explicitly covers:
