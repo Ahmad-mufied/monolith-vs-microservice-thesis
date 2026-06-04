@@ -362,7 +362,7 @@ for architecture in $ARCHITECTURE_ORDER; do
     if [ "$scenario" = "login" ] && [ "$skip_scenario_setup" = "false" ]; then
       reset_seed_active "$architecture"
     fi
-    if [ "$scenario" = "enriched-transactions" ] && [ "$skip_scenario_setup" = "false" ]; then
+    if { [ "$scenario" = "enriched-transactions" ] || [ "$scenario" = "mixed-workload" ]; } && [ "$skip_scenario_setup" = "false" ]; then
       reset_seed_active "$architecture"
       prepare_enrichment_active "$architecture"
     fi
@@ -420,8 +420,11 @@ for architecture in $ARCHITECTURE_ORDER; do
         continue
       fi
 
-      if [ "$scenario" = "create-transaction" ] || [ "$scenario" = "sync-items" ]; then
+      if [ "$scenario" = "create-transaction" ] || [ "$scenario" = "sync-items" ] || [ "$scenario" = "mixed-workload" ]; then
         reset_seed_active "$architecture"
+        if [ "$scenario" = "mixed-workload" ]; then
+          prepare_enrichment_active "$architecture"
+        fi
       fi
 
       case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
