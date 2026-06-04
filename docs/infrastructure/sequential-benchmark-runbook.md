@@ -228,6 +228,43 @@ s3://<bucket>/experiments/<run_id>/_suite/manifest.json
 s3://<bucket>/experiments/<run_id>/_suite/summary.json
 ```
 
+Each sequential suite case now also records:
+
+- case-level `started_at_utc`
+- case-level `finished_at_utc`
+- case-level `timing_source`
+- `architectures.<active-architecture>.*`
+
+This is separate from `architecture_phases`:
+
+- case timing tracks one `scenario + target_rps + architecture` execution
+- `architecture_phases` still summarizes the broader monolith or microservices
+  phase in the sequential suite
+
+Timing precedence per case is:
+
+1. `metadata.json.datadog.time_window_start` and `time_window_end`
+   → `timing_source: attempt_metadata`
+2. `metadata.json.timestamp_utc` plus suite-orchestrator finish time
+   → `timing_source: attempt_metadata_partial`
+3. suite-orchestrator start and finish time
+   → `timing_source: orchestrator`
+
+Per-architecture `timing_source` values (under `architectures.<name>`):
+
+- `attempt_metadata`: both timestamps came from attempt metadata (Datadog window)
+- `attempt_metadata_partial`: start from metadata `timestamp_utc`, end from
+  orchestrator wall-clock
+- `orchestrator`: both timestamps came from orchestrator wall-clock
+
+Case-level `timing_source` values:
+
+- `attempt_metadata`: the architecture used full metadata
+- `orchestrator`: the architecture used orchestrator-based timing (includes
+  `attempt_metadata_partial` which normalizes to `orchestrator` at case level)
+- `mixed`: reserved; currently unreachable in sequential mode with a single
+  architecture per case
+
 Delay controls:
 
 | Variable | Scope | Default | Purpose |

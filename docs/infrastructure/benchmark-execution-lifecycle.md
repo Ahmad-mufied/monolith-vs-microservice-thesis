@@ -288,6 +288,19 @@ attempt output during collection. Kubernetes snapshot files are not required
 by default; the primary internal evidence comes from Datadog telemetry plus
 `metadata.json`.
 
+Suite runners may also write run-level artifacts under:
+
+```text
+s3://{bucket}/experiments/{run_id}/_suite/manifest.json
+s3://{bucket}/experiments/{run_id}/_suite/summary.json
+```
+
+`_suite/summary.json` is a navigation and orchestration aid layered on top of
+attempt artifacts. It should include per-case timing fields such as
+`started_at_utc`, `finished_at_utc`, `timing_source`, and architecture timing
+blocks when the run was executed through a suite runner. Attempt
+`metadata.json` remains the source of truth for attempt-local timing.
+
 Raw collection must stay separated by attempt.
 
 Aggregated data should be produced later during analysis.

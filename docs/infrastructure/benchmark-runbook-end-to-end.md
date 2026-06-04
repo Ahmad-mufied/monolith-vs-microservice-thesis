@@ -969,6 +969,30 @@ aws s3 cp s3://skripsi-benchmark-results/experiments/$RUN_ID/_suite/summary.json
   | jq '{suite_status, case_count: (.cases | length), cases}'
 ```
 
+Quick timing-focused inspection:
+
+```bash
+aws s3 cp s3://skripsi-benchmark-results/experiments/$RUN_ID/_suite/summary.json - \
+  | jq '{suite_status, case_count: (.cases | length), cases: (.cases | map({scenario, target_rps, started_at_utc, finished_at_utc, timing_source, architectures}))}'
+```
+
+Interpret timing fields as follows:
+
+- `started_at_utc` and `finished_at_utc` on each case provide a suite-level time
+  window for that benchmark case
+- `architectures` breaks the case window down per architecture
+- case-level `timing_source` values:
+  - `attempt_metadata` — all architectures used full metadata (Datadog window)
+  - `orchestrator` — all architectures used orchestrator-based timing (includes
+    cases where metadata only had `timestamp_utc` without Datadog window)
+  - `mixed` — at least one architecture used full metadata AND at least one used
+    fallback
+- per-architecture `timing_source` values (under `architectures.<name>`):
+  - `attempt_metadata` — both timestamps from metadata (Datadog window)
+  - `attempt_metadata_partial` — start from metadata `timestamp_utc`, end from
+    orchestrator
+  - `orchestrator` — both timestamps from orchestrator wall-clock
+
 For a primary fixed or HPA run, `case_count` should be `15` when the suite uses:
 
 ```text

@@ -482,6 +482,38 @@ Both files include `resource_configuration` and `inter_case_delay` for the
 selected scaling mode. The resource value is generated from the same runner
 configuration that is passed into each attempt's `metadata.json`.
 
+In `_suite/summary.json`, each case now also includes:
+
+- case-level `started_at_utc`
+- case-level `finished_at_utc`
+- case-level `timing_source`
+- `architectures.monolith.*`
+- `architectures.microservices.*`
+
+Timing precedence per architecture is:
+
+1. `metadata.json.datadog.time_window_start` and `time_window_end`
+   → `timing_source: attempt_metadata`
+2. `metadata.json.timestamp_utc` plus suite-orchestrator finish time
+   → `timing_source: attempt_metadata_partial`
+3. suite-orchestrator start and finish time
+   → `timing_source: orchestrator`
+
+Per-architecture `timing_source` values (under `architectures.<name>`):
+
+- `attempt_metadata`: both timestamps came from attempt metadata (Datadog window)
+- `attempt_metadata_partial`: start from metadata `timestamp_utc`, end from
+  orchestrator wall-clock
+- `orchestrator`: both timestamps came from orchestrator wall-clock
+
+Case-level `timing_source` values:
+
+- `attempt_metadata`: all architectures used full metadata
+- `orchestrator`: all architectures used orchestrator-based timing (includes
+  `attempt_metadata_partial`)
+- `mixed`: at least one architecture used full metadata AND at least one used
+  fallback
+
 ---
 
 ## 10. Verify S3 Results
