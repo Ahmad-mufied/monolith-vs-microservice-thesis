@@ -742,10 +742,10 @@ scaleDown window    : 60s
 Per-service maxReplicas:
 
 ```text
-api-gateway         : 2
-auth-service        : 2
-item-service        : 2
-transaction-service : 2
+api-gateway         : 4
+auth-service        : 4
+item-service        : 4
+transaction-service : 4
 ```
 
 Namespace ceiling:
