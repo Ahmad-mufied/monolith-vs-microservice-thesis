@@ -147,7 +147,8 @@ docs/
 │   └── grpc-contracts.md
 │
 ├── deployment/
-│   └── codebuild-ecr.md
+│   ├── codebuild-ecr.md
+│   └── github-actions-dockerhub.md
 │
 ├── development/
 │   ├── project-structure.md

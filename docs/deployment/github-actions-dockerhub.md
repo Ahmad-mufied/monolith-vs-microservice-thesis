@@ -32,6 +32,18 @@ Developer PR Merge to main
 - Each service has an isolated cache `scope` (`scope=${{ matrix.service.name }}`) to prevent cache pollution and invalidations between services.
 - **Cache Hit Benefit**: When `go.mod` / `go.sum` and internal packages remain unchanged, subsequent merge builds complete in **under 30 seconds** as almost all build stages are skipped.
 
+### Conditional Build (Path Filtering)
+- The workflow only runs when source code that affects Docker images changes. Non-code changes (docs, infrastructure, deployments, scripts, CI config) are skipped entirely.
+- Monitored paths:
+  - `monolith/**`
+  - `microservices/**`
+  - `pkg/**`
+  - `proto/gen/**`
+  - `seed/**`
+  - `k6/**`
+- All 7 images are always built together with the same tag (git short SHA). Partial builds are not supported to maintain research consistency and deployment compatibility.
+- Manual rebuilds are available via the `workflow_dispatch` trigger in the GitHub Actions UI.
+
 ---
 
 ## 3. GitHub Secrets Configuration (One-time Setup)
@@ -61,6 +73,8 @@ Once the GitHub Actions workflow is running and secrets are set, you can integra
 
 ### Step 1 — Make code changes and push to main
 Merge your code/schema changes into the `main` branch. GitHub Actions will start building and pushing the images immediately. You can track progress under the **Actions** tab of your repository.
+
+**Note**: Only pushes that modify source code paths (`monolith/`, `microservices/`, `pkg/`, `proto/gen/`, `seed/`, `k6/`) trigger builds. Non-code changes (docs, infrastructure, deployments, scripts) are skipped. To force a rebuild without code changes, use the `workflow_dispatch` trigger in the GitHub Actions UI.
 
 ### Step 2 — Sync your local repository
 Pull the latest merged commit to your local developer machine:
