@@ -116,3 +116,17 @@ spec:
     - name: grpc
       port: 50053
       targetPort: grpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transaction-service-headless
+  namespace: msa
+spec:
+  clusterIP: None
+  selector:
+    app: transaction-service
+  ports:
+    - name: grpc
+      port: 50053
+      targetPort: grpc

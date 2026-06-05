@@ -416,9 +416,9 @@ kubectl --context=msa create secret generic api-gateway-secret \
   --from-literal=HTTP_PORT=8080 \
   --from-literal=SERVICE_NAME=api-gateway \
   --from-literal=JWT_SECRET="$JWT_SECRET" \
-  --from-literal=AUTH_SERVICE_ADDR="auth-service.msa.svc.cluster.local:${GRPC_PORT_AUTH}" \
-  --from-literal=ITEM_SERVICE_ADDR="item-service.msa.svc.cluster.local:${GRPC_PORT_ITEM}" \
-  --from-literal=TRANSACTION_SERVICE_ADDR="transaction-service.msa.svc.cluster.local:${GRPC_PORT_TX}" \
+  --from-literal=AUTH_SERVICE_ADDR="dns:///auth-service-headless.msa.svc.cluster.local:${GRPC_PORT_AUTH}" \
+  --from-literal=ITEM_SERVICE_ADDR="dns:///item-service-headless.msa.svc.cluster.local:${GRPC_PORT_ITEM}" \
+  --from-literal=TRANSACTION_SERVICE_ADDR="dns:///transaction-service-headless.msa.svc.cluster.local:${GRPC_PORT_TX}" \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
 # Auth Service secret
@@ -448,7 +448,7 @@ kubectl --context=msa create secret generic transaction-service-secret \
   --from-literal=GRPC_PORT="$GRPC_PORT_TX" \
   --from-literal=SERVICE_NAME=transaction-service \
   --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD_URI_ENCODED}@${MSA_RDS}:5432/transaction_db?sslmode=require" \
-  --from-literal=ITEM_SERVICE_ADDR="item-service.msa.svc.cluster.local:${GRPC_PORT_ITEM}" \
+  --from-literal=ITEM_SERVICE_ADDR="dns:///item-service-headless.msa.svc.cluster.local:${GRPC_PORT_ITEM}" \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
 # k6 runner secret

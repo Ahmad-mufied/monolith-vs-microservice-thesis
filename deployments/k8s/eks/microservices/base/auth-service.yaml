@@ -116,3 +116,17 @@ spec:
     - name: grpc
       port: 50051
       targetPort: grpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service-headless
+  namespace: msa
+spec:
+  clusterIP: None
+  selector:
+    app: auth-service
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc

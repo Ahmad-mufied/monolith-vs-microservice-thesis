@@ -297,6 +297,15 @@ JWT_SECRET
 DATADOG_ENABLED
 ```
 
+For Kubernetes benchmark deployments, the gRPC dependency addresses should use
+headless Services with the gRPC DNS resolver scheme:
+
+```text
+AUTH_SERVICE_ADDR=dns:///auth-service-headless.msa.svc.cluster.local:50051
+ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
+TRANSACTION_SERVICE_ADDR=dns:///transaction-service-headless.msa.svc.cluster.local:50053
+```
+
 Datadog `DD_*` runtime configuration is applied directly in Kubernetes
 workload manifests because it is non-sensitive. The Datadog API key is stored
 separately in the Datadog Agent secret.
@@ -395,6 +404,14 @@ DATABASE_URL
 AUTH_SERVICE_ADDR
 ITEM_SERVICE_ADDR
 DATADOG_ENABLED
+```
+
+For Kubernetes benchmark deployments, `ITEM_SERVICE_ADDR` should point to the
+Item Service headless target so the gRPC client can distribute calls across
+ready Item Service pods:
+
+```text
+ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
 ```
 
 ---
