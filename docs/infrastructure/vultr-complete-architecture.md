@@ -600,6 +600,26 @@ ResourceQuota in mono namespace:  CPU=7800m, Memory=15360Mi
 ResourceQuota in msa namespace:   CPU=7800m, Memory=15360Mi
 ```
 
+For the active Vultr benchmark path, the repository documentation treats
+`7800m CPU / 15360Mi memory` as the final shared architecture ceiling.
+
+Inside the microservices architecture, the final documentation path uses
+**equal split** across the four services rather than role-aware service
+budgets. Each service therefore carries a ceiling of:
+
+```text
+1950m CPU / 3840Mi memory
+```
+
+The HPA path preserves the same service-level ceiling by dividing each service
+budget across at most two replicas:
+
+```text
+975m CPU / 1920Mi memory per pod
+minReplicas = 1
+maxReplicas = 2
+```
+
 ---
 
 ## 11. Benchmark Data Flow
@@ -1015,7 +1035,7 @@ Every Vultr benchmark run must record:
   "app_node_pool": "app-nodes",
   "testing_node_pool": "testing-nodes",
   "postgres_version": 18,
-  "resource_profile": "vultr-measurement-derived",
+  "resource_profile": "vultr-equal-split",
   "app_resource_quota": "7800m CPU / 15360Mi memory",
   "image_tag": "thesis-vultr-20260602",
   "scaling_mode": "fixed",

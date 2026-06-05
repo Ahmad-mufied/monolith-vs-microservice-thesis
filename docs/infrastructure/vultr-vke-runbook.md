@@ -701,6 +701,25 @@ image_tag=<expected tag>
 app_resource_quota=<measurement-derived quota>
 ```
 
+For the active Vultr path, the expected quota is:
+
+```text
+7800m CPU / 15360Mi memory
+```
+
+The final documentation path also assumes equal split across the four
+microservices:
+
+```text
+fixed mode:
+  each service = 1950m CPU / 3840Mi memory
+
+hpa mode:
+  each service = 975m CPU / 1920Mi memory per pod
+  minReplicas = 1
+  maxReplicas = 2
+```
+
 ## Phase 14 - Guarded Destroy
 
 Destroy only after S3 artifacts are verified.

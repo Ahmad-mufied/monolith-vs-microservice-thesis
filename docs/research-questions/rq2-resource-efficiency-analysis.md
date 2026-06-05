@@ -236,9 +236,8 @@ Important scope note:
 
 ```text
 The concrete numerical examples in this section must always be interpreted
-relative to the active benchmark configuration. Older drafts in this document
-used a 4000m CPU / 4096Mi memory ceiling. The current repository configuration
-uses a 15800m CPU / 27648Mi memory ceiling per architecture.
+relative to the active benchmark configuration. For the active Vultr path, the
+shared architecture ceiling is 7800m CPU / 15360Mi memory per architecture.
 ```
 
 Incorrect design:
@@ -257,22 +256,22 @@ total MSA = 64000m CPU
 Correct design:
 
 ```text
-monolith total ceiling = 15800m CPU
+monolith total ceiling = 7800m CPU / 15360Mi memory
 
 api-gateway + auth-service + item-service + transaction-service
-  = total MSA ceiling 15800m CPU
+  = total MSA ceiling 7800m CPU / 15360Mi memory
 ```
 
 Example table:
 
 | Architecture | Component | Replica | CPU Limit per Pod | Memory Limit per Pod | Total CPU | Total Memory |
 |---|---:|---:|---:|---:|---:|---:|
-| Monolith | monolith | 4 | 3950m | 6912Mi | 15800m | 27648Mi |
-| MSA | api-gateway | 5 | 500m | 864Mi | 2500m | 4320Mi |
-| MSA | auth-service | 2 | 3500m | 5184Mi | 7000m | 10368Mi |
-| MSA | item-service | 5 | 460m | 864Mi | 2300m | 4320Mi |
-| MSA | transaction-service | 2 | 2000m | 5184Mi | 4000m | 10368Mi |
-| **MSA Total** | - | - | - | - | **15800m** | **27648Mi** |
+| Monolith | monolith | 1 | 7800m | 15360Mi | 7800m | 15360Mi |
+| MSA | api-gateway | 1 | 1950m | 3840Mi | 1950m | 3840Mi |
+| MSA | auth-service | 1 | 1950m | 3840Mi | 1950m | 3840Mi |
+| MSA | item-service | 1 | 1950m | 3840Mi | 1950m | 3840Mi |
+| MSA | transaction-service | 1 | 1950m | 3840Mi | 1950m | 3840Mi |
+| **MSA Total** | - | - | - | - | **7800m** | **15360Mi** |
 
 Recommended Chapter 3 explanation:
 
@@ -545,18 +544,18 @@ Maximum CPU ceiling = max_replicas x CPU limit per pod
 Example monolith:
 
 ```text
-4 replicas x 3950m CPU = 15800m CPU
+4 replicas x 1950m CPU = 7800m CPU
 ```
 
 Example MSA:
 
 ```text
-api-gateway          5 x 500m = 2500m
-auth-service         2 x 3500m = 7000m
-item-service         5 x 460m = 2300m
-transaction-service  2 x 2000m = 4000m
+api-gateway          2 x 975m = 1950m
+auth-service         2 x 975m = 1950m
+item-service         2 x 975m = 1950m
+transaction-service  2 x 975m = 1950m
 
-total MSA max CPU = 15800m
+total MSA max CPU = 7800m
 ```
 
 ### 12.2 Actual Resource Usage
@@ -915,7 +914,7 @@ Important metadata fields:
   "target_rps": 1000,
   "duration": "5m",
   "dataset_version": "v1",
-  "resource_ceiling": "15800m CPU / 27648Mi memory",
+  "resource_ceiling": "7800m CPU / 15360Mi memory",
   "hpa_enabled": true,
   "hpa_target_cpu": "70%",
   "datadog": {

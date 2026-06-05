@@ -617,10 +617,10 @@ The application resource ceiling is designed to keep the comparison fair.
 Monolith:
 
 ```text
-CPU ceiling      : 15800m
-Memory ceiling   : 27648Mi
-fixed            : 1 pod x (7900m request / 15800m limit, 13824Mi request / 27648Mi limit)
-hpa              : 1 to 4 pods x (1975m request / 3950m limit, 3456Mi request / 6912Mi limit)
+CPU ceiling      : 7800m
+Memory ceiling   : 15360Mi
+fixed            : 1 pod x (3900m request / 7800m limit, 7680Mi request / 15360Mi limit)
+hpa              : 1 to 4 pods x (970m request / 1950m limit, 1920Mi request / 3840Mi limit)
 maxReplicas      : 4
 HPA target CPU   : 70%
 ```
@@ -628,32 +628,18 @@ HPA target CPU   : 70%
 Microservices:
 
 ```text
-Namespace CPU ceiling    : 15800m
-Namespace memory ceiling : 27648Mi
-fixed api-gateway        : request 750m / limit 2500m / 864Mi / 3456Mi
-fixed auth-service       : request 2500m / limit 7000m / 3456Mi / 10368Mi
-fixed item-service       : request 750m / limit 2300m / 1296Mi / 3456Mi
-fixed transaction-service: request 1000m / limit 4000m / 3024Mi / 10368Mi
-hpa api-gateway          : request 200m / limit 500m / 432Mi / 864Mi
-hpa auth-service         : request 2000m / limit 3500m / 3456Mi / 5184Mi
-hpa item-service         : request 200m / limit 460m / 432Mi / 864Mi
-hpa transaction-service  : request 800m / limit 2000m / 3024Mi / 5184Mi
+Namespace CPU ceiling    : 7800m
+Namespace memory ceiling : 15360Mi
+fixed per service        : request 980m / limit 1950m / 1920Mi / 3840Mi
+hpa per service          : request 500m / limit 975m / 960Mi / 1920Mi
 minReplicas per service  : 1
+maxReplicas per service  : 2
 HPA target CPU           : 70%
 ```
 
-Role-aware HPA maxReplicas:
-
-```text
-api-gateway         : 5
-auth-service        : 2
-item-service        : 5
-transaction-service : 2
-```
-
-This keeps fairness at the shared namespace ceiling while allowing
-hotspot services, especially `auth-service`, to consume more of the
-remaining headroom in HPA mode.
+The active Vultr benchmark path uses an equal per-service split rather than
+role-aware service budgets because the study does not have a separate
+empirical profiling dataset to justify asymmetric service ceilings.
 
 ---
 

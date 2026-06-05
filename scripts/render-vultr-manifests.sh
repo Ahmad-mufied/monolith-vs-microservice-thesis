@@ -94,6 +94,59 @@ replace_resource_value() {
   perl -0pi -e "s{\\Q${old}\\E}{${new}}g" "$file"
 }
 
+set_deployment_replicas() {
+  local file="$1" replicas="$2"
+  perl -0pi -e "s{(spec:\\n(?:.*\\n)*?\\sreplicas:\\s*)\\d+}{\${1}${replicas}}m" "$file"
+}
+
+set_hpa_replicas() {
+  local file="$1" min_replicas="$2" max_replicas="$3"
+  perl -0pi -e "s{minReplicas:\\s*\\d+}{minReplicas: ${min_replicas}}g; s{maxReplicas:\\s*\\d+}{maxReplicas: ${max_replicas}}g" "$file"
+}
+
+set_container_resources() {
+  local file="$1" cpu_request="$2" cpu_limit="$3" memory_request="$4" memory_limit="$5"
+  perl -0pi -e "s{requests:\\n\\s+cpu:\\s*[^\\n]+\\n\\s+memory:\\s*[^\\n]+\\n\\s+limits:\\n\\s+cpu:\\s*[^\\n]+\\n\\s+memory:\\s*[^\\n]+}{requests:\\n              cpu: ${cpu_request}\\n              memory: ${memory_request}\\n            limits:\\n              cpu: ${cpu_limit}\\n              memory: ${memory_limit}}g" "$file"
+}
+
+patch_benchmark_resource_json() {
+  local file="$1" resources_json="$2" quota_json="$3"
+  patch_value_line "$file" "RESOURCES_CONFIGURATION_JSON" "'${resources_json}'"
+  patch_value_line "$file" "APP_RESOURCE_QUOTA_JSON" "'${quota_json}'"
+}
+
+patch_equal_split_resource_profile() {
+  local quota_json
+  local mono_fixed_json
+  local mono_hpa_json
+  local msa_fixed_json
+  local msa_hpa_json
+
+  quota_json="{\"cpu\":\"${VULTR_APP_CPU_QUOTA}\",\"memory\":\"${VULTR_APP_MEMORY_QUOTA}\"}"
+  mono_fixed_json='{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"'"${VULTR_APP_CPU_QUOTA}"'","memory":"'"${VULTR_APP_MEMORY_QUOTA}"'"},"cpu_request":"3900m","cpu_limit":"7800m","memory_request":"7680Mi","memory_limit":"15360Mi","replica_count":1}'
+  mono_hpa_json='{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"'"${VULTR_APP_CPU_QUOTA}"'","memory":"'"${VULTR_APP_MEMORY_QUOTA}"'"},"cpu_request":"970m","cpu_limit":"1950m","memory_request":"1920Mi","memory_limit":"3840Mi","min_replicas":1,"max_replicas":4,"target_cpu_utilization":70}'
+  msa_fixed_json='{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"'"${VULTR_APP_CPU_QUOTA}"'","memory":"'"${VULTR_APP_MEMORY_QUOTA}"'"},"services":{"api-gateway":{"cpu_request":"980m","cpu_limit":"1950m","memory_request":"1920Mi","memory_limit":"3840Mi","replica_count":1},"auth-service":{"cpu_request":"980m","cpu_limit":"1950m","memory_request":"1920Mi","memory_limit":"3840Mi","replica_count":1},"item-service":{"cpu_request":"980m","cpu_limit":"1950m","memory_request":"1920Mi","memory_limit":"3840Mi","replica_count":1},"transaction-service":{"cpu_request":"980m","cpu_limit":"1950m","memory_request":"1920Mi","memory_limit":"3840Mi","replica_count":1}}}'
+  msa_hpa_json='{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"'"${VULTR_APP_CPU_QUOTA}"'","memory":"'"${VULTR_APP_MEMORY_QUOTA}"'"},"services":{"api-gateway":{"cpu_request":"500m","cpu_limit":"975m","memory_request":"960Mi","memory_limit":"1920Mi","min_replicas":1,"max_replicas":2,"target_cpu_utilization":70},"auth-service":{"cpu_request":"500m","cpu_limit":"975m","memory_request":"960Mi","memory_limit":"1920Mi","min_replicas":1,"max_replicas":2,"target_cpu_utilization":70},"item-service":{"cpu_request":"500m","cpu_limit":"975m","memory_request":"960Mi","memory_limit":"1920Mi","min_replicas":1,"max_replicas":2,"target_cpu_utilization":70},"transaction-service":{"cpu_request":"500m","cpu_limit":"975m","memory_request":"960Mi","memory_limit":"1920Mi","min_replicas":1,"max_replicas":2,"target_cpu_utilization":70}}}'
+
+  set_deployment_replicas "$manifest_root/deployments/k8s/eks/monolith/overlays/fixed/deployment-patch.yaml" 1
+  set_container_resources "$manifest_root/deployments/k8s/eks/monolith/overlays/fixed/deployment-patch.yaml" "3900m" "7800m" "7680Mi" "15360Mi"
+
+  set_deployment_replicas "$manifest_root/deployments/k8s/eks/monolith/overlays/hpa/deployment-patch.yaml" 1
+  set_container_resources "$manifest_root/deployments/k8s/eks/monolith/overlays/hpa/deployment-patch.yaml" "970m" "1950m" "1920Mi" "3840Mi"
+  set_hpa_replicas "$manifest_root/deployments/k8s/eks/monolith/overlays/hpa/hpa.yaml" 1 4
+
+  for svc in api-gateway auth-service item-service transaction-service; do
+    set_deployment_replicas "$manifest_root/deployments/k8s/eks/microservices/overlays/fixed/${svc}-patch.yaml" 1
+    set_container_resources "$manifest_root/deployments/k8s/eks/microservices/overlays/fixed/${svc}-patch.yaml" "980m" "1950m" "1920Mi" "3840Mi"
+    set_deployment_replicas "$manifest_root/deployments/k8s/eks/microservices/overlays/hpa/${svc}-patch.yaml" 1
+    set_container_resources "$manifest_root/deployments/k8s/eks/microservices/overlays/hpa/${svc}-patch.yaml" "500m" "975m" "960Mi" "1920Mi"
+    set_hpa_replicas "$manifest_root/deployments/k8s/eks/microservices/overlays/hpa/${svc}-hpa.yaml" 1 2
+  done
+
+  patch_benchmark_resource_json "$manifest_root/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml" "$mono_fixed_json" "$quota_json"
+  patch_benchmark_resource_json "$manifest_root/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml" "$msa_fixed_json" "$quota_json"
+}
+
 patch_resource_baseline() {
   [ "$SKIP_VULTR_RESOURCE_BASELINE" = "true" ] && return 0
   local file
@@ -110,6 +163,8 @@ patch_resource_baseline() {
     while IFS= read -r value; do replace_resource_value "$file" "$value" "$(scale_cpu "$value")"; done < <(rg -o '[0-9]+m' "$file" | sort -rnu)
     while IFS= read -r value; do replace_resource_value "$file" "$value" "$(scale_memory "$value")"; done < <(rg -o '[0-9]+Mi' "$file" | sort -rnu)
   done
+
+  patch_equal_split_resource_profile
 }
 
 patch_resource_baseline

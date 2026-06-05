@@ -1075,42 +1075,34 @@ Per-service resource configuration:
 
 ```text
 fixed mode:
-  api-gateway        : request 750m / limit 2500m / 864Mi / 3456Mi
-  auth-service       : request 2500m / limit 7000m / 3456Mi / 10368Mi
-  item-service       : request 750m / limit 2300m / 1296Mi / 3456Mi
-  transaction-service: request 1000m / limit 4000m / 3024Mi / 10368Mi
+  api-gateway        : request 980m / limit 1950m / 1920Mi / 3840Mi
+  auth-service       : request 980m / limit 1950m / 1920Mi / 3840Mi
+  item-service       : request 980m / limit 1950m / 1920Mi / 3840Mi
+  transaction-service: request 980m / limit 1950m / 1920Mi / 3840Mi
 
 hpa mode:
-  api-gateway        : request 200m / limit 500m / 432Mi / 864Mi
-  auth-service       : request 2000m / limit 3500m / 3456Mi / 5184Mi
-  item-service       : request 200m / limit 460m / 432Mi / 864Mi
-  transaction-service: request 800m / limit 2000m / 3024Mi / 5184Mi
+  api-gateway        : request 500m / limit 975m / 960Mi / 1920Mi
+  auth-service       : request 500m / limit 975m / 960Mi / 1920Mi
+  item-service       : request 500m / limit 975m / 960Mi / 1920Mi
+  transaction-service: request 500m / limit 975m / 960Mi / 1920Mi
 minReplicas       : 1
+maxReplicas       : 2
 HPA target CPU    : 70%
 ```
 
 Namespace resource ceiling:
 
 ```text
-CPU max           : 15800m
-Memory max        : 27648Mi
-```
-
-Role-aware maxReplicas:
-
-```text
-api-gateway         : 4
-auth-service        : 4
-item-service        : 6
-transaction-service : 4
+CPU max           : 7800m
+Memory max        : 15360Mi
 ```
 
 This allows one focused service to scale up under targeted load while the
 namespace ResourceQuota still prevents the total microservices resource usage
 from exceeding the monolith resource ceiling.
 
-The methodology for deciding why these per-service budgets are role-aware
-instead of equal-split is documented in
+The methodology for deciding why these per-service budgets use equal split
+instead of role-aware allocation is documented in
 `docs/experiment/resource-configuration.md`.
 
 Example login-heavy scaling:
@@ -1127,8 +1119,8 @@ API Gateway scales out
 Auth Service scales out
     |
     v
-Item Service and Transaction Service may remain near minReplicas while
-`auth-service` consumes more of the shared headroom during login-heavy load
+Item Service and Transaction Service may remain near minReplicas while the
+overall namespace ceiling still limits total scale-out
 ```
 
 ASCII example:
@@ -1151,7 +1143,8 @@ ASCII example:
 +------------------------+
 ```
 
-This is the expected granular scaling advantage of microservices.
+This is the expected granular scaling advantage of microservices, even when the
+initial service budgets are allocated uniformly.
 
 ---
 
@@ -1161,8 +1154,8 @@ The MSA namespace uses ResourceQuota to keep the total application resource budg
 
 ```text
 Namespace: msa
-CPU max   : 15800m
-Memory max: 27648Mi
+CPU max   : 7800m
+Memory max: 15360Mi
 ```
 
 Important consequence:

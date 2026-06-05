@@ -374,7 +374,7 @@ Recommended fields:
   },
 
   "resources": {
-    "app_resource_quota": "15800m CPU / 27648Mi memory",
+    "app_resource_quota": "7800m CPU / 15360Mi memory",
     "autoscaling_mode": "hpa",
     "hpa_enabled": true,
     "hpa_target_cpu": "70%",
@@ -407,7 +407,7 @@ For a fixed replica experiment without HPA, use this resources shape:
 ```json
 {
   "resources": {
-    "app_resource_quota": "15800m CPU / 27648Mi memory",
+    "app_resource_quota": "7800m CPU / 15360Mi memory",
     "autoscaling_mode": "fixed",
     "hpa_enabled": false,
     "replica_count": 2

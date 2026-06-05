@@ -36,27 +36,149 @@ resources_configuration_json() {
       ;;
   esac
 
-  if [ "$provider" = "hetzner" ] || [ "$provider" = "vultr" ]; then
-    local cpu_quota memory_quota app_node_count allocatable_cpu allocatable_memory resource_profile
-    if [ "$provider" = "hetzner" ]; then
-      : "${HETZNER_APP_CPU_QUOTA:?HETZNER_APP_CPU_QUOTA must be set in $baseline_env}"
-      : "${HETZNER_APP_MEMORY_QUOTA:?HETZNER_APP_MEMORY_QUOTA must be set in $baseline_env}"
-      cpu_quota="$HETZNER_APP_CPU_QUOTA"
-      memory_quota="$HETZNER_APP_MEMORY_QUOTA"
-      app_node_count="${HETZNER_APP_NODE_COUNT:-2}"
-      allocatable_cpu="${HETZNER_APP_ALLOCATABLE_CPU:-unknown}"
-      allocatable_memory="${HETZNER_APP_ALLOCATABLE_MEMORY:-unknown}"
-      resource_profile="hetzner-measurement-derived"
-    else
-      : "${VULTR_APP_CPU_QUOTA:?VULTR_APP_CPU_QUOTA must be set in $baseline_env}"
-      : "${VULTR_APP_MEMORY_QUOTA:?VULTR_APP_MEMORY_QUOTA must be set in $baseline_env}"
-      cpu_quota="$VULTR_APP_CPU_QUOTA"
-      memory_quota="$VULTR_APP_MEMORY_QUOTA"
-      app_node_count="${VULTR_APP_NODE_COUNT:-1}"
-      allocatable_cpu="${VULTR_APP_ALLOCATABLE_CPU:-unknown}"
-      allocatable_memory="${VULTR_APP_ALLOCATABLE_MEMORY:-unknown}"
-      resource_profile="vultr-measurement-derived"
+  if [ "$provider" = "vultr" ]; then
+    local cpu_quota memory_quota app_node_count allocatable_cpu allocatable_memory
+    : "${VULTR_APP_CPU_QUOTA:?VULTR_APP_CPU_QUOTA must be set in $baseline_env}"
+    : "${VULTR_APP_MEMORY_QUOTA:?VULTR_APP_MEMORY_QUOTA must be set in $baseline_env}"
+    cpu_quota="$VULTR_APP_CPU_QUOTA"
+    memory_quota="$VULTR_APP_MEMORY_QUOTA"
+    app_node_count="${VULTR_APP_NODE_COUNT:-1}"
+    allocatable_cpu="${VULTR_APP_ALLOCATABLE_CPU:-unknown}"
+    allocatable_memory="${VULTR_APP_ALLOCATABLE_MEMORY:-unknown}"
+
+    if [ "$architecture" = "monolith" ]; then
+      if [ "$scaling_mode" = "hpa" ]; then
+        jq -cn \
+          --arg provider "$provider" \
+          --arg architecture "$architecture" \
+          --arg autoscaling_mode "$scaling_mode" \
+          --arg cpu "$cpu_quota" \
+          --arg memory "$memory_quota" \
+          --arg app_node_count "$app_node_count" \
+          --arg allocatable_cpu "$allocatable_cpu" \
+          --arg allocatable_memory "$allocatable_memory" \
+          '{
+            provider: $provider,
+            architecture: $architecture,
+            autoscaling_mode: $autoscaling_mode,
+            hpa_enabled: true,
+            namespace_resource_quota: {cpu: $cpu, memory: $memory},
+            measured_app_node_count: ($app_node_count | tonumber),
+            measured_app_allocatable: {cpu: $allocatable_cpu, memory: $allocatable_memory},
+            resource_profile: "vultr-equal-split",
+            cpu_request: "970m",
+            cpu_limit: "1950m",
+            memory_request: "1920Mi",
+            memory_limit: "3840Mi",
+            min_replicas: 1,
+            max_replicas: 4,
+            target_cpu_utilization: 70
+          }'
+        return 0
+      fi
+
+      jq -cn \
+        --arg provider "$provider" \
+        --arg architecture "$architecture" \
+        --arg autoscaling_mode "$scaling_mode" \
+        --arg cpu "$cpu_quota" \
+        --arg memory "$memory_quota" \
+        --arg app_node_count "$app_node_count" \
+        --arg allocatable_cpu "$allocatable_cpu" \
+        --arg allocatable_memory "$allocatable_memory" \
+        '{
+          provider: $provider,
+          architecture: $architecture,
+          autoscaling_mode: $autoscaling_mode,
+          hpa_enabled: false,
+          namespace_resource_quota: {cpu: $cpu, memory: $memory},
+          measured_app_node_count: ($app_node_count | tonumber),
+          measured_app_allocatable: {cpu: $allocatable_cpu, memory: $allocatable_memory},
+          resource_profile: "vultr-equal-split",
+          cpu_request: "3900m",
+          cpu_limit: "7800m",
+          memory_request: "7680Mi",
+          memory_limit: "15360Mi",
+          replica_count: 1
+        }'
+      return 0
     fi
+
+    jq -cn \
+      --arg provider "$provider" \
+      --arg architecture "$architecture" \
+      --arg autoscaling_mode "$scaling_mode" \
+      --arg cpu "$cpu_quota" \
+      --arg memory "$memory_quota" \
+      --arg app_node_count "$app_node_count" \
+      --arg allocatable_cpu "$allocatable_cpu" \
+      --arg allocatable_memory "$allocatable_memory" \
+      '{
+        provider: $provider,
+        architecture: $architecture,
+        autoscaling_mode: $autoscaling_mode,
+        hpa_enabled: ($autoscaling_mode == "hpa"),
+        namespace_resource_quota: {cpu: $cpu, memory: $memory},
+        measured_app_node_count: ($app_node_count | tonumber),
+        measured_app_allocatable: {cpu: $allocatable_cpu, memory: $allocatable_memory},
+        resource_profile: "vultr-equal-split",
+        allocation_method: "equal-per-service split from measured architecture ceiling",
+        services: {
+          "api-gateway": {
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "980m" end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "975m" else "1950m" end),
+            memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
+            min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 2 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
+            replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
+          },
+          "auth-service": {
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "980m" end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "975m" else "1950m" end),
+            memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
+            min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 2 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
+            replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
+          },
+          "item-service": {
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "980m" end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "975m" else "1950m" end),
+            memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
+            min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 2 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
+            replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
+          },
+          "transaction-service": {
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "980m" end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "975m" else "1950m" end),
+            memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
+            min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 2 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
+            replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
+          }
+        }
+      }'
+    return 0
+  fi
+
+  if [ "$provider" = "hetzner" ]; then
+    local cpu_quota memory_quota app_node_count allocatable_cpu allocatable_memory resource_profile
+    : "${HETZNER_APP_CPU_QUOTA:?HETZNER_APP_CPU_QUOTA must be set in $baseline_env}"
+    : "${HETZNER_APP_MEMORY_QUOTA:?HETZNER_APP_MEMORY_QUOTA must be set in $baseline_env}"
+    cpu_quota="$HETZNER_APP_CPU_QUOTA"
+    memory_quota="$HETZNER_APP_MEMORY_QUOTA"
+    app_node_count="${HETZNER_APP_NODE_COUNT:-2}"
+    allocatable_cpu="${HETZNER_APP_ALLOCATABLE_CPU:-unknown}"
+    allocatable_memory="${HETZNER_APP_ALLOCATABLE_MEMORY:-unknown}"
+    resource_profile="hetzner-measurement-derived"
     jq -cn \
       --arg provider "$provider" \
       --arg architecture "$architecture" \

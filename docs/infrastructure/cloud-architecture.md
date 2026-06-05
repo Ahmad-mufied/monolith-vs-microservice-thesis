@@ -457,8 +457,10 @@ This explicit placement is essential. It guarantees that:
 
 ### 6.4 Resource Ceiling and Scaling Modes
 
-Both clusters enforce the same resource ceiling via Kubernetes
-`ResourceQuota` at the workload namespace level:
+The active Vultr benchmark path uses a shared architecture ceiling of
+`7800m CPU / 15360Mi memory`. The older AWS-oriented example below is kept as
+historical cluster design context. Regardless of provider, both architectures
+must enforce the same workload namespace ceiling.
 
 ```text
 mono namespace                  msa namespace
@@ -478,13 +480,13 @@ Used for clean RQ1 comparisons. No autoscaling, replicas stay at the
 configured count throughout the benchmark.
 
 ```text
-Monolith: 1 pod with fixed role-neutral budget inside one deployment
-MSA:      4 pods with role-aware requests/limits (one pod per service)
+Monolith: 1 pod with fixed architecture ceiling inside one deployment
+MSA:      4 pods with equal-split requests/limits (one pod per service)
 ```
 
-The MSA fixed-mode baseline uses one replica per service with the same
-per-service requests and limits used in HPA mode. The fairness boundary is the
-shared namespace ResourceQuota ceiling, not equal per-pod slices.
+The active Vultr MSA fixed-mode baseline uses one replica per service with
+equal-split resource ceilings. The fairness boundary is the shared namespace
+ResourceQuota ceiling, not equal pod count.
 
 #### HPA mode
 
@@ -494,22 +496,17 @@ Used for RQ2 with scaling behavior analysis.
 Monolith HPA           MSA HPA (one per service)
 ────────────           ─────────────────────────
 minReplicas    : 1     minReplicas    : 1 per service
-maxReplicas    : 4     maxReplicas    : role-aware
+maxReplicas    : 4     maxReplicas    : 2 per service
 target CPU     : 70%   target CPU     : 70%
 ```
 
-In HPA mode, the MSA profile uses role-aware per-service budgets under the same
-shared architecture ceiling:
+In the active Vultr equal-split HPA profile, each microservice uses:
 
-- `api-gateway`: request `200m`, limit `500m`, maxReplicas `5`
-- `auth-service`: request `2000m`, limit `3500m`, maxReplicas `2`
-- `item-service`: request `200m`, limit `460m`, maxReplicas `5`
-- `transaction-service`: request `800m`, limit `2000m`, maxReplicas `2`
+- request `500m`, limit `975m`, minReplicas `1`, maxReplicas `2`
+- request `960Mi`, limit `1920Mi`, minReplicas `1`, maxReplicas `2`
 
-This keeps fairness at the same `15800m CPU / 27648Mi memory` namespace ceiling
-while allowing hotspot services such as `auth-service` and
-`transaction-service` to consume more of the
-remaining headroom.
+This keeps fairness at the same `7800m CPU / 15360Mi memory` shared ceiling
+without relying on manual role-aware service tuning.
 
 All HPA objects set `behavior.scaleDown.stabilizationWindowSeconds: 60` so
 post-benchmark scale-in is more responsive than the Kubernetes default

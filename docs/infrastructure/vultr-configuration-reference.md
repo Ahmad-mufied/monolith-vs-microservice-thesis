@@ -188,6 +188,11 @@ Rules:
 - Every `fixed <-> hpa` transition must redeploy manifests.
 - HPA uses the same 70% CPU target as the existing benchmark strategy.
 - ResourceQuota is equal for monolith and MSA.
+- The active Vultr documentation path uses equal split across the four
+  microservices:
+  `1950m CPU / 3840Mi memory` per service in fixed mode,
+  `975m CPU / 1920Mi memory` per pod with `minReplicas=1` and
+  `maxReplicas=2` in HPA mode.
 - Set `VULTR_EXPECTED_APP_NODE_COUNT=1` when verifying the current single app
   node topology.
 
@@ -204,7 +209,7 @@ cluster=<active VKE cluster name>
 app_node_pool=app-nodes
 testing_node_pool=testing-nodes
 postgres_version=18
-resource_profile=vultr-measurement-derived
+resource_profile=vultr-equal-split
 app_resource_quota=<measured quota>
 image_tag=<pushed Docker Hub tag>
 ```
