@@ -387,12 +387,13 @@ Diagram:
 
 ## 10. Relationship with HPA
 
-HPA is not the primary RQ2 metric. It is a supporting mechanism for explaining resource usage and scaling behavior.
+HPA is not the primary RQ2 metric. It is a mechanism for explaining resource
+usage and scaling behavior under autoscaling-enabled execution.
 
-Fixed-replica mode is the primary RQ2 comparison mode because it isolates CPU
-and memory usage under a static deployment configuration. HPA-enabled mode is a
-supporting experiment used to explain whether autoscaling changes the
-performance-resource trade-off.
+Fixed-replica mode is the primary static-scale RQ2 comparison mode because it
+isolates CPU and memory usage under a static deployment configuration.
+HPA-enabled mode is reported separately to explain whether autoscaling changes
+the performance-resource trade-off.
 
 Mechanism:
 
@@ -457,7 +458,7 @@ For the final thesis analysis:
 
 ```text
 fixed-replica mode = primary RQ1/RQ2 comparison
-HPA-enabled mode   = supporting autoscaling analysis
+HPA-enabled mode   = separately labeled autoscaling analysis
 ```
 
 ### 11.1 Fixed Replica Mode
@@ -982,10 +983,10 @@ responses.
 
 ```text
 When HPA is enabled, current replicas, desired replicas, and scale events are
-recorded as supporting metrics. These metrics explain how Kubernetes adjusts
-application capacity under increasing load. However, the primary RQ2 comparison
-is still based on fixed-replica aggregate CPU and memory usage at the
-architecture level. HPA results are reported separately as supporting evidence.
+recorded as autoscaling metrics. These metrics explain how Kubernetes adjusts
+application capacity under increasing load. HPA results are reported separately
+from fixed-replica results and interpreted as autoscaling-enabled resource
+efficiency, not merged into the static-scale comparison table.
 ```
 
 ---

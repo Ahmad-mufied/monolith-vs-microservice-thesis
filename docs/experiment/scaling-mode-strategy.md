@@ -884,17 +884,19 @@ Before starting any benchmark run, verify the manifest and profile match:
 Run both modes to answer both research questions cleanly.
 
 ```text
-Phase 1 — Fixed-replica benchmark (RQ1 primary data)
+Phase 1 — Fixed-replica benchmark (static-scale primary data)
   → redeploy app stack with SCALING_MODE=fixed
   → verify HPA objects are absent and replicas=1
-  → run login, create-transaction, enriched-transactions scenarios
+  → run concurrent-mixed-workload at 100, 200, 300, 400, 500 RPS
+  → run login, create-transaction, enriched-transactions diagnostics at 100, 200, 300, 400, 500 RPS
   → collect k6 summary.json per attempt
   → upload to S3
 
-Phase 2 — HPA benchmark (RQ2 primary data)
+Phase 2 — HPA benchmark (autoscaling-enabled data)
   → redeploy app stack with SCALING_MODE=hpa
   → verify HPA objects are present
-  → run same scenarios at same target RPS
+  → run concurrent-mixed-workload at 100, 250, 500 RPS
+  → run login, create-transaction, enriched-transactions diagnostics at 100, 250, 500 RPS
   → collect k6 summary.json per attempt
   → collect Datadog CPU/memory/replica data via time window
   → upload to S3
@@ -1062,21 +1064,21 @@ These are optional. Datadog is the primary source for HPA behavior analysis.
 |---|---|---|
 | Pod count | Static (1 per unit) | Dynamic (1 to max) |
 | Scaling variable | Eliminated | Present |
-| Primary use | RQ1 + RQ2 core (clean, no scaling variable) | RQ1 under autoscaling + RQ2 with HPA behavior |
+| Primary use | Static-scale RQ1 + RQ2 comparison | Autoscaling-enabled RQ1 + RQ2 comparison |
 | Data source | k6 summary.json | k6 summary.json + Datadog |
 | Deployment mode source | `overlays/fixed` | `overlays/hpa` |
 | K6_PROFILE | `steady`, `ramp`, `smoke` | `hpa` |
 | Fairness basis | Equal active resources at start | Equal resource ceiling |
 | Result label | `autoscaling_mode: fixed-replica` | `autoscaling_mode: hpa` |
 
-HPA mode produces data for both research questions simultaneously:
+HPA mode produces separately labeled data for both research questions:
 
 ```text
 RQ1 — latency, RPS, error rate under autoscaling-enabled environment
-RQ2 — HPA scaling behavior as supporting evidence
+RQ2 — CPU/memory efficiency plus HPA scaling behavior
 ```
 
-Fixed-replica mode is sufficient for both RQ1 and RQ2 core analysis:
+Fixed-replica mode remains the clean static-scale baseline:
 
 ```text
 RQ1 — clean latency, RPS, error rate comparison without scaling variable

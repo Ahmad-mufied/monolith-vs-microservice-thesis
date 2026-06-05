@@ -281,7 +281,15 @@ lower latency cannot be treated as a clean performance advantage.
 
 ## 7. Benchmark Scenarios
 
-RQ1 uses three primary k6 scenarios.
+RQ1 uses `concurrent-mixed-workload` as the primary system-level k6 scenario.
+
+| Scenario | Script | Endpoint Mix | Workload Type |
+|---|---|---|---|
+| Concurrent Mixed Workload | `k6/scripts/concurrent-mixed-workload.js` | login 20%, create transaction 40%, enriched transactions 40% | concurrent composite workload |
+
+The individual endpoint scenarios are diagnostic scenarios. They explain which
+request path contributes to the aggregate performance observed in the composite
+workload.
 
 | Scenario | Script | Endpoint | Workload Type |
 |---|---|---|---|
@@ -295,9 +303,11 @@ Validation and optional scenarios:
 |---|---|---|
 | Smoke | `k6/scripts/smoke.js` | deployment validation only |
 | Sync Items | `k6/scripts/sync-items.js` | optional item synchronization scenario |
-| Mixed Workload | `k6/scripts/mixed-workload.js` | optional mixed traffic scenario |
+| Mixed Workload | `k6/scripts/mixed-workload.js` | legacy random-branch mixed traffic scenario |
 
-Only the three primary scenarios are required to answer RQ1.
+The composite workload answers RQ1 at the application-system level. The three
+individual endpoint scenarios support root-cause analysis and prevent the
+composite result from becoming a black-box comparison.
 
 ---
 
@@ -722,9 +732,9 @@ If HPA is enabled, results must be labeled as:
 supporting performance result under autoscaling-enabled Kubernetes environment
 ```
 
-Fixed-replica mode is the primary RQ1 comparison mode. HPA-enabled results are
-supporting evidence and must not be mixed into the primary fixed-replica
-comparison without explicit labeling.
+Fixed-replica mode is the primary static-scale RQ1 comparison mode.
+HPA-enabled results are reported separately and must not be mixed into the
+fixed-replica comparison without explicit labeling.
 
 ---
 

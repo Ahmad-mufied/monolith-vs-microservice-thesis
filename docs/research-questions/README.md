@@ -47,9 +47,16 @@ microservices service breakdown as supporting explanation
 HPA behavior as supporting evidence
 ```
 
-Fixed-replica mode is the primary comparison mode for both research questions.
-HPA mode is a supporting experiment used to explain autoscaling behavior and
-whether the observed trade-offs change when Kubernetes is allowed to scale pods.
+The primary system-level workload is `concurrent-mixed-workload`, which runs
+login, create transaction, and enriched transactions concurrently using a
+20/40/40 RPS split. The individual `login`, `create-transaction`, and
+`enriched-transactions` scenarios remain diagnostic evidence for explaining the
+source of latency, throughput, CPU, and memory behavior.
+
+Fixed-replica mode is the primary static-scale comparison mode for both
+research questions. HPA mode is reported separately to explain autoscaling
+behavior and whether the observed trade-offs change when Kubernetes is allowed
+to scale pods.
 
 Final thesis measurements use Vultr Kubernetes Engine (VKE) as the managed
 Kubernetes environment. The RQ definitions remain cloud-native and
