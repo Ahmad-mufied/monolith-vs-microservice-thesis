@@ -633,7 +633,8 @@ Namespace memory ceiling : 15360Mi
 fixed per service        : request 980m / limit 1950m / 1920Mi / 3840Mi
 hpa per service          : request 500m / limit 975m / 960Mi / 1920Mi
 minReplicas per service  : 1
-maxReplicas per service  : 2
+maxReplicas per service  : 4
+shared HPA headroom      : 4 additional pods across the namespace
 HPA target CPU           : 70%
 ```
 

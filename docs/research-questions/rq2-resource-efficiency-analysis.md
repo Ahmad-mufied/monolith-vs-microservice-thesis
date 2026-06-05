@@ -538,7 +538,8 @@ Used for fairness.
 Formula:
 
 ```text
-Maximum CPU ceiling = max_replicas x CPU limit per pod
+Monolith maximum CPU ceiling = max_replicas x CPU limit per pod
+MSA HPA maximum CPU ceiling  = namespace CPU limit quota
 ```
 
 Example monolith:
@@ -550,12 +551,9 @@ Example monolith:
 Example MSA:
 
 ```text
-api-gateway          2 x 975m = 1950m
-auth-service         2 x 975m = 1950m
-item-service         2 x 975m = 1950m
-transaction-service  2 x 975m = 1950m
-
-total MSA max CPU = 7800m
+minimum MSA state     = 4 x 975m = 3900m
+shared burst budget   = 4 x 975m = 3900m
+namespace CPU ceiling = 7800m
 ```
 
 ### 12.2 Actual Resource Usage

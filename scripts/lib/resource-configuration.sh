@@ -122,7 +122,7 @@ resources_configuration_json() {
         measured_app_node_count: ($app_node_count | tonumber),
         measured_app_allocatable: {cpu: $allocatable_cpu, memory: $allocatable_memory},
         resource_profile: "vultr-equal-split",
-        allocation_method: "equal-per-service split from measured architecture ceiling",
+        allocation_method: (if $autoscaling_mode == "hpa" then "equal per-pod baseline with shared namespace headroom" else "equal per-service split from measured architecture ceiling" end),
         services: {
           "api-gateway": {
             cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "980m" end),
@@ -130,7 +130,7 @@ resources_configuration_json() {
             memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
-            max_replicas: (if $autoscaling_mode == "hpa" then 2 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
@@ -140,7 +140,7 @@ resources_configuration_json() {
             memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
-            max_replicas: (if $autoscaling_mode == "hpa" then 2 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
@@ -150,7 +150,7 @@ resources_configuration_json() {
             memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
-            max_replicas: (if $autoscaling_mode == "hpa" then 2 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
@@ -160,7 +160,7 @@ resources_configuration_json() {
             memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
-            max_replicas: (if $autoscaling_mode == "hpa" then 2 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           }

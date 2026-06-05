@@ -11,8 +11,8 @@ spec:
         - name: api-gateway
           resources:
             requests:
-              cpu: 750m
-              memory: 864Mi
+              cpu: 980m
+              memory: 1920Mi
             limits:
-              cpu: 2500m
-              memory: 3456Mi
+              cpu: 1950m
+              memory: 3840Mi

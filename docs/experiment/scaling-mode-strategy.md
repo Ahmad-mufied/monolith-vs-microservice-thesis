@@ -81,7 +81,7 @@ The key rule is:
 
 ```text
 fixed mode and hpa mode may differ in pod shape,
-but must preserve the same total ceiling
+but must preserve the same total architecture ceiling
 ```
 
 ### 3.1 Monolith HPA
@@ -103,39 +103,42 @@ Maximum monolith ceiling:
 
 ### 3.2 Microservices HPA
 
-Each service keeps the same equal-split ceiling:
-
-```text
-1950m CPU / 3840Mi memory per service
-```
-
 Each service uses:
 
 ```text
 minReplicas            : 1
-maxReplicas            : 2
+maxReplicas            : 4
 target CPU utilization : 70%
 request / pod          : 500m CPU / 960Mi memory
 limit / pod            : 975m CPU / 1920Mi memory
 ```
 
-Per-service maximum:
+If all services stay at `minReplicas = 1`, the namespace starts with:
 
 ```text
-2 x 975m   = 1950m CPU
-2 x 1920Mi = 3840Mi memory
+4 x 975m   = 3900m CPU limit
+4 x 1920Mi = 7680Mi memory limit
 ```
 
-If all four services scale to their maximum:
+Remaining shared burst headroom:
 
 ```text
-CPU request total = 4 x 2 x 500m   = 4000m
-CPU limit total   = 4 x 2 x 975m   = 7800m
-Mem request total = 4 x 2 x 960Mi  = 7680Mi
-Mem limit total   = 4 x 2 x 1920Mi = 15360Mi
+7800m - 3900m   = 3900m CPU
+15360Mi - 7680Mi = 7680Mi memory
 ```
 
-This keeps HPA mathematically aligned with fixed mode.
+That headroom is exactly equal to four more pods of the same HPA size:
+
+```text
+4 x 975m   = 3900m CPU
+4 x 1920Mi = 7680Mi memory
+```
+
+Therefore, the active Vultr HPA model should be read as:
+
+- 4 baseline pods, one for each service,
+- plus up to 4 extra pods shared across the namespace,
+- with ResourceQuota and node schedulability acting as the final limiters.
 
 ---
 
@@ -173,8 +176,18 @@ Remaining request headroom:
 7800m - 2000m = 5800m
 ```
 
-Therefore, if one service is idle, the not-yet-created second pod for that
-service does not block another service from scaling.
+Remaining limit headroom:
+
+```text
+7800m - 3900m = 3900m
+```
+
+Therefore, if one service is idle, its not-yet-created extra pods do not block
+another service from scaling.
+
+The request headroom is larger than the limit headroom, but the real burst
+shape is still capped by namespace limit quota and node schedulability. With
+the active HPA pod size, that practical burst ceiling is four additional pods.
 
 ---
 
@@ -250,7 +263,7 @@ monolith:
   1920Mi request / 3840Mi limit
 
 microservices:
-  min 1 max 2 for each service
+  min 1 max 4 for each service
   500m request / 975m limit
   960Mi request / 1920Mi limit
 ```

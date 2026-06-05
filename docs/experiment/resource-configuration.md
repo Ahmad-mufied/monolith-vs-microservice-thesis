@@ -70,8 +70,14 @@ The reason is methodological, not technical:
 Therefore, the final Vultr benchmark uses:
 
 ```text
-equal total architecture budget
-+ equal per-service split inside microservices
+fixed:
+  equal total architecture budget
+  + equal per-service split inside microservices
+
+hpa:
+  equal total architecture budget
+  + equal per-pod baseline
+  + shared namespace headroom
 ```
 
 This keeps the internal MSA allocation:
@@ -168,17 +174,17 @@ In HPA mode:
 
 - monolith uses CPU-based HPA,
 - each microservice also uses CPU-based HPA,
-- fixed and HPA must preserve the same total service-level ceiling.
+- fixed and HPA must preserve the same architecture-level ceiling.
 
 The comparison rule is:
 
 ```text
 fixed mode:
-  total service ceiling is active immediately
+  equal service ceilings are active immediately
 
 hpa mode:
-  total service ceiling is identical
-  but distributed across multiple possible replicas
+  equal per-pod baselines are active immediately
+  and burst capacity uses shared namespace headroom
 ```
 
 ### 5.1 Monolith HPA Configuration
@@ -200,17 +206,11 @@ This preserves:
 
 ### 5.2 Microservices HPA Configuration
 
-The equal-split service ceiling remains:
-
-```text
-1950m CPU / 3840Mi memory per service
-```
-
-To preserve that ceiling while enabling scale-out, each service uses:
+Each service uses the same equal per-pod baseline:
 
 ```text
 minReplicas            : 1
-maxReplicas            : 2
+maxReplicas            : 4
 target CPU utilization : 70%
 ```
 
@@ -218,28 +218,38 @@ Per-pod resources:
 
 | Service | Min | Max | CPU Request / Pod | CPU Limit / Pod | Memory Request / Pod | Memory Limit / Pod |
 |---|---:|---:|---:|---:|---:|---:|
-| `api-gateway` | `1` | `2` | `500m` | `975m` | `960Mi` | `1920Mi` |
-| `auth-service` | `1` | `2` | `500m` | `975m` | `960Mi` | `1920Mi` |
-| `item-service` | `1` | `2` | `500m` | `975m` | `960Mi` | `1920Mi` |
-| `transaction-service` | `1` | `2` | `500m` | `975m` | `960Mi` | `1920Mi` |
+| `api-gateway` | `1` | `4` | `500m` | `975m` | `960Mi` | `1920Mi` |
+| `auth-service` | `1` | `4` | `500m` | `975m` | `960Mi` | `1920Mi` |
+| `item-service` | `1` | `4` | `500m` | `975m` | `960Mi` | `1920Mi` |
+| `transaction-service` | `1` | `4` | `500m` | `975m` | `960Mi` | `1920Mi` |
 
-If a service scales to `maxReplicas = 2`, its total service ceiling becomes:
-
-```text
-2 x 975m   = 1950m CPU
-2 x 1920Mi = 3840Mi memory
-```
-
-Therefore, if all services reach max replicas simultaneously:
+The namespace minimum state is:
 
 ```text
-CPU request total = 4 services x 2 pods x 500m   = 4000m
-CPU limit total   = 4 services x 2 pods x 975m   = 7800m
-Memory request    = 4 services x 2 pods x 960Mi  = 7680Mi
-Memory limit      = 4 services x 2 pods x 1920Mi = 15360Mi
+4 services x 1 pod x 975m   = 3900m CPU limit
+4 services x 1 pod x 1920Mi = 7680Mi memory limit
 ```
 
-This keeps HPA mode mathematically aligned with fixed mode.
+Remaining shared headroom:
+
+```text
+7800m - 3900m   = 3900m CPU
+15360Mi - 7680Mi = 7680Mi memory
+```
+
+That headroom is exactly enough for four additional pods of the same size:
+
+```text
+4 x 975m   = 3900m CPU
+4 x 1920Mi = 7680Mi memory
+```
+
+Therefore, the active HPA model should be interpreted as:
+
+- 4 baseline pods across the namespace,
+- plus up to 4 additional burst pods shared by all services,
+- with namespace ResourceQuota and node schedulability acting as the final
+  guardrails.
 
 ---
 
@@ -249,7 +259,7 @@ HPA does not reserve `maxReplicas` in advance.
 
 Only running pods contribute active requests and limits.
 
-For the equal-split HPA configuration, all services at `minReplicas = 1`
+For the equal-baseline HPA configuration, all services at `minReplicas = 1`
 consume:
 
 ```text
@@ -266,14 +276,24 @@ Remaining request headroom:
 7800m - 2000m = 5800m
 ```
 
+Remaining limit headroom:
+
+```text
+7800m - 3900m = 3900m
+```
+
 This means:
 
-- if one service is idle, its not-yet-created second pod does not reserve
+- if one service is idle, its not-yet-created extra pods do not reserve
   request or limit,
 - another service with higher load can use the remaining namespace headroom to
-  scale,
+  scale until the shared burst capacity is exhausted,
 - the active guardrails remain the namespace ResourceQuota and node-level
   schedulability.
+
+In practice, request headroom explains why the namespace can admit more pods,
+while limit headroom explains why the realistic burst ceiling is four
+additional pods of the configured HPA size.
 
 This is one reason why the equal-split HPA design remains operationally useful
 even though it does not tune each service differently.
@@ -290,8 +310,9 @@ The equal-split design is justified by the following argument:
    per-service profiling dataset,
 3. therefore, the least assumption-heavy internal split is equal division
    across the four services,
-4. fixed mode and HPA preserve the same total service-level ceiling, so the
-   comparison focuses on scaling behavior rather than manual service tuning.
+4. fixed mode and HPA preserve the same total architecture-level ceiling, so
+   the comparison focuses on scaling behavior rather than manual service
+   tuning.
 
 Suggested thesis wording:
 
@@ -338,8 +359,10 @@ For the active Vultr benchmark path, use the following rules:
 4. monolith HPA:
    `min 1 max 4`, `970m/1950m`, `1920Mi/3840Mi`
 5. microservices HPA:
-   `min 1 max 2` for each service,
+   `min 1 max 4` for each service,
    `500m/975m`, `960Mi/1920Mi` per pod
+6. microservices HPA interpretation:
+   `4 baseline pods + up to 4 shared burst pods inside the same namespace quota`
 
 These values are the source of truth for the final equal-split Vultr
 documentation path.
