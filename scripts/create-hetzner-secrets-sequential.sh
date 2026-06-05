@@ -114,9 +114,9 @@ $K8S create secret generic api-gateway-secret \
   --from-literal=HTTP_PORT=8080 \
   --from-literal=SERVICE_NAME=api-gateway \
   --from-literal=JWT_SECRET="$api_gateway_jwt_secret" \
-  --from-literal=AUTH_SERVICE_ADDR=auth-service.msa.svc.cluster.local:50051 \
-  --from-literal=ITEM_SERVICE_ADDR=item-service.msa.svc.cluster.local:50052 \
-  --from-literal=TRANSACTION_SERVICE_ADDR=transaction-service.msa.svc.cluster.local:50053 \
+  --from-literal=AUTH_SERVICE_ADDR=dns:///auth-service-headless.msa.svc.cluster.local:50051 \
+  --from-literal=ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052 \
+  --from-literal=TRANSACTION_SERVICE_ADDR=dns:///transaction-service-headless.msa.svc.cluster.local:50053 \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic auth-service-secret \
@@ -143,7 +143,7 @@ $K8S create secret generic transaction-service-secret \
   --from-literal=GRPC_PORT=50053 \
   --from-literal=SERVICE_NAME=transaction-service \
   --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${postgres_ip}:5432/transaction_db?sslmode=require" \
-  --from-literal=ITEM_SERVICE_ADDR=item-service.msa.svc.cluster.local:50052 \
+  --from-literal=ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052 \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic k6-runner-secret \

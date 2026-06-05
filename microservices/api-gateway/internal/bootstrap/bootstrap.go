@@ -26,6 +26,7 @@ import (
 )
 
 const shutdownTimeout = 10 * time.Second
+const grpcRoundRobinServiceConfig = `{"loadBalancingConfig":[{"round_robin":{}}]}`
 
 func Run() error {
 	cfg, err := config.Load()
@@ -100,6 +101,7 @@ func Run() error {
 func grpcClientOptions(serviceName string) []grpc.DialOption {
 	return []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(grpcRoundRobinServiceConfig),
 		grpc.WithChainUnaryInterceptor(grpctrace.UnaryClientInterceptor(grpctrace.WithService(serviceName))),
 		grpc.WithChainStreamInterceptor(grpctrace.StreamClientInterceptor(grpctrace.WithService(serviceName))),
 	}

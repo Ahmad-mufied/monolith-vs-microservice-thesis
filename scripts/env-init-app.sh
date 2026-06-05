@@ -80,6 +80,21 @@ write_or_update_env_value() {
   echo "updated $file"
 }
 
+update_if_missing_or_default() {
+  local file="$1"
+  local key="$2"
+  local old_default="$3"
+  local new_default="$4"
+
+  local current_value
+  current_value="$(read_env_value "$file" "$key")"
+  if [[ -z "$current_value" || "$current_value" == "$old_default" ]]; then
+    write_or_update_env_value "$file" "$key" "$new_default"
+  else
+    echo "skip $file ($key has custom value)"
+  fi
+}
+
 migrate_if_missing() {
   local preferred="$1"
   local legacy="$2"
@@ -165,9 +180,9 @@ write_if_missing "env/api-gateway.app.env" "APP_ENV=production
 HTTP_PORT=8080
 SERVICE_NAME=api-gateway
 JWT_SECRET=${jwt_secret}
-AUTH_SERVICE_ADDR=auth-service.msa.svc.cluster.local:50051
-ITEM_SERVICE_ADDR=item-service.msa.svc.cluster.local:50052
-TRANSACTION_SERVICE_ADDR=transaction-service.msa.svc.cluster.local:50053"
+AUTH_SERVICE_ADDR=dns:///auth-service-headless.msa.svc.cluster.local:50051
+ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
+TRANSACTION_SERVICE_ADDR=dns:///transaction-service-headless.msa.svc.cluster.local:50053"
 
 write_if_missing "env/auth-service.app.env" "APP_ENV=production
 GRPC_PORT=50051
@@ -182,7 +197,7 @@ SERVICE_NAME=item-service"
 write_if_missing "env/transaction-service.app.env" "APP_ENV=production
 GRPC_PORT=50053
 SERVICE_NAME=transaction-service
-ITEM_SERVICE_ADDR=item-service.msa.svc.cluster.local:50052"
+ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052"
 
 write_if_missing "env/k6-runner.app.env" "ADMIN_USER_EMAIL=${k6_runner_email}
 ADMIN_USER_PASSWORD=${k6_runner_password}"
@@ -194,5 +209,9 @@ fi
 write_or_update_env_value "env/k6-runner.app.env" "ADMIN_USER_EMAIL" "$k6_runner_email"
 write_or_update_env_value "env/monolith.app.env" "BCRYPT_COST" "10"
 write_or_update_env_value "env/auth-service.app.env" "BCRYPT_COST" "10"
+update_if_missing_or_default "env/api-gateway.app.env" "AUTH_SERVICE_ADDR" "auth-service.msa.svc.cluster.local:50051" "dns:///auth-service-headless.msa.svc.cluster.local:50051"
+update_if_missing_or_default "env/api-gateway.app.env" "ITEM_SERVICE_ADDR" "item-service.msa.svc.cluster.local:50052" "dns:///item-service-headless.msa.svc.cluster.local:50052"
+update_if_missing_or_default "env/api-gateway.app.env" "TRANSACTION_SERVICE_ADDR" "transaction-service.msa.svc.cluster.local:50053" "dns:///transaction-service-headless.msa.svc.cluster.local:50053"
+update_if_missing_or_default "env/transaction-service.app.env" "ITEM_SERVICE_ADDR" "item-service.msa.svc.cluster.local:50052" "dns:///item-service-headless.msa.svc.cluster.local:50052"
 
 echo "App env initialization complete"

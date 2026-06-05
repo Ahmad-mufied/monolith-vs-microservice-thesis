@@ -48,6 +48,42 @@ API Gateway        → exposes REST API, validates JWT, maps REST to gRPC, perfo
 
 The API Gateway must not access service databases directly. Business services must not access another service's database directly.
 
+## 4.1 Runtime Service Discovery
+
+Kubernetes deployments should expose internal gRPC backends through a normal
+ClusterIP Service and a matching headless Service:
+
+```text
+auth-service                    -> compatibility/debug ClusterIP
+auth-service-headless           -> gRPC client-side load balancing target
+item-service                    -> compatibility/debug ClusterIP
+item-service-headless           -> gRPC client-side load balancing target
+transaction-service             -> compatibility/debug ClusterIP
+transaction-service-headless    -> gRPC client-side load balancing target
+```
+
+gRPC clients that talk to scalable Kubernetes services should use the DNS
+resolver scheme and the `round_robin` client-side load balancing policy:
+
+```text
+dns:///auth-service-headless.msa.svc.cluster.local:50051
+dns:///item-service-headless.msa.svc.cluster.local:50052
+dns:///transaction-service-headless.msa.svc.cluster.local:50053
+```
+
+Reason:
+
+```text
+gRPC uses long-lived HTTP/2 connections. When a client targets a normal
+ClusterIP Service, many RPCs can stay on one connection selected by kube-proxy.
+The headless Service returns pod IPs through DNS, and round_robin distributes
+RPCs across the resolved ready endpoints.
+```
+
+This does not change the gRPC message contract, REST behavior, database
+ownership, benchmark semantics, retry behavior, or consistency model. It only
+changes how gRPC clients choose backend pods.
+
 ## 5. UUID and Timestamp Rules
 
 UUID values are represented as strings in gRPC messages. PostgreSQL stores UUIDs as native UUID values and generates new IDs using UUIDv7.
