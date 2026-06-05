@@ -40,7 +40,7 @@ fi
 source scripts/lib/resource-configuration.sh
 source scripts/lib/benchmark-preflight.sh
 
-SCENARIO="${SCENARIO:?SCENARIO is required (login|create-transaction|enriched-transactions|mixed-workload|sync-items)}"
+SCENARIO="${SCENARIO:?SCENARIO is required (login|create-transaction|enriched-transactions|concurrent-mixed-workload|mixed-workload|sync-items)}"
 TARGET_RPS="${TARGET_RPS:?TARGET_RPS is required}"
 RUN_ID="${RUN_ID:?RUN_ID is required}"
 ATTEMPT="${ATTEMPT:-attempt-01}"

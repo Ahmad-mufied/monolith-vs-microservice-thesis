@@ -108,7 +108,7 @@ validate_seconds_value() {
 
 validate_supported_scenario() {
   case "$1" in
-    login|create-transaction|enriched-transactions|mixed-workload|sync-items) ;;
+    login|create-transaction|enriched-transactions|concurrent-mixed-workload|mixed-workload|sync-items) ;;
     *)
       echo "ERROR: unsupported scenario '$1'" >&2
       exit 1
@@ -420,9 +420,9 @@ for architecture in $ARCHITECTURE_ORDER; do
         continue
       fi
 
-      if [ "$scenario" = "create-transaction" ] || [ "$scenario" = "sync-items" ] || [ "$scenario" = "mixed-workload" ]; then
+      if [ "$scenario" = "create-transaction" ] || [ "$scenario" = "sync-items" ] || [ "$scenario" = "concurrent-mixed-workload" ] || [ "$scenario" = "mixed-workload" ]; then
         reset_seed_active "$architecture"
-        if [ "$scenario" = "mixed-workload" ]; then
+        if [ "$scenario" = "concurrent-mixed-workload" ] || [ "$scenario" = "mixed-workload" ]; then
           prepare_enrichment_active "$architecture"
         fi
       fi

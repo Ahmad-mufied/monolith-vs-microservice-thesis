@@ -64,7 +64,7 @@ export function expectStatusIn(response, statuses, label) {
   });
 }
 
-export function expectJsonValue(response, selector, label) {
+export function expectJsonValue(response, selector, label, tags = undefined) {
   return check(response, {
     [`${label}: ${selector} exists`]: (r) => {
       try {
@@ -74,18 +74,18 @@ export function expectJsonValue(response, selector, label) {
         return false;
       }
     },
-  });
+  }, tags);
 }
 
 export function healthRequest() {
   return http.get(`${BASE_URL}/healthz`);
 }
 
-export function loginRequest(email, password) {
+export function loginRequest(email, password, extraParams = {}) {
   return http.post(
     `${BASE_URL}/api/v1/auth/login`,
     JSON.stringify({ email, password }),
-    jsonHeaders()
+    mergeRequestParams(jsonHeaders(), extraParams)
   );
 }
 
@@ -157,7 +157,7 @@ export function syncItemsRequest(token, items) {
   );
 }
 
-export function createTransactionRequest(token, itemId, amount = TRANSACTION_AMOUNT) {
+export function createTransactionRequest(token, itemId, amount = TRANSACTION_AMOUNT, extraParams = {}) {
   return http.post(
     `${BASE_URL}/api/v1/transactions`,
     JSON.stringify({
@@ -168,7 +168,7 @@ export function createTransactionRequest(token, itemId, amount = TRANSACTION_AMO
         },
       ],
     }),
-    jsonHeaders(token)
+    mergeRequestParams(jsonHeaders(token), extraParams)
   );
 }
 
@@ -186,10 +186,10 @@ export function transactionDetailRequest(token, transactionId) {
   );
 }
 
-export function enrichedTransactionsRequest(token, limit = ENRICHED_TRANSACTION_LIMIT, offset = 0) {
+export function enrichedTransactionsRequest(token, limit = ENRICHED_TRANSACTION_LIMIT, offset = 0, extraParams = {}) {
   return http.get(
     `${BASE_URL}/api/v1/admin/transactions?limit=${limit}&offset=${offset}`,
-    jsonHeaders(token)
+    mergeRequestParams(jsonHeaders(token), extraParams)
   );
 }
 

@@ -117,9 +117,9 @@ validate_supported_scenario() {
   local scenario="$1"
 
   case "$scenario" in
-    login|create-transaction|enriched-transactions|mixed-workload|sync-items) ;;
+    login|create-transaction|enriched-transactions|concurrent-mixed-workload|mixed-workload|sync-items) ;;
     *)
-      echo "ERROR: unsupported scenario '$scenario' (expected: login|create-transaction|enriched-transactions|mixed-workload|sync-items)" >&2
+      echo "ERROR: unsupported scenario '$scenario' (expected: login|create-transaction|enriched-transactions|concurrent-mixed-workload|mixed-workload|sync-items)" >&2
       return 1
       ;;
   esac
@@ -1027,6 +1027,9 @@ while IFS=$'\t' read -r scenario scenario_rps_levels; do
 
     if [ "$scenario" = "create-transaction" ] || [ "$scenario" = "sync-items" ]; then
       reset_and_seed_benchmark_data
+    fi
+    if [ "$scenario" = "concurrent-mixed-workload" ]; then
+      reset_seed_and_prepare_enrichment_data
     fi
 
     case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
