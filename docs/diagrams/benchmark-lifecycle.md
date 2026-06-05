@@ -67,21 +67,29 @@ flowchart TB
 
 ## Benchmark Matrix
 
-Primary Bab 4 runs use two deployment modes, three primary workload scenarios,
-and five target RPS levels.
+Primary Bab 4 runs use two deployment modes. The main comparison uses one
+system-level composite workload plus three diagnostic endpoint workloads.
 
 | Dimension | Values |
 |---|---|
 | Scaling modes | `fixed`, `hpa` |
-| Primary scenarios | `login`, `create-transaction`, `enriched-transactions` |
-| Default RPS levels | `1000`, `2500`, `5000`, `7500`, `10000` |
-| Optional exploratory scenario | `mixed-workload` |
+| Primary scenario | `concurrent-mixed-workload` |
+| Diagnostic scenarios | `login`, `create-transaction`, `enriched-transactions` |
+| Fixed RPS levels | `100`, `200`, `300`, `400`, `500` |
+| HPA RPS levels | `100`, `250`, `500` |
+| Optional legacy scenario | `mixed-workload` |
 
-This produces `15` suite cases per scaling mode for the primary matrix:
+This produces the following final suite shape per architecture comparison:
 
 ```text
-3 scenarios x 5 RPS levels = 15 cases per mode
-2 modes x 15 cases = 30 primary suite cases
+fixed mode:
+  4 scenarios x 5 RPS levels = 20 suite cases
+
+hpa mode:
+  4 scenarios x 3 RPS levels = 12 suite cases
+
+total:
+  32 suite cases per architecture
 ```
 
 In parallel mode, each suite case runs monolith and microservices jobs together.

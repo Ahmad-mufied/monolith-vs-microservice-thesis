@@ -660,21 +660,30 @@ for deliberate debugging.
 
 ### Phase 6.1 — Matrix Definition
 
-The primary Bab 4 matrix uses two deployment modes, three primary workload
-scenarios, and five target RPS levels.
+The primary Bab 4 matrix uses two deployment modes. The main RQ1/RQ2 comparison
+uses one system-level composite workload, while the individual endpoint
+workloads are retained as diagnostic runs for explaining the composite result.
 
 | Dimension | Values |
 |---|---|
 | Scaling modes | `fixed`, `hpa` |
-| Primary scenarios | `login`, `create-transaction`, `enriched-transactions` |
-| Default target RPS levels | `1000`, `2500`, `5000`, `7500`, `10000` |
-| Optional exploratory scenario | `mixed-workload` |
+| Primary scenario | `concurrent-mixed-workload` |
+| Diagnostic scenarios | `login`, `create-transaction`, `enriched-transactions` |
+| Fixed target RPS levels | `100`, `200`, `300`, `400`, `500` |
+| HPA target RPS levels | `100`, `250`, `500` |
+| Optional legacy scenario | `mixed-workload` |
 
 Primary case count:
 
 ```text
-3 scenarios x 5 RPS levels = 15 suite cases per scaling mode
-2 scaling modes x 15 cases = 30 primary suite cases
+fixed mode:
+  4 scenarios x 5 RPS levels = 20 suite cases
+
+hpa mode:
+  4 scenarios x 3 RPS levels = 12 suite cases
+
+total:
+  32 suite cases per architecture
 ```
 
 Each suite case runs the monolith and microservices k6 jobs together. The S3
@@ -684,9 +693,9 @@ layout still stores one artifact folder per architecture:
 s3://<bucket>/experiments/<run_id>/<architecture>/<scenario>/<target_rps>rps/<attempt>/
 ```
 
-Use `mixed-workload` only when you intentionally want an additional exploratory
-matrix. It is not part of the primary RQ1/RQ2 comparison unless the thesis
-chapter explicitly analyzes mixed traffic.
+Use `mixed-workload` only when you intentionally want the legacy random-branch
+mixed traffic. It is not part of the primary RQ1/RQ2 comparison; use
+`concurrent-mixed-workload` for final composite analysis.
 
 ### Phase 6.2 — Fixed Mode Primary Matrix
 
@@ -701,8 +710,8 @@ make run-benchmark-suite \
   EXPERIMENT_NAME=rq1-fixed-final \
   TEST_DURATION=5m \
   INTER_CASE_DELAY=120 \
-  SCENARIOS="login create-transaction enriched-transactions" \
-  RPS_LEVELS="1000 2500 5000 7500 10000" \
+  SCENARIOS="concurrent-mixed-workload login create-transaction enriched-transactions" \
+  RPS_LEVELS="100 200 300 400 500" \
   S3_BUCKET=skripsi-benchmark-results
 ```
 
@@ -714,9 +723,9 @@ run_id       : eks-fixed-rq1-fixed-final
 attempt      : attempt-01, then attempt-02/03 when the same run_id is reused
 scaling_mode : fixed
 k6_profile   : steady
-scenarios    : login create-transaction enriched-transactions
-rps_levels   : 1000 2500 5000 7500 10000
-case count   : 15
+scenarios    : concurrent-mixed-workload login create-transaction enriched-transactions
+rps_levels   : 100 200 300 400 500
+case count   : 20
 ```
 
 When one scenario needs a tighter load range than the others, use
@@ -729,26 +738,20 @@ make run-benchmark-suite \
   EXPERIMENT_NAME=rq1-fixed-primary \
   TEST_DURATION=5m \
   INTER_CASE_DELAY=120 \
-  SCENARIO_RPS_MATRIX="login:100,120,140,160,180,200;create-transaction:100,150,200,250,300,400,500;enriched-transactions:100,150,200,250,300,400,500" \
+  SCENARIO_RPS_MATRIX="concurrent-mixed-workload:100,200,300,400,500;login:100,200,300,400,500;create-transaction:100,200,300,400,500;enriched-transactions:100,200,300,400,500" \
   S3_BUCKET=skripsi-benchmark-results
 ```
 
 This keeps the executor and methodology consistent while letting each scenario
 use a more informative calibrated RPS range.
 
-For the final fixed primary matrix, interpret this choice as a conservative
-main run:
+For the final fixed matrix, keep all four scenarios on the same `100` to `500`
+RPS ladder. This makes Bab 4 tables easier to compare and keeps the diagnostic
+endpoint runs aligned with the composite workload.
 
-- `login` is capped at `200` RPS because the microservices login path usually
-  reaches its critical transition zone earlier than the other scenarios.
-- `create-transaction` and `enriched-transactions` continue to `500` RPS
-  because the higher range still yields useful separation between
-  architectures.
-- If the thesis needs stronger evidence that monolith login still has headroom
-  above `200` RPS, add a separate `login` extension run rather than changing
-  the primary matrix while measured attempts are already in progress.
-
-Recommended fixed `login` extension run:
+If calibration indicates that one endpoint needs a narrower or wider range,
+run it as a clearly labeled extension instead of changing the final matrix
+while measured attempts are already in progress. Example extension:
 
 ```bash
 make run-benchmark-suite \
@@ -789,8 +792,8 @@ make run-benchmark-suite \
   EXPERIMENT_NAME=rq2-hpa-final \
   TEST_DURATION=5m \
   INTER_CASE_DELAY=300 \
-  SCENARIOS="login create-transaction enriched-transactions" \
-  RPS_LEVELS="1000 2500 5000 7500 10000" \
+  SCENARIOS="concurrent-mixed-workload login create-transaction enriched-transactions" \
+  RPS_LEVELS="100 250 500" \
   S3_BUCKET=skripsi-benchmark-results
 ```
 
@@ -820,11 +823,11 @@ run_id       : eks-hpa-rq2-hpa-final
 attempt      : attempt-01, then attempt-02/03 when the same run_id is reused
 scaling_mode : hpa
 k6_profile   : hpa
-scenarios    : login create-transaction enriched-transactions
-rps_levels   : 1000 2500 5000 7500 10000
-case count   : 15
+scenarios    : concurrent-mixed-workload login create-transaction enriched-transactions
+rps_levels   : 100 250 500
+case count   : 12
 k6 duration  : ~13 minutes per case (HPA stages, not TEST_DURATION)
-suite time   : ~4.5 hours (15 cases × 13m + inter-case delays)
+suite time   : ~3.5 hours (12 cases × 13m + inter-case delays)
 ```
 
 ### Phase 6.4 — Calibration Matrix
