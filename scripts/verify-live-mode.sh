@@ -48,6 +48,7 @@ check_context_architecture() {
     for svc in auth-service item-service transaction-service api-gateway; do
       kubectl --context="$context" rollout status "deployment/${svc}" -n msa --timeout=30s
     done
+    check_msa_grpc_discovery "$context"
     app_pods="$(kubectl --context="$context" get pods -n msa -o json)"
   fi
 
@@ -55,6 +56,42 @@ check_context_architecture() {
     echo "ERROR: unable to verify scheduled application pods in context '$context'" >&2
     exit 1
   fi
+}
+
+secret_value() {
+  local context="$1"
+  local secret_name="$2"
+  local key="$3"
+
+  kubectl --context="$context" get secret "$secret_name" -n msa -o "jsonpath={.data.${key}}" | base64 --decode
+}
+
+check_secret_value() {
+  local context="$1"
+  local secret_name="$2"
+  local key="$3"
+  local expected="$4"
+  local actual
+
+  actual="$(secret_value "$context" "$secret_name" "$key")"
+  if [ "$actual" != "$expected" ]; then
+    echo "ERROR: expected $secret_name/$key to be '$expected' in context '$context', got '$actual'" >&2
+    echo "ERROR: rerun make env-init-app and recreate microservices secrets before benchmarking" >&2
+    exit 1
+  fi
+}
+
+check_msa_grpc_discovery() {
+  local context="$1"
+
+  kubectl --context="$context" get service auth-service-headless -n msa >/dev/null
+  kubectl --context="$context" get service item-service-headless -n msa >/dev/null
+  kubectl --context="$context" get service transaction-service-headless -n msa >/dev/null
+
+  check_secret_value "$context" api-gateway-secret AUTH_SERVICE_ADDR "dns:///auth-service-headless.msa.svc.cluster.local:50051"
+  check_secret_value "$context" api-gateway-secret ITEM_SERVICE_ADDR "dns:///item-service-headless.msa.svc.cluster.local:50052"
+  check_secret_value "$context" api-gateway-secret TRANSACTION_SERVICE_ADDR "dns:///transaction-service-headless.msa.svc.cluster.local:50053"
+  check_secret_value "$context" transaction-service-secret ITEM_SERVICE_ADDR "dns:///item-service-headless.msa.svc.cluster.local:50052"
 }
 
 case "$EXECUTION_MODE" in
@@ -76,4 +113,3 @@ case "$EXECUTION_MODE" in
 esac
 
 echo "Live mode verification passed: execution_mode=$EXECUTION_MODE scaling_mode=$SCALING_MODE"
-

@@ -208,6 +208,38 @@ image_tag=<pushed Docker Hub tag>
 If a result is missing these fields, treat it as invalid for final thesis
 analysis until the metadata path is fixed.
 
+## Microservices gRPC Service Discovery
+
+Microservices use gRPC for internal calls. On Kubernetes/VKE, the benchmark
+deployment exposes each gRPC backend through two Services:
+
+| Backend | Compatibility Service | Load-balanced gRPC target |
+|---|---|---|
+| Auth Service | `auth-service` | `auth-service-headless` |
+| Item Service | `item-service` | `item-service-headless` |
+| Transaction Service | `transaction-service` | `transaction-service-headless` |
+
+Application secrets should point gRPC clients at the headless Services with
+the `dns:///` resolver scheme:
+
+```text
+AUTH_SERVICE_ADDR=dns:///auth-service-headless.msa.svc.cluster.local:50051
+ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
+TRANSACTION_SERVICE_ADDR=dns:///transaction-service-headless.msa.svc.cluster.local:50053
+```
+
+Transaction Service uses the same pattern for its Item Service dependency:
+
+```text
+ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
+```
+
+API Gateway and Transaction Service configure gRPC `round_robin` client-side
+load balancing. This is needed because gRPC multiplexes RPCs over long-lived
+HTTP/2 connections; with a normal ClusterIP target, traffic can remain
+concentrated on the backend selected for that connection. Headless Services let
+the gRPC DNS resolver see the ready pod IPs directly.
+
 ## Guardrails
 
 The Vultr integration should fail rather than silently continue when:
@@ -217,6 +249,7 @@ The Vultr integration should fail rather than silently continue when:
 - `env/vultr-resource-baseline.env` is missing before manifest rendering
 - Vultr-rendered manifests still contain ECR image references
 - AWS S3 credentials are missing from the k6 secret path
+- microservices gRPC secrets still point at non-headless ClusterIP service DNS
 - fixed/HPA live mode does not match requested benchmark mode
 - destroy is attempted without `S3_BENCHMARK_DATA_VERIFIED=true`
 

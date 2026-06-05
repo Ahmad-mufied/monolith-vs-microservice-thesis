@@ -177,9 +177,9 @@ create_secret_from_pairs msa api-gateway-secret \
   HTTP_PORT "${api_gateway_http_port:-8080}" \
   SERVICE_NAME "${api_gateway_service_name:-api-gateway}" \
   JWT_SECRET "$api_gateway_jwt_secret" \
-  AUTH_SERVICE_ADDR "${api_gateway_auth_service_addr:-auth-service.msa.svc.cluster.local:50051}" \
-  ITEM_SERVICE_ADDR "${api_gateway_item_service_addr:-item-service.msa.svc.cluster.local:50052}" \
-  TRANSACTION_SERVICE_ADDR "${api_gateway_transaction_service_addr:-transaction-service.msa.svc.cluster.local:50053}"
+  AUTH_SERVICE_ADDR "${api_gateway_auth_service_addr:-dns:///auth-service-headless.msa.svc.cluster.local:50051}" \
+  ITEM_SERVICE_ADDR "${api_gateway_item_service_addr:-dns:///item-service-headless.msa.svc.cluster.local:50052}" \
+  TRANSACTION_SERVICE_ADDR "${api_gateway_transaction_service_addr:-dns:///transaction-service-headless.msa.svc.cluster.local:50053}"
 
 create_secret_from_pairs msa auth-service-secret \
   APP_ENV "${auth_service_app_env:-production}" \
@@ -200,7 +200,7 @@ create_secret_from_pairs msa transaction-service-secret \
   GRPC_PORT "${transaction_service_grpc_port:-50053}" \
   SERVICE_NAME "${transaction_service_name:-transaction-service}" \
   DATABASE_URL "postgres://postgres_admin:${encoded_db_password}@${sequential_rds}:5432/transaction_db?sslmode=require" \
-  ITEM_SERVICE_ADDR "${transaction_service_item_service_addr:-item-service.msa.svc.cluster.local:50052}"
+  ITEM_SERVICE_ADDR "${transaction_service_item_service_addr:-dns:///item-service-headless.msa.svc.cluster.local:50052}"
 
 create_secret_from_pairs benchmark k6-runner-secret \
   ADMIN_USER_EMAIL "$admin_user_email" \

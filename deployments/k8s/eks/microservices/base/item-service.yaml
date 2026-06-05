@@ -116,3 +116,17 @@ spec:
     - name: grpc
       port: 50052
       targetPort: grpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: item-service-headless
+  namespace: msa
+spec:
+  clusterIP: None
+  selector:
+    app: item-service
+  ports:
+    - name: grpc
+      port: 50052
+      targetPort: grpc

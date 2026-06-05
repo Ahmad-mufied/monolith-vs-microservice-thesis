@@ -400,6 +400,38 @@ make env-init-app
 make env-init-vultr
 ```
 
+Microservices gRPC addresses should use the headless Kubernetes Services and
+the gRPC DNS resolver scheme:
+
+```text
+AUTH_SERVICE_ADDR=dns:///auth-service-headless.msa.svc.cluster.local:50051
+ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
+TRANSACTION_SERVICE_ADDR=dns:///transaction-service-headless.msa.svc.cluster.local:50053
+```
+
+Transaction Service also calls Item Service through the headless target:
+
+```text
+ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
+```
+
+The normal ClusterIP Services remain available for compatibility and manual
+debugging, but benchmark traffic should use the headless addresses. gRPC keeps
+long-lived HTTP/2 connections; using `dns:///` plus client-side `round_robin`
+lets API Gateway and Transaction Service distribute RPCs across ready backend
+pod IPs after HPA scale-out.
+
+If existing `env/*.app.env` files still contain the older ClusterIP addresses,
+rerun:
+
+```bash
+make env-init-app
+make vultr-create-secrets
+```
+
+For sequential mode, use `make vultr-create-secrets-sequential` instead of
+`make vultr-create-secrets`.
+
 Validation:
 
 ```bash
