@@ -54,6 +54,12 @@ case "$OPERATOR_SSH_PUBLIC_KEY" in
   *) echo "OPERATOR_SSH_PUBLIC_KEY must be a real SSH public key" >&2; exit 1 ;;
 esac
 
+vultr_app_node_count="${VULTR_APP_NODE_COUNT:-1}"
+if ! [[ "$vultr_app_node_count" =~ ^[1-9][0-9]*$ ]]; then
+  echo "VULTR_APP_NODE_COUNT must be a positive whole number" >&2
+  exit 1
+fi
+
 operator_cidrs_hcl="$(format_hcl_list "$OPERATOR_CIDRS")"
 vpc_cidr="${VULTR_VPC_CIDR:-10.20.0.0/16}"
 vpc_subnet="${vpc_cidr%/*}"
@@ -74,9 +80,10 @@ region                    = "${VULTR_REGION:-sgp}"
 kubernetes_version        = "${VULTR_KUBERNETES_VERSION:-v1.33.0+1}"
 monolith_cluster_name     = "${VULTR_MONOLITH_CLUSTER_NAME:-skripsi-vultr-monolith}"
 msa_cluster_name          = "${VULTR_MSA_CLUSTER_NAME:-skripsi-vultr-msa}"
-app_node_plan             = "${VULTR_APP_NODE_PLAN:-voc-c-16c-32gb-300s}"
-testing_node_plan         = "${VULTR_TESTING_NODE_PLAN:-vc2-4c-8gb}"
-postgres_plan             = "${VULTR_POSTGRES_PLAN:-vc2-4c-8gb}"
+app_node_plan             = "${VULTR_APP_NODE_PLAN:-voc-c-8c-16gb-150s-amd}"
+app_node_count            = ${vultr_app_node_count}
+testing_node_plan         = "${VULTR_TESTING_NODE_PLAN:-vc2-2c-4gb}"
+postgres_plan             = "${VULTR_POSTGRES_PLAN:-voc-c-2c-4gb-50s-amd}"
 postgres_os_id            = ${VULTR_POSTGRES_OS_ID:-1743}
 EOF
 
@@ -85,9 +92,10 @@ project                   = "${PROJECT:-skripsi}"
 region                    = "${VULTR_REGION:-sgp}"
 kubernetes_version        = "${VULTR_KUBERNETES_VERSION:-v1.33.0+1}"
 sequential_cluster_name   = "${VULTR_SEQUENTIAL_CLUSTER_NAME:-skripsi-vultr-benchmark}"
-app_node_plan             = "${VULTR_APP_NODE_PLAN:-voc-c-16c-32gb-300s}"
-testing_node_plan         = "${VULTR_TESTING_NODE_PLAN:-vc2-4c-8gb}"
-postgres_plan             = "${VULTR_POSTGRES_PLAN:-vc2-4c-8gb}"
+app_node_plan             = "${VULTR_APP_NODE_PLAN:-voc-c-8c-16gb-150s-amd}"
+app_node_count            = ${vultr_app_node_count}
+testing_node_plan         = "${VULTR_TESTING_NODE_PLAN:-vc2-2c-4gb}"
+postgres_plan             = "${VULTR_POSTGRES_PLAN:-voc-c-2c-4gb-50s-amd}"
 postgres_os_id            = ${VULTR_POSTGRES_OS_ID:-1743}
 EOF
 

@@ -9,7 +9,7 @@ spec:
     kind: Deployment
     name: auth-service
   minReplicas: 1
-  maxReplicas: 2
+  maxReplicas: 4
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 60

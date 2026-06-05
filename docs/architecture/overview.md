@@ -572,13 +572,13 @@ Vultr Region: sgp (Singapore)
 
 Vultr Legacy VPC (10.20.0.0/16)
 ├── VKE: skripsi-vultr-monolith
-│   ├── app-nodes (2 x voc-c-16c-32gb-300s)  -> mono namespace
-│   ├── testing-nodes (1 x vc2-4c-8gb)        -> benchmark namespace
+│   ├── app-nodes (1 x voc-c-8c-16gb-150s-amd) -> mono namespace
+│   ├── testing-nodes (1 x vc2-2c-4gb)         -> benchmark namespace
 │   └── PostgreSQL VM                          -> mono_db
 │
 └── VKE: skripsi-vultr-msa
-    ├── app-nodes (2 x voc-c-16c-32gb-300s)  -> msa namespace
-    ├── testing-nodes (1 x vc2-4c-8gb)        -> benchmark namespace
+    ├── app-nodes (1 x voc-c-8c-16gb-150s-amd) -> msa namespace
+    ├── testing-nodes (1 x vc2-2c-4gb)         -> benchmark namespace
     └── PostgreSQL VM                          -> auth_db, item_db, transaction_db
 
 External services:
@@ -594,8 +594,8 @@ Vultr Region: sgp (Singapore)
 
 Vultr Legacy VPC (10.20.0.0/16)
 └── VKE: skripsi-vultr-benchmark
-    ├── app-nodes (2 x voc-c-16c-32gb-300s)  -> one active architecture at a time
-    ├── testing-nodes (1 x vc2-4c-8gb)        -> benchmark namespace
+    ├── app-nodes (1 x voc-c-8c-16gb-150s-amd) -> one active architecture at a time
+    ├── testing-nodes (1 x vc2-2c-4gb)         -> benchmark namespace
     └── PostgreSQL VM                          -> mono_db, auth_db, item_db, transaction_db
 
 Sequential phase 1:
@@ -617,10 +617,10 @@ The application resource ceiling is designed to keep the comparison fair.
 Monolith:
 
 ```text
-CPU ceiling      : 15800m
-Memory ceiling   : 27648Mi
-fixed            : 2 pods x (3950m request / 7900m limit, 6912Mi request / 13824Mi limit)
-hpa              : 2 to 4 pods x (1975m request / 3950m limit, 3456Mi request / 6912Mi limit)
+CPU ceiling      : 7800m
+Memory ceiling   : 15360Mi
+fixed            : 1 pod x (3900m request / 7800m limit, 7680Mi request / 15360Mi limit)
+hpa              : 1 to 4 pods x (970m request / 1950m limit, 1920Mi request / 3840Mi limit)
 maxReplicas      : 4
 HPA target CPU   : 70%
 ```
@@ -628,32 +628,19 @@ HPA target CPU   : 70%
 Microservices:
 
 ```text
-Namespace CPU ceiling    : 15800m
-Namespace memory ceiling : 27648Mi
-fixed api-gateway        : request 500m / limit 2000m / 864Mi / 3456Mi
-fixed auth-service       : request 1500m / limit 4000m / 2592Mi / 6912Mi
-fixed item-service       : request 1000m / limit 3000m / 1728Mi / 5184Mi
-fixed transaction-service: request 2000m / limit 6800m / 3456Mi / 12096Mi
-hpa api-gateway          : request 250m / limit 500m / 432Mi / 864Mi
-hpa auth-service         : request 500m / limit 1000m / 864Mi / 1728Mi
-hpa item-service         : request 250m / limit 500m / 432Mi / 864Mi
-hpa transaction-service  : request 850m / limit 1700m / 1512Mi / 3024Mi
+Namespace CPU ceiling    : 7800m
+Namespace memory ceiling : 15360Mi
+fixed per service        : request 980m / limit 1950m / 1920Mi / 3840Mi
+hpa per service          : request 500m / limit 975m / 960Mi / 1920Mi
 minReplicas per service  : 1
+maxReplicas per service  : 4
+shared HPA headroom      : 4 additional pods across the namespace
 HPA target CPU           : 70%
 ```
 
-Role-aware HPA maxReplicas:
-
-```text
-api-gateway         : 4
-auth-service        : 4
-item-service        : 6
-transaction-service : 4
-```
-
-This keeps fairness at the shared namespace ceiling while allowing
-hotspot services, especially `auth-service`, to consume more of the
-remaining headroom in HPA mode.
+The active Vultr benchmark path uses an equal per-service split rather than
+role-aware service budgets because the study does not have a separate
+empirical profiling dataset to justify asymmetric service ceilings.
 
 ---
 

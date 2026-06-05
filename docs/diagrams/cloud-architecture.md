@@ -185,8 +185,8 @@ flowchart TB
 
     subgraph parallel["Parallel stack: infra/terraform/vultr-parallel"]
       subgraph monoCluster["VKE: skripsi-vultr-monolith"]
-        monoAppNodes["app-nodes<br/>2 x voc-c-16c-32gb-300s<br/>node-group=app"]
-        monoTesting["testing-nodes<br/>1 x vc2-4c-8gb<br/>node-group=testing<br/>taint workload=benchmark"]
+        monoAppNodes["app-nodes<br/>1 x voc-c-8c-16gb-150s-amd<br/>node-group=app"]
+        monoTesting["testing-nodes<br/>1 x vc2-2c-4gb<br/>node-group=testing<br/>taint workload=benchmark"]
         monoNs["namespace: mono<br/>monolith pod(s)"]
         monoBench["namespace: benchmark<br/>k6 runner job"]
         monoDD["Datadog Agent DaemonSet"]
@@ -195,8 +195,8 @@ flowchart TB
       monoPg["Vultr Compute VM<br/>PostgreSQL 18<br/>mono_db"]
 
       subgraph msaCluster["VKE: skripsi-vultr-msa"]
-        msaAppNodes["app-nodes<br/>2 x voc-c-16c-32gb-300s<br/>node-group=app"]
-        msaTesting["testing-nodes<br/>1 x vc2-4c-8gb<br/>node-group=testing<br/>taint workload=benchmark"]
+        msaAppNodes["app-nodes<br/>1 x voc-c-8c-16gb-150s-amd<br/>node-group=app"]
+        msaTesting["testing-nodes<br/>1 x vc2-2c-4gb<br/>node-group=testing<br/>taint workload=benchmark"]
         msaNs["namespace: msa<br/>api-gateway, auth-service,<br/>item-service, transaction-service"]
         msaBench["namespace: benchmark<br/>k6 runner job"]
         msaDD["Datadog Agent DaemonSet"]
@@ -248,8 +248,8 @@ flowchart TB
 
     subgraph sequential["Sequential stack: infra/terraform/vultr-sequential"]
       subgraph benchmarkCluster["VKE: skripsi-vultr-benchmark"]
-        appPool["app-nodes<br/>2 x voc-c-16c-32gb-300s<br/>node-group=app"]
-        testPool["testing-nodes<br/>1 x vc2-4c-8gb<br/>node-group=testing<br/>taint workload=benchmark"]
+        appPool["app-nodes<br/>1 x voc-c-8c-16gb-150s-amd<br/>node-group=app"]
+        testPool["testing-nodes<br/>1 x vc2-2c-4gb<br/>node-group=testing<br/>taint workload=benchmark"]
         monoNs["namespace: mono<br/>active during monolith phase"]
         msaNs["namespace: msa<br/>active during MSA phase"]
         benchNs["namespace: benchmark<br/>k6 + bootstrap jobs"]

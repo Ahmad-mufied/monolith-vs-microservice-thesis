@@ -30,7 +30,7 @@ Vultr official references used by this design:
 ```text
 Provider                : Vultr
 Kubernetes              : VKE
-Application nodes       : 2 x high-vCPU app nodes per active architecture
+Application nodes       : 1 x high-vCPU app node per active architecture
 Testing nodes           : 1 x dedicated k6 node per active architecture
 Database                : PostgreSQL 18 on separate Vultr Compute VM
 Container registry      : Docker Hub public
@@ -90,12 +90,12 @@ Vultr region: sgp
   | context: monolith                 |     | context: msa                      |
   |                                   |     |                                   |
   | app node pool                     |     | app node pool                     |
-  | - 2 x voc-c-16c-32gb-300s         |     | - 2 x voc-c-16c-32gb-300s         |
+  | - 1 x voc-c-8c-16gb-150s-amd      |     | - 1 x voc-c-8c-16gb-150s-amd      |
   | - label role=app                  |     | - label role=app                  |
   | - namespace mono                  |     | - namespace msa                   |
   |                                   |     |                                   |
   | testing node pool                 |     | testing node pool                 |
-  | - 1 x vc2-4c-8gb                  |     | - 1 x vc2-4c-8gb                  |
+  | - 1 x vc2-2c-4gb                  |     | - 1 x vc2-2c-4gb                  |
   | - label role=testing              |     | - label role=testing              |
   | - taint dedicated=testing:NoSchedule|   | - taint dedicated=testing:NoSchedule|
   | - namespace benchmark             |     | - namespace benchmark             |
@@ -138,13 +138,13 @@ Vultr region: sgp
   | context: benchmark                                          |
   |                                                             |
   | app node pool                                               |
-  | - 2 x voc-c-16c-32gb-300s                                   |
+  | - 1 x voc-c-8c-16gb-150s-amd                                |
   | - label role=app                                            |
   | - namespace mono active during monolith phase                |
   | - namespace msa active during microservices phase            |
   |                                                             |
   | testing node pool                                           |
-  | - 1 x vc2-4c-8gb                                            |
+  | - 1 x vc2-2c-4gb                                            |
   | - label role=testing                                        |
   | - taint dedicated=testing:NoSchedule                        |
   | - namespace benchmark                                       |
@@ -186,17 +186,22 @@ Network rules:
 Default app node shape:
 
 ```text
-VULTR_APP_NODE_PLAN=voc-c-16c-32gb-300s
-VULTR_APP_NODE_COUNT=2
+VULTR_APP_NODE_PLAN=voc-c-8c-16gb-150s-amd
+VULTR_APP_NODE_COUNT=1
 ```
 
 Default per active architecture:
 
 ```text
-app capacity nominal   : 32 vCPU, 64 GiB
-testing capacity       : 1 x vc2-4c-8gb
-PostgreSQL capacity    : 1 x vc2-4c-8gb
+app capacity nominal   : 8 vCPU, 16 GiB
+testing capacity       : 1 x vc2-2c-4gb
+PostgreSQL capacity    : 1 x voc-c-2c-4gb-50s-amd
 ```
+
+The single app node shape is chosen for benchmark scheduling stability. It
+keeps the nominal app capacity close to the previous two-node 4c/8GB topology
+while avoiding pod packing fragmentation across two smaller nodes. This is a
+benchmark reproducibility choice, not a high-availability design.
 
 The Kubernetes allocatable capacity is measured after cluster creation because
 nominal plan capacity is not the same as schedulable capacity. The measured

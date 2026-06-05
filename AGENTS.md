@@ -724,43 +724,59 @@ Use IAM roles, IRSA, EKS Pod Identity, Kubernetes Secrets, or external secret ma
 
 ## Resource and HPA Rules
 
-Application CPU ceiling:
+On Vultr single-node deployments, manifest resource values are rendered
+dynamically by `scripts/render-vultr-manifests.sh` based on live node
+measurement. The resource profile used is `vultr-equal-split`: fixed mode uses
+equal per-service allocation, while HPA mode uses equal per-pod baselines with
+shared namespace headroom.
 
-- monolith: 15800m
-- microservices namespace: 15800m
+Reference ceiling (AWS EKS baseline used as render denominator):
 
-Application memory ceiling:
+- monolith: 15800m CPU / 27648Mi memory
+- microservices namespace: 15800m CPU / 27648Mi memory
 
-- monolith: 27648Mi
-- microservices namespace: 27648Mi
+Vultr single-node equal-split values (post-render):
 
 Monolith pod:
 
-- fixed mode: 2 pods, each 3950m request / 7900m limit and 6912Mi request / 13824Mi limit
-- hpa mode: 2 to 4 pods, each 1975m request / 3950m limit and 3456Mi request / 6912Mi limit
+- fixed mode: 1 pod, request ~3900m / limit ~7800m CPU, request ~7680Mi / limit ~15360Mi memory
+- hpa mode: 1 to 4 pods, each request ~970m / limit ~1950m CPU, request ~1920Mi / limit ~3840Mi memory
 - maxReplicas: 4
 - HPA target CPU utilization: 70%
 
-Microservices pod per service:
+Microservices pod per service (all services equal):
 
-- fixed mode:
-  api-gateway: 500m request / 2000m limit and 864Mi request / 3456Mi limit
-  auth-service: 1500m request / 4000m limit and 2592Mi request / 6912Mi limit
-  item-service: 1000m request / 3000m limit and 1728Mi request / 5184Mi limit
-  transaction-service: 2000m request / 6800m limit and 3456Mi request / 12096Mi limit
-- hpa mode:
-  api-gateway: 250m request / 500m limit and 432Mi request / 864Mi limit, maxReplicas 4
-  auth-service: 500m request / 1000m limit and 864Mi request / 1728Mi limit, maxReplicas 4
-  item-service: 250m request / 500m limit and 432Mi request / 864Mi limit, maxReplicas 6
-  transaction-service: 850m request / 1700m limit and 1512Mi request / 3024Mi limit, maxReplicas 4
+- fixed mode (all 4 services identical):
+  cpu request: 980m / cpu limit: 1950m
+  memory request: 1920Mi / memory limit: 3840Mi
+  replicas: 1
+- hpa mode (all 4 services identical):
+  cpu request: 500m / cpu limit: 975m
+  memory request: 960Mi / memory limit: 1920Mi
+  minReplicas: 1 / maxReplicas: 4
 - HPA target CPU utilization: 70%
 
-Microservices namespace ResourceQuota:
+Fixed-mode budget verification:
 
-- CPU max: 15800m
-- memory max: 27648Mi
+  4 services × 1950m   = 7800m  CPU  (matches ceiling)
+  4 services × 3840Mi  = 15360Mi memory (matches ceiling)
 
-This allows a focused service to scale up under targeted load while keeping the total microservices resource budget aligned with the monolith architecture ceiling.
+HPA shared-headroom interpretation:
+
+  min state  = 4 services × 1 pod × 975m   = 3900m CPU limit
+  min state  = 4 services × 1 pod × 1920Mi = 7680Mi memory limit
+  headroom   = 3900m CPU / 7680Mi memory
+  burst room = 4 additional equal-size pods before hitting the namespace ceiling
+
+Microservices namespace ResourceQuota (Vultr, rendered from live measurement):
+
+- CPU max: equal to measured VULTR_APP_CPU_QUOTA (~7800m)
+- memory max: equal to measured VULTR_APP_MEMORY_QUOTA (~15360Mi)
+
+Resource allocation method: uniform per-service allocation baseline for fixed
+mode, and uniform per-pod baseline with shared namespace headroom for HPA
+mode. This approach was chosen because no empirical per-service profiling data
+was available to justify role-aware allocation. See docs/experiment/scaling-mode-strategy.md for rationale.
 
 Do not add KEDA, Prometheus Adapter custom metrics, VPA, Cluster Autoscaler, or Karpenter unless explicitly requested.
 

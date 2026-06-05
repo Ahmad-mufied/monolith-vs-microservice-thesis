@@ -19,6 +19,7 @@ check_context_architecture() {
 
   kubectl --context="$context" get nodes -l node-group=app >/dev/null
   kubectl --context="$context" get nodes -l node-group=testing >/dev/null
+  check_app_node_count "$context"
 
   if [ "$architecture" = "monolith" ]; then
     if kubectl --context="$context" get hpa monolith -n mono >/dev/null 2>&1; then
@@ -31,6 +32,11 @@ check_context_architecture() {
     if [ "$SCALING_MODE" = "fixed" ] && [ "$mono_hpa_present" -ne 0 ]; then
       echo "ERROR: found stale monolith HPA in fixed mode in context '$context'" >&2
       exit 1
+    fi
+    if [ "$SCALING_MODE" = "fixed" ]; then
+      check_deployment_replicas "$context" mono monolith 1
+    else
+      check_hpa_replicas "$context" mono monolith 1 4
     fi
     kubectl --context="$context" rollout status deployment/monolith -n mono --timeout=30s
     app_pods="$(kubectl --context="$context" get pods -n mono -l app=monolith -o json)"
@@ -46,6 +52,9 @@ check_context_architecture() {
       exit 1
     fi
     for svc in auth-service item-service transaction-service api-gateway; do
+      if [ "$SCALING_MODE" = "fixed" ]; then
+        check_deployment_replicas "$context" msa "$svc" 1
+      fi
       kubectl --context="$context" rollout status "deployment/${svc}" -n msa --timeout=30s
     done
     check_msa_grpc_discovery "$context"
@@ -54,6 +63,56 @@ check_context_architecture() {
 
   if ! jq -e '.items[] | select(.spec.nodeSelector["node-group"] == "app" or (.spec.nodeName | length > 0))' >/dev/null <<<"$app_pods"; then
     echo "ERROR: unable to verify scheduled application pods in context '$context'" >&2
+    exit 1
+  fi
+}
+
+check_app_node_count() {
+  local context="$1"
+  local expected="${VULTR_EXPECTED_APP_NODE_COUNT:-}"
+  local actual
+
+  [ -n "$expected" ] || return 0
+  if ! [[ "$expected" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: VULTR_EXPECTED_APP_NODE_COUNT must be a positive whole number" >&2
+    exit 1
+  fi
+
+  actual="$(kubectl --context="$context" get nodes -l node-group=app --no-headers | wc -l | tr -d '[:space:]')"
+  if [ "$actual" != "$expected" ]; then
+    echo "ERROR: expected $expected app node(s) in context '$context', found $actual" >&2
+    exit 1
+  fi
+}
+
+check_deployment_replicas() {
+  local context="$1"
+  local namespace="$2"
+  local deployment="$3"
+  local expected="$4"
+  local actual
+
+  actual="$(kubectl --context="$context" get deployment "$deployment" -n "$namespace" -o jsonpath='{.spec.replicas}')"
+  actual="${actual:-0}"
+  if [ "$actual" != "$expected" ]; then
+    echo "ERROR: expected deployment/${deployment} in namespace '$namespace' to have replicas=$expected in context '$context', got $actual" >&2
+    exit 1
+  fi
+}
+
+check_hpa_replicas() {
+  local context="$1"
+  local namespace="$2"
+  local hpa="$3"
+  local expected_min="$4"
+  local expected_max="$5"
+  local actual_min actual_max
+
+  actual_min="$(kubectl --context="$context" get hpa "$hpa" -n "$namespace" -o jsonpath='{.spec.minReplicas}')"
+  actual_max="$(kubectl --context="$context" get hpa "$hpa" -n "$namespace" -o jsonpath='{.spec.maxReplicas}')"
+  actual_min="${actual_min:-1}"
+  if [ "$actual_min" != "$expected_min" ] || [ "$actual_max" != "$expected_max" ]; then
+    echo "ERROR: expected hpa/${hpa} in namespace '$namespace' to have min=$expected_min max=$expected_max in context '$context', got min=$actual_min max=$actual_max" >&2
     exit 1
   fi
 }

@@ -26,7 +26,7 @@ for PostgreSQL. The active implementation uses Vultr instead, for these reasons:
 | Container Registry | Amazon ECR | Docker Hub Public |
 | Cost model | EKS control plane fee + EC2 + RDS | VKE included + Compute instances |
 | Complexity | VPC, subnets, NAT, security groups, IAM | Legacy VPC, firewall group, SSH key |
-| Dedicated CPU | c8i.2xlarge (expensive) | voc-c-16c-32gb-300s (cost-effective) |
+| Dedicated CPU | c8i.2xlarge (expensive) | voc-c-8c-16gb-150s-amd (single app node) |
 | Provisioning | Terraform AWS provider | Terraform Vultr provider |
 
 The Vultr path provides sufficient CPU capacity for high-throughput benchmark
@@ -42,8 +42,8 @@ This table shows what Vultr provides and what remains with external services:
 | Component | Provider | Service/Resource |
 |---|---|---|
 | Kubernetes cluster | **Vultr** | Vultr Kubernetes Engine (VKE) |
-| Application nodes | **Vultr** | VKE node pool (voc-c-16c-32gb-300s) |
-| Testing nodes (k6) | **Vultr** | VKE node pool (vc2-4c-8gb) |
+| Application nodes | **Vultr** | VKE node pool (voc-c-8c-16gb-150s-amd) |
+| Testing nodes (k6) | **Vultr** | VKE node pool (vc2-2c-4gb) |
 | PostgreSQL database | **Vultr** | Vultr Compute VM (self-managed) |
 | Private networking | **Vultr** | Legacy VPC Network (10.20.0.0/16) |
 | Firewall rules | **Vultr** | Vultr Firewall Group |
@@ -84,8 +84,8 @@ flowchart LR
 Provider                : Vultr
 Region                  : sgp (Singapore)
 Kubernetes              : Vultr Kubernetes Engine (VKE) v1.33.0+1
-Application nodes       : 2 x voc-c-16c-32gb-300s per active architecture
-Testing nodes           : 1 x vc2-4c-8gb per active architecture
+Application nodes       : 1 x voc-c-8c-16gb-150s-amd per active architecture
+Testing nodes           : 1 x vc2-2c-4gb per active architecture
 Database                : PostgreSQL 18 on Vultr Compute VM (self-managed)
 Container registry      : Docker Hub public
 Benchmark result store  : AWS S3
@@ -99,16 +99,16 @@ Networking              : Legacy Vultr VPC (not VPC 2.0)
 
 | Resource | Plan | vCPU | RAM | Storage | Type |
 |---|---|---|---|---|---|
-| App nodes | voc-c-16c-32gb-300s | 16 | 32 GB | 300 GB NVMe | Dedicated CPU |
-| Testing nodes | vc2-4c-8gb | 4 | 8 GB | — | Shared CPU |
-| PostgreSQL VMs | vc2-4c-8gb | 4 | 8 GB | — | Shared CPU |
+| App node | voc-c-8c-16gb-150s-amd | 8 | 16 GB | 150 GB NVMe | Dedicated CPU |
+| Testing node | vc2-2c-4gb | 2 | 4 GB | — | Shared CPU |
+| PostgreSQL VM | voc-c-2c-4gb-50s-amd | 2 | 4 GB | 50 GB NVMe | Dedicated CPU |
 
 Per-architecture nominal capacity:
 
 ```text
-App nodes       : 2 x 16 vCPU = 32 vCPU, 2 x 32 GB = 64 GB RAM
-Testing nodes   : 1 x 4 vCPU = 4 vCPU, 8 GB RAM
-PostgreSQL VM   : 1 x 4 vCPU = 4 vCPU, 8 GB RAM
+App node        : 1 x 8 vCPU = 8 vCPU, 16 GB RAM
+Testing node    : 1 x 2 vCPU = 2 vCPU, 4 GB RAM
+PostgreSQL VM   : 1 x 2 vCPU = 2 vCPU, 4 GB RAM
 ```
 
 ---
@@ -187,13 +187,13 @@ Creates:
 
 ```text
 VKE: skripsi-vultr-monolith
-  ├── app-nodes: 2 x voc-c-16c-32gb-300s
-  ├── testing-nodes: 1 x vc2-4c-8gb
+  ├── app-nodes: 1 x voc-c-8c-16gb-150s-amd
+  ├── testing-nodes: 1 x vc2-2c-4gb
   └── PostgreSQL VM: mono_db
 
 VKE: skripsi-vultr-msa
-  ├── app-nodes: 2 x voc-c-16c-32gb-300s
-  ├── testing-nodes: 1 x vc2-4c-8gb
+  ├── app-nodes: 1 x voc-c-8c-16gb-150s-amd
+  ├── testing-nodes: 1 x vc2-2c-4gb
   └── PostgreSQL VM: auth_db, item_db, transaction_db
 ```
 
@@ -211,8 +211,8 @@ Creates:
 
 ```text
 VKE: skripsi-vultr-benchmark
-  ├── app-nodes: 2 x voc-c-16c-32gb-300s
-  ├── testing-nodes: 1 x vc2-4c-8gb
+  ├── app-nodes: 1 x voc-c-8c-16gb-150s-amd
+  ├── testing-nodes: 1 x vc2-2c-4gb
   └── PostgreSQL VM: mono_db, auth_db, item_db, transaction_db
 ```
 
@@ -404,12 +404,12 @@ Each VKE cluster contains two node pools:
 ```text
 VKE Cluster
 ├── App Node Pool (node-group=app)
-│   ├── 2 x voc-c-16c-32gb-300s
+│   ├── 1 x voc-c-8c-16gb-150s-amd
 │   ├── Label: node-group=app
 │   └── Runs: application pods (mono or msa namespace)
 │
 └── Testing Node Pool (node-group=testing)
-    ├── 1 x vc2-4c-8gb
+    ├── 1 x vc2-2c-4gb
     ├── Label: node-group=testing
     ├── Taint: workload=benchmark:NoSchedule
     └── Runs: k6 runner jobs (benchmark namespace)
@@ -476,12 +476,11 @@ VKE: skripsi-vultr-benchmark
 flowchart TB
   subgraph vke["VKE Cluster"]
     subgraph app_pool["App Node Pool"]
-      node1["Node 1<br/>voc-c-16c-32gb-300s<br/>16 vCPU / 32 GB"]
-      node2["Node 2<br/>voc-c-16c-32gb-300s<br/>16 vCPU / 32 GB"]
+      node1["Node 1<br/>voc-c-8c-16gb-150s-amd<br/>8 vCPU / 16 GB"]
     end
 
     subgraph test_pool["Testing Node Pool"]
-      node3["Node 3<br/>vc2-4c-8gb<br/>4 vCPU / 8 GB"]
+      node3["Node 2<br/>vc2-2c-4gb<br/>2 vCPU / 4 GB"]
     end
   end
 
@@ -570,19 +569,19 @@ Output example:
 ```text
 VULTR_RESOURCE_BASELINE_PROVIDER=vultr
 VULTR_REGION=sgp
-VULTR_APP_NODE_PLAN=voc-c-16c-32gb-300s
-VULTR_APP_CPU_QUOTA=31500m
-VULTR_APP_MEMORY_QUOTA=55200Mi
-VULTR_APP_NODE_COUNT=2
-VULTR_APP_ALLOCATABLE_CPU=32000m
-VULTR_APP_ALLOCATABLE_MEMORY=57248Mi
-VULTR_RESOURCE_SAFETY_CPU=500m
-VULTR_RESOURCE_SAFETY_MEMORY=2048Mi
+VULTR_APP_NODE_PLAN=voc-c-8c-16gb-150s-amd
+VULTR_APP_CPU_QUOTA=7800m
+VULTR_APP_MEMORY_QUOTA=15360Mi
+VULTR_APP_NODE_COUNT=1
+VULTR_APP_ALLOCATABLE_CPU=7800m
+VULTR_APP_ALLOCATABLE_MEMORY=15800Mi
+VULTR_RESOURCE_SAFETY_CPU=0m
+VULTR_RESOURCE_SAFETY_MEMORY=110Mi
 ```
 
 ### 10.3 Why Measurement-Derived?
 
-Nominal plan capacity (e.g., 32 vCPU) is not the same as Kubernetes schedulable
+Nominal plan capacity (e.g., 8 vCPU) is not the same as Kubernetes schedulable
 capacity. The kubelet, system processes, and Kubernetes components consume some
 CPU and memory. Using nominal values would cause ResourceQuota to exceed actual
 capacity, leading to pod scheduling failures.
@@ -597,8 +596,28 @@ env/vultr-resource-baseline.env
     ↓
 scripts/render-vultr-manifests.sh
     ↓
-ResourceQuota in mono namespace:  CPU=31500m, Memory=55200Mi
-ResourceQuota in msa namespace:   CPU=31500m, Memory=55200Mi
+ResourceQuota in mono namespace:  CPU=7800m, Memory=15360Mi
+ResourceQuota in msa namespace:   CPU=7800m, Memory=15360Mi
+```
+
+For the active Vultr benchmark path, the repository documentation treats
+`7800m CPU / 15360Mi memory` as the final shared architecture ceiling.
+
+Inside the microservices architecture, the final documentation path uses
+**equal split** across the four services rather than role-aware service
+budgets. Each service therefore carries a ceiling of:
+
+```text
+1950m CPU / 3840Mi memory
+```
+
+The HPA path preserves the same service-level ceiling by dividing each service
+budget across at most two replicas:
+
+```text
+975m CPU / 1920Mi memory per pod
+minReplicas = 1
+maxReplicas = 2
 ```
 
 ---
@@ -830,7 +849,7 @@ flowchart TB
 
 **Requirements:**
 
-- Sufficient Vultr instance quota (4 app nodes + 2 testing nodes + 2 PG VMs)
+- Sufficient Vultr instance quota (2 app nodes + 2 testing nodes + 2 PG VMs)
 - Higher cost
 
 ### 14.2 Sequential Mode (Fallback)
@@ -875,8 +894,8 @@ flowchart TB
 Application runs with fixed replica count, no autoscaling.
 
 ```text
-Monolith: 2 pods (fixed)
-Microservices: api-gateway=2, auth-service=2, item-service=2, transaction-service=2
+Monolith: 1 pod (fixed)
+Microservices: api-gateway=1, auth-service=1, item-service=1, transaction-service=1
 ```
 
 ### 15.2 HPA Mode
@@ -884,12 +903,12 @@ Microservices: api-gateway=2, auth-service=2, item-service=2, transaction-servic
 Application uses Kubernetes Horizontal Pod Autoscaler.
 
 ```text
-Monolith: 2-4 pods, HPA target CPU 70%
+Monolith: 1-4 pods, HPA target CPU 70%
 Microservices:
-  api-gateway: 2-5 pods
-  auth-service: 2-2 pods
-  item-service: 2-5 pods
-  transaction-service: 2-2 pods
+  api-gateway: 1-5 pods
+  auth-service: 1-2 pods
+  item-service: 1-5 pods
+  transaction-service: 1-2 pods
   HPA target CPU: 70%
 ```
 
@@ -945,9 +964,9 @@ EKS-based base manifests for Vultr:
 
 | Resource | Plan | Monthly Cost (approx) |
 |---|---|---|
-| App node (dedicated) | voc-c-16c-32gb-300s | ~$480/month each |
-| Testing node (shared) | vc2-4c-8gb | ~$48/month each |
-| PostgreSQL VM (shared) | vc2-4c-8gb | ~$48/month each |
+| App node (dedicated) | voc-c-8c-16gb-150s-amd | provider-listed regional price |
+| Testing node (shared) | vc2-2c-4gb | provider-listed regional price |
+| PostgreSQL VM (dedicated) | voc-c-2c-4gb-50s-amd | provider-listed regional price |
 | VKE control plane | — | Included |
 | VPC | — | Included |
 | Firewall | — | Included |
@@ -955,9 +974,9 @@ EKS-based base manifests for Vultr:
 ### 17.2 Parallel Mode Cost (per hour)
 
 ```text
-2 clusters x (2 app nodes + 1 testing node + 1 PG VM)
-= 4 app nodes + 2 testing nodes + 2 PG VMs
-≈ $480*4 + $48*2 + $48*2 = $2,112/month (if always on)
+2 clusters x (1 app node + 1 testing node + 1 PG VM)
+= 2 app nodes + 2 testing nodes + 2 PG VMs
+Use the current Vultr pricing page for the selected region before applying.
 ```
 
 ### 17.3 Cost Guardrails
@@ -1016,8 +1035,8 @@ Every Vultr benchmark run must record:
   "app_node_pool": "app-nodes",
   "testing_node_pool": "testing-nodes",
   "postgres_version": 18,
-  "resource_profile": "vultr-measurement-derived",
-  "app_resource_quota": "31500m CPU / 55200Mi memory",
+  "resource_profile": "vultr-equal-split",
+  "app_resource_quota": "7800m CPU / 15360Mi memory",
   "image_tag": "thesis-vultr-20260602",
   "scaling_mode": "fixed",
   "kubernetes_version": "v1.33.0+1"
@@ -1039,8 +1058,8 @@ For thesis documents that originally referenced AWS, use this mapping:
 | AWS Security Groups | Vultr Firewall Group |
 | AWS Key Pairs | Vultr SSH Keys |
 | EKS Managed Node Groups | VKE Node Pools |
-| c8i.2xlarge (app node) | voc-c-16c-32gb-300s |
-| c8i-flex.large (testing node) | vc2-4c-8gb |
+| c8i.2xlarge-class app capacity | voc-c-8c-16gb-150s-amd |
+| c8i-flex.large-class testing capacity | vc2-2c-4gb |
 | EKS Pod Identity | Not applicable (direct credentials) |
 | AWS region ap-southeast-1 | Vultr region sgp |
 | Terraform AWS provider | Terraform Vultr provider |

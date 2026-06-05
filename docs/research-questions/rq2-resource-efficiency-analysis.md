@@ -236,9 +236,8 @@ Important scope note:
 
 ```text
 The concrete numerical examples in this section must always be interpreted
-relative to the active benchmark configuration. Older drafts in this document
-used a 4000m CPU / 4096Mi memory ceiling. The current repository configuration
-uses a 15800m CPU / 27648Mi memory ceiling per architecture.
+relative to the active benchmark configuration. For the active Vultr path, the
+shared architecture ceiling is 7800m CPU / 15360Mi memory per architecture.
 ```
 
 Incorrect design:
@@ -257,22 +256,22 @@ total MSA = 64000m CPU
 Correct design:
 
 ```text
-monolith total ceiling = 15800m CPU
+monolith total ceiling = 7800m CPU / 15360Mi memory
 
 api-gateway + auth-service + item-service + transaction-service
-  = total MSA ceiling 15800m CPU
+  = total MSA ceiling 7800m CPU / 15360Mi memory
 ```
 
 Example table:
 
 | Architecture | Component | Replica | CPU Limit per Pod | Memory Limit per Pod | Total CPU | Total Memory |
 |---|---:|---:|---:|---:|---:|---:|
-| Monolith | monolith | 4 | 3950m | 6912Mi | 15800m | 27648Mi |
-| MSA | api-gateway | 4 | 500m | 864Mi | 2000m | 3456Mi |
-| MSA | auth-service | 4 | 1000m | 1728Mi | 4000m | 6912Mi |
-| MSA | item-service | 6 | 500m | 864Mi | 3000m | 5184Mi |
-| MSA | transaction-service | 4 | 1700m | 3024Mi | 6800m | 12096Mi |
-| **MSA Total** | - | - | - | - | **15800m** | **27648Mi** |
+| Monolith | monolith | 1 | 7800m | 15360Mi | 7800m | 15360Mi |
+| MSA | api-gateway | 1 | 1950m | 3840Mi | 1950m | 3840Mi |
+| MSA | auth-service | 1 | 1950m | 3840Mi | 1950m | 3840Mi |
+| MSA | item-service | 1 | 1950m | 3840Mi | 1950m | 3840Mi |
+| MSA | transaction-service | 1 | 1950m | 3840Mi | 1950m | 3840Mi |
+| **MSA Total** | - | - | - | - | **7800m** | **15360Mi** |
 
 Recommended Chapter 3 explanation:
 
@@ -539,24 +538,22 @@ Used for fairness.
 Formula:
 
 ```text
-Maximum CPU ceiling = max_replicas x CPU limit per pod
+Monolith maximum CPU ceiling = max_replicas x CPU limit per pod
+MSA HPA maximum CPU ceiling  = namespace CPU limit quota
 ```
 
 Example monolith:
 
 ```text
-4 replicas x 3950m CPU = 15800m CPU
+4 replicas x 1950m CPU = 7800m CPU
 ```
 
 Example MSA:
 
 ```text
-api-gateway          4 x 500m = 2000m
-auth-service         4 x 1000m = 4000m
-item-service         6 x 500m = 3000m
-transaction-service  4 x 1700m = 6800m
-
-total MSA max CPU = 15800m
+minimum MSA state     = 4 x 975m = 3900m
+shared burst budget   = 4 x 975m = 3900m
+namespace CPU ceiling = 7800m
 ```
 
 ### 12.2 Actual Resource Usage
@@ -915,7 +912,7 @@ Important metadata fields:
   "target_rps": 1000,
   "duration": "5m",
   "dataset_version": "v1",
-  "resource_ceiling": "15800m CPU / 27648Mi memory",
+  "resource_ceiling": "7800m CPU / 15360Mi memory",
   "hpa_enabled": true,
   "hpa_target_cpu": "70%",
   "datadog": {

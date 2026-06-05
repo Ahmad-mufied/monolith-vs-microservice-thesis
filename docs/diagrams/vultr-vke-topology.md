@@ -19,16 +19,16 @@ flowchart TB
   end
 
   subgraph mono_cluster[VKE: skripsi-vultr-monolith]
-    mono_app_pool[app-nodes<br/>2 x voc-c-16c-32gb-300s]
-    mono_test_pool[testing-nodes<br/>1 x vc2-4c-8gb]
+    mono_app_pool[app-nodes<br/>1 x voc-c-8c-16gb-150s-amd]
+    mono_test_pool[testing-nodes<br/>1 x vc2-2c-4gb]
     mono_ns[namespace mono<br/>monolith pods]
     mono_bench[namespace benchmark<br/>k6 runner jobs]
     mono_dd[Datadog Agent]
   end
 
   subgraph msa_cluster[VKE: skripsi-vultr-msa]
-    msa_app_pool[app-nodes<br/>2 x voc-c-16c-32gb-300s]
-    msa_test_pool[testing-nodes<br/>1 x vc2-4c-8gb]
+    msa_app_pool[app-nodes<br/>1 x voc-c-8c-16gb-150s-amd]
+    msa_test_pool[testing-nodes<br/>1 x vc2-2c-4gb]
     msa_ns[namespace msa<br/>api-gateway/auth/item/transaction]
     msa_bench[namespace benchmark<br/>k6 runner jobs]
     msa_dd[Datadog Agent]
@@ -80,8 +80,8 @@ flowchart TB
   end
 
   subgraph benchmark_cluster[VKE: skripsi-vultr-benchmark]
-    app_pool[app-nodes<br/>2 x voc-c-16c-32gb-300s]
-    test_pool[testing-nodes<br/>1 x vc2-4c-8gb]
+    app_pool[app-nodes<br/>1 x voc-c-8c-16gb-150s-amd]
+    test_pool[testing-nodes<br/>1 x vc2-2c-4gb]
     mono_phase[namespace mono<br/>active during monolith phase]
     msa_phase[namespace msa<br/>active during MSA phase]
     bench[namespace benchmark<br/>k6 + bootstrap jobs]
@@ -138,4 +138,3 @@ sequenceDiagram
   Op->>S3: Verify artifacts
   Op->>TF: guarded destroy after S3 verification
 ```
-

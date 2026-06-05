@@ -3,8 +3,11 @@
 This diagram shows how the two benchmark execution modes relate to the same
 application architecture comparison. Parallel and sequential are execution
 topologies, not new application variants. Both must preserve the same external
-API, seed data assumptions, resource ceiling, scaling mode, and k6 workload
-scripts.
+API, seed data assumptions, scaling mode, and k6 workload scripts.
+
+The active Vultr benchmark path uses a shared architecture ceiling of
+`7800m CPU / 15360Mi memory`. The AWS EKS examples below are historical
+topology references and do not replace the active Vultr resource methodology.
 
 ```mermaid
 flowchart TB
@@ -31,13 +34,13 @@ flowchart TB
 
   subgraph parallel["Parallel experiment stack: infra/terraform/aws-parallel"]
     monoCluster["EKS: skripsi-monolith<br/>kubectl context: monolith"]
-    monoApp["namespace: mono<br/>monolith deployment<br/>Resource ceiling: 15800m CPU / 27648Mi"]
+    monoApp["namespace: mono<br/>monolith deployment<br/>Resource ceiling: 7800m CPU / 15360Mi"]
     monoBench["namespace: benchmark<br/>k6 job: k6-benchmark-monolith"]
     monoRds["RDS: skripsi-monolith-postgres<br/>mono_db"]
     monoDD["namespace: datadog<br/>cluster_name=skripsi-monolith"]
 
     msaCluster["EKS: skripsi-msa<br/>kubectl context: msa"]
-    msaApp["namespace: msa<br/>api-gateway, auth-service,<br/>item-service, transaction-service<br/>ResourceQuota: 15800m CPU / 27648Mi"]
+    msaApp["namespace: msa<br/>api-gateway, auth-service,<br/>item-service, transaction-service<br/>ResourceQuota: 7800m CPU / 15360Mi"]
     msaBench["namespace: benchmark<br/>k6 job: k6-benchmark-microservices"]
     msaRds["RDS: skripsi-msa-postgres<br/>auth_db, item_db, transaction_db"]
     msaDD["namespace: datadog<br/>cluster_name=skripsi-msa"]

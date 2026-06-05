@@ -27,10 +27,10 @@ module "sequential_cluster" {
   ssh_key_ids                = data.terraform_remote_state.shared.outputs.ssh_key_ids
   postgres_firewall_group_id = data.terraform_remote_state.shared.outputs.postgres_firewall_group_id
   app_node_plan              = var.app_node_plan
+  app_node_count             = var.app_node_count
   testing_node_plan          = var.testing_node_plan
   postgres_plan              = var.postgres_plan
   postgres_os_id             = var.postgres_os_id
   postgres_password          = var.postgres_password
   labels                     = local.common_labels
 }
-

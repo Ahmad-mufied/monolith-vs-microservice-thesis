@@ -697,13 +697,13 @@ The microservices version better preserves ownership boundaries but pays communi
 Monolith resource configuration:
 
 ```text
-fixed mode        : 2 pods, each 3950m request / 7900m limit and 6912Mi request / 13824Mi limit
-hpa mode          : 2 to 4 pods, each 1975m request / 3950m limit and 3456Mi request / 6912Mi limit
-minReplicas       : 2
+fixed mode        : 1 pod, 3900m request / 7800m limit and 7680Mi request / 15360Mi limit
+hpa mode          : 1 to 4 pods, each 970m request / 1950m limit and 1920Mi request / 3840Mi limit
+minReplicas       : 1
 maxReplicas       : 4
 HPA target CPU    : 70%
-Total CPU ceiling : 15800m
-Memory ceiling    : 27648Mi
+Total CPU ceiling : 7800m
+Memory ceiling    : 15360Mi
 ```
 
 Scaling behavior:
@@ -725,34 +725,34 @@ Auth + Item + Transaction all replicated
 Microservices resource configuration per service:
 
 ```text
-fixed api-gateway         : request 500m / limit 2000m / 864Mi / 3456Mi
-fixed auth-service        : request 1500m / limit 4000m / 2592Mi / 6912Mi
-fixed item-service        : request 1000m / limit 3000m / 1728Mi / 5184Mi
-fixed transaction-service : request 2000m / limit 6800m / 3456Mi / 12096Mi
+fixed api-gateway         : request 980m / limit 1950m / 1920Mi / 3840Mi
+fixed auth-service        : request 980m / limit 1950m / 1920Mi / 3840Mi
+fixed item-service        : request 980m / limit 1950m / 1920Mi / 3840Mi
+fixed transaction-service : request 980m / limit 1950m / 1920Mi / 3840Mi
 
-hpa api-gateway           : request 250m / limit 500m / 432Mi / 864Mi
-hpa auth-service          : request 500m / limit 1000m / 864Mi / 1728Mi
-hpa item-service          : request 250m / limit 500m / 432Mi / 864Mi
-hpa transaction-service   : request 850m / limit 1700m / 1512Mi / 3024Mi
+hpa api-gateway           : request 500m / limit 975m / 960Mi / 1920Mi
+hpa auth-service          : request 500m / limit 975m / 960Mi / 1920Mi
+hpa item-service          : request 500m / limit 975m / 960Mi / 1920Mi
+hpa transaction-service   : request 500m / limit 975m / 960Mi / 1920Mi
 minReplicas         : 1
 HPA target CPU      : 70%
 scaleDown window    : 60s
 ```
 
-Role-aware maxReplicas:
+Per-service maxReplicas:
 
 ```text
 api-gateway         : 4
 auth-service        : 4
-item-service        : 6
+item-service        : 4
 transaction-service : 4
 ```
 
 Namespace ceiling:
 
 ```text
-CPU max           : 15800m
-Memory max        : 27648Mi
+CPU max           : 7800m
+Memory max        : 15360Mi
 ```
 
 Scaling behavior:
@@ -1008,7 +1008,7 @@ Controlled variables:
 | Load generator | k6 |
 | Test scenarios | Same scripts |
 | Deployment environment | Same cloud environment (AWS EKS or Vultr VKE) |
-| Resource ceiling | Measurement-derived per architecture (Vultr) or 15800m CPU / 27648Mi (AWS) |
+| Resource ceiling | Measurement-derived per architecture; active Vultr baseline `7800m CPU / 15360Mi`, historical AWS example `15800m CPU / 27648Mi` |
 | Observability | Datadog |
 | Dataset | Logically equivalent seed |
 | Authentication behavior | Equivalent JWT rules |
@@ -1144,7 +1144,7 @@ Therefore, this project uses a synchronous REST + gRPC flow for create transacti
 | Monolith scaling | whole app |
 | MSA scaling | per service |
 | Autoscaling metric | CPU-based HPA |
-| Resource fairness | Measurement-derived ceiling (Vultr) or 15800m CPU / 27648Mi (AWS) |
+| Resource fairness | Same measured ceiling per architecture; active Vultr baseline `7800m CPU / 15360Mi`, historical AWS example `15800m CPU / 27648Mi` |
 | Execution topology | parallel or sequential, documented in benchmark metadata |
 | Async transaction flow | excluded |
 | Caching | excluded unless applied fairly |

@@ -24,19 +24,30 @@ variable "sequential_cluster_name" {
 variable "app_node_plan" {
   description = "VKE app node pool plan."
   type        = string
-  default     = "voc-c-16c-32gb-300s"
+  default     = "voc-c-8c-16gb-150s-amd"
+}
+
+variable "app_node_count" {
+  description = "VKE app node pool node count."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.app_node_count >= 1 && floor(var.app_node_count) == var.app_node_count
+    error_message = "app_node_count must be a positive whole number."
+  }
 }
 
 variable "testing_node_plan" {
   description = "VKE testing node pool plan."
   type        = string
-  default     = "vc2-4c-8gb"
+  default     = "vc2-2c-4gb"
 }
 
 variable "postgres_plan" {
   description = "Vultr PostgreSQL compute plan."
   type        = string
-  default     = "vc2-4c-8gb"
+  default     = "voc-c-2c-4gb-50s-amd"
 }
 
 variable "postgres_os_id" {
@@ -50,4 +61,3 @@ variable "postgres_password" {
   type        = string
   sensitive   = true
 }
-

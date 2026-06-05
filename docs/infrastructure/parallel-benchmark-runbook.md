@@ -632,12 +632,12 @@ Example for fixed mode:
 {
   "autoscaling_mode": "fixed",
   "hpa_enabled": false,
-  "namespace_resource_quota": { "cpu": "15800m", "memory": "27648Mi" },
+  "namespace_resource_quota": { "cpu": "7800m", "memory": "15360Mi" },
   "services": {
-    "api-gateway": { "cpu_request": "500m", "cpu_limit": "2000m", "memory_request": "864Mi", "memory_limit": "3456Mi", "replica_count": 1 },
-    "auth-service": { "cpu_request": "1500m", "cpu_limit": "4000m", "memory_request": "2592Mi", "memory_limit": "6912Mi", "replica_count": 1 },
-    "item-service": { "cpu_request": "1000m", "cpu_limit": "3000m", "memory_request": "1728Mi", "memory_limit": "5184Mi", "replica_count": 1 },
-    "transaction-service": { "cpu_request": "2000m", "cpu_limit": "6800m", "memory_request": "3456Mi", "memory_limit": "12096Mi", "replica_count": 1 }
+    "api-gateway": { "cpu_request": "980m", "cpu_limit": "1950m", "memory_request": "1920Mi", "memory_limit": "3840Mi", "replica_count": 1 },
+    "auth-service": { "cpu_request": "980m", "cpu_limit": "1950m", "memory_request": "1920Mi", "memory_limit": "3840Mi", "replica_count": 1 },
+    "item-service": { "cpu_request": "980m", "cpu_limit": "1950m", "memory_request": "1920Mi", "memory_limit": "3840Mi", "replica_count": 1 },
+    "transaction-service": { "cpu_request": "980m", "cpu_limit": "1950m", "memory_request": "1920Mi", "memory_limit": "3840Mi", "replica_count": 1 }
   }
 }
 ```
@@ -648,12 +648,12 @@ Example for HPA mode:
 {
   "autoscaling_mode": "hpa",
   "hpa_enabled": true,
-  "namespace_resource_quota": { "cpu": "15800m", "memory": "27648Mi" },
+  "namespace_resource_quota": { "cpu": "7800m", "memory": "15360Mi" },
   "services": {
-    "api-gateway": { "cpu_request": "250m", "cpu_limit": "500m", "memory_request": "432Mi", "memory_limit": "864Mi", "min_replicas": 1, "max_replicas": 4, "target_cpu_utilization": 70 },
-    "auth-service": { "cpu_request": "500m", "cpu_limit": "1000m", "memory_request": "864Mi", "memory_limit": "1728Mi", "min_replicas": 1, "max_replicas": 4, "target_cpu_utilization": 70 },
-    "item-service": { "cpu_request": "250m", "cpu_limit": "500m", "memory_request": "432Mi", "memory_limit": "864Mi", "min_replicas": 1, "max_replicas": 6, "target_cpu_utilization": 70 },
-    "transaction-service": { "cpu_request": "850m", "cpu_limit": "1700m", "memory_request": "1512Mi", "memory_limit": "3024Mi", "min_replicas": 1, "max_replicas": 4, "target_cpu_utilization": 70 }
+    "api-gateway": { "cpu_request": "500m", "cpu_limit": "975m", "memory_request": "960Mi", "memory_limit": "1920Mi", "min_replicas": 1, "max_replicas": 2, "target_cpu_utilization": 70 },
+    "auth-service": { "cpu_request": "500m", "cpu_limit": "975m", "memory_request": "960Mi", "memory_limit": "1920Mi", "min_replicas": 1, "max_replicas": 2, "target_cpu_utilization": 70 },
+    "item-service": { "cpu_request": "500m", "cpu_limit": "975m", "memory_request": "960Mi", "memory_limit": "1920Mi", "min_replicas": 1, "max_replicas": 2, "target_cpu_utilization": 70 },
+    "transaction-service": { "cpu_request": "500m", "cpu_limit": "975m", "memory_request": "960Mi", "memory_limit": "1920Mi", "min_replicas": 1, "max_replicas": 2, "target_cpu_utilization": 70 }
   }
 }
 ```
