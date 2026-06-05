@@ -110,6 +110,7 @@ check_hpa_replicas() {
 
   actual_min="$(kubectl --context="$context" get hpa "$hpa" -n "$namespace" -o jsonpath='{.spec.minReplicas}')"
   actual_max="$(kubectl --context="$context" get hpa "$hpa" -n "$namespace" -o jsonpath='{.spec.maxReplicas}')"
+  actual_min="${actual_min:-1}"
   if [ "$actual_min" != "$expected_min" ] || [ "$actual_max" != "$expected_max" ]; then
     echo "ERROR: expected hpa/${hpa} in namespace '$namespace' to have min=$expected_min max=$expected_max in context '$context', got min=$actual_min max=$actual_max" >&2
     exit 1

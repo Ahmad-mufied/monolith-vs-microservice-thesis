@@ -13,8 +13,8 @@ spec:
         - name: monolith
           resources:
             requests:
-              cpu: 7900m
-              memory: 13824Mi
+              cpu: 3900m
+              memory: 7680Mi
             limits:
-              cpu: 15800m
-              memory: 27648Mi
+              cpu: 7800m
+              memory: 15360Mi
