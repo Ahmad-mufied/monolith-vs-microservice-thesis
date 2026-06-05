@@ -4,8 +4,8 @@ set -euo pipefail
 context="${VULTR_CONTEXT:-${VULTR_RESOURCE_CONTEXT:-benchmark}}"
 output_env="${VULTR_RESOURCE_BASELINE_ENV:-env/vultr-resource-baseline.env}"
 output_json="${VULTR_RESOURCE_BASELINE_JSON:-env/vultr-resource-baseline.json}"
-safety_cpu_m="${VULTR_RESOURCE_SAFETY_CPU_M:-500}"
-safety_memory_mi="${VULTR_RESOURCE_SAFETY_MEMORY_MI:-2048}"
+safety_cpu_m="${VULTR_RESOURCE_SAFETY_CPU_M:-0}"
+safety_memory_mi="${VULTR_RESOURCE_SAFETY_MEMORY_MI:-110}"
 
 mkdir -p "$(dirname "$output_env")"
 mkdir -p "$(dirname "$output_json")"
