@@ -6,15 +6,15 @@ metadata:
 spec:
   strategy:
     type: Recreate
-  replicas: 2
+  replicas: 1
   template:
     spec:
       containers:
         - name: monolith
           resources:
             requests:
-              cpu: 3950m
-              memory: 6912Mi
-            limits:
               cpu: 7900m
               memory: 13824Mi
+            limits:
+              cpu: 15800m
+              memory: 27648Mi

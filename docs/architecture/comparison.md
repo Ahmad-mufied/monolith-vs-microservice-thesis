@@ -697,9 +697,9 @@ The microservices version better preserves ownership boundaries but pays communi
 Monolith resource configuration:
 
 ```text
-fixed mode        : 2 pods, each 3950m request / 7900m limit and 6912Mi request / 13824Mi limit
-hpa mode          : 2 to 4 pods, each 1975m request / 3950m limit and 3456Mi request / 6912Mi limit
-minReplicas       : 2
+fixed mode        : 1 pod, 7900m request / 15800m limit and 13824Mi request / 27648Mi limit
+hpa mode          : 1 to 4 pods, each 1975m request / 3950m limit and 3456Mi request / 6912Mi limit
+minReplicas       : 1
 maxReplicas       : 4
 HPA target CPU    : 70%
 Total CPU ceiling : 15800m
@@ -725,15 +725,15 @@ Auth + Item + Transaction all replicated
 Microservices resource configuration per service:
 
 ```text
-fixed api-gateway         : request 500m / limit 2000m / 864Mi / 3456Mi
-fixed auth-service        : request 1500m / limit 4000m / 2592Mi / 6912Mi
-fixed item-service        : request 1000m / limit 3000m / 1728Mi / 5184Mi
-fixed transaction-service : request 2000m / limit 6800m / 3456Mi / 12096Mi
+fixed api-gateway         : request 750m / limit 2500m / 864Mi / 3456Mi
+fixed auth-service        : request 2500m / limit 7000m / 3456Mi / 10368Mi
+fixed item-service        : request 750m / limit 2300m / 1296Mi / 3456Mi
+fixed transaction-service : request 1000m / limit 4000m / 3024Mi / 10368Mi
 
-hpa api-gateway           : request 250m / limit 500m / 432Mi / 864Mi
-hpa auth-service          : request 500m / limit 1000m / 864Mi / 1728Mi
-hpa item-service          : request 250m / limit 500m / 432Mi / 864Mi
-hpa transaction-service   : request 850m / limit 1700m / 1512Mi / 3024Mi
+hpa api-gateway           : request 200m / limit 500m / 432Mi / 864Mi
+hpa auth-service          : request 2000m / limit 3500m / 3456Mi / 5184Mi
+hpa item-service          : request 200m / limit 460m / 432Mi / 864Mi
+hpa transaction-service   : request 800m / limit 2000m / 3024Mi / 5184Mi
 minReplicas         : 1
 HPA target CPU      : 70%
 scaleDown window    : 60s
@@ -742,10 +742,10 @@ scaleDown window    : 60s
 Role-aware maxReplicas:
 
 ```text
-api-gateway         : 4
-auth-service        : 4
-item-service        : 6
-transaction-service : 4
+api-gateway         : 5
+auth-service        : 2
+item-service        : 5
+transaction-service : 2
 ```
 
 Namespace ceiling:

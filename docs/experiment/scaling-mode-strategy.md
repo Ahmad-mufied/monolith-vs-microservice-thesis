@@ -38,31 +38,36 @@ the namespace ResourceQuota. No HPA object is created.
 Monolith fixed configuration:
 
 ```text
-replicas : 2
-CPU      : 3950m request / 7900m limit per pod
-Memory   : 6912Mi request / 13824Mi limit per pod
+replicas : 1
+CPU      : 7900m request / 15800m limit per pod
+Memory   : 13824Mi request / 27648Mi limit per pod
 ```
 
 Microservices fixed configuration (per service):
 
 ```text
 replicas : 1 per service (api-gateway, auth-service, item-service, transaction-service)
-api-gateway         : request 500m / limit 2000m / 864Mi / 3456Mi
-auth-service        : request 1500m / limit 4000m / 2592Mi / 6912Mi
-item-service        : request 1000m / limit 3000m / 1728Mi / 5184Mi
-transaction-service : request 2000m / limit 6800m / 3456Mi / 12096Mi
+api-gateway         : request 750m / limit 2500m / 864Mi / 3456Mi
+auth-service        : request 2500m / limit 7000m / 3456Mi / 10368Mi
+item-service        : request 750m / limit 2300m / 1296Mi / 3456Mi
+transaction-service : request 1000m / limit 4000m / 3024Mi / 10368Mi
 ```
 
 Total active resources in fixed mode:
 
 | Architecture | Pods | CPU requests | CPU limits | Memory requests | Memory limits |
 |---|---:|---:|---:|---:|---:|
-| Monolith | 2 | 7900m | 15800m | 13824Mi | 27648Mi |
+| Monolith | 1 | 7900m | 15800m | 13824Mi | 27648Mi |
 | Microservices | 4 (1 per service) | 5000m | 15800m | 8640Mi | 27648Mi |
 
 Both architectures remain bounded by the same namespace ResourceQuota ceiling
 of `15800m CPU / 27648Mi memory`. The MSA pod-level requests and limits are
 role-aware rather than equal `250m` slices.
+
+Fixed mode is intentionally a no-horizontal-scale baseline. The monolith runs
+as one larger pod, while microservices run as one pod per independently
+deployable service. The fairness boundary is the equal architecture-level
+ResourceQuota, not an equal pod count.
 
 For non-EKS providers such as Hetzner and Vultr, the numeric ResourceQuota can
 be derived from live app-node allocatable capacity. The fairness rule remains
@@ -100,7 +105,7 @@ namespace ResourceQuota, and all HPA objects.
 Monolith HPA configuration:
 
 ```text
-minReplicas            : 2
+minReplicas            : 1
 maxReplicas            : 4
 HPA target CPU         : 70%
 CPU request / limit    : 1975m / 3950m per pod
@@ -123,10 +128,10 @@ Scale-down window    : 60s
 Role-aware service configuration:
 
 ```text
-api-gateway         : request 250m / limit 500m / 432Mi / 864Mi / maxReplicas 4
-auth-service        : request 500m / limit 1000m / 864Mi / 1728Mi / maxReplicas 4
-item-service        : request 250m / limit 500m / 432Mi / 864Mi / maxReplicas 6
-transaction-service : request 850m / limit 1700m / 1512Mi / 3024Mi / maxReplicas 4
+api-gateway         : request 200m / limit 500m / 432Mi / 864Mi / maxReplicas 5
+auth-service        : request 2000m / limit 3500m / 3456Mi / 5184Mi / maxReplicas 2
+item-service        : request 200m / limit 460m / 432Mi / 864Mi / maxReplicas 5
+transaction-service : request 800m / limit 2000m / 3024Mi / 5184Mi / maxReplicas 2
 ```
 
 The namespace ResourceQuota caps total MSA CPU at 15800m and memory at
@@ -196,7 +201,8 @@ In Kubernetes, CPU can be written as a whole CPU value or as millicpu:
 The `m` suffix means millicpu. It is useful because Kubernetes often needs to
 schedule pods that consume fractions of a CPU core.
 
-For this benchmark, app nodes use `c8i.2xlarge`. Each `c8i.2xlarge` provides:
+In the AWS/EKS baseline, app nodes use `c8i.2xlarge`. Each `c8i.2xlarge`
+provides:
 
 ```text
 8 vCPU
@@ -238,12 +244,17 @@ So a pod with `memory: 1024Mi` requests or limits roughly one GiB of memory.
 Likewise, a namespace quota of `27648Mi` corresponds to exactly `27Gi` of
 application budget.
 
-### 3.3 Mapping Repository Values to c8i.2xlarge Capacity
+For the active Vultr path, the app node plan is
+`voc-c-8c-16gb-150s-amd`, which has the same nominal 8 vCPU / 16 GB class.
+Vultr manifests still use live measured allocatable capacity instead of
+assuming the nominal plan capacity is fully schedulable.
+
+### 3.3 Mapping Repository Values to 8 vCPU / 16 GiB-Class Capacity
 
 The following table maps common repository resource values to the approximate
-capacity of one `c8i.2xlarge` app node.
+capacity of one 8 vCPU / 16 GiB-class app node.
 
-| Repo value | Kubernetes meaning | Approximate share of one `c8i.2xlarge` |
+| Repo value | Kubernetes meaning | Approximate share of one 8 vCPU node |
 |---|---|---:|
 | `100m` CPU | 0.1 CPU | 1.25% of 8 vCPU |
 | `150m` CPU | 0.15 CPU | 1.875% of 8 vCPU |
@@ -272,23 +283,22 @@ The app node has physical capacity, but the benchmark intentionally limits the
 application namespace with `ResourceQuota`.
 
 ```text
-Two c8i.2xlarge app nodes
-  physical visible capacity : about 16000m CPU / 31416Mi memory
-  allocatable pool          : about 15820m CPU / 28110Mi memory
+AWS/EKS baseline:
+  two c8i.2xlarge app nodes
+  fixed quota: 15800m CPU / 27648Mi memory
 
-Benchmark application namespace quota
-  CPU    : 15800m
-  Memory : 27648Mi
+Vultr active path:
+  one voc-c-8c-16gb-150s-amd app node
+  fixed quota: measured live allocatable capacity minus safety margin
+
+Both paths keep:
+  monolith namespace quota == microservices namespace quota
 ```
 
-In the current configuration, the namespace quota is intentionally placed below
-the measured allocatable pool and below the clean ceiling derived after
-subtracting always-on `kube-system` and `datadog` pod overhead on app nodes.
-
-The EKS cluster uses two app nodes per architecture cluster. The namespace quota
-caps the application workload at `15800m CPU / 27648Mi memory`, so the
-benchmark comparison remains controlled at architecture level while still
-respecting measured cluster overhead.
+In Vultr, the namespace quota is not copied from the AWS baseline. It is
+rendered from `env/vultr-resource-baseline.env`, which is created by measuring
+the live VKE app node. This prevents a silent mismatch between nominal plan
+capacity and Kubernetes schedulable capacity.
 
 ### 3.5 Request, Limit, and ResourceQuota
 
@@ -329,21 +339,21 @@ The quota is what keeps the benchmark fair at architecture level.
 The relationship from EC2 node to pod can be read as:
 
 ```text
-EKS cluster for one architecture
+Vultr VKE cluster for one active architecture
   |
   +-- app-nodes
   |     |
-  |     +-- 2 x c8i.2xlarge
+  |     +-- 1 x voc-c-8c-16gb-150s-amd
   |           |
-  |           +-- each node is roughly 8000m CPU / 16384Mi memory
+  |           +-- quota is derived from live allocatable capacity
   |
   +-- application namespace
         |
-        +-- ResourceQuota: 15800m CPU / 27648Mi memory
+        +-- ResourceQuota: equal for monolith and microservices
               |
               +-- fixed mode
               |     |
-              |     +-- monolith: 1 pod x 1000m / 1024Mi
+              |     +-- monolith: 1 pod carrying the fixed architecture ceiling
               |     +-- MSA: 1 pod per service with role-aware requests/limits
               |
               +-- hpa mode
@@ -393,17 +403,20 @@ Cluster overhead
     container runtime, and other node-level or cluster-level components
 ```
 
-For example, two `c8i.2xlarge` app nodes are roughly:
+For example, the AWS/EKS baseline app nodes are roughly:
 
 ```text
 16000m CPU / 31416Mi visible memory
 ```
 
-But the application namespace is capped at:
+But the AWS/EKS application namespace is capped at:
 
 ```text
 15800m CPU / 27648Mi memory
 ```
+
+For Vultr, use the measured values in `env/vultr-resource-baseline.env`
+instead of these AWS/EKS numbers.
 
 This means the final application ceiling sits below both the app-node
 allocatable pool and the measured clean ceiling after subtracting always-on
@@ -515,10 +528,10 @@ current configuration uses role-aware requests, limits, and HPA maxima:
 
 | Service | Fixed request / limit | HPA maxReplicas | Reasoning |
 |---|---:|---:|---|
-| `api-gateway` | `250m / 500m` | 4 | lightweight entry point, but still needs moderate headroom for HTTP translation and JWT middleware |
-| `auth-service` | `500m / 1000m` | 4 | bcrypt/JWT work is CPU-heavy, so each pod gets a larger CPU limit |
-| `item-service` | `250m / 500m` | 6 | validation/read path scales horizontally with smaller pods |
-| `transaction-service` | `850m / 1700m` | 4 | write path and transaction retrieval are the heaviest service responsibilities, so each pod gets the largest per-pod budget |
+| `api-gateway` | `750m / 2500m` | 5 | lightweight entry point, but still needs moderate headroom for HTTP translation and JWT middleware |
+| `auth-service` | `2500m / 7000m` | 2 | bcrypt/JWT work is CPU-heavy, so each pod gets a larger CPU limit |
+| `item-service` | `750m / 2300m` | 5 | validation/read path scales horizontally with smaller pods |
+| `transaction-service` | `1000m / 4000m` | 2 | write path and transaction retrieval are heavy service responsibilities, so each pod gets a larger per-pod budget |
 
 This avoids pretending every service has the same cost. It also keeps the total
 MSA architecture constrained by the same `15800m CPU / 27648Mi memory` quota.

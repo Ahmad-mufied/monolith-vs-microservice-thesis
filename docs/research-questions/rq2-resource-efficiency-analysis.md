@@ -268,10 +268,10 @@ Example table:
 | Architecture | Component | Replica | CPU Limit per Pod | Memory Limit per Pod | Total CPU | Total Memory |
 |---|---:|---:|---:|---:|---:|---:|
 | Monolith | monolith | 4 | 3950m | 6912Mi | 15800m | 27648Mi |
-| MSA | api-gateway | 4 | 500m | 864Mi | 2000m | 3456Mi |
-| MSA | auth-service | 4 | 1000m | 1728Mi | 4000m | 6912Mi |
-| MSA | item-service | 6 | 500m | 864Mi | 3000m | 5184Mi |
-| MSA | transaction-service | 4 | 1700m | 3024Mi | 6800m | 12096Mi |
+| MSA | api-gateway | 5 | 500m | 864Mi | 2500m | 4320Mi |
+| MSA | auth-service | 2 | 3500m | 5184Mi | 7000m | 10368Mi |
+| MSA | item-service | 5 | 460m | 864Mi | 2300m | 4320Mi |
+| MSA | transaction-service | 2 | 2000m | 5184Mi | 4000m | 10368Mi |
 | **MSA Total** | - | - | - | - | **15800m** | **27648Mi** |
 
 Recommended Chapter 3 explanation:
@@ -551,10 +551,10 @@ Example monolith:
 Example MSA:
 
 ```text
-api-gateway          4 x 500m = 2000m
-auth-service         4 x 1000m = 4000m
-item-service         6 x 500m = 3000m
-transaction-service  4 x 1700m = 6800m
+api-gateway          5 x 500m = 2500m
+auth-service         2 x 3500m = 7000m
+item-service         5 x 460m = 2300m
+transaction-service  2 x 2000m = 4000m
 
 total MSA max CPU = 15800m
 ```

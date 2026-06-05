@@ -136,10 +136,16 @@ Recommended defaults for thesis-sized Vultr tests:
 VULTR_REGION=sgp
 VULTR_VPC_CIDR=10.20.0.0/16
 VULTR_KUBERNETES_VERSION=v1.33.0+1
-VULTR_APP_NODE_PLAN=voc-c-16c-32gb-300s
-VULTR_TESTING_NODE_PLAN=vc2-4c-8gb
-VULTR_POSTGRES_PLAN=vc2-4c-8gb
+VULTR_APP_NODE_PLAN=voc-c-8c-16gb-150s-amd
+VULTR_APP_NODE_COUNT=1
+VULTR_TESTING_NODE_PLAN=vc2-2c-4gb
+VULTR_POSTGRES_PLAN=voc-c-2c-4gb-50s-amd
 ```
+
+The app node topology intentionally uses one larger node instead of two
+smaller nodes with the same nominal total CPU and memory. This avoids
+Kubernetes scheduling fragmentation during fixed-mode runs while keeping k6 on
+its own testing node.
 
 The normal Vultr `make` flow auto-loads `env/vultr.env`, so you do not need to
 run a manual shell `source` step before each command:

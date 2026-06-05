@@ -52,7 +52,7 @@ resources_configuration_json() {
       : "${VULTR_APP_MEMORY_QUOTA:?VULTR_APP_MEMORY_QUOTA must be set in $baseline_env}"
       cpu_quota="$VULTR_APP_CPU_QUOTA"
       memory_quota="$VULTR_APP_MEMORY_QUOTA"
-      app_node_count="${VULTR_APP_NODE_COUNT:-2}"
+      app_node_count="${VULTR_APP_NODE_COUNT:-1}"
       allocatable_cpu="${VULTR_APP_ALLOCATABLE_CPU:-unknown}"
       allocatable_memory="${VULTR_APP_ALLOCATABLE_MEMORY:-unknown}"
       resource_profile="vultr-measurement-derived"
@@ -82,11 +82,11 @@ resources_configuration_json() {
 
   if [ "$architecture" = "monolith" ]; then
     if [ "$scaling_mode" = "hpa" ]; then
-      printf '%s' '{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"cpu_request":"1975m","cpu_limit":"3950m","memory_request":"3456Mi","memory_limit":"6912Mi","min_replicas":2,"max_replicas":4,"target_cpu_utilization":70}'
+      printf '%s' '{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"cpu_request":"1975m","cpu_limit":"3950m","memory_request":"3456Mi","memory_limit":"6912Mi","min_replicas":1,"max_replicas":4,"target_cpu_utilization":70}'
       return 0
     fi
 
-    printf '%s' '{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"cpu_request":"3950m","cpu_limit":"7900m","memory_request":"6912Mi","memory_limit":"13824Mi","replica_count":2}'
+    printf '%s' '{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"cpu_request":"7900m","cpu_limit":"15800m","memory_request":"13824Mi","memory_limit":"27648Mi","replica_count":1}'
     return 0
   fi
 

@@ -26,9 +26,10 @@ flow.
 | `VULTR_REGION` | `sgp` | Terraform, metadata | Keep all Vultr stacks in the same region for private networking. |
 | `VULTR_VPC_CIDR` | `10.20.0.0/16` | Shared Terraform | Legacy VPC CIDR. |
 | `VULTR_KUBERNETES_VERSION` | `v1.33.0+1` | VKE Terraform | Must be available in the selected Vultr region. |
-| `VULTR_APP_NODE_PLAN` | `voc-c-16c-32gb-300s` | VKE Terraform, baseline metadata | High-vCPU app node plan. |
-| `VULTR_TESTING_NODE_PLAN` | `vc2-4c-8gb` | VKE Terraform | Dedicated k6/testing node pool. |
-| `VULTR_POSTGRES_PLAN` | `vc2-4c-8gb` | PostgreSQL VM Terraform | Separate DB compute. |
+| `VULTR_APP_NODE_PLAN` | `voc-c-8c-16gb-150s-amd` | VKE Terraform, baseline metadata | Single high-vCPU app node plan. |
+| `VULTR_APP_NODE_COUNT` | `1` | VKE Terraform, live verification | App node count per active architecture. |
+| `VULTR_TESTING_NODE_PLAN` | `vc2-2c-4gb` | VKE Terraform | Dedicated k6/testing node pool. |
+| `VULTR_POSTGRES_PLAN` | `voc-c-2c-4gb-50s-amd` | PostgreSQL VM Terraform | Separate DB compute. |
 | `VULTR_POSTGRES_OS_ID` | `1743` | PostgreSQL VM Terraform | OS image ID used by Vultr instance. |
 | `VULTR_MONOLITH_CLUSTER_NAME` | `skripsi-vultr-monolith` | Parallel Terraform, metadata | Parallel monolith context becomes `monolith`. |
 | `VULTR_MSA_CLUSTER_NAME` | `skripsi-vultr-msa` | Parallel Terraform, metadata | Parallel MSA context becomes `msa`. |
@@ -113,6 +114,7 @@ The Vultr plan variables are cost-impacting infrastructure choices:
 
 ```text
 VULTR_APP_NODE_PLAN
+VULTR_APP_NODE_COUNT
 VULTR_TESTING_NODE_PLAN
 VULTR_POSTGRES_PLAN
 ```
@@ -150,14 +152,14 @@ Output example:
 ```text
 VULTR_RESOURCE_BASELINE_PROVIDER=vultr
 VULTR_REGION=sgp
-VULTR_APP_NODE_PLAN=voc-c-16c-32gb-300s
-VULTR_APP_CPU_QUOTA=31500m
-VULTR_APP_MEMORY_QUOTA=55200Mi
-VULTR_APP_NODE_COUNT=2
-VULTR_APP_ALLOCATABLE_CPU=32000m
-VULTR_APP_ALLOCATABLE_MEMORY=57248Mi
-VULTR_RESOURCE_SAFETY_CPU=500m
-VULTR_RESOURCE_SAFETY_MEMORY=2048Mi
+VULTR_APP_NODE_PLAN=voc-c-8c-16gb-150s-amd
+VULTR_APP_CPU_QUOTA=7800m
+VULTR_APP_MEMORY_QUOTA=15360Mi
+VULTR_APP_NODE_COUNT=1
+VULTR_APP_ALLOCATABLE_CPU=7800m
+VULTR_APP_ALLOCATABLE_MEMORY=15800Mi
+VULTR_RESOURCE_SAFETY_CPU=0m
+VULTR_RESOURCE_SAFETY_MEMORY=110Mi
 ```
 
 The exact numbers must come from the live cluster. Do not copy the example into
@@ -186,6 +188,8 @@ Rules:
 - Every `fixed <-> hpa` transition must redeploy manifests.
 - HPA uses the same 70% CPU target as the existing benchmark strategy.
 - ResourceQuota is equal for monolith and MSA.
+- Set `VULTR_EXPECTED_APP_NODE_COUNT=1` when verifying the current single app
+  node topology.
 
 ## Benchmark Metadata
 
@@ -251,6 +255,7 @@ The Vultr integration should fail rather than silently continue when:
 - AWS S3 credentials are missing from the k6 secret path
 - microservices gRPC secrets still point at non-headless ClusterIP service DNS
 - fixed/HPA live mode does not match requested benchmark mode
+- `VULTR_EXPECTED_APP_NODE_COUNT` is set and the live app node count differs
 - destroy is attempted without `S3_BENCHMARK_DATA_VERIFIED=true`
 
 These guardrails are intentionally simple and repo-native. They avoid extra

@@ -175,7 +175,8 @@ This distinction matters.
 
 In fixed mode:
 
-- one pod per service is kept alive,
+- one monolith pod is kept alive for the monolith architecture,
+- one pod per service is kept alive for the microservices architecture,
 - the service limit itself carries the service budget,
 - there is no additional scale-out headroom because the fixed deployment is
   already the final allocation shape.

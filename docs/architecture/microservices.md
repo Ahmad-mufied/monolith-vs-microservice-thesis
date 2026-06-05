@@ -1075,16 +1075,16 @@ Per-service resource configuration:
 
 ```text
 fixed mode:
-  api-gateway        : request 500m / limit 2000m / 864Mi / 3456Mi
-  auth-service       : request 1500m / limit 4000m / 2592Mi / 6912Mi
-  item-service       : request 1000m / limit 3000m / 1728Mi / 5184Mi
-  transaction-service: request 2000m / limit 6800m / 3456Mi / 12096Mi
+  api-gateway        : request 750m / limit 2500m / 864Mi / 3456Mi
+  auth-service       : request 2500m / limit 7000m / 3456Mi / 10368Mi
+  item-service       : request 750m / limit 2300m / 1296Mi / 3456Mi
+  transaction-service: request 1000m / limit 4000m / 3024Mi / 10368Mi
 
 hpa mode:
-  api-gateway        : request 250m / limit 500m / 432Mi / 864Mi
-  auth-service       : request 500m / limit 1000m / 864Mi / 1728Mi
-  item-service       : request 250m / limit 500m / 432Mi / 864Mi
-  transaction-service: request 850m / limit 1700m / 1512Mi / 3024Mi
+  api-gateway        : request 200m / limit 500m / 432Mi / 864Mi
+  auth-service       : request 2000m / limit 3500m / 3456Mi / 5184Mi
+  item-service       : request 200m / limit 460m / 432Mi / 864Mi
+  transaction-service: request 800m / limit 2000m / 3024Mi / 5184Mi
 minReplicas       : 1
 HPA target CPU    : 70%
 ```

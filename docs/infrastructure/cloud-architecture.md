@@ -478,7 +478,7 @@ Used for clean RQ1 comparisons. No autoscaling, replicas stay at the
 configured count throughout the benchmark.
 
 ```text
-Monolith: 2 pods with fixed role-neutral budget inside one deployment
+Monolith: 1 pod with fixed role-neutral budget inside one deployment
 MSA:      4 pods with role-aware requests/limits (one pod per service)
 ```
 
@@ -501,10 +501,10 @@ target CPU     : 70%   target CPU     : 70%
 In HPA mode, the MSA profile uses role-aware per-service budgets under the same
 shared architecture ceiling:
 
-- `api-gateway`: request `250m`, limit `500m`, maxReplicas `4`
-- `auth-service`: request `500m`, limit `1000m`, maxReplicas `4`
-- `item-service`: request `250m`, limit `500m`, maxReplicas `6`
-- `transaction-service`: request `850m`, limit `1700m`, maxReplicas `4`
+- `api-gateway`: request `200m`, limit `500m`, maxReplicas `5`
+- `auth-service`: request `2000m`, limit `3500m`, maxReplicas `2`
+- `item-service`: request `200m`, limit `460m`, maxReplicas `5`
+- `transaction-service`: request `800m`, limit `2000m`, maxReplicas `2`
 
 This keeps fairness at the same `15800m CPU / 27648Mi memory` namespace ceiling
 while allowing hotspot services such as `auth-service` and

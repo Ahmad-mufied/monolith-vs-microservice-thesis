@@ -736,23 +736,23 @@ Application memory ceiling:
 
 Monolith pod:
 
-- fixed mode: 2 pods, each 3950m request / 7900m limit and 6912Mi request / 13824Mi limit
-- hpa mode: 2 to 4 pods, each 1975m request / 3950m limit and 3456Mi request / 6912Mi limit
+- fixed mode: 1 pod, 7900m request / 15800m limit and 13824Mi request / 27648Mi limit
+- hpa mode: 1 to 4 pods, each 1975m request / 3950m limit and 3456Mi request / 6912Mi limit
 - maxReplicas: 4
 - HPA target CPU utilization: 70%
 
 Microservices pod per service:
 
 - fixed mode:
-  api-gateway: 500m request / 2000m limit and 864Mi request / 3456Mi limit
-  auth-service: 1500m request / 4000m limit and 2592Mi request / 6912Mi limit
-  item-service: 1000m request / 3000m limit and 1728Mi request / 5184Mi limit
-  transaction-service: 2000m request / 6800m limit and 3456Mi request / 12096Mi limit
+  api-gateway: 750m request / 2500m limit and 864Mi request / 3456Mi limit
+  auth-service: 2500m request / 7000m limit and 3456Mi request / 10368Mi limit
+  item-service: 750m request / 2300m limit and 1296Mi request / 3456Mi limit
+  transaction-service: 1000m request / 4000m limit and 3024Mi request / 10368Mi limit
 - hpa mode:
-  api-gateway: 250m request / 500m limit and 432Mi request / 864Mi limit, maxReplicas 4
-  auth-service: 500m request / 1000m limit and 864Mi request / 1728Mi limit, maxReplicas 4
-  item-service: 250m request / 500m limit and 432Mi request / 864Mi limit, maxReplicas 6
-  transaction-service: 850m request / 1700m limit and 1512Mi request / 3024Mi limit, maxReplicas 4
+  api-gateway: 200m request / 500m limit and 432Mi request / 864Mi limit, maxReplicas 5
+  auth-service: 2000m request / 3500m limit and 3456Mi request / 5184Mi limit, maxReplicas 2
+  item-service: 200m request / 460m limit and 432Mi request / 864Mi limit, maxReplicas 5
+  transaction-service: 800m request / 2000m limit and 3024Mi request / 5184Mi limit, maxReplicas 2
 - HPA target CPU utilization: 70%
 
 Microservices namespace ResourceQuota:

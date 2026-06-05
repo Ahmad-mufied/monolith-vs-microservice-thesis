@@ -626,16 +626,13 @@ affinity:
 
 ### Expected Result
 
-With 2 app nodes and 4 services (fixed mode, 1 replica each), the scheduler
-will spread 2 services per node:
+With the single Vultr app node topology, all four fixed-mode services schedule
+onto the same app node. The soft pod anti-affinity remains harmless and
+best-effort; it does not block scheduling when only one app node exists.
 
 ```text
-App Node 1: auth-service + transaction-service
-App Node 2: api-gateway + item-service
+App Node 1: api-gateway + auth-service + item-service + transaction-service
 ```
-
-Or any other 2-service combination, depending on scheduling order and resource
-availability.
 
 ### Properties
 
