@@ -64,7 +64,7 @@ function branchRate(branchName, weight) {
   const numerator = TARGET_RPS * weight;
   assertCondition(
     numerator % TOTAL_WEIGHT === 0,
-    `TARGET_RPS=${TARGET_RPS} cannot be split exactly for ${branchName} with weights ${LOGIN_WEIGHT}/${CREATE_TRANSACTION_WEIGHT}/${ENRICHED_TRANSACTIONS_WEIGHT}. Use a target RPS divisible by ${TOTAL_WEIGHT}, or adjust CONCURRENT_MIX_*_WEIGHT.`
+    `TARGET_RPS=${TARGET_RPS} cannot be split exactly for ${branchName} with branch weight ${weight} and weights ${LOGIN_WEIGHT}/${CREATE_TRANSACTION_WEIGHT}/${ENRICHED_TRANSACTIONS_WEIGHT}. The split requires TARGET_RPS * ${weight} to be divisible by ${TOTAL_WEIGHT}; adjust TARGET_RPS or CONCURRENT_MIX_*_WEIGHT.`
   );
 
   const rate = numerator / TOTAL_WEIGHT;
