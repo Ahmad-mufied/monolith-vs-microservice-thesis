@@ -766,6 +766,7 @@ k6/
 │   ├── login.js
 │   ├── create-transaction.js
 │   ├── enriched-transactions.js
+│   ├── concurrent-mixed-workload.js
 │   └── mixed-workload.js
 │
 ├── runner/

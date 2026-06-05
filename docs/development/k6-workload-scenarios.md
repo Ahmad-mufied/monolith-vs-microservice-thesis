@@ -22,7 +22,16 @@ Microservices
 
 ## 2. Scenario Set
 
-The benchmark uses three required scenarios:
+The final benchmark uses one primary system-level scenario and three diagnostic
+endpoint scenarios.
+
+Primary scenario:
+
+| Scenario | Script | Endpoint mix | Category |
+|---|---|---|---|
+| Concurrent Mixed Workload | `k6/scripts/concurrent-mixed-workload.js` | `POST /api/v1/auth/login` 20%, `POST /api/v1/transactions` 40%, `GET /api/v1/admin/transactions` 40% | system-level composite workload |
+
+Diagnostic scenarios:
 
 | Scenario | Script | Endpoint | Category |
 |---|---|---|---|
@@ -36,7 +45,7 @@ Additional validation or optional scenarios:
 |---|---|---|
 | Smoke | `k6/scripts/smoke.js` | validation only |
 | Sync Items | `k6/scripts/sync-items.js` | optional |
-| Mixed Workload | `k6/scripts/mixed-workload.js` | optional; requires enrichment preparation when the enriched branch weight is enabled |
+| Mixed Workload | `k6/scripts/mixed-workload.js` | legacy random-branch mixed traffic; optional |
 
 ---
 
@@ -127,7 +136,72 @@ The enrichment preparation step inserts transactions and transaction_items befor
 
 That preparation step is not part of the measured k6 result.
 
-### 3.4 Mixed Workload
+### 3.4 Concurrent Mixed Workload
+
+Lifecycle:
+
+```text
+reset data
+seed base users/items
+prepare enrichment transaction dataset
+validate setup logins and enrichment probe
+run concurrent-mixed-workload scenario
+collect results
+```
+
+Measured endpoints:
+
+```text
+POST /api/v1/auth/login              = 20% of total target RPS
+POST /api/v1/transactions            = 40% of total target RPS
+GET /api/v1/admin/transactions       = 40% of total target RPS
+```
+
+The scenario uses separate k6 arrival-rate scenarios for each endpoint branch.
+This means the three endpoint branches run concurrently in one k6 execution
+rather than being selected randomly inside a single iteration.
+
+Only workload traffic is used for thresholds and the stdout summary line.
+Setup logins and the enrichment readiness probe are tagged separately as setup
+traffic, so they do not pollute the primary latency, failure-rate, and check-rate
+metrics.
+
+Example split:
+
+```text
+TARGET_RPS=100 -> login 20 RPS, create transaction 40 RPS, enriched transactions 40 RPS
+TARGET_RPS=250 -> login 50 RPS, create transaction 100 RPS, enriched transactions 100 RPS
+TARGET_RPS=500 -> login 100 RPS, create transaction 200 RPS, enriched transactions 200 RPS
+```
+
+With the default `20/40/40` split, `TARGET_RPS` must be divisible by `5`.
+The configured `PRE_ALLOCATED_VUS` and `MAX_VUS` values represent total
+load-generator capacity for the composite run and are divided proportionally
+across the internal k6 scenarios.
+
+The workload split represents external traffic composition, not microservices
+resource allocation. Resource allocation is still controlled separately through
+the architecture-level ResourceQuota and pod request/limit configuration.
+
+The scenario fails fast when:
+
+```text
+seeded users are missing
+seeded items are missing
+token setup fails
+enrichment data is not ready
+TARGET_RPS cannot be split exactly by the configured weights
+```
+
+Default weights:
+
+```text
+CONCURRENT_MIX_LOGIN_WEIGHT=20
+CONCURRENT_MIX_CREATE_TRANSACTION_WEIGHT=40
+CONCURRENT_MIX_ENRICHED_TRANSACTIONS_WEIGHT=40
+```
+
+### 3.5 Legacy Mixed Workload
 
 Lifecycle:
 
@@ -146,11 +220,17 @@ measured workload begins. This prevents the mixed scenario from silently
 degrading into authentication/write-only traffic when enrichment fixtures are
 missing.
 
+Unlike `concurrent-mixed-workload`, the legacy `mixed-workload` script chooses
+one branch per iteration using random weights. It can produce concurrent mixed
+traffic at aggregate k6 level because many VUs run at the same time, but it is
+not the final system-level workload used for primary RQ analysis.
+
 ---
 
 ## 4. Load Model
 
-Main benchmark scenarios use RPS-based execution with k6 `constant-arrival-rate`.
+Main fixed-mode benchmark scenarios use RPS-based execution with k6
+`constant-arrival-rate`.
 
 Reason:
 
@@ -341,6 +421,7 @@ client -> api-gateway -> transaction-service
 Required benchmark scripts:
 
 ```text
+concurrent-mixed-workload.js
 login.js
 create-transaction.js
 enriched-transactions.js

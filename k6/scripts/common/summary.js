@@ -102,18 +102,27 @@ function matchingMetricName(data, metricName, metricTags = null, options = {}) {
     return metricName;
   }
 
-  const matches = Object.keys(metrics).filter((candidate) => {
+  const matches = Object.keys(metrics).map((candidate) => {
     if (!candidate.startsWith(`${metricName}{`)) {
-      return false;
+      return null;
     }
 
     const candidateTags = parseMetricTags(candidate);
+    const matchesFilter = Object.entries(metricTags).every(([tagKey, tagValue]) => candidateTags[tagKey] === tagValue);
 
-    return Object.entries(metricTags).every(([tagKey, tagValue]) => candidateTags[tagKey] === tagValue);
-  });
+    if (!matchesFilter) {
+      return null;
+    }
+
+    return {
+      name: candidate,
+      extraTagCount: Math.max(0, Object.keys(candidateTags).length - Object.keys(metricTags).length),
+    };
+  }).filter(Boolean);
 
   if (matches.length > 0) {
-    return matches[0];
+    matches.sort((left, right) => left.extraTagCount - right.extraTagCount || left.name.localeCompare(right.name));
+    return matches[0].name;
   }
 
   return allowFallback ? metricName : null;

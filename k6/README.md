@@ -45,6 +45,7 @@ k6/
     │   ├── requests.js
     │   └── summary.js
     ├── smoke.js
+    ├── concurrent-mixed-workload.js
     ├── login.js
     ├── create-transaction.js
     ├── enriched-transactions.js
@@ -56,7 +57,13 @@ k6/
 
 ## Main Benchmark Scenarios
 
-The required benchmark scenarios are:
+The primary benchmark scenario is:
+
+| Script | Endpoint Mix | Workload Type |
+|---|---|---|
+| `concurrent-mixed-workload.js` | login 20%, create transaction 40%, enriched transactions 40% | concurrent system-level composite workload |
+
+Diagnostic benchmark scenarios are:
 
 | Script | Endpoint | Workload Type |
 |---|---|---|
@@ -70,7 +77,7 @@ Validation and optional scripts:
 |---|---|
 | `smoke.js` | end-to-end deployment validation |
 | `sync-items.js` | optional full item synchronization workload |
-| `mixed-workload.js` | optional mixed traffic simulation; requires enrichment preparation when the enriched branch weight is enabled |
+| `mixed-workload.js` | legacy random-branch mixed traffic; optional |
 
 ---
 
@@ -110,7 +117,51 @@ collect results
 
 The enrichment preparation step is not measured as part of the k6 result.
 
-### Mixed Workload Benchmark
+### Concurrent Mixed Workload Benchmark
+
+```text
+reset
+seed base users/items
+prepare enrichment transaction dataset
+run k6/scripts/concurrent-mixed-workload.js
+collect results
+```
+
+`concurrent-mixed-workload.js` runs three k6 scenarios in parallel inside one
+k6 execution:
+
+```text
+login                  = 20% of TARGET_RPS
+create-transaction     = 40% of TARGET_RPS
+enriched-transactions  = 40% of TARGET_RPS
+```
+
+Only requests tagged with `benchmark_phase=workload` and `request_kind=workload`
+are used for the scenario thresholds and stdout summary line. Setup logins and
+the enrichment readiness probe are tagged as setup traffic so they do not pollute
+the primary workload metrics.
+
+The configured `PRE_ALLOCATED_VUS` and `MAX_VUS` values are treated as the total
+load-generator capacity for the composite run. The script splits that capacity
+proportionally across the three internal k6 scenarios according to the branch
+RPS.
+
+The default split is controlled by:
+
+```text
+CONCURRENT_MIX_LOGIN_WEIGHT=20
+CONCURRENT_MIX_CREATE_TRANSACTION_WEIGHT=40
+CONCURRENT_MIX_ENRICHED_TRANSACTIONS_WEIGHT=40
+```
+
+The script fails fast if setup logins fail, item IDs are missing, enrichment
+data is unavailable, or `TARGET_RPS` cannot be split exactly by the configured
+weights.
+
+With the default `20/40/40` split, use a `TARGET_RPS` divisible by `5`; for
+example `100`, `200`, `250`, `300`, `400`, or `500`.
+
+### Legacy Mixed Workload Benchmark
 
 ```text
 reset
@@ -123,6 +174,11 @@ collect results
 The default mixed workload includes an enriched-transactions branch. If that
 branch weight is non-zero, the runner must prepare enrichment data first or the
 scenario setup will fail intentionally.
+
+The legacy `mixed-workload.js` script selects one branch per iteration using
+random weights. Use `concurrent-mixed-workload.js` for final primary composite
+analysis because it runs the three main endpoint branches concurrently with an
+explicit RPS split.
 
 ---
 
@@ -570,9 +626,9 @@ Recommended environment variable reference:
 | Variable | Purpose | Minikube validation mode | EKS benchmark mode |
 |---|---|---|---|
 | `BASE_URL` | target benchmark endpoint | Minikube ingress or service URL | in-cluster service or EKS ingress URL |
-| `K6_SCRIPT` | selected scenario script | `login.js`, `create-transaction.js`, `enriched-transactions.js` | same as Minikube |
+| `K6_SCRIPT` | selected scenario script | `login.js`, `create-transaction.js`, `enriched-transactions.js`, `concurrent-mixed-workload.js` | same as Minikube |
 | `ARCHITECTURE` | benchmark architecture identity | `monolith` or `microservices` | `monolith` or `microservices` |
-| `SCENARIO_NAME` | benchmark scenario label in metadata | `login`, `create-transaction`, `enriched-transactions` | same as Minikube |
+| `SCENARIO_NAME` | benchmark scenario label in metadata | `login`, `create-transaction`, `enriched-transactions`, `concurrent-mixed-workload` | same as Minikube |
 | `TARGET_RPS` | target request rate | small validation value such as `1` | final benchmark target such as `1000`, `2500`, `5000` |
 | `TEST_DURATION` | run duration | short duration such as `10s` or `30s` | measured benchmark duration such as `5m` |
 | `PRE_ALLOCATED_VUS` | initial VU pool for arrival-rate executor | small validation value | benchmark-sized value |

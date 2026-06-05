@@ -162,7 +162,44 @@ export function benchmarkOptions(name, metricTags = null) {
   };
 }
 
+export function benchmarkScenarioDefinition(rate, options = {}) {
+  assertCondition(Number.isInteger(rate) && rate > 0, `scenario rate must be a positive integer, got ${rate}.`);
+  const preAllocatedVUs = options.scaleVusByTargetRps ? scaleCapacity(PRE_ALLOCATED_VUS, rate) : PRE_ALLOCATED_VUS;
+  const maxVUs = Math.max(
+    preAllocatedVUs,
+    options.scaleVusByTargetRps ? scaleCapacity(MAX_VUS, rate) : MAX_VUS
+  );
+
+  if (K6_PROFILE === "ramp" || K6_PROFILE === "hpa") {
+    return {
+      executor: "ramping-arrival-rate",
+      startRate: Math.max(1, Math.floor(rate / 10)),
+      timeUnit: TIME_UNIT,
+      preAllocatedVUs,
+      maxVUs,
+      stages: parseStagesForTarget(rate),
+    };
+  }
+
+  return {
+    executor: "constant-arrival-rate",
+    rate,
+    timeUnit: TIME_UNIT,
+    duration: TEST_DURATION,
+    preAllocatedVUs,
+    maxVUs,
+  };
+}
+
+function scaleCapacity(totalCapacity, targetRps) {
+  return Math.max(1, Math.ceil((totalCapacity * targetRps) / TARGET_RPS));
+}
+
 function parseStages() {
+  return parseStagesForTarget(TARGET_RPS);
+}
+
+function parseStagesForTarget(targetRps) {
   const raw = envString("RAMP_STAGES_JSON", "");
   if (raw) {
     try {
@@ -172,7 +209,7 @@ function parseStages() {
       }
 
       parsed.forEach((stage, index) => validateStage(stage, index, "RAMP_STAGES_JSON"));
-      return parsed;
+      return scaleCustomStages(parsed, targetRps);
     } catch (error) {
       throw new Error(`Invalid RAMP_STAGES_JSON: ${error.message}`);
     }
@@ -180,17 +217,17 @@ function parseStages() {
 
   if (K6_PROFILE === "hpa") {
     return [
-      { target: Math.max(1, Math.floor(TARGET_RPS * 0.25)), duration: envString("HPA_RAMP_UP_1", "2m") },
-      { target: Math.max(1, Math.floor(TARGET_RPS * 0.50)), duration: envString("HPA_RAMP_UP_2", "2m") },
-      { target: TARGET_RPS, duration: envString("HPA_RAMP_UP_3", "3m") },
-      { target: TARGET_RPS, duration: envString("HPA_HOLD", "5m") },
+      { target: Math.max(1, Math.floor(targetRps * 0.25)), duration: envString("HPA_RAMP_UP_1", "2m") },
+      { target: Math.max(1, Math.floor(targetRps * 0.50)), duration: envString("HPA_RAMP_UP_2", "2m") },
+      { target: targetRps, duration: envString("HPA_RAMP_UP_3", "3m") },
+      { target: targetRps, duration: envString("HPA_HOLD", "5m") },
       { target: 0, duration: envString("HPA_RAMP_DOWN", "1m") },
     ];
   }
 
   return [
-    { target: TARGET_RPS, duration: envString("RAMP_UP_DURATION", "1m") },
-    { target: TARGET_RPS, duration: TEST_DURATION },
+    { target: targetRps, duration: envString("RAMP_UP_DURATION", "1m") },
+    { target: targetRps, duration: TEST_DURATION },
     { target: 0, duration: envString("RAMP_DOWN_DURATION", "30s") },
   ];
 }
@@ -199,6 +236,25 @@ function validateStage(stage, index, sourceName) {
   assertCondition(stage && typeof stage === "object" && !Array.isArray(stage), `${sourceName}[${index}] must be an object.`);
   assertCondition(Number.isInteger(stage.target) && stage.target >= 0, `${sourceName}[${index}].target must be a non-negative integer.`);
   assertCondition(typeof stage.duration === "string" && stage.duration.trim() !== "", `${sourceName}[${index}].duration must be a non-empty duration string.`);
+}
+
+function scaleCustomStages(stages, targetRps) {
+  if (targetRps === TARGET_RPS) {
+    return stages;
+  }
+
+  return stages.map((stage, index) => {
+    const numerator = stage.target * targetRps;
+    assertCondition(
+      numerator % TARGET_RPS === 0,
+      `RAMP_STAGES_JSON[${index}].target=${stage.target} cannot be split exactly from TARGET_RPS=${TARGET_RPS} to branch rate=${targetRps}. Use stage targets divisible by the composite split, or omit RAMP_STAGES_JSON for generated stages.`
+    );
+
+    return {
+      ...stage,
+      target: numerator / TARGET_RPS,
+    };
+  });
 }
 
 function validateConfig() {
