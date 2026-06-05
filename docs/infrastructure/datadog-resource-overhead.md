@@ -48,8 +48,8 @@ Important interpretation note:
   configuration active on `2026-05-23`,
 - at that time, the application resource ceiling documented in the benchmark
   manifests was `4000m CPU / 4096Mi memory` per architecture,
-- the current repository methodology later moved to a final measured ceiling
-  of `15800m CPU / 27648Mi memory` per architecture,
+- the current repository methodology later moved to the active Vultr final
+  measured ceiling of `7800m CPU / 15360Mi memory` per architecture,
 - therefore the Datadog usage measurements in this document remain valid as a
   historical overhead snapshot, while the final fairness baseline is now
   documented in `docs/experiment/application-ceiling-methodology.md`.
@@ -228,11 +228,11 @@ still the older exploratory `4000m CPU / 4096Mi memory` baseline. The current
 final methodology now uses:
 
 - monolith application ceiling:
-  - `15800m CPU`
-  - `27648Mi memory`
+  - `7800m CPU`
+  - `15360Mi memory`
 - microservices application ceiling:
-  - `15800m CPU`
-  - `27648Mi memory`
+  - `7800m CPU`
+  - `15360Mi memory`
 
 Datadog overhead should be interpreted separately as:
 

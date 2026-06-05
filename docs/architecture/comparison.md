@@ -1008,7 +1008,7 @@ Controlled variables:
 | Load generator | k6 |
 | Test scenarios | Same scripts |
 | Deployment environment | Same cloud environment (AWS EKS or Vultr VKE) |
-| Resource ceiling | Measurement-derived per architecture (Vultr) or 15800m CPU / 27648Mi (AWS) |
+| Resource ceiling | Measurement-derived per architecture; active Vultr baseline `7800m CPU / 15360Mi`, historical AWS example `15800m CPU / 27648Mi` |
 | Observability | Datadog |
 | Dataset | Logically equivalent seed |
 | Authentication behavior | Equivalent JWT rules |
@@ -1144,7 +1144,7 @@ Therefore, this project uses a synchronous REST + gRPC flow for create transacti
 | Monolith scaling | whole app |
 | MSA scaling | per service |
 | Autoscaling metric | CPU-based HPA |
-| Resource fairness | Measurement-derived ceiling (Vultr) or 15800m CPU / 27648Mi (AWS) |
+| Resource fairness | Same measured ceiling per architecture; active Vultr baseline `7800m CPU / 15360Mi`, historical AWS example `15800m CPU / 27648Mi` |
 | Execution topology | parallel or sequential, documented in benchmark metadata |
 | Async transaction flow | excluded |
 | Caching | excluded unless applied fairly |
