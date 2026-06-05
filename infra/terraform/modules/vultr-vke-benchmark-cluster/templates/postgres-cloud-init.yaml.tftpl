@@ -7,8 +7,8 @@ packages:
   - gnupg
   - lsb-release
 write_files:
-  - path: /tmp/init-postgres.sql
-    owner: postgres:postgres
+  - path: /root/init-postgres.sql
+    owner: root:root
     permissions: '0600'
     content: |
       CREATE ROLE postgres_admin WITH LOGIN SUPERUSER PASSWORD '${postgres_password_sql_literal}';
@@ -22,8 +22,12 @@ runcmd:
   - sed -i "s/^#listen_addresses =.*/listen_addresses = '*'/" /etc/postgresql/18/main/postgresql.conf
   - printf "host all postgres_admin ${vpc_cidr} scram-sha-256\nhost all postgres ${vpc_cidr} scram-sha-256\n" >> /etc/postgresql/18/main/pg_hba.conf
   - systemctl restart postgresql
-  - sudo -u postgres psql -v ON_ERROR_STOP=1 -f /tmp/init-postgres.sql
-  - shred -u /tmp/init-postgres.sql || rm -f /tmp/init-postgres.sql
+  - mv /root/init-postgres.sql /var/lib/postgresql/init-postgres.sql
+  - chown postgres:postgres /var/lib/postgresql/init-postgres.sql
+  - chmod 0600 /var/lib/postgresql/init-postgres.sql
+  - sudo -u postgres psql -v ON_ERROR_STOP=1 -f /var/lib/postgresql/init-postgres.sql
+  - shred -u /var/lib/postgresql/init-postgres.sql || rm -f /var/lib/postgresql/init-postgres.sql
+
   - ufw allow 22/tcp
   - ufw allow 5432/tcp
   - ufw reload || true
