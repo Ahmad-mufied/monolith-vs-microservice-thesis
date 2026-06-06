@@ -16,6 +16,8 @@ It answers four methodological questions:
 The total application ceiling itself is defined in
 [Application Ceiling Methodology](./application-ceiling-methodology.md).
 This document explains how that ceiling is divided inside each architecture.
+The image tag selection workflow for final benchmark runs is documented in
+[Image Tag Workflow](./image-tag-workflow.md).
 
 ---
 

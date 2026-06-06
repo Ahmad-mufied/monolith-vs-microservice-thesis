@@ -1,0 +1,144 @@
+# Image Tag Workflow
+
+## Purpose
+
+This document defines the image tag workflow for final benchmark experiments.
+It focuses on the active Vultr path, where benchmark images are stored in
+Docker Hub and Kubernetes manifests are rendered with one explicit image tag.
+
+The goal is to keep all deployables on the same application revision during a
+measured run.
+
+Required Docker Hub repositories:
+
+```text
+monolith
+api-gateway
+auth-service
+item-service
+transaction-service
+seed-runner
+k6-runner
+```
+
+All seven repositories must have the selected `IMAGE_TAG` before deployment.
+
+---
+
+## 1. List Available Tags
+
+Use this command when choosing which Docker Hub tag to use:
+
+```bash
+make dockerhub-list-images
+```
+
+By default, this lists available tags for the required Docker Hub repositories.
+It reads `DOCKERHUB_NAMESPACE` from the shell or from `env/vultr.env` /
+`env/hetzner.env`.
+
+Limit the number of tags shown per service:
+
+```bash
+make dockerhub-list-images DOCKERHUB_TAG_LIMIT=3
+```
+
+The output uses the operator timezone. The default timezone is
+`Asia/Jakarta`, unless `DOCKERHUB_TIMEZONE` or `TZ` is set.
+
+Example override:
+
+```bash
+DOCKERHUB_TIMEZONE=UTC make dockerhub-list-images DOCKERHUB_TAG_LIMIT=3
+```
+
+---
+
+## 2. Check One Candidate Tag
+
+After choosing a candidate tag, verify that it exists for all seven images:
+
+```bash
+make dockerhub-list-images IMAGE_TAG=670736c
+```
+
+Expected result:
+
+```text
+status      : FOUND
+```
+
+for every required service.
+
+If any service is `MISSING`, do not deploy that tag. Rebuild and push all
+images with the same tag:
+
+```bash
+make dockerhub-push-all IMAGE_TAG=670736c
+```
+
+Then rerun the check.
+
+---
+
+## 3. Pin the Selected Tag
+
+Pinning writes the selected tag to `env/image-tag.env`:
+
+```bash
+make pin-image-tag IMAGE_TAG=670736c
+make show-image-tag
+```
+
+Pinning provides a stable default for deploy and benchmark commands.
+
+The resolution order is:
+
+1. explicit `IMAGE_TAG=...` passed to the command,
+2. `env/image-tag.env`,
+3. legacy `env/image-tag.eks.env`,
+4. current Git short SHA.
+
+For final experiments, still pass `IMAGE_TAG` explicitly in deploy and suite
+commands. Treat the pin file as a guardrail, not as the only source of truth.
+
+---
+
+## 4. Deploy or Run With the Selected Tag
+
+Sequential Vultr deploy example:
+
+```bash
+ARCHITECTURE=monolith \
+SCALING_MODE=fixed \
+IMAGE_TAG=670736c \
+make deploy-workloads
+```
+
+Sequential Vultr suite example:
+
+```bash
+SCALING_MODE=fixed \
+K6_PROFILE=steady \
+IMAGE_TAG=670736c \
+ARCHITECTURE_ORDER="monolith microservices" \
+EXPERIMENT_NAME=rq1-fixed-vultr-sequential \
+make run-benchmark-suite
+```
+
+Switching `SCALING_MODE` from `fixed` to `hpa` requires redeployment before the
+next suite. The benchmark command records and validates the intended mode; it
+does not by itself mutate existing Kubernetes workload objects.
+
+---
+
+## 5. Final Experiment Rules
+
+- Use one `IMAGE_TAG` for all deployables in one measured experiment session.
+- Do not rebuild a different commit into an existing experiment tag.
+- If code changes, create a new tag and push all seven images again.
+- Verify the selected tag with `make dockerhub-list-images IMAGE_TAG=<tag>`
+  before deploy.
+- Pin the selected tag for operator safety.
+- Pass `IMAGE_TAG=<tag>` explicitly to deploy and benchmark suite commands.
+- Verify benchmark metadata includes the expected `image_tag`.
