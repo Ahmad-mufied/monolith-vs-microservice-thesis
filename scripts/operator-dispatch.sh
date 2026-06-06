@@ -230,11 +230,11 @@ dispatch_run_benchmark_case() {
   case "$EXECUTION_MODE" in
     parallel)
       reject_parallel_architecture
-      CLOUD_PROVIDER="$CLOUD_PROVIDER" bash scripts/run-benchmark-parallel.sh
+      CLOUD_PROVIDER="$CLOUD_PROVIDER" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" bash scripts/run-benchmark-parallel.sh
       ;;
     sequential)
       require_sequential_architecture
-      CLOUD_PROVIDER="$CLOUD_PROVIDER" bash scripts/run-benchmark-sequential.sh
+      CLOUD_PROVIDER="$CLOUD_PROVIDER" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" bash scripts/run-benchmark-sequential.sh
       ;;
   esac
 }
@@ -243,10 +243,10 @@ dispatch_run_benchmark_suite() {
   : "${SCALING_MODE:?SCALING_MODE is required}"
   case "$EXECUTION_MODE" in
     parallel)
-      CLOUD_PROVIDER="$CLOUD_PROVIDER" bash scripts/run-benchmark-suite.sh
+      CLOUD_PROVIDER="$CLOUD_PROVIDER" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" bash scripts/run-benchmark-suite.sh
       ;;
     sequential)
-      CLOUD_PROVIDER="$CLOUD_PROVIDER" bash scripts/run-benchmark-suite-sequential.sh
+      CLOUD_PROVIDER="$CLOUD_PROVIDER" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" bash scripts/run-benchmark-suite-sequential.sh
       ;;
   esac
 }

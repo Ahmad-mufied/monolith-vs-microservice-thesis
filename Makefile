@@ -1363,6 +1363,7 @@ run-benchmark-parallel:
 	S3_BUCKET=$(S3_BUCKET) \
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/run-benchmark-parallel.sh
 
 .PHONY: run-benchmark-case
@@ -1382,6 +1383,7 @@ run-benchmark-case:
 	AWS_REGION=$(AWS_REGION) \
 	ECR_NAMESPACE=$(ECR_NAMESPACE) \
 	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/operator-dispatch.sh run-benchmark-case
 
 .PHONY: run-benchmark-suite
@@ -1393,6 +1395,7 @@ run-benchmark-suite:
 	RPS_LEVELS="$(RPS_LEVELS)" \
 	SCENARIO_RPS_MATRIX="$(SCENARIO_RPS_MATRIX)" \
 	INTER_CASE_DELAY=$(INTER_CASE_DELAY) \
+	ARCHITECTURE_SWITCH_DELAY=$(ARCHITECTURE_SWITCH_DELAY) \
 	AUTO_DESTROY_CONFIRMED=$(AUTO_DESTROY_CONFIRMED) \
 	EXPERIMENT_NAME="$(if $(filter command line environment,$(origin EXPERIMENT_NAME)),$(EXPERIMENT_NAME),)" \
 	RUN_ID="$(if $(filter command line environment,$(origin RUN_ID)),$(RUN_ID),)" \
@@ -1403,6 +1406,7 @@ run-benchmark-suite:
 	AWS_REGION=$(AWS_REGION) \
 	ECR_NAMESPACE=$(ECR_NAMESPACE) \
 	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/operator-dispatch.sh run-benchmark-suite
 
 .PHONY: run-benchmark-sequential
@@ -1419,6 +1423,7 @@ run-benchmark-sequential:
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
 	ARCHITECTURE_ORDER="$(ARCHITECTURE_ORDER)" \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/run-benchmark-sequential.sh
 
 .PHONY: run-benchmark-sequential-hetzner
@@ -1436,6 +1441,7 @@ run-benchmark-sequential-hetzner:
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
 	ARCHITECTURE_ORDER="$(ARCHITECTURE_ORDER)" \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/run-benchmark-sequential.sh
 
 .PHONY: run-benchmark-parallel-hetzner
@@ -1451,6 +1457,7 @@ run-benchmark-parallel-hetzner:
 	S3_BUCKET=$(S3_BUCKET) \
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/run-benchmark-parallel.sh
 
 .PHONY: run-benchmark-parallel-vultr
@@ -1466,6 +1473,7 @@ run-benchmark-parallel-vultr:
 	S3_BUCKET=$(S3_BUCKET) \
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/run-benchmark-parallel.sh
 
 .PHONY: run-benchmark-sequential-vultr
@@ -1483,6 +1491,7 @@ run-benchmark-sequential-vultr:
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
 	ARCHITECTURE_ORDER="$(ARCHITECTURE_ORDER)" \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/run-benchmark-sequential.sh
 
 .PHONY: run-benchmark-suite-vultr
@@ -1503,6 +1512,7 @@ run-benchmark-suite-vultr:
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
 	AWS_REGION=$(AWS_REGION) \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/run-benchmark-suite.sh
 
 .PHONY: run-benchmark-suite-sequential-vultr
@@ -1525,6 +1535,7 @@ run-benchmark-suite-sequential-vultr:
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
 	AWS_REGION=$(AWS_REGION) \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/run-benchmark-suite-sequential.sh
 
 .PHONY: run-benchmark-suite-sequential
@@ -1546,4 +1557,5 @@ run-benchmark-suite-sequential:
 	DATADOG_ENABLED=$(DATADOG_ENABLED) \
 	DATADOG_ENV=$(DATADOG_ENV) \
 	AWS_REGION=$(AWS_REGION) \
+	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/run-benchmark-suite-sequential.sh

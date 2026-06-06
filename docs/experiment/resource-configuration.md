@@ -19,6 +19,9 @@ This document explains how that ceiling is divided inside each architecture.
 The image tag selection workflow for final benchmark runs is documented in
 [Image Tag Workflow](./image-tag-workflow.md).
 
+For the final Vultr sequential operator flow, see
+[Vultr Sequential Final Experiment Guide](./vultr-sequential-final-experiment-guide.md).
+
 ---
 
 ## 1. Core Fairness Rule

@@ -804,6 +804,7 @@ run_parallel_case() {
   AWS_REGION="$AWS_REGION" \
   CLOUD_PROVIDER="$CLOUD_PROVIDER" \
   DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
+  IMAGE_TAG="$IMAGE_TAG" \
   bash scripts/run-benchmark-parallel.sh
 }
 

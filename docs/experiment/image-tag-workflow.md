@@ -133,9 +133,10 @@ EXPERIMENT_NAME=rq1-fixed-vultr-sequential \
 make run-benchmark-suite
 ```
 
-Switching `SCALING_MODE` from `fixed` to `hpa` requires redeployment before the
-next suite. The benchmark command records and validates the intended mode; it
-does not by itself mutate existing Kubernetes workload objects.
+For sequential Vultr suites, `make run-benchmark-suite` deploys each
+architecture phase internally with the suite-level `SCALING_MODE` and
+`IMAGE_TAG`. Run a new suite with `SCALING_MODE=hpa` when switching from fixed
+to HPA.
 
 ---
 

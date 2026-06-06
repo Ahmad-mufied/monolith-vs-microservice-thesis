@@ -445,6 +445,7 @@ for architecture in $ARCHITECTURE_ORDER; do
       ECR_NAMESPACE="$ECR_NAMESPACE" \
       CLOUD_PROVIDER="$CLOUD_PROVIDER" \
       DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
+      IMAGE_TAG="$IMAGE_TAG" \
       bash scripts/run-benchmark-sequential.sh
       case_exit_code=$?
       set -e
