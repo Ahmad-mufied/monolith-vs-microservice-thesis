@@ -87,7 +87,7 @@ kubectl() {
     command kubectl "$@" 2>"$stderr_tmp" || exit_code=$?
 
     if [ $exit_code -eq 0 ]; then
-      cat "$stderr_tmp" >&2
+      grep -v 'Unexpected error when reading response body.*request canceled.*while reading body' "$stderr_tmp" >&2 || true
       rm -f "$stderr_tmp"
       return 0
     fi
