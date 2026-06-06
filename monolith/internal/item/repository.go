@@ -3,7 +3,6 @@ package item
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sort"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
@@ -23,7 +22,7 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 func (r *PostgresRepository) SyncItems(ctx context.Context, items []SyncItem) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return apperror.Internal("internal server error", fmt.Errorf("begin sync transaction: %w", err))
+		return apperror.InternalFromContext("begin sync transaction", err)
 	}
 	defer func() { _ = tx.Rollback(context.Background()) }()
 
@@ -35,7 +34,7 @@ func (r *PostgresRepository) SyncItems(ctx context.Context, items []SyncItem) er
 	})
 
 	if err := softDeleteOmittedItems(ctx, tx, keepIDs); err != nil {
-		return apperror.Internal("internal server error", fmt.Errorf("soft delete omitted items: %w", err))
+		return apperror.InternalFromContext("soft delete omitted items", err)
 	}
 	if len(inserts) > 0 {
 		if err := batchInsertItems(ctx, tx, inserts); err != nil {
@@ -49,7 +48,7 @@ func (r *PostgresRepository) SyncItems(ctx context.Context, items []SyncItem) er
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return apperror.Internal("internal server error", fmt.Errorf("commit sync transaction: %w", err))
+		return apperror.InternalFromContext("commit sync transaction", err)
 	}
 	return nil
 }
@@ -64,7 +63,7 @@ LIMIT $1 OFFSET $2`
 
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
-		return nil, apperror.Internal("internal server error", fmt.Errorf("list items: %w", err))
+		return nil, apperror.InternalFromContext("list items", err)
 	}
 	defer rows.Close()
 
@@ -72,12 +71,12 @@ LIMIT $1 OFFSET $2`
 	for rows.Next() {
 		item, err := scanItem(rows)
 		if err != nil {
-			return nil, apperror.Internal("internal server error", fmt.Errorf("scan item row: %w", err))
+			return nil, apperror.InternalFromContext("scan item row", err)
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, apperror.Internal("internal server error", fmt.Errorf("iterate items: %w", err))
+		return nil, apperror.InternalFromContext("iterate items", err)
 	}
 	return items, nil
 }
@@ -94,7 +93,7 @@ WHERE id = $1::uuid
 		return Item{}, apperror.NotFound("item not found")
 	}
 	if err != nil {
-		return Item{}, apperror.Internal("internal server error", fmt.Errorf("get item by id: %w", err))
+		return Item{}, apperror.InternalFromContext("get item by id", err)
 	}
 	return item, nil
 }
@@ -217,7 +216,7 @@ func mapConflictError(err error) error {
 	}
 	pgErr, ok := errors.AsType[*pgconn.PgError](err)
 	if !ok {
-		return apperror.Internal("internal server error", fmt.Errorf("upsert item: %w", err))
+		return apperror.InternalFromContext("upsert item", err)
 	}
 	switch pgErr.Code {
 	case "23505":
@@ -225,6 +224,6 @@ func mapConflictError(err error) error {
 	case "40001", "40P01", "57014":
 		return apperror.Conflict("transaction conflict, please retry")
 	default:
-		return apperror.Internal("internal server error", fmt.Errorf("upsert item: %w", err))
+		return apperror.InternalFromContext("upsert item", err)
 	}
 }

@@ -1,7 +1,9 @@
 package errors
 
 import (
+	"context"
 	stderrors "errors"
+	"fmt"
 	"sort"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -17,6 +19,7 @@ var (
 	ErrInvalidInput       = stderrors.New("invalid input")
 	ErrUnavailable        = stderrors.New("unavailable")
 	ErrDeadlineExceeded   = stderrors.New("deadline exceeded")
+	ErrCanceled           = stderrors.New("canceled")
 	ErrInternal           = stderrors.New("internal")
 )
 
@@ -90,8 +93,30 @@ func DeadlineExceeded(message string) error {
 	return &Error{kind: ErrDeadlineExceeded, message: message}
 }
 
+func Canceled(message string) error {
+	return &Error{kind: ErrCanceled, message: message}
+}
+
+func FromContext(err error, deadlineMessage, canceledMessage string) error {
+	switch {
+	case stderrors.Is(err, context.DeadlineExceeded):
+		return &Error{kind: ErrDeadlineExceeded, message: deadlineMessage, cause: err}
+	case stderrors.Is(err, context.Canceled):
+		return &Error{kind: ErrCanceled, message: canceledMessage, cause: err}
+	default:
+		return nil
+	}
+}
+
 func Internal(message string, cause error) error {
 	return &Error{kind: ErrInternal, message: message, cause: cause}
+}
+
+func InternalFromContext(action string, err error) error {
+	if ctxErr := FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
+		return ctxErr
+	}
+	return Internal("internal server error", fmt.Errorf("%s: %w", action, err))
 }
 
 func ToGRPCStatus(err error) error {
@@ -117,6 +142,8 @@ func ToGRPCStatus(err error) error {
 		code = codes.Unavailable
 	case stderrors.Is(err, ErrDeadlineExceeded):
 		code = codes.DeadlineExceeded
+	case stderrors.Is(err, ErrCanceled):
+		code = codes.Canceled
 	}
 
 	st := status.New(code, message)
@@ -154,6 +181,8 @@ func publicMessage(err error) string {
 		return "service unavailable"
 	case stderrors.Is(err, ErrDeadlineExceeded):
 		return "request timeout"
+	case stderrors.Is(err, ErrCanceled):
+		return "request canceled"
 	default:
 		return "internal server error"
 	}

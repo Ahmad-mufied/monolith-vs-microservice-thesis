@@ -926,6 +926,7 @@ Common HTTP status codes:
 | 403 | forbidden |
 | 404 | resource not found |
 | 409 | conflict, allocation conflict, or insufficient item amount |
+| 499 | client canceled request |
 | 500 | internal server error |
 | 503 | upstream service unavailable |
 | 504 | upstream timeout |
@@ -935,6 +936,7 @@ For create transaction:
 - insufficient item amount should return `409`,
 - invalid UUID should return `400`,
 - invalid JWT should return `401`,
+- canceled request should return `499`,
 - upstream service timeout in microservices should return `504`,
 - unexpected internal error should return `500`.
 

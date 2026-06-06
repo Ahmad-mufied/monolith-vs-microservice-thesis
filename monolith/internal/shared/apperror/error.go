@@ -1,6 +1,11 @@
 package apperror
 
-import "net/http"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+)
 
 type Code string
 
@@ -12,6 +17,8 @@ const (
 	CodeMethodNotAllowed     Code = "METHOD_NOT_ALLOWED"
 	CodeUnsupportedMediaType Code = "UNSUPPORTED_MEDIA_TYPE"
 	CodeConflict             Code = "CONFLICT"
+	CodeGatewayTimeout       Code = "GATEWAY_TIMEOUT"
+	CodeClientCanceled       Code = "CLIENT_CANCELED"
 	CodeInternal             Code = "INTERNAL_SERVER_ERROR"
 )
 
@@ -57,8 +64,34 @@ func Conflict(message string) *Error {
 	return &Error{Code: CodeConflict, Message: message, Status: http.StatusConflict}
 }
 
+func DeadlineExceeded(message string, err error) *Error {
+	return &Error{Code: CodeGatewayTimeout, Message: message, Status: http.StatusGatewayTimeout, Err: err}
+}
+
+func Canceled(message string, err error) *Error {
+	return &Error{Code: CodeClientCanceled, Message: message, Status: 499, Err: err}
+}
+
 func Internal(message string, err error) *Error {
 	return &Error{Code: CodeInternal, Message: message, Status: http.StatusInternalServerError, Err: err}
+}
+
+func InternalFromContext(action string, err error) *Error {
+	if ctxErr := FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
+		return ctxErr
+	}
+	return Internal("internal server error", fmt.Errorf("%s: %w", action, err))
+}
+
+func FromContext(err error, deadlineMessage, canceledMessage string) *Error {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return DeadlineExceeded(deadlineMessage, err)
+	case errors.Is(err, context.Canceled):
+		return Canceled(canceledMessage, err)
+	default:
+		return nil
+	}
 }
 
 func FromHTTPStatus(status int, message string) *Error {

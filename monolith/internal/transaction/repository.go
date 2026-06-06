@@ -25,7 +25,7 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 func (r *PostgresRepository) Create(ctx context.Context, userID string, items []CreateItemRequest) (Transaction, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return Transaction{}, apperror.Internal("internal server error", fmt.Errorf("beginning transaction: %w", err))
+		return Transaction{}, apperror.InternalFromContext("beginning transaction", err)
 	}
 	finalizeCtx, finalizeCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer finalizeCancel()
@@ -54,7 +54,7 @@ func (r *PostgresRepository) Create(ctx context.Context, userID string, items []
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return Transaction{}, apperror.Internal("internal server error", fmt.Errorf("committing transaction: %w", err))
+		return Transaction{}, apperror.InternalFromContext("committing transaction", err)
 	}
 	return transaction, nil
 }
@@ -77,7 +77,7 @@ ORDER BY created_at DESC, id DESC
 LIMIT $2 OFFSET $3`
 	rows, err := r.db.Query(ctx, query, userID, limit, offset)
 	if err != nil {
-		return nil, apperror.Internal("internal server error", fmt.Errorf("listing own transactions: %w", err))
+		return nil, apperror.InternalFromContext("listing own transactions", err)
 	}
 	defer rows.Close()
 
@@ -85,12 +85,12 @@ LIMIT $2 OFFSET $3`
 	for rows.Next() {
 		var tx Transaction
 		if err := rows.Scan(&tx.ID, &tx.UserID, &tx.CreatedAt, &tx.UpdatedAt); err != nil {
-			return nil, apperror.Internal("internal server error", fmt.Errorf("scanning transaction: %w", err))
+			return nil, apperror.InternalFromContext("scanning transaction", err)
 		}
 		transactions = append(transactions, tx)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, apperror.Internal("internal server error", fmt.Errorf("iterating transactions: %w", err))
+		return nil, apperror.InternalFromContext("iterating transactions", err)
 	}
 	if len(transactions) == 0 {
 		return transactions, nil
@@ -116,7 +116,7 @@ WHERE id = $1::uuid AND user_id = $2::uuid`
 		if err == pgx.ErrNoRows {
 			return Transaction{}, apperror.NotFound("transaction not found")
 		}
-		return Transaction{}, apperror.Internal("internal server error", fmt.Errorf("getting transaction: %w", err))
+		return Transaction{}, apperror.InternalFromContext("getting transaction", err)
 	}
 	items, err := r.listItems(ctx, tx.ID)
 	if err != nil {
@@ -153,7 +153,7 @@ JOIN items i ON i.id = ti.item_id
 ORDER BY t.created_at DESC, t.id DESC, i.id`
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
-		return nil, apperror.Internal("internal server error", fmt.Errorf("listing enriched transactions: %w", err))
+		return nil, apperror.InternalFromContext("listing enriched transactions", err)
 	}
 	defer rows.Close()
 
@@ -175,7 +175,7 @@ ORDER BY t.created_at DESC, t.id DESC, i.id`
 			&row.ItemDeleted,
 			&row.Amount,
 		); err != nil {
-			return nil, apperror.Internal("internal server error", fmt.Errorf("scanning enriched transaction: %w", err))
+			return nil, apperror.InternalFromContext("scanning enriched transaction", err)
 		}
 
 		tx, ok := byID[row.TransactionID]
@@ -205,7 +205,7 @@ ORDER BY t.created_at DESC, t.id DESC, i.id`
 		})
 	}
 	if err := rows.Err(); err != nil {
-		return nil, apperror.Internal("internal server error", fmt.Errorf("iterating enriched transactions: %w", err))
+		return nil, apperror.InternalFromContext("iterating enriched transactions", err)
 	}
 
 	transactions := make([]EnrichedTransaction, 0, len(order))
@@ -223,7 +223,7 @@ WHERE transaction_id = $1::uuid
 ORDER BY item_id`
 	rows, err := r.db.Query(ctx, query, transactionID)
 	if err != nil {
-		return nil, apperror.Internal("internal server error", fmt.Errorf("listing transaction items: %w", err))
+		return nil, apperror.InternalFromContext("listing transaction items", err)
 	}
 	defer rows.Close()
 
@@ -231,12 +231,12 @@ ORDER BY item_id`
 	for rows.Next() {
 		var item Item
 		if err := rows.Scan(&item.ItemID, &item.Amount); err != nil {
-			return nil, apperror.Internal("internal server error", fmt.Errorf("scanning transaction item: %w", err))
+			return nil, apperror.InternalFromContext("scanning transaction item", err)
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, apperror.Internal("internal server error", fmt.Errorf("iterating transaction items: %w", err))
+		return nil, apperror.InternalFromContext("iterating transaction items", err)
 	}
 	return items, nil
 }
@@ -245,7 +245,7 @@ func (r *PostgresRepository) listItemsByTransactionIDs(ctx context.Context, tran
 	query, args := buildListItemsByTransactionIDsQuery(transactionIDs)
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, apperror.Internal("internal server error", fmt.Errorf("listing transaction items: %w", err))
+		return nil, apperror.InternalFromContext("listing transaction items", err)
 	}
 	defer rows.Close()
 
@@ -258,12 +258,12 @@ func (r *PostgresRepository) listItemsByTransactionIDs(ctx context.Context, tran
 		var transactionID string
 		var item Item
 		if err := rows.Scan(&transactionID, &item.ItemID, &item.Amount); err != nil {
-			return nil, apperror.Internal("internal server error", fmt.Errorf("scanning transaction item: %w", err))
+			return nil, apperror.InternalFromContext("scanning transaction item", err)
 		}
 		itemsByTransactionID[transactionID] = append(itemsByTransactionID[transactionID], item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, apperror.Internal("internal server error", fmt.Errorf("iterating transaction items: %w", err))
+		return nil, apperror.InternalFromContext("iterating transaction items", err)
 	}
 	return itemsByTransactionID, nil
 }
@@ -298,7 +298,7 @@ func validateItem(ctx context.Context, tx pgx.Tx, item CreateItemRequest) error 
 		if err == pgx.ErrNoRows {
 			return apperror.NotFound("item not found")
 		}
-		return apperror.Internal("internal server error", fmt.Errorf("validating item: %w", err))
+		return apperror.InternalFromContext("validating item", err)
 	}
 	if availableAmount < item.Amount {
 		return apperror.Conflict("insufficient available amount")
@@ -316,7 +316,7 @@ func insertTransaction(ctx context.Context, tx pgx.Tx, userID string) (Transacti
 		if isMissingTransactionUserError(err) {
 			return Transaction{}, apperror.Unauthorized("invalid authentication context")
 		}
-		return Transaction{}, apperror.Internal("internal server error", fmt.Errorf("inserting transaction: %w", err))
+		return Transaction{}, apperror.InternalFromContext("inserting transaction", err)
 	}
 	return transaction, nil
 }
@@ -334,7 +334,7 @@ func insertTransactionItem(ctx context.Context, tx pgx.Tx, transactionID string,
 INSERT INTO transaction_items (transaction_id, item_id, amount)
 VALUES ($1::uuid, $2::uuid, $3)`
 	if _, err := tx.Exec(ctx, query, transactionID, item.ItemID, item.Amount); err != nil {
-		return apperror.Internal("internal server error", fmt.Errorf("inserting transaction item: %w", err))
+		return apperror.InternalFromContext("inserting transaction item", err)
 	}
 	return nil
 }

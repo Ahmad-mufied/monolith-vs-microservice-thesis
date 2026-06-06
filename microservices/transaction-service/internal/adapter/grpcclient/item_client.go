@@ -40,6 +40,9 @@ func (c *ItemClient) ValidateTransactionItems(ctx context.Context, items []domai
 	if err == nil {
 		return nil
 	}
+	if ctxErr := pkgerrors.FromContext(err, "item service request timed out", "item service request canceled"); ctxErr != nil {
+		return ctxErr
+	}
 
 	st, ok := status.FromError(err)
 	if !ok {
@@ -57,6 +60,8 @@ func (c *ItemClient) ValidateTransactionItems(ctx context.Context, items []domai
 		return pkgerrors.Conflict("transaction conflict")
 	case codes.DeadlineExceeded:
 		return pkgerrors.DeadlineExceeded("item service request timed out")
+	case codes.Canceled:
+		return pkgerrors.Canceled("item service request canceled")
 	case codes.Unavailable:
 		return pkgerrors.Unavailable("item service unavailable")
 	default:
