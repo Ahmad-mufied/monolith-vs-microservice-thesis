@@ -174,9 +174,15 @@ ETA behavior:
   the current scenario.
 - `est_suite` is the expected finish time for the remaining sequential suite.
 - ETA is based on the configured k6 profile duration plus
-  `INTER_CASE_DELAY` and `ARCHITECTURE_SWITCH_DELAY`. It intentionally excludes
-  deploy, reset, seed, enrichment prepare, Kubernetes scheduling, and S3 upload
-  overhead, so treat it as the lower-bound operational estimate.
+  `INTER_CASE_DELAY`, `ARCHITECTURE_SWITCH_DELAY`, and a per-case operational
+  overhead buffer. The default per-case buffer is
+  `SEQUENTIAL_CASE_OVERHEAD_SECONDS=180` to account for reset, seed, prepare,
+  Kubernetes scheduling, cleanup, and S3 upload overhead.
+- Retry time is not added by default because the suite does not retry failed
+  cases automatically. If you intentionally add manual retry allowance, set
+  `SEQUENTIAL_RETRY_BUFFER_SECONDS=<seconds>`.
+- ETA uses S3 `result-status.json` markers when resuming, so skipped cases do
+  not inflate the remaining suite estimate.
 
 Resume behavior:
 
