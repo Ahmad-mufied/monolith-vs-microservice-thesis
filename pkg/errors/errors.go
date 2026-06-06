@@ -3,6 +3,7 @@ package errors
 import (
 	"context"
 	stderrors "errors"
+	"fmt"
 	"sort"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -109,6 +110,13 @@ func FromContext(err error, deadlineMessage, canceledMessage string) error {
 
 func Internal(message string, cause error) error {
 	return &Error{kind: ErrInternal, message: message, cause: cause}
+}
+
+func InternalFromContext(action string, err error) error {
+	if ctxErr := FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
+		return ctxErr
+	}
+	return Internal("internal server error", fmt.Errorf("%s: %w", action, err))
 }
 
 func ToGRPCStatus(err error) error {

@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/jackc/pgx/v5"
@@ -37,7 +36,7 @@ RETURNING id::text, name, email, password_hash, created_at, updated_at`
 		if isUniqueViolation(err) {
 			return User{}, apperror.Conflict("email already exists")
 		}
-		return User{}, internalError("creating user", err)
+		return User{}, apperror.InternalFromContext("creating user", err)
 	}
 	return user, nil
 }
@@ -60,7 +59,7 @@ WHERE lower(email) = lower($1)`
 		if err == pgx.ErrNoRows {
 			return User{}, apperror.Unauthorized("invalid email or password")
 		}
-		return User{}, internalError("finding user by email", err)
+		return User{}, apperror.InternalFromContext("finding user by email", err)
 	}
 	return user, nil
 }
@@ -68,11 +67,4 @@ WHERE lower(email) = lower($1)`
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
-}
-
-func internalError(action string, err error) error {
-	if ctxErr := apperror.FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
-		return ctxErr
-	}
-	return apperror.Internal("internal server error", fmt.Errorf("%s: %w", action, err))
 }

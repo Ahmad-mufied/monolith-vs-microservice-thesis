@@ -3,6 +3,7 @@ package apperror
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 )
 
@@ -73,6 +74,13 @@ func Canceled(message string, err error) *Error {
 
 func Internal(message string, err error) *Error {
 	return &Error{Code: CodeInternal, Message: message, Status: http.StatusInternalServerError, Err: err}
+}
+
+func InternalFromContext(action string, err error) *Error {
+	if ctxErr := FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
+		return ctxErr
+	}
+	return Internal("internal server error", fmt.Errorf("%s: %w", action, err))
 }
 
 func FromContext(err error, deadlineMessage, canceledMessage string) *Error {

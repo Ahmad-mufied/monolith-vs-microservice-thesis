@@ -67,3 +67,31 @@ func TestFromContext(t *testing.T) {
 		})
 	}
 }
+
+func TestInternalFromContext(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantCode   Code
+		wantStatus int
+	}{
+		{name: "deadline exceeded", err: context.DeadlineExceeded, wantCode: CodeGatewayTimeout, wantStatus: http.StatusGatewayTimeout},
+		{name: "canceled", err: context.Canceled, wantCode: CodeClientCanceled, wantStatus: 499},
+		{name: "other", err: errors.New("driver error"), wantCode: CodeInternal, wantStatus: http.StatusInternalServerError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := InternalFromContext("query users", tt.err)
+			if got.Code != tt.wantCode {
+				t.Fatalf("code = %s, want %s", got.Code, tt.wantCode)
+			}
+			if got.Status != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", got.Status, tt.wantStatus)
+			}
+			if !errors.Is(got, tt.err) {
+				t.Fatalf("InternalFromContext() should preserve cause %v, got %v", tt.err, got)
+			}
+		})
+	}
+}

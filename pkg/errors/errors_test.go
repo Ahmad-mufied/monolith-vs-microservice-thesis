@@ -165,6 +165,30 @@ func TestFromContext(t *testing.T) {
 	}
 }
 
+func TestInternalFromContext(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want error
+	}{
+		{name: "deadline exceeded", err: context.DeadlineExceeded, want: ErrDeadlineExceeded},
+		{name: "canceled", err: context.Canceled, want: ErrCanceled},
+		{name: "other", err: stderrors.New("driver error"), want: ErrInternal},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := InternalFromContext("query users", tt.err)
+			if !stderrors.Is(got, tt.want) {
+				t.Fatalf("InternalFromContext() = %v, want %v", got, tt.want)
+			}
+			if !stderrors.Is(got, tt.err) {
+				t.Fatalf("InternalFromContext() should preserve cause %v, got %v", tt.err, got)
+			}
+		})
+	}
+}
+
 func assertGRPCFieldViolations(t *testing.T, st *status.Status, want map[string]string) {
 	t.Helper()
 
