@@ -37,6 +37,13 @@ By default, this lists available tags for the required Docker Hub repositories.
 It reads `DOCKERHUB_NAMESPACE` from the shell or from `env/vultr.env` /
 `env/hetzner.env`.
 
+Optional hardening for repeated operator use:
+
+- `DOCKERHUB_TOKEN=<token>` adds an authenticated Docker Hub API header.
+- `DOCKERHUB_USER=<user>` plus `DOCKERHUB_TOKEN=<token>` uses Basic auth.
+- The script retries a small number of times for Docker Hub API rate limiting
+  or transient `5xx` failures.
+
 Limit the number of tags shown per service:
 
 ```bash

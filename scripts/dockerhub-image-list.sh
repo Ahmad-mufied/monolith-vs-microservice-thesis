@@ -37,6 +37,53 @@ repos=(monolith api-gateway auth-service item-service transaction-service seed-r
 
 tag_pushed_at_filter='.tag_last_pushed // .last_updated // (.images[0]?.last_pushed) // "unknown"'
 available_blocks=()
+dockerhub_auth_args=()
+
+if [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+  if [ -n "${DOCKERHUB_USER:-}" ]; then
+    dockerhub_auth_args=(-H "Authorization: Basic $(printf '%s' "${DOCKERHUB_USER}:${DOCKERHUB_TOKEN}" | base64 | tr -d '\n')")
+  else
+    dockerhub_auth_args=(-H "Authorization: Bearer ${DOCKERHUB_TOKEN}")
+  fi
+fi
+
+dockerhub_request() {
+  local url="$1"
+  local attempt=1
+  local max_attempts=3
+  local response=""
+  local body=""
+  local status=""
+
+  while [ "$attempt" -le "$max_attempts" ]; do
+    response="$(curl -sS "${dockerhub_auth_args[@]}" -w $'\n%{http_code}' "$url" 2>/dev/null || true)"
+    status="${response##*$'\n'}"
+    body="${response%$'\n'*}"
+
+    if [[ "$status" =~ ^2[0-9][0-9]$ ]]; then
+      printf '%s' "$body"
+      return 0
+    fi
+
+    if [ "$status" = "429" ] || [ "$status" = "000" ] || [[ "$status" =~ ^5[0-9][0-9]$ ]]; then
+      if [ "$attempt" -lt "$max_attempts" ]; then
+        sleep "$attempt"
+        attempt=$((attempt + 1))
+        continue
+      fi
+    fi
+
+    if [ -n "$status" ]; then
+      echo "WARN: Docker Hub API request failed for $url with HTTP $status" >&2
+    else
+      echo "WARN: Docker Hub API request failed for $url" >&2
+    fi
+    return 1
+  done
+
+  echo "WARN: Docker Hub API request failed for $url" >&2
+  return 1
+}
 
 format_time() {
   local raw="$1"
@@ -80,7 +127,7 @@ echo ""
 missing=0
 for repo in "${repos[@]}"; do
   tags_url="https://hub.docker.com/v2/repositories/${namespace}/${repo}/tags?page_size=${tag_limit}"
-  tags_json="$(curl -fsS "$tags_url" 2>/dev/null || true)"
+  tags_json="$(dockerhub_request "$tags_url" || true)"
 
   if [ -z "$tags_json" ] || ! jq -e . >/dev/null 2>&1 <<<"$tags_json"; then
     image="docker.io/${namespace}/${repo}"
@@ -122,7 +169,7 @@ for repo in "${repos[@]}"; do
       printf '  image       : %s\n' "$image"
       printf '  last pushed : %s\n\n' "$(format_time "$selected_pushed_at")"
     elif docker manifest inspect "docker.io/${namespace}/${repo}:${image_tag}" >/dev/null 2>&1; then
-      tag_detail_json="$(curl -fsS "https://hub.docker.com/v2/repositories/${namespace}/${repo}/tags/${image_tag}" 2>/dev/null || true)"
+      tag_detail_json="$(dockerhub_request "https://hub.docker.com/v2/repositories/${namespace}/${repo}/tags/${image_tag}" || true)"
       selected_pushed_at="unknown"
       if [ -n "$tag_detail_json" ] && jq -e . >/dev/null 2>&1 <<<"$tag_detail_json"; then
         selected_pushed_at="$(jq -r "$tag_pushed_at_filter" <<<"$tag_detail_json")"
