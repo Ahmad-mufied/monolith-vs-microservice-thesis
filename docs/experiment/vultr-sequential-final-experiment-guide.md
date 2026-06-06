@@ -29,6 +29,7 @@ make experiment-apply
 make setup-contexts
 make create-secrets
 make measure-resource-baseline
+IMAGE_TAG="$IMAGE_TAG" make render-manifests
 ```
 
 Then choose one of these benchmark execution paths:
@@ -39,7 +40,18 @@ ARCHITECTURE=monolith SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" make deploy-work
 SCALING_MODE=fixed EXECUTION_MODE=sequential ARCHITECTURE=monolith make verify-live-mode
 
 # Final matrix. The sequential suite deploys each architecture phase itself.
-SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" ARCHITECTURE_ORDER="monolith microservices" make run-benchmark-suite
+make profile-show
+
+SCALING_MODE=fixed \
+K6_PROFILE=steady \
+TEST_DURATION=5m \
+RUN_ID=rq1-fixed-vultr-sequential \
+ATTEMPT=attempt-01 \
+INTER_CASE_DELAY=120 \
+ARCHITECTURE_SWITCH_DELAY=300 \
+IMAGE_TAG="$IMAGE_TAG" \
+SCENARIO_RPS_MATRIX="login:100,200;create-transaction:100,200" \
+make run-benchmark-suite
 ```
 
 Provider-specific `vultr-*` commands remain useful for debugging individual
@@ -59,8 +71,10 @@ make run-benchmark-suite  = run the full scenario/RPS matrix
 
 Sequential mode does not mean HPA. Fixed/HPA is a separate deployment state.
 
-Use `deploy-workloads` for manual smoke validation. Use `run-benchmark-suite`
-for the final matrix.
+Use `deploy-workloads` only for optional manual smoke validation. After
+Terraform apply, context setup, secret creation, resource baseline measurement,
+and manifest rendering, `run-benchmark-suite` can be run directly for the final
+matrix.
 
 The important distinction:
 
@@ -82,7 +96,7 @@ full suite path:
 So, for a full sequential suite, you do **not** need to run
 `make deploy-workloads` immediately before `make run-benchmark-suite`.
 The suite deploys each architecture phase internally using the suite-level
-`SCALING_MODE`, `IMAGE_TAG`, and `ARCHITECTURE_ORDER`.
+`SCALING_MODE`, `IMAGE_TAG`, and architecture order.
 
 However, `run-benchmark-suite` only deploys what you ask it to deploy. If you
 want HPA, pass `SCALING_MODE=hpa`. If you want fixed, pass
@@ -100,15 +114,15 @@ phase 1: deploy selected architecture, reset/seed as needed, run all cases
 phase 2: wait ARCHITECTURE_SWITCH_DELAY, deploy the other architecture, run all cases
 ```
 
-The architecture order is controlled by `ARCHITECTURE_ORDER`.
-
-Use monolith first:
+The default architecture order is:
 
 ```bash
 ARCHITECTURE_ORDER="monolith microservices"
 ```
 
-Use microservices first:
+You do not need to pass that value for the standard final run. Only pass
+`ARCHITECTURE_ORDER` when overriding the default order, for example to run
+microservices first:
 
 ```bash
 ARCHITECTURE_ORDER="microservices monolith"
@@ -175,10 +189,16 @@ ARCHITECTURE=monolith SCENARIO=login TARGET_RPS=100 RUN_ID=smoke ATTEMPT=attempt
 Use this when you want the suite to manage deployment automatically:
 
 ```bash
+make profile-show
+
 SCALING_MODE=fixed \
 K6_PROFILE=steady \
+TEST_DURATION=5m \
+RUN_ID=rq1-fixed-vultr-sequential \
+ATTEMPT=attempt-01 \
 IMAGE_TAG="$IMAGE_TAG" \
-ARCHITECTURE_ORDER="monolith microservices" \
+INTER_CASE_DELAY=120 \
+ARCHITECTURE_SWITCH_DELAY=300 \
 SCENARIO_RPS_MATRIX="login:100,200;create-transaction:100,200" \
 make run-benchmark-suite
 ```
@@ -195,7 +215,7 @@ Quick decision table:
 | Run one smoke case after manual deploy | `run-benchmark-case` | Yes, recommended |
 | Run fixed full matrix | `SCALING_MODE=fixed make run-benchmark-suite` | No |
 | Run HPA full matrix | `SCALING_MODE=hpa make run-benchmark-suite` | No |
-| Change order to MSA first | `ARCHITECTURE_ORDER="microservices monolith" make run-benchmark-suite` | No |
+| Change order to MSA first | add `ARCHITECTURE_ORDER="microservices monolith"` to `make run-benchmark-suite` | No |
 | Switch fixed suite to HPA suite | run a new suite with `SCALING_MODE=hpa` | No manual deploy required |
 
 ## 1. Initialize Operator Config
@@ -319,6 +339,45 @@ For `PLATFORM=vultr` and `EXECUTION_MODE=sequential`,
 The Vultr experiment apply path also ensures the AWS S3 writer stack exists for
 k6 uploads.
 
+## 5.1. Refresh Operator CIDR After Network Changes
+
+If the operator machine changes network, public IP, VPN, hotspot, or ISP,
+refresh `OPERATOR_CIDRS` before running Terraform or accessing the PostgreSQL
+VM through SSH.
+
+For auto-detected operator CIDR:
+
+```bash
+make env-init PLATFORM=vultr EXECUTION_MODE=sequential
+make render-tfvars
+make shared-plan
+make shared-apply
+```
+
+For manual operator CIDR, edit `env/vultr.env` first:
+
+```bash
+OPERATOR_CIDRS=<new-public-ip>/32
+OPERATOR_CIDRS_SOURCE=manual
+```
+
+Then render and apply the shared stack:
+
+```bash
+make render-tfvars
+make shared-plan
+make shared-apply
+```
+
+For Vultr, `OPERATOR_CIDRS` is rendered into
+`infra/terraform/vultr-shared/terraform.tfvars` and used by the shared firewall
+rules for PostgreSQL SSH access. If only the operator public IP changed, the
+experiment stack usually does not need to be applied again.
+
+Use `make experiment-plan` only when changing experiment resources such as
+cluster name, region, node plan, node count, PostgreSQL plan, or other
+experiment-stack inputs.
+
 ## 6. Setup Kubernetes Context
 
 Create the local kubeconfig context:
@@ -392,7 +451,17 @@ For Vultr, rendered images use:
 docker.io/<DOCKERHUB_NAMESPACE>/<repo>:<IMAGE_TAG>
 ```
 
-## 10. Smoke Test Fixed Mode
+After this step, the full suite path can go directly to
+[Run Fixed Suite](#11-run-fixed-suite). The suite renders/deploys each
+architecture phase internally, so a manual `make deploy-workloads` is not
+required before the suite.
+
+## 10. Optional Smoke Test Fixed Mode
+
+This section is optional. Use it when you want to validate image pull, secrets,
+migrations, seed jobs, and one lightweight k6 case before starting the full
+matrix. Skip this section when you are confident the infra/context/secrets/render
+path is clean and want the suite to orchestrate deployment directly.
 
 Deploy fixed monolith:
 
@@ -440,14 +509,35 @@ make run-benchmark-case
 
 ## 11. Run Fixed Suite
 
+Before running a suite, verify the generic operator profile is still pointing
+to Vultr sequential:
+
+```bash
+make profile-show
+```
+
+Expected:
+
+```text
+PLATFORM=vultr
+CLOUD_PROVIDER=vultr
+EXECUTION_MODE=sequential
+IMAGE_REGISTRY=dockerhub
+RESULT_STORAGE=aws-s3
+```
+
+The final suite commands below intentionally pass only per-run controls
+explicitly. Provider config, Docker Hub namespace, S3 bucket, AWS region, and
+Datadog defaults should come from the env files created by `make env-init`.
+
 Run the final fixed suite with monolith first:
 
 ```bash
 SCALING_MODE=fixed \
 K6_PROFILE=steady \
 TEST_DURATION=5m \
-EXPERIMENT_NAME=rq1-fixed-vultr-sequential \
-ARCHITECTURE_ORDER="monolith microservices" \
+RUN_ID=rq1-fixed-vultr-sequential \
+ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=120 \
 ARCHITECTURE_SWITCH_DELAY=300 \
 IMAGE_TAG="$IMAGE_TAG" \
@@ -455,13 +545,15 @@ SCENARIO_RPS_MATRIX="login:100,200,300,400,500;create-transaction:100,200,300,40
 make run-benchmark-suite
 ```
 
-Run the same fixed suite with microservices first:
+Optional: run the same fixed suite with microservices first by overriding the
+default architecture order:
 
 ```bash
 SCALING_MODE=fixed \
 K6_PROFILE=steady \
 TEST_DURATION=5m \
-EXPERIMENT_NAME=rq1-fixed-vultr-sequential-msa-first \
+RUN_ID=rq1-fixed-vultr-sequential-msa-first \
+ATTEMPT=attempt-01 \
 ARCHITECTURE_ORDER="microservices monolith" \
 INTER_CASE_DELAY=120 \
 ARCHITECTURE_SWITCH_DELAY=300 \
@@ -473,32 +565,40 @@ make run-benchmark-suite
 Notes:
 
 - `ARCHITECTURE_ORDER` uses spaces, not commas.
-- `ARCHITECTURE_ORDER="monolith microservices"` means monolith runs first.
+- If omitted, `ARCHITECTURE_ORDER` defaults to `monolith microservices`.
 - `ARCHITECTURE_ORDER="microservices monolith"` means microservices runs
   first.
 - Sequential suite redeploys each architecture at phase start with
   `SCALING_MODE=fixed`.
 - The suite uploads `_suite/manifest.json` and `_suite/summary.json` to S3.
 
-## 12. Switch to HPA
+## 12. Optional Manual HPA Smoke Deploy
 
-Switching from fixed to HPA is a redeploy event.
+Switching from fixed to HPA is a redeploy event, but the HPA suite performs
+that redeploy internally for each architecture phase. You do not need to run
+these manual deploy commands before [Run HPA Suite](#14-run-hpa-suite).
 
-Deploy HPA monolith:
+Use this section only if you want to smoke-test HPA mode manually before the
+full HPA matrix.
+
+Deploy HPA monolith for manual smoke validation:
 
 ```bash
 ARCHITECTURE=monolith SCALING_MODE=hpa IMAGE_TAG="$IMAGE_TAG" make deploy-workloads
 SCALING_MODE=hpa EXECUTION_MODE=sequential ARCHITECTURE=monolith make verify-live-mode
 ```
 
-Deploy HPA microservices:
+Deploy HPA microservices for manual smoke validation:
 
 ```bash
 ARCHITECTURE=microservices SCALING_MODE=hpa IMAGE_TAG="$IMAGE_TAG" make deploy-workloads
 SCALING_MODE=hpa EXECUTION_MODE=sequential ARCHITECTURE=microservices make verify-live-mode
 ```
 
-## 13. Smoke Test HPA
+## 13. Optional Smoke Test HPA
+
+This section is optional and assumes you manually deployed HPA in the previous
+section. Skip it when running the full HPA suite directly.
 
 Run a monolith HPA smoke case:
 
@@ -532,14 +632,20 @@ make run-benchmark-case
 
 ## 14. Run HPA Suite
 
+Before running the HPA suite, verify the generic operator profile again:
+
+```bash
+make profile-show
+```
+
 Run the final HPA suite with monolith first:
 
 ```bash
 SCALING_MODE=hpa \
 K6_PROFILE=hpa \
 TEST_DURATION=5m \
-EXPERIMENT_NAME=rq2-hpa-vultr-sequential \
-ARCHITECTURE_ORDER="monolith microservices" \
+RUN_ID=rq2-hpa-vultr-sequential \
+ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=300 \
 ARCHITECTURE_SWITCH_DELAY=300 \
 IMAGE_TAG="$IMAGE_TAG" \
@@ -547,13 +653,15 @@ SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-t
 make run-benchmark-suite
 ```
 
-Run the same HPA suite with microservices first:
+Optional: run the same HPA suite with microservices first by overriding the
+default architecture order:
 
 ```bash
 SCALING_MODE=hpa \
 K6_PROFILE=hpa \
 TEST_DURATION=5m \
-EXPERIMENT_NAME=rq2-hpa-vultr-sequential-msa-first \
+RUN_ID=rq2-hpa-vultr-sequential-msa-first \
+ATTEMPT=attempt-01 \
 ARCHITECTURE_ORDER="microservices monolith" \
 INTER_CASE_DELAY=300 \
 ARCHITECTURE_SWITCH_DELAY=300 \
@@ -571,6 +679,42 @@ Notes:
 - If the first HPA run warms shared cluster components, run the opposite
   `ARCHITECTURE_ORDER` as a second suite and compare both orderings during
   analysis.
+
+## Suite Argument Reference
+
+These are the arguments that matter most for the final sequential suite:
+
+| Argument | Example | Purpose |
+|---|---|---|
+| `SCALING_MODE` | `fixed` or `hpa` | Selects the deployment overlay used by each architecture phase. |
+| `K6_PROFILE` | `steady` or `hpa` | Selects k6 execution profile. HPA suite must use `hpa`. |
+| `TEST_DURATION` | `5m` | Duration per benchmark case. |
+| `RUN_ID` | `rq1-fixed-vultr-sequential` | Exact S3 run folder under `experiments/`. |
+| `ATTEMPT` | `attempt-01` | Exact attempt folder per case; change this for reruns under the same `RUN_ID`. |
+| `ARCHITECTURE_ORDER` | `"microservices monolith"` | Optional override; default is `monolith microservices`. |
+| `INTER_CASE_DELAY` | `120` or `300` | Pause between cases inside the same architecture phase. |
+| `ARCHITECTURE_SWITCH_DELAY` | `300` | Pause between monolith and microservices phases. |
+| `IMAGE_TAG` | `$IMAGE_TAG` | Image tag rendered and deployed by the suite. |
+| `SCENARIO_RPS_MATRIX` | `login:100,200` | Scenario-specific RPS matrix. |
+
+These values should normally come from env files and do not need to be repeated
+on the suite command:
+
+| Env value | Source | Purpose |
+|---|---|---|
+| `PLATFORM` | `env/operator-profile.env` | Selects Vultr through the generic dispatcher. |
+| `EXECUTION_MODE` | `env/operator-profile.env` | Selects sequential suite dispatch. |
+| `CLOUD_PROVIDER` | `env/operator-profile.env` | Normalized provider value used by scripts. |
+| `S3_BUCKET` | `env/vultr.env` or `env/aws-benchmark.env` | Result bucket used by k6 upload and suite manifests. |
+| `AWS_REGION` | `env/vultr.env` or `env/aws-benchmark.env` | AWS region for S3 access. |
+| `DOCKERHUB_NAMESPACE` | `env/vultr.env` | Docker Hub namespace used by Vultr manifest rendering. |
+| `DATADOG_ENABLED` | script default or env | Enables Datadog timing/artifact capture. |
+| `DATADOG_ENV` | script default or env | Datadog environment tag expected by telemetry queries. |
+
+Only pass env-file values on the command line when intentionally overriding
+them for a specific run. Use
+`make env-init PLATFORM=vultr EXECUTION_MODE=sequential` to set the operator
+profile and `make profile-show` to verify it before running the suite.
 
 ## 15. Verify S3 Results
 
