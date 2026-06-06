@@ -640,7 +640,6 @@ Run the final HPA suite with monolith first:
 ```bash
 SCALING_MODE=hpa \
 K6_PROFILE=hpa \
-TEST_DURATION=5m \
 RUN_ID=rq2-hpa-vultr-sequential \
 ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=300 \
@@ -655,7 +654,6 @@ default architecture order:
 ```bash
 SCALING_MODE=hpa \
 K6_PROFILE=hpa \
-TEST_DURATION=5m \
 RUN_ID=rq2-hpa-vultr-sequential-msa-first \
 ATTEMPT=attempt-01 \
 ARCHITECTURE_ORDER="microservices monolith" \
@@ -671,6 +669,9 @@ Notes:
   `SCALING_MODE=hpa`.
 - Keep `K6_PROFILE=hpa`; the script rejects the standard HPA run if it uses
   `steady`, `ramp`, or `smoke`.
+- `TEST_DURATION` is intentionally omitted for the final HPA suite because the
+  HPA k6 profile uses its own ramping arrival-rate stages. Treat each HPA case
+  as roughly 13 minutes, not 5 minutes.
 - If the first HPA run warms shared cluster components, run the opposite
   `ARCHITECTURE_ORDER` as a second suite and compare both orderings during
   analysis.
@@ -683,7 +684,7 @@ These are the arguments that matter most for the final sequential suite:
 |---|---|---|
 | `SCALING_MODE` | `fixed` or `hpa` | Selects the deployment overlay used by each architecture phase. |
 | `K6_PROFILE` | `steady` or `hpa` | Selects k6 execution profile. HPA suite must use `hpa`. |
-| `TEST_DURATION` | `5m` | Duration per benchmark case. |
+| `TEST_DURATION` | `5m` | Fixed/steady case duration. Omit for final HPA suite because `K6_PROFILE=hpa` uses ramp stages. |
 | `RUN_ID` | `rq1-fixed-vultr-sequential` | Exact S3 run folder under `experiments/`. |
 | `ATTEMPT` | `attempt-01` | Exact attempt folder per case; change this for reruns under the same `RUN_ID`. |
 | `ARCHITECTURE_ORDER` | `"microservices monolith"` | Optional override; default is `monolith microservices`. |

@@ -219,6 +219,12 @@ That trade-off should be stated explicitly in the thesis.
 Fixed and HPA runs are still executed as independent k6 jobs per scenario and
 RPS combination. The inter-case delay remains part of the benchmark method.
 
+For `K6_PROFILE=hpa`, `TEST_DURATION` should not be read as the total case
+duration. The HPA k6 profile uses ramping arrival-rate stages so each HPA case
+is approximately 13 minutes before orchestration overhead and inter-case delay.
+Use `TEST_DURATION` as the fixed/steady case duration control, not as the HPA
+suite duration control.
+
 Recommended values:
 
 | Scaling mode | Suggested inter-case delay |
