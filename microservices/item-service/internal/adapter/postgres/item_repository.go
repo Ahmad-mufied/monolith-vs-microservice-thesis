@@ -24,7 +24,7 @@ func NewItemRepository(pool *pgxpool.Pool) *ItemRepository {
 func (r *ItemRepository) SyncItems(ctx context.Context, items []domain.SyncItemInput) error {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return pkgerrors.Internal("internal server error", fmt.Errorf("begin sync items transaction: %w", err))
+		return internalError("begin sync items transaction", err)
 	}
 	defer func() { _ = tx.Rollback(context.Background()) }()
 
@@ -36,7 +36,7 @@ func (r *ItemRepository) SyncItems(ctx context.Context, items []domain.SyncItemI
 	})
 
 	if err := softDeleteOmittedItems(ctx, tx, keepIDs); err != nil {
-		return pkgerrors.Internal("internal server error", fmt.Errorf("soft delete omitted items: %w", err))
+		return internalError("soft delete omitted items", err)
 	}
 	if len(inserts) > 0 {
 		if err := batchInsertItems(ctx, tx, inserts); err != nil {
@@ -50,7 +50,7 @@ func (r *ItemRepository) SyncItems(ctx context.Context, items []domain.SyncItemI
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return pkgerrors.Internal("internal server error", fmt.Errorf("commit sync items transaction: %w", err))
+		return internalError("commit sync items transaction", err)
 	}
 	return nil
 }
@@ -65,7 +65,7 @@ LIMIT $1 OFFSET $2`
 
 	rows, err := r.pool.Query(ctx, query, limit, offset)
 	if err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("list items: %w", err))
+		return nil, internalError("list items", err)
 	}
 	defer rows.Close()
 
@@ -73,12 +73,12 @@ LIMIT $1 OFFSET $2`
 	for rows.Next() {
 		item, err := scanItem(rows)
 		if err != nil {
-			return nil, pkgerrors.Internal("internal server error", fmt.Errorf("scan listed items: %w", err))
+			return nil, internalError("scan listed items", err)
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("iterate listed items: %w", err))
+		return nil, internalError("iterate listed items", err)
 	}
 
 	return items, nil
@@ -97,7 +97,7 @@ WHERE id = $1::uuid
 		return nil, pkgerrors.NotFound("item not found")
 	}
 	if err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("get item by id: %w", err))
+		return nil, internalError("get item by id", err)
 	}
 
 	return item, nil
@@ -115,7 +115,7 @@ WHERE id = ANY($1::uuid[])`
 
 	rows, err := r.pool.Query(ctx, query, ids)
 	if err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("get item summaries by ids: %w", err))
+		return nil, internalError("get item summaries by ids", err)
 	}
 	defer rows.Close()
 
@@ -123,12 +123,12 @@ WHERE id = ANY($1::uuid[])`
 	for rows.Next() {
 		var item domain.ItemSummary
 		if err := rows.Scan(&item.ID, &item.Name, &item.Deleted); err != nil {
-			return nil, pkgerrors.Internal("internal server error", fmt.Errorf("scan item summaries: %w", err))
+			return nil, internalError("scan item summaries", err)
 		}
 		items = append(items, &item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("iterate item summaries: %w", err))
+		return nil, internalError("iterate item summaries", err)
 	}
 
 	return items, nil
@@ -149,7 +149,7 @@ WHERE deleted_at IS NULL
 
 	rows, err := r.pool.Query(ctx, query, itemIDs)
 	if err != nil {
-		return pkgerrors.Internal("internal server error", fmt.Errorf("validate transaction items: %w", err))
+		return internalError("validate transaction items", err)
 	}
 	defer rows.Close()
 
@@ -158,12 +158,12 @@ WHERE deleted_at IS NULL
 		var itemID string
 		var availableAmount int
 		if err := rows.Scan(&itemID, &availableAmount); err != nil {
-			return pkgerrors.Internal("internal server error", fmt.Errorf("scan validated items: %w", err))
+			return internalError("scan validated items", err)
 		}
 		found[itemID] = availableAmount
 	}
 	if err := rows.Err(); err != nil {
-		return pkgerrors.Internal("internal server error", fmt.Errorf("iterate validated items: %w", err))
+		return internalError("iterate validated items", err)
 	}
 
 	if len(found) != len(requestedAmounts) {
@@ -319,7 +319,7 @@ func mapConflictError(err error) error {
 	}
 	pgErr, ok := errors.AsType[*pgconn.PgError](err)
 	if !ok {
-		return pkgerrors.Internal("internal server error", fmt.Errorf("upsert item: %w", err))
+		return internalError("upsert item", err)
 	}
 	switch pgErr.Code {
 	case "23505":
@@ -327,6 +327,13 @@ func mapConflictError(err error) error {
 	case "40001", "40P01", "57014":
 		return pkgerrors.Conflict("transaction conflict, please retry")
 	default:
-		return pkgerrors.Internal("internal server error", fmt.Errorf("upsert item: %w", err))
+		return internalError("upsert item", err)
 	}
+}
+
+func internalError(action string, err error) error {
+	if ctxErr := pkgerrors.FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
+		return ctxErr
+	}
+	return pkgerrors.Internal("internal server error", fmt.Errorf("%s: %w", action, err))
 }

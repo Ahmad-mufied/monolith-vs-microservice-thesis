@@ -226,6 +226,33 @@ func TestLoginUserNotFound(t *testing.T) {
 	}
 }
 
+func TestLoginRepositoryContextErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want error
+	}{
+		{name: "deadline exceeded", err: pkgerrors.DeadlineExceeded("request timeout"), want: pkgerrors.ErrDeadlineExceeded},
+		{name: "canceled", err: pkgerrors.Canceled("request canceled"), want: pkgerrors.ErrCanceled},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeUserRepo{
+				findByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {
+					return nil, tt.err
+				},
+			}
+			uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+
+			_, _, err := uc.Login(context.Background(), "ahmad@example.com", "Secret123!")
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
 func TestLoginWrongPassword(t *testing.T) {
 	repo := &fakeUserRepo{
 		findByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {

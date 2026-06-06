@@ -77,6 +77,12 @@ func TestFromGRPCError(t *testing.T) {
 			wantCode:   "GATEWAY_TIMEOUT",
 		},
 		{
+			name:       "Canceled -> 499 CLIENT_CANCELED",
+			err:        status.Error(codes.Canceled, "request canceled"),
+			wantStatus: statusClientClosedRequest,
+			wantCode:   "CLIENT_CANCELED",
+		},
+		{
 			name:       "Internal -> 500 INTERNAL_SERVER_ERROR",
 			err:        status.Error(codes.Internal, "internal"),
 			wantStatus: http.StatusInternalServerError,

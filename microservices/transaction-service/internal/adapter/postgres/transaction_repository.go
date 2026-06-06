@@ -26,7 +26,7 @@ func NewTransactionRepository(pool *pgxpool.Pool) *TransactionRepository {
 func (r *TransactionRepository) BeginTx(ctx context.Context) (port.TransactionWriteTx, error) {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("begin transaction: %w", err))
+		return nil, internalError("begin transaction", err)
 	}
 	return &transactionWriteTx{tx: tx}, nil
 }
@@ -42,7 +42,7 @@ LIMIT $2 OFFSET $3;
 
 	rows, err := r.pool.Query(ctx, query, userID, limit, offset)
 	if err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("list own transactions: %w", err))
+		return nil, internalError("list own transactions", err)
 	}
 	defer rows.Close()
 
@@ -64,7 +64,7 @@ WHERE id = $1::uuid
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, pkgerrors.NotFound("transaction not found")
 		}
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("get transaction by id: %w", err))
+		return nil, internalError("get transaction by id", err)
 	}
 
 	return &transaction, nil
@@ -80,7 +80,7 @@ LIMIT $1 OFFSET $2;
 
 	rows, err := r.pool.Query(ctx, query, limit, offset)
 	if err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("list transactions for enrichment: %w", err))
+		return nil, internalError("list transactions for enrichment", err)
 	}
 	defer rows.Close()
 
@@ -101,7 +101,7 @@ ORDER BY transaction_id, created_at ASC, item_id ASC;
 
 	rows, err := r.pool.Query(ctx, query, transactionIDs)
 	if err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("list transaction items: %w", err))
+		return nil, internalError("list transaction items", err)
 	}
 	defer rows.Close()
 
@@ -110,12 +110,12 @@ ORDER BY transaction_id, created_at ASC, item_id ASC;
 		var transactionID string
 		var item domain.TransactionItem
 		if err := rows.Scan(&transactionID, &item.ItemID, &item.Amount); err != nil {
-			return nil, pkgerrors.Internal("internal server error", fmt.Errorf("scan transaction items: %w", err))
+			return nil, internalError("scan transaction items", err)
 		}
 		itemsByTransactionID[transactionID] = append(itemsByTransactionID[transactionID], item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("iterate transaction items: %w", err))
+		return nil, internalError("iterate transaction items", err)
 	}
 
 	return itemsByTransactionID, nil
@@ -134,7 +134,7 @@ RETURNING id;
 
 	var transactionID string
 	if err := t.tx.QueryRow(ctx, query, userID).Scan(&transactionID); err != nil {
-		return "", pkgerrors.Internal("internal server error", fmt.Errorf("insert transaction: %w", err))
+		return "", internalError("insert transaction", err)
 	}
 	return transactionID, nil
 }
@@ -147,7 +147,7 @@ VALUES ($1::uuid, $2::uuid, $3);
 
 	for _, item := range items {
 		if _, err := t.tx.Exec(ctx, query, transactionID, item.ItemID, item.Amount); err != nil {
-			return pkgerrors.Internal("internal server error", fmt.Errorf("insert transaction item: %w", err))
+			return internalError("insert transaction item", err)
 		}
 	}
 
@@ -156,7 +156,7 @@ VALUES ($1::uuid, $2::uuid, $3);
 
 func (t *transactionWriteTx) Commit(ctx context.Context) error {
 	if err := t.tx.Commit(ctx); err != nil {
-		return pkgerrors.Internal("internal server error", fmt.Errorf("commit transaction: %w", err))
+		return internalError("commit transaction", err)
 	}
 	return nil
 }
@@ -172,13 +172,20 @@ func scanTransactions(rows pgx.Rows, action string) ([]*domain.Transaction, erro
 	for rows.Next() {
 		var transaction domain.Transaction
 		if err := rows.Scan(&transaction.ID, &transaction.UserID, &transaction.CreatedAt, &transaction.UpdatedAt); err != nil {
-			return nil, pkgerrors.Internal("internal server error", fmt.Errorf("%s: %w", action, err))
+			return nil, internalError(action, err)
 		}
 		transactions = append(transactions, &transaction)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("%s: %w", action, err))
+		return nil, internalError(action, err)
 	}
 
 	return transactions, nil
+}
+
+func internalError(action string, err error) error {
+	if ctxErr := pkgerrors.FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
+		return ctxErr
+	}
+	return pkgerrors.Internal("internal server error", fmt.Errorf("%s: %w", action, err))
 }

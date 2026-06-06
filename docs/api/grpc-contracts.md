@@ -220,6 +220,7 @@ There is no external item delete endpoint in the final contract. Item deletion i
 | `FailedPrecondition` | 409 | Business conflict, such as amount exceeding available_amount |
 | `Aborted` | 409 | Transaction or concurrency conflict |
 | `Unavailable` | 503 | Upstream service unavailable |
+| `Canceled` | 499 | Client canceled request |
 | `DeadlineExceeded` | 504 | Upstream timeout |
 | `Internal` | 500 | Internal error |
 

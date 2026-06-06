@@ -8,6 +8,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const statusClientClosedRequest = 499
+
 // AppError is an HTTP-level error returned by gRPC error mapping.
 type AppError struct {
 	Status  int
@@ -42,6 +44,8 @@ func FromGRPCError(err error) *AppError {
 			return &AppError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: msg}
 		case codes.DeadlineExceeded:
 			return &AppError{Status: http.StatusGatewayTimeout, Code: "GATEWAY_TIMEOUT", Message: msg}
+		case codes.Canceled:
+			return &AppError{Status: statusClientClosedRequest, Code: "CLIENT_CANCELED", Message: msg}
 		}
 	}
 

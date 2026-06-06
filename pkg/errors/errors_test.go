@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"context"
 	stderrors "errors"
 	"testing"
 
@@ -67,6 +68,12 @@ func TestToGRPCStatus(t *testing.T) {
 			wantMsg:  "item service request timed out",
 		},
 		{
+			name:     "canceled",
+			err:      Canceled("request canceled"),
+			wantCode: codes.Canceled,
+			wantMsg:  "request canceled",
+		},
+		{
 			name:     "internal",
 			err:      Internal("internal server error", stderrors.New("db timeout")),
 			wantCode: codes.Internal,
@@ -122,6 +129,39 @@ func TestTypedErrorsPreserveSentinelIdentity(t *testing.T) {
 	}
 	if !stderrors.Is(DeadlineExceeded("item service request timed out"), ErrDeadlineExceeded) {
 		t.Fatal("expected DeadlineExceeded to match ErrDeadlineExceeded")
+	}
+	if !stderrors.Is(Canceled("request canceled"), ErrCanceled) {
+		t.Fatal("expected Canceled to match ErrCanceled")
+	}
+}
+
+func TestFromContext(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want error
+	}{
+		{name: "deadline exceeded", err: context.DeadlineExceeded, want: ErrDeadlineExceeded},
+		{name: "canceled", err: context.Canceled, want: ErrCanceled},
+		{name: "other", err: stderrors.New("driver error"), want: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FromContext(tt.err, "request timeout", "request canceled")
+			if tt.want == nil {
+				if got != nil {
+					t.Fatalf("FromContext() = %v, want nil", got)
+				}
+				return
+			}
+			if !stderrors.Is(got, tt.want) {
+				t.Fatalf("FromContext() = %v, want %v", got, tt.want)
+			}
+			if !stderrors.Is(got, tt.err) {
+				t.Fatalf("FromContext() should preserve cause %v, got %v", tt.err, got)
+			}
+		})
 	}
 }
 

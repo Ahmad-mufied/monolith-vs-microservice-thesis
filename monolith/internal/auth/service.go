@@ -94,10 +94,12 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 	if err != nil {
 		var appErr *apperror.Error
 		if errors.As(err, &appErr) {
-			if appErr.Code == apperror.CodeInternal {
+			switch appErr.Code {
+			case apperror.CodeUnauthorized, apperror.CodeNotFound:
+				return LoginResponse{}, apperror.Unauthorized("invalid email or password")
+			default:
 				return LoginResponse{}, err
 			}
-			return LoginResponse{}, apperror.Unauthorized("invalid email or password")
 		}
 		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("finding user by email: %w", err))
 	}

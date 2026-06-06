@@ -119,8 +119,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '499':
+          $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
   /api/v1/auth/login:
     post:
       tags:
@@ -158,8 +162,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '499':
+          $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
   /api/v1/items:
     get:
       tags:
@@ -184,8 +192,12 @@ paths:
                 $ref: '#/components/schemas/ItemListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '499':
+          $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
     put:
       tags:
       - Items
@@ -258,8 +270,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '409':
           $ref: '#/components/responses/Conflict'
+        '499':
+          $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
   /api/v1/items/{item_id}:
     get:
       tags:
@@ -281,8 +297,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '499':
+          $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
       description: Returns active item detail. If the item is soft-deleted, this endpoint returns 404 Not Found.
   /api/v1/transactions:
     post:
@@ -340,8 +360,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '499':
+          $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
     get:
       tags:
       - Transactions
@@ -366,8 +390,12 @@ paths:
                 $ref: '#/components/schemas/TransactionListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '499':
+          $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
   /api/v1/transactions/{transaction_id}:
     get:
       tags:
@@ -389,8 +417,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '499':
+          $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
   /api/v1/admin/transactions:
     get:
       tags:
@@ -442,8 +474,12 @@ paths:
                 $ref: '#/components/schemas/EnrichedTransactionListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '499':
+          $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
 components:
   securitySchemes:
     bearerAuth:
@@ -529,6 +565,16 @@ components:
             error:
               code: CONFLICT
               message: Resource conflict
+    ClientCanceled:
+      description: Client canceled request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: CLIENT_CANCELED
+              message: Request canceled
     InternalServerError:
       description: Internal server error
       content:
@@ -539,6 +585,16 @@ components:
             error:
               code: INTERNAL_SERVER_ERROR
               message: Internal server error
+    GatewayTimeout:
+      description: Request timeout
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: GATEWAY_TIMEOUT
+              message: Request timeout
   schemas:
     HealthResponse:
       type: object
