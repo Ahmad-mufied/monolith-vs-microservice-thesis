@@ -27,7 +27,7 @@ esac
 
 for context in monolith msa; do
   if ! kubectl config get-contexts "$context" >/dev/null 2>&1; then
-    echo "missing kubectl context '$context'; run: make eks-setup-contexts" >&2
+    echo "missing kubectl context '$context'; run: make setup-contexts" >&2
     exit 1
   fi
 done

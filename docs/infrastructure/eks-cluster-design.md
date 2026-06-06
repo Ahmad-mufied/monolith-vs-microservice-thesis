@@ -327,7 +327,7 @@ applied from the same laptop.
 
 ## 11. Deployment Manifests
 
-EKS-specific manifests are in `deployments/k8s/eks/` and differ from
+Cloud deployment manifests are in `deployments/k8s/cloud/` and differ from
 Minikube manifests in three ways:
 
 | Difference | Minikube | EKS |

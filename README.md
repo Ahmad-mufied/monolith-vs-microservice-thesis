@@ -127,7 +127,7 @@ Kubernetes manifests are separated by environment purpose:
 
 - `deployments/k8s/local/` for Minikube and local Kubernetes workflows
 - `deployments/k8s/benchmark/` for benchmark-only jobs and bootstrap assets
-- `deployments/k8s/eks/` for EKS deployment source-of-truth manifests
+- `deployments/k8s/cloud/` for cloud deployment source-of-truth manifests
 
 ## Source of Truth
 

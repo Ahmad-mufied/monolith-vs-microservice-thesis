@@ -218,11 +218,11 @@ restore_active() {
   local architecture="$1"
   local svc
   if [ "$architecture" = "monolith" ]; then
-    kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/eks/monolith/overlays/$SCALING_MODE"
+    kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/cloud/monolith/overlays/$SCALING_MODE"
     kubectl --context="$SEQUENTIAL_CONTEXT" rollout status deployment/monolith -n mono --timeout=300s
     return
   fi
-  kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/eks/microservices/overlays/$SCALING_MODE"
+  kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/cloud/microservices/overlays/$SCALING_MODE"
   for svc in auth-service item-service transaction-service api-gateway; do
     kubectl --context="$SEQUENTIAL_CONTEXT" rollout status "deployment/${svc}" -n msa --timeout=300s
   done
@@ -246,11 +246,11 @@ reset_seed_active() {
   local architecture="$1"
   scale_down_active "$architecture"
   if [ "$architecture" = "monolith" ]; then
-    recreate_job mono reset-monolith-data-job "$RENDER_ROOT/deployments/k8s/eks/monolith/reset-monolith-data-job.yaml" 120s
-    recreate_job mono seed-monolith-benchmark-data-job "$RENDER_ROOT/deployments/k8s/eks/monolith/seed-monolith-benchmark-data-job.yaml" 300s
+    recreate_job mono reset-monolith-data-job "$RENDER_ROOT/deployments/k8s/cloud/monolith/reset-monolith-data-job.yaml" 120s
+    recreate_job mono seed-monolith-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/monolith/seed-monolith-benchmark-data-job.yaml" 300s
   else
-    recreate_job msa reset-microservices-data-job "$RENDER_ROOT/deployments/k8s/eks/microservices/reset-microservices-data-job.yaml" 120s
-    recreate_job msa seed-microservices-benchmark-data-job "$RENDER_ROOT/deployments/k8s/eks/microservices/seed-microservices-benchmark-data-job.yaml" 300s
+    recreate_job msa reset-microservices-data-job "$RENDER_ROOT/deployments/k8s/cloud/microservices/reset-microservices-data-job.yaml" 120s
+    recreate_job msa seed-microservices-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/microservices/seed-microservices-benchmark-data-job.yaml" 300s
   fi
   restore_active "$architecture"
 }
@@ -259,9 +259,9 @@ prepare_enrichment_active() {
   local architecture="$1"
   scale_down_active "$architecture"
   if [ "$architecture" = "monolith" ]; then
-    recreate_job mono prepare-monolith-enrichment-benchmark-data-job "$RENDER_ROOT/deployments/k8s/eks/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml" 600s
+    recreate_job mono prepare-monolith-enrichment-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml" 600s
   else
-    recreate_job msa prepare-microservices-enrichment-benchmark-data-job "$RENDER_ROOT/deployments/k8s/eks/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml" 600s
+    recreate_job msa prepare-microservices-enrichment-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml" 600s
   fi
   restore_active "$architecture"
 }
@@ -308,7 +308,7 @@ if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
 fi
 
 render_provider_manifests "$RENDER_ROOT"
-bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
+bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 
 manifest_path="$SUITE_WORKDIR/manifest.json"
 jq -n \

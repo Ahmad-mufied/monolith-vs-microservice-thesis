@@ -143,7 +143,7 @@ run_parallel_preflight "parallel benchmark bootstrap"
 render_provider_manifests "$RENDER_ROOT"
 MONOLITH_MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml"
 MICROSERVICES_MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml"
-bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
+bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 
 # ─── Clean up previous jobs ───────────────────────────────────────────────────
 

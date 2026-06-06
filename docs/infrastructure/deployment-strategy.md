@@ -658,10 +658,10 @@ single deployment with replicas that are identical and interchangeable.
 ### Files Modified
 
 ```text
-deployments/k8s/eks/microservices/base/api-gateway.yaml
-deployments/k8s/eks/microservices/base/auth-service.yaml
-deployments/k8s/eks/microservices/base/item-service.yaml
-deployments/k8s/eks/microservices/base/transaction-service.yaml
+deployments/k8s/cloud/microservices/base/api-gateway.yaml
+deployments/k8s/cloud/microservices/base/auth-service.yaml
+deployments/k8s/cloud/microservices/base/item-service.yaml
+deployments/k8s/cloud/microservices/base/transaction-service.yaml
 ```
 
 ---
