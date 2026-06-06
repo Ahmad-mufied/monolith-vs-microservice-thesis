@@ -106,8 +106,9 @@ The resolution order is:
 3. legacy `env/image-tag.eks.env`,
 4. current Git short SHA.
 
-For final experiments, still pass `IMAGE_TAG` explicitly in deploy and suite
-commands. Treat the pin file as a guardrail, not as the only source of truth.
+For final experiments, pin the selected tag and let deploy/suite commands use
+that pinned default. Pass `IMAGE_TAG=<tag>` explicitly only when intentionally
+overriding the pin for one command, and never pass an empty `IMAGE_TAG`.
 
 ---
 
@@ -118,7 +119,6 @@ Sequential Vultr deploy example:
 ```bash
 ARCHITECTURE=monolith \
 SCALING_MODE=fixed \
-IMAGE_TAG=670736c \
 make deploy-workloads
 ```
 
@@ -127,10 +127,14 @@ Sequential Vultr suite example:
 ```bash
 SCALING_MODE=fixed \
 K6_PROFILE=steady \
-IMAGE_TAG=670736c \
-ARCHITECTURE_ORDER="monolith microservices" \
-EXPERIMENT_NAME=rq1-fixed-vultr-sequential \
+RUN_ID=rq1-fixed-vultr-sequential \
 make run-benchmark-suite
+```
+
+Override the pinned tag only when needed:
+
+```bash
+IMAGE_TAG=670736c make run-benchmark-suite
 ```
 
 For sequential Vultr suites, `make run-benchmark-suite` deploys each
@@ -148,5 +152,6 @@ to HPA.
 - Verify the selected tag with `make dockerhub-list-images IMAGE_TAG=<tag>`
   before deploy.
 - Pin the selected tag for operator safety.
-- Pass `IMAGE_TAG=<tag>` explicitly to deploy and benchmark suite commands.
+- Let deploy and benchmark suite commands use the pinned tag unless you are
+  intentionally overriding it with a non-empty `IMAGE_TAG=<tag>`.
 - Verify benchmark metadata includes the expected `image_tag`.

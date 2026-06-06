@@ -29,14 +29,14 @@ make experiment-apply
 make setup-contexts
 make create-secrets
 make measure-resource-baseline
-IMAGE_TAG="$IMAGE_TAG" make render-manifests
+make render-manifests
 ```
 
 Then choose one of these benchmark execution paths:
 
 ```bash
 # Optional smoke validation for one architecture.
-ARCHITECTURE=monolith SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" make deploy-workloads
+ARCHITECTURE=monolith SCALING_MODE=fixed make deploy-workloads
 SCALING_MODE=fixed EXECUTION_MODE=sequential ARCHITECTURE=monolith make verify-live-mode
 
 # Final matrix. The sequential suite deploys each architecture phase itself.
@@ -49,7 +49,6 @@ RUN_ID=rq1-fixed-vultr-sequential \
 ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=120 \
 ARCHITECTURE_SWITCH_DELAY=300 \
-IMAGE_TAG="$IMAGE_TAG" \
 SCENARIO_RPS_MATRIX="login:100,200;create-transaction:100,200" \
 make run-benchmark-suite
 ```
@@ -181,9 +180,9 @@ Resume behavior:
 Use these commands when you want to verify a single architecture manually:
 
 ```bash
-ARCHITECTURE=monolith SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" make deploy-workloads
+ARCHITECTURE=monolith SCALING_MODE=fixed make deploy-workloads
 SCALING_MODE=fixed EXECUTION_MODE=sequential ARCHITECTURE=monolith make verify-live-mode
-ARCHITECTURE=monolith SCENARIO=login TARGET_RPS=100 RUN_ID=smoke ATTEMPT=attempt-01 SCALING_MODE=fixed K6_PROFILE=smoke IMAGE_TAG="$IMAGE_TAG" make run-benchmark-case
+ARCHITECTURE=monolith SCENARIO=login TARGET_RPS=100 RUN_ID=smoke ATTEMPT=attempt-01 SCALING_MODE=fixed K6_PROFILE=smoke make run-benchmark-case
 ```
 
 Use this when you want the suite to manage deployment automatically:
@@ -196,7 +195,6 @@ K6_PROFILE=steady \
 TEST_DURATION=5m \
 RUN_ID=rq1-fixed-vultr-sequential \
 ATTEMPT=attempt-01 \
-IMAGE_TAG="$IMAGE_TAG" \
 INTER_CASE_DELAY=120 \
 ARCHITECTURE_SWITCH_DELAY=300 \
 SCENARIO_RPS_MATRIX="login:100,200;create-transaction:100,200" \
@@ -271,8 +269,13 @@ Final experiment rules:
 
 - Do not rebuild a different commit into the same tag.
 - If code changes, create a new image tag.
-- Still pass `IMAGE_TAG="$IMAGE_TAG"` on deploy and benchmark commands so the
-  execution log is explicit.
+- After pinning, deploy and benchmark commands can omit `IMAGE_TAG`; the
+  Makefile reads `env/image-tag.env`.
+- To override the pin for one command, pass a non-empty literal value such as
+  `IMAGE_TAG=670736c make run-benchmark-suite` or export `IMAGE_TAG` first.
+- Do not pass `IMAGE_TAG="$IMAGE_TAG"` unless the shell variable is definitely
+  set; an empty shell variable can hide the pinned tag in older Makefile
+  revisions.
 
 ## 3. Render Terraform Inputs
 
@@ -297,7 +300,7 @@ Do not commit generated `terraform.tfvars` files.
 Run preflight before creating expensive resources:
 
 ```bash
-IMAGE_TAG="$IMAGE_TAG" make preflight-check
+make preflight-check
 ```
 
 For Vultr, this checks:
@@ -442,7 +445,7 @@ so monolith and microservices use the same measured architecture ceiling.
 Render and validate manifests with the final image tag:
 
 ```bash
-IMAGE_TAG="$IMAGE_TAG" make render-manifests
+make render-manifests
 ```
 
 For Vultr, rendered images use:
@@ -466,7 +469,7 @@ path is clean and want the suite to orchestrate deployment directly.
 Deploy fixed monolith:
 
 ```bash
-ARCHITECTURE=monolith SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" make deploy-workloads
+ARCHITECTURE=monolith SCALING_MODE=fixed make deploy-workloads
 SCALING_MODE=fixed EXECUTION_MODE=sequential ARCHITECTURE=monolith make verify-live-mode
 ```
 
@@ -481,14 +484,13 @@ ATTEMPT=attempt-01 \
 SCALING_MODE=fixed \
 K6_PROFILE=smoke \
 TEST_DURATION=1m \
-IMAGE_TAG="$IMAGE_TAG" \
 make run-benchmark-case
 ```
 
 Deploy fixed microservices:
 
 ```bash
-ARCHITECTURE=microservices SCALING_MODE=fixed IMAGE_TAG="$IMAGE_TAG" make deploy-workloads
+ARCHITECTURE=microservices SCALING_MODE=fixed make deploy-workloads
 SCALING_MODE=fixed EXECUTION_MODE=sequential ARCHITECTURE=microservices make verify-live-mode
 ```
 
@@ -503,7 +505,6 @@ ATTEMPT=attempt-01 \
 SCALING_MODE=fixed \
 K6_PROFILE=smoke \
 TEST_DURATION=1m \
-IMAGE_TAG="$IMAGE_TAG" \
 make run-benchmark-case
 ```
 
@@ -540,7 +541,6 @@ RUN_ID=rq1-fixed-vultr-sequential \
 ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=120 \
 ARCHITECTURE_SWITCH_DELAY=300 \
-IMAGE_TAG="$IMAGE_TAG" \
 SCENARIO_RPS_MATRIX="login:100,200,300,400,500;create-transaction:100,200,300,400,500;enriched-transactions:100,200,300,400,500;concurrent-mixed-workload:100,200,300,400,500" \
 make run-benchmark-suite
 ```
@@ -557,7 +557,6 @@ ATTEMPT=attempt-01 \
 ARCHITECTURE_ORDER="microservices monolith" \
 INTER_CASE_DELAY=120 \
 ARCHITECTURE_SWITCH_DELAY=300 \
-IMAGE_TAG="$IMAGE_TAG" \
 SCENARIO_RPS_MATRIX="login:100,200,300,400,500;create-transaction:100,200,300,400,500;enriched-transactions:100,200,300,400,500;concurrent-mixed-workload:100,200,300,400,500" \
 make run-benchmark-suite
 ```
@@ -584,14 +583,14 @@ full HPA matrix.
 Deploy HPA monolith for manual smoke validation:
 
 ```bash
-ARCHITECTURE=monolith SCALING_MODE=hpa IMAGE_TAG="$IMAGE_TAG" make deploy-workloads
+ARCHITECTURE=monolith SCALING_MODE=hpa make deploy-workloads
 SCALING_MODE=hpa EXECUTION_MODE=sequential ARCHITECTURE=monolith make verify-live-mode
 ```
 
 Deploy HPA microservices for manual smoke validation:
 
 ```bash
-ARCHITECTURE=microservices SCALING_MODE=hpa IMAGE_TAG="$IMAGE_TAG" make deploy-workloads
+ARCHITECTURE=microservices SCALING_MODE=hpa make deploy-workloads
 SCALING_MODE=hpa EXECUTION_MODE=sequential ARCHITECTURE=microservices make verify-live-mode
 ```
 
@@ -611,7 +610,6 @@ ATTEMPT=attempt-01 \
 SCALING_MODE=hpa \
 K6_PROFILE=hpa \
 TEST_DURATION=1m \
-IMAGE_TAG="$IMAGE_TAG" \
 make run-benchmark-case
 ```
 
@@ -626,7 +624,6 @@ ATTEMPT=attempt-01 \
 SCALING_MODE=hpa \
 K6_PROFILE=hpa \
 TEST_DURATION=1m \
-IMAGE_TAG="$IMAGE_TAG" \
 make run-benchmark-case
 ```
 
@@ -648,7 +645,6 @@ RUN_ID=rq2-hpa-vultr-sequential \
 ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=300 \
 ARCHITECTURE_SWITCH_DELAY=300 \
-IMAGE_TAG="$IMAGE_TAG" \
 SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-transactions:100,250,500;concurrent-mixed-workload:100,250,500" \
 make run-benchmark-suite
 ```
@@ -665,7 +661,6 @@ ATTEMPT=attempt-01 \
 ARCHITECTURE_ORDER="microservices monolith" \
 INTER_CASE_DELAY=300 \
 ARCHITECTURE_SWITCH_DELAY=300 \
-IMAGE_TAG="$IMAGE_TAG" \
 SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-transactions:100,250,500;concurrent-mixed-workload:100,250,500" \
 make run-benchmark-suite
 ```
@@ -694,7 +689,7 @@ These are the arguments that matter most for the final sequential suite:
 | `ARCHITECTURE_ORDER` | `"microservices monolith"` | Optional override; default is `monolith microservices`. |
 | `INTER_CASE_DELAY` | `120` or `300` | Pause between cases inside the same architecture phase. |
 | `ARCHITECTURE_SWITCH_DELAY` | `300` | Pause between monolith and microservices phases. |
-| `IMAGE_TAG` | `$IMAGE_TAG` | Image tag rendered and deployed by the suite. |
+| `IMAGE_TAG` | `670736c` | Optional per-command override; default comes from `env/image-tag.env`. |
 | `SCENARIO_RPS_MATRIX` | `login:100,200` | Scenario-specific RPS matrix. |
 
 These values should normally come from env files and do not need to be repeated

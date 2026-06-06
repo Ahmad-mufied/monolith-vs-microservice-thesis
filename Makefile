@@ -899,7 +899,10 @@ ecr-check-tag:
 # ECR Image Build and Push
 # =========================
 
-IMAGE_TAG ?= $(shell if [ -f $(SHARED_IMAGE_TAG_ENV) ]; then grep -E '^IMAGE_TAG=' $(SHARED_IMAGE_TAG_ENV) | head -n 1 | cut -d= -f2-; elif [ -f env/image-tag.eks.env ]; then grep -E '^IMAGE_TAG=' env/image-tag.eks.env | head -n 1 | cut -d= -f2-; else git rev-parse --short HEAD; fi)
+RESOLVED_IMAGE_TAG := $(shell if [ -f $(SHARED_IMAGE_TAG_ENV) ]; then grep -E '^IMAGE_TAG=' $(SHARED_IMAGE_TAG_ENV) | head -n 1 | cut -d= -f2-; elif [ -f env/image-tag.eks.env ]; then grep -E '^IMAGE_TAG=' env/image-tag.eks.env | head -n 1 | cut -d= -f2-; else git rev-parse --short HEAD; fi)
+ifeq ($(strip $(IMAGE_TAG)),)
+override IMAGE_TAG := $(RESOLVED_IMAGE_TAG)
+endif
 
 .PHONY: show-image-tag
 show-image-tag:
