@@ -179,19 +179,19 @@ dispatch_render_manifests() {
   case "$PLATFORM" in
     eks)
       IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" AWS_REGION="${AWS_REGION:-ap-southeast-1}" ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}" OUTPUT_DIR="$render_dir" bash scripts/render-eks-manifests.sh >/dev/null
-      bash scripts/validate-eks-assets.sh deploy "$render_dir"
+      bash scripts/validate-cloud-assets.sh deploy "$render_dir"
       echo "Rendered manifests to $render_dir"
       trap - EXIT
       ;;
     hetzner)
       IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}" OUTPUT_DIR="$render_dir" bash scripts/render-hetzner-manifests.sh >/dev/null
-      bash scripts/validate-eks-assets.sh deploy "$render_dir"
+      bash scripts/validate-cloud-assets.sh deploy "$render_dir"
       echo "Rendered manifests to $render_dir"
       trap - EXIT
       ;;
     vultr)
       IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" OUTPUT_DIR="$render_dir" bash scripts/render-vultr-manifests.sh >/dev/null
-      bash scripts/validate-eks-assets.sh deploy "$render_dir"
+      bash scripts/validate-cloud-assets.sh deploy "$render_dir"
       bash scripts/validate-rendered-provider-assets.sh vultr "$render_dir"
       echo "Rendered manifests to $render_dir"
       trap - EXIT
@@ -207,11 +207,11 @@ dispatch_deploy_workloads() {
       case "$PLATFORM" in
         eks)
           IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" AWS_REGION="${AWS_REGION:-ap-southeast-1}" ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}" make --no-print-directory ecr-check-tag
-          CLOUD_PROVIDER=aws SCALING_MODE="$SCALING_MODE" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" AWS_REGION="${AWS_REGION:-ap-southeast-1}" ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}" bash scripts/deploy-all-eks-clusters.sh
+          CLOUD_PROVIDER=aws SCALING_MODE="$SCALING_MODE" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" AWS_REGION="${AWS_REGION:-ap-southeast-1}" ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}" bash scripts/deploy-all-clusters.sh
           ;;
         hetzner|vultr)
           IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}" bash scripts/dockerhub-public-image-check.sh
-          CLOUD_PROVIDER="$CLOUD_PROVIDER" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" bash scripts/deploy-all-eks-clusters.sh
+          CLOUD_PROVIDER="$CLOUD_PROVIDER" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" bash scripts/deploy-all-clusters.sh
           ;;
       esac
       ;;

@@ -688,7 +688,7 @@ Rules:
 - seed runs via Kubernetes Job,
 - migration and seed must not run during benchmark execution,
 - API Gateway has no migration job,
-- EKS app deployment mode is selected via `deployments/k8s/eks/*/overlays/fixed` and `overlays/hpa`,
+- App deployment mode is selected via `deployments/k8s/cloud/*/overlays/fixed` and `overlays/hpa`,
 - the legacy `resource-management-*.yaml` files remain as generic namespace/HPA references outside the EKS overlay flow.
 
 ---
@@ -809,11 +809,11 @@ scripts/
 ├── create-local-postgres-secrets.sh
 ├── create-local-secrets.sh
 ├── create-local-secrets-microservices.sh
-├── deploy-all-eks-clusters.sh
+├── deploy-all-clusters.sh
 ├── deploy-monolith-cluster.sh
 ├── deploy-msa-cluster.sh
 ├── deploy-sequential-architecture.sh
-├── eks-update-manifests.sh
+├── update-cloud-manifests.sh
 ├── env-init-app.sh
 ├── env-init-base.sh
 ├── env-init-datadog-minikube.sh
@@ -841,7 +841,7 @@ scripts/
 ├── terraform-recovery-fix-tainted-nodegroups.sh
 ├── terraform-aws-sequential.sh
 ├── terraform-sequential-recovery-check.sh
-└── validate-eks-assets.sh
+└── validate-cloud-assets.sh
 ```
 
 Rules:

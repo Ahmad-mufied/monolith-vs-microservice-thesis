@@ -142,7 +142,7 @@ fi
 
 render_provider_manifests "$RENDER_ROOT"
 MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/$MANIFEST_NAME"
-bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
+bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 
 resources_json="$(resources_configuration_json "$ARCHITECTURE" "$SCALING_MODE")"
 provider_region="${VULTR_REGION:-$AWS_REGION}"

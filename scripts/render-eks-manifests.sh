@@ -24,15 +24,15 @@ cleanup() {
 trap cleanup ERR
 
 mkdir -p "$OUTPUT_DIR/deployments/k8s"
-rm -rf "$OUTPUT_DIR/deployments/k8s/eks" "$OUTPUT_DIR/deployments/k8s/benchmark"
-cp -R deployments/k8s/eks "$OUTPUT_DIR/deployments/k8s/"
+rm -rf "$OUTPUT_DIR/deployments/k8s/cloud" "$OUTPUT_DIR/deployments/k8s/benchmark"
+cp -R deployments/k8s/cloud "$OUTPUT_DIR/deployments/k8s/"
 cp -R deployments/k8s/benchmark "$OUTPUT_DIR/deployments/k8s/"
 
 IMAGE_TAG="$IMAGE_TAG" \
 AWS_REGION="$AWS_REGION" \
 ECR_NAMESPACE="$ECR_NAMESPACE" \
 MANIFEST_ROOT="$MANIFEST_ROOT" \
-bash scripts/eks-update-manifests.sh >/dev/null
+bash scripts/update-cloud-manifests.sh >/dev/null
 
 trap - ERR
 echo "$OUTPUT_DIR"

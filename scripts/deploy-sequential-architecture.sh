@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy exactly one architecture on the single sequential EKS cluster.
+# Deploy exactly one architecture on the single sequential cluster.
 set -euo pipefail
 
 source scripts/lib/shared-env.sh
@@ -145,7 +145,7 @@ echo "  provider      : $CLOUD_PROVIDER"
 echo ""
 
 render_provider_manifests "$RENDER_ROOT"
-bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
+bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 
 $K8S apply -f deployments/k8s/namespaces/local.yaml
 $K8S apply -f deployments/k8s/benchmark/namespace.yaml
@@ -153,7 +153,7 @@ $K8S apply -f deployments/k8s/benchmark/k6-runner-rbac.yaml
 
 case "$ARCHITECTURE" in
   monolith)
-    rendered_job_dir="$RENDER_ROOT/deployments/k8s/eks/monolith"
+    rendered_job_dir="$RENDER_ROOT/deployments/k8s/cloud/monolith"
     rendered_overlay_dir="$rendered_job_dir/overlays/$SCALING_MODE"
 
     require_secret benchmark db-bootstrap-env "BOOTSTRAP_DATABASE_URL"
@@ -180,7 +180,7 @@ case "$ARCHITECTURE" in
     $K8S rollout status deployment/monolith -n mono --timeout=300s
     ;;
   microservices)
-    rendered_job_dir="$RENDER_ROOT/deployments/k8s/eks/microservices"
+    rendered_job_dir="$RENDER_ROOT/deployments/k8s/cloud/microservices"
     rendered_overlay_dir="$rendered_job_dir/overlays/$SCALING_MODE"
 
     require_secret benchmark db-bootstrap-env "BOOTSTRAP_DATABASE_URL"

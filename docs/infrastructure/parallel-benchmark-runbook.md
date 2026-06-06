@@ -196,19 +196,19 @@ Estimated suite time with default HPA stages:
 ```bash
 # Reset and seed (both clusters)
 kubectl --context=monolith delete job reset-monolith-data-job -n mono --ignore-not-found
-kubectl --context=monolith apply -f deployments/k8s/eks/monolith/reset-monolith-data-job.yaml
+kubectl --context=monolith apply -f deployments/k8s/cloud/monolith/reset-monolith-data-job.yaml
 kubectl --context=monolith wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=120s
 
 kubectl --context=msa delete job reset-microservices-data-job -n msa --ignore-not-found
-kubectl --context=msa apply -f deployments/k8s/eks/microservices/reset-microservices-data-job.yaml
+kubectl --context=msa apply -f deployments/k8s/cloud/microservices/reset-microservices-data-job.yaml
 kubectl --context=msa wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
 
 kubectl --context=monolith delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
-kubectl --context=monolith apply -f deployments/k8s/eks/monolith/seed-monolith-benchmark-data-job.yaml
+kubectl --context=monolith apply -f deployments/k8s/cloud/monolith/seed-monolith-benchmark-data-job.yaml
 kubectl --context=monolith wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
 
 kubectl --context=msa delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-kubectl --context=msa apply -f deployments/k8s/eks/microservices/seed-microservices-benchmark-data-job.yaml
+kubectl --context=msa apply -f deployments/k8s/cloud/microservices/seed-microservices-benchmark-data-job.yaml
 kubectl --context=msa wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
 
 # Run parallel benchmark

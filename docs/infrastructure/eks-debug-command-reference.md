@@ -305,8 +305,8 @@ benchmark metadata are resolved correctly:
 IMAGE_TAG=$(git rev-parse --short HEAD)
 RENDER_ROOT="$(IMAGE_TAG="$IMAGE_TAG" AWS_REGION=ap-southeast-1 ECR_NAMESPACE=skripsi bash scripts/render-eks-manifests.sh)"
 
-RENDERED_EKS_MONOLITH_DIR="$RENDER_ROOT/deployments/k8s/eks/monolith"
-RENDERED_EKS_MICROSERVICES_DIR="$RENDER_ROOT/deployments/k8s/eks/microservices"
+RENDERED_APP_MONOLITH_DIR="$RENDER_ROOT/deployments/k8s/cloud/monolith"
+RENDERED_APP_MICROSERVICES_DIR="$RENDER_ROOT/deployments/k8s/cloud/microservices"
 RENDERED_BENCHMARK_DIR="$RENDER_ROOT/deployments/k8s/benchmark"
 ```
 
@@ -317,38 +317,38 @@ Monolith migration, reset, seed, and enrichment preparation:
 
 ```bash
 kubectl --context=monolith delete job monolith-migration-job -n mono --ignore-not-found
-kubectl --context=monolith apply -f "$RENDERED_EKS_MONOLITH_DIR/migration-job.yaml"
+kubectl --context=monolith apply -f "$RENDERED_APP_MONOLITH_DIR/migration-job.yaml"
 
 kubectl --context=monolith delete job reset-monolith-data-job -n mono --ignore-not-found
-kubectl --context=monolith apply -f "$RENDERED_EKS_MONOLITH_DIR/reset-monolith-data-job.yaml"
+kubectl --context=monolith apply -f "$RENDERED_APP_MONOLITH_DIR/reset-monolith-data-job.yaml"
 
 kubectl --context=monolith delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
-kubectl --context=monolith apply -f "$RENDERED_EKS_MONOLITH_DIR/seed-monolith-benchmark-data-job.yaml"
+kubectl --context=monolith apply -f "$RENDERED_APP_MONOLITH_DIR/seed-monolith-benchmark-data-job.yaml"
 
 kubectl --context=monolith delete job prepare-monolith-enrichment-benchmark-data-job -n mono --ignore-not-found
-kubectl --context=monolith apply -f "$RENDERED_EKS_MONOLITH_DIR/prepare-monolith-enrichment-benchmark-data-job.yaml"
+kubectl --context=monolith apply -f "$RENDERED_APP_MONOLITH_DIR/prepare-monolith-enrichment-benchmark-data-job.yaml"
 ```
 
 Microservices migration, reset, seed, and enrichment preparation:
 
 ```bash
 kubectl --context=msa delete job auth-migration-job -n msa --ignore-not-found
-kubectl --context=msa apply -f "$RENDERED_EKS_MICROSERVICES_DIR/auth-migration-job.yaml"
+kubectl --context=msa apply -f "$RENDERED_APP_MICROSERVICES_DIR/auth-migration-job.yaml"
 
 kubectl --context=msa delete job item-migration-job -n msa --ignore-not-found
-kubectl --context=msa apply -f "$RENDERED_EKS_MICROSERVICES_DIR/item-migration-job.yaml"
+kubectl --context=msa apply -f "$RENDERED_APP_MICROSERVICES_DIR/item-migration-job.yaml"
 
 kubectl --context=msa delete job transaction-migration-job -n msa --ignore-not-found
-kubectl --context=msa apply -f "$RENDERED_EKS_MICROSERVICES_DIR/transaction-migration-job.yaml"
+kubectl --context=msa apply -f "$RENDERED_APP_MICROSERVICES_DIR/transaction-migration-job.yaml"
 
 kubectl --context=msa delete job reset-microservices-data-job -n msa --ignore-not-found
-kubectl --context=msa apply -f "$RENDERED_EKS_MICROSERVICES_DIR/reset-microservices-data-job.yaml"
+kubectl --context=msa apply -f "$RENDERED_APP_MICROSERVICES_DIR/reset-microservices-data-job.yaml"
 
 kubectl --context=msa delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-kubectl --context=msa apply -f "$RENDERED_EKS_MICROSERVICES_DIR/seed-microservices-benchmark-data-job.yaml"
+kubectl --context=msa apply -f "$RENDERED_APP_MICROSERVICES_DIR/seed-microservices-benchmark-data-job.yaml"
 
 kubectl --context=msa delete job prepare-microservices-enrichment-benchmark-data-job -n msa --ignore-not-found
-kubectl --context=msa apply -f "$RENDERED_EKS_MICROSERVICES_DIR/prepare-microservices-enrichment-benchmark-data-job.yaml"
+kubectl --context=msa apply -f "$RENDERED_APP_MICROSERVICES_DIR/prepare-microservices-enrichment-benchmark-data-job.yaml"
 ```
 
 Benchmark jobs:
