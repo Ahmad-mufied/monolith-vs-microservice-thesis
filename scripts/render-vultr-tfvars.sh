@@ -77,7 +77,7 @@ EOF
 cat > infra/terraform/vultr-parallel/terraform.tfvars <<EOF
 project                   = "${PROJECT:-skripsi}"
 region                    = "${VULTR_REGION:-sgp}"
-kubernetes_version        = "${VULTR_KUBERNETES_VERSION:-v1.33.0+1}"
+kubernetes_version        = "${VULTR_KUBERNETES_VERSION:-v1.36.1+1}"
 monolith_cluster_name     = "${VULTR_MONOLITH_CLUSTER_NAME:-skripsi-vultr-monolith}"
 msa_cluster_name          = "${VULTR_MSA_CLUSTER_NAME:-skripsi-vultr-msa}"
 app_node_plan             = "${VULTR_APP_NODE_PLAN:-voc-c-8c-16gb-150s-amd}"
@@ -90,7 +90,7 @@ EOF
 cat > infra/terraform/vultr-sequential/terraform.tfvars <<EOF
 project                   = "${PROJECT:-skripsi}"
 region                    = "${VULTR_REGION:-sgp}"
-kubernetes_version        = "${VULTR_KUBERNETES_VERSION:-v1.33.0+1}"
+kubernetes_version        = "${VULTR_KUBERNETES_VERSION:-v1.36.1+1}"
 sequential_cluster_name   = "${VULTR_SEQUENTIAL_CLUSTER_NAME:-skripsi-vultr-benchmark}"
 app_node_plan             = "${VULTR_APP_NODE_PLAN:-voc-c-8c-16gb-150s-amd}"
 app_node_count            = ${vultr_app_node_count}
