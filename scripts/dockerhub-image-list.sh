@@ -105,7 +105,7 @@ for repo in "${repos[@]}"; do
         first(.results[]? | select(.name == $tag) | (.tag_last_pushed // .last_updated // (.images[0]?.last_pushed) // "unknown")) // ""
       ' <<<"$tags_json"
     )"
-    if jq -e --arg tag "$image_tag" '.results[]?.name == $tag' >/dev/null <<<"$tags_json"; then
+    if jq -e --arg tag "$image_tag" 'any(.results[]?; .name == $tag)' >/dev/null <<<"$tags_json"; then
       printf '%s\n' "$repo"
       printf '  status      : FOUND\n'
       printf '  image       : %s\n' "$image"
