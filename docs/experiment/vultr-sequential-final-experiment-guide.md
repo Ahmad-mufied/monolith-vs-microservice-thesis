@@ -184,6 +184,15 @@ Resume behavior:
   `result-status.json` already exists in S3 for that exact
   `run_id/architecture/scenario/rps/attempt`.
 - Existing completed cases are skipped and included in the suite summary.
+- If all cases for an architecture already exist in S3, the suite skips
+  redeploying that architecture and moves on to the next architecture phase.
+- If an architecture still has pending cases, the suite can also skip the
+  resume redeploy when the live deployment already matches the requested
+  `IMAGE_TAG` and `SCALING_MODE`, the deployment is ready, and the inactive
+  architecture is scaled down. This is enabled by default with
+  `SEQUENTIAL_RESUME_SKIP_READY_DEPLOY=true`.
+- Set `SEQUENTIAL_RESUME_SKIP_READY_DEPLOY=false` if you intentionally want a
+  clean redeploy before resuming partial results.
 - To rerun the same matrix from scratch, use a new `RUN_ID` or a new
   `ATTEMPT`.
 

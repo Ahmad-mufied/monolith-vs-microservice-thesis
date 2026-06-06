@@ -37,6 +37,7 @@ INTER_CASE_DELAY="${INTER_CASE_DELAY:-0}"
 ARCHITECTURE_SWITCH_DELAY="${ARCHITECTURE_SWITCH_DELAY:-300}"
 AUTO_DESTROY_CONFIRMED="${AUTO_DESTROY_CONFIRMED:-false}"
 SKIP_BENCHMARK_PREFLIGHT="${SKIP_BENCHMARK_PREFLIGHT:-false}"
+SEQUENTIAL_RESUME_SKIP_READY_DEPLOY="${SEQUENTIAL_RESUME_SKIP_READY_DEPLOY:-true}"
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
 DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 K6_PROFILE="${K6_PROFILE:-}"
@@ -301,6 +302,126 @@ matrix_json() {
   ' < "$MATRIX_TSV"
 }
 
+architecture_has_pending_cases() {
+  local architecture="$1"
+  local scenario scenario_rps_levels target_rps case_s3_uri
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ -z "$scenario" ] && continue
+    for target_rps in $scenario_rps_levels; do
+      case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
+      if ! aws s3 ls "${case_s3_uri}/result-status.json" >/dev/null 2>&1; then
+        return 0
+      fi
+    done
+  done < "$MATRIX_TSV"
+
+  return 1
+}
+
+deployment_ready_with_image_tag() {
+  local namespace="$1"
+  local deployment="$2"
+  local container="$3"
+  local desired ready image
+
+  if ! kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  desired="$(kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" -o jsonpath='{.spec.replicas}' 2>/dev/null || true)"
+  ready="$(kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+  image="$(kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" -o "jsonpath={.spec.template.spec.containers[?(@.name=='${container}')].image}" 2>/dev/null || true)"
+
+  desired="${desired:-0}"
+  ready="${ready:-0}"
+
+  if ! [[ "$desired" =~ ^[0-9]+$ ]] || ! [[ "$ready" =~ ^[0-9]+$ ]]; then
+    return 1
+  fi
+  if [ "$desired" -lt 1 ] || [ "$ready" -lt "$desired" ]; then
+    return 1
+  fi
+  if [[ "$image" != *":${IMAGE_TAG}" ]]; then
+    return 1
+  fi
+
+  return 0
+}
+
+deployment_scaled_down_or_absent() {
+  local namespace="$1"
+  local deployment="$2"
+  local desired ready
+
+  if ! kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  desired="$(kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" -o jsonpath='{.spec.replicas}' 2>/dev/null || true)"
+  ready="$(kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+  desired="${desired:-0}"
+  ready="${ready:-0}"
+
+  [ "$desired" = "0" ] && [ "$ready" = "0" ]
+}
+
+scaling_mode_matches_live_architecture() {
+  local architecture="$1"
+  local hpa_count
+
+  case "$architecture:$SCALING_MODE" in
+    monolith:fixed)
+      ! kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
+      ;;
+    monolith:hpa)
+      kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
+      ;;
+    microservices:fixed)
+      hpa_count="$(kubectl --context="$SEQUENTIAL_CONTEXT" get hpa -n msa -o name 2>/dev/null | wc -l | tr -d '[:space:]' || true)"
+      [ "${hpa_count:-0}" = "0" ]
+      ;;
+    microservices:hpa)
+      hpa_count="$(kubectl --context="$SEQUENTIAL_CONTEXT" get hpa -n msa -o name 2>/dev/null | wc -l | tr -d '[:space:]' || true)"
+      [ "${hpa_count:-0}" -ge 4 ]
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+inactive_architecture_scaled_down() {
+  local active_architecture="$1"
+  local svc
+
+  if [ "$active_architecture" = "monolith" ]; then
+    for svc in api-gateway auth-service item-service transaction-service; do
+      deployment_scaled_down_or_absent msa "$svc" || return 1
+    done
+    return 0
+  fi
+
+  deployment_scaled_down_or_absent mono monolith
+}
+
+architecture_ready_for_resume() {
+  local architecture="$1"
+  local svc
+
+  scaling_mode_matches_live_architecture "$architecture" || return 1
+  inactive_architecture_scaled_down "$architecture" || return 1
+
+  if [ "$architecture" = "monolith" ]; then
+    deployment_ready_with_image_tag mono monolith monolith
+    return
+  fi
+
+  for svc in api-gateway auth-service item-service transaction-service; do
+    deployment_ready_with_image_tag msa "$svc" "$svc" || return 1
+  done
+}
+
 normalize_case_timing_source() {
   local source="$1"
 
@@ -498,7 +619,17 @@ for architecture in $ARCHITECTURE_ORDER; do
   architecture_index=$((architecture_index + 1))
   phase_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "=== Sequential Architecture: ${architecture} ==="
-  ARCHITECTURE="$architecture" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" CLOUD_PROVIDER="$CLOUD_PROVIDER" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" bash scripts/deploy-sequential-architecture.sh
+  phase_has_pending_cases=false
+  if architecture_has_pending_cases "$architecture"; then
+    phase_has_pending_cases=true
+    if [ "$SEQUENTIAL_RESUME_SKIP_READY_DEPLOY" = "true" ] && architecture_ready_for_resume "$architecture"; then
+      echo "Architecture ${architecture} is already ready with IMAGE_TAG=${IMAGE_TAG} and SCALING_MODE=${SCALING_MODE}; skipping resume redeploy."
+    else
+      ARCHITECTURE="$architecture" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" CLOUD_PROVIDER="$CLOUD_PROVIDER" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" bash scripts/deploy-sequential-architecture.sh
+    fi
+  else
+    echo "All cases for ${architecture} already exist in S3; skipping architecture deploy."
+  fi
 
   completed_architecture_cases=0
   while IFS=$'\t' read -r scenario scenario_rps_levels; do
@@ -666,7 +797,7 @@ for architecture in $ARCHITECTURE_ORDER; do
     --argjson next_switch_delay_seconds "$ARCHITECTURE_SWITCH_DELAY" \
     '{architecture:$architecture, architecture_index:$architecture_index, architecture_count:$architecture_count, case_count:$case_count, started_at_utc:$started_at_utc, finished_at_utc:$finished_at_utc, next_switch_delay_seconds:(if $architecture_index < $architecture_count then $next_switch_delay_seconds else 0 end)}' >> "$PHASES_JSONL"
 
-  if [ "$architecture_index" -lt "$architecture_count" ] && [ "$ARCHITECTURE_SWITCH_DELAY" != "0" ]; then
+  if [ "$phase_has_pending_cases" = "true" ] && [ "$architecture_index" -lt "$architecture_count" ] && [ "$ARCHITECTURE_SWITCH_DELAY" != "0" ]; then
     echo "Waiting ${ARCHITECTURE_SWITCH_DELAY}s before switching to the next architecture for cleaner Datadog windows..."
     sleep "$ARCHITECTURE_SWITCH_DELAY"
   fi
