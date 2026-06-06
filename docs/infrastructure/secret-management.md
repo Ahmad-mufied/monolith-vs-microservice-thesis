@@ -64,7 +64,7 @@ S3 writer before creating cluster infrastructure. Manual `AWS_ACCESS_KEY_ID`
 and `AWS_SECRET_ACCESS_KEY` values in `env/vultr.env` remain a fallback only.
 
 Application secrets reuse the current Kubernetes Secret names consumed by the
-EKS manifests. PostgreSQL URLs point to Vultr private VPC IPs from Terraform
+cloud manifests. PostgreSQL URLs point to Vultr private VPC IPs from Terraform
 outputs. Do not commit `env/vultr.env`, generated `terraform.tfvars`, local
 Terraform state, or kubeconfig files.
 

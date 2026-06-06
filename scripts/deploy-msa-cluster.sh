@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full deployment flow for the MSA EKS cluster.
+# Full deployment flow for the MSA application.
 # Run after terraform apply and setup-eks-contexts.sh.
 set -euo pipefail
 
@@ -35,14 +35,14 @@ fi
 CONTEXT="msa"
 K8S="kubectl --context=$CONTEXT"
 SCALING_MODE="${SCALING_MODE:-fixed}"
-EKS_JOB_DIR="deployments/k8s/eks/microservices"
+APP_JOB_DIR="deployments/k8s/cloud/microservices"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
 DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
 CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
 RENDER_ROOT="$(mktemp -d)"
-RENDERED_EKS_JOB_DIR=""
+RENDERED_APP_JOB_DIR=""
 RENDERED_MSA_OVERLAY_DIR=""
 
 cleanup() {
@@ -73,11 +73,11 @@ require_secret() {
 
 echo "=== Deploying MSA cluster (context: $CONTEXT) ==="
 
-echo "Rendering EKS manifests with IMAGE_TAG=$IMAGE_TAG"
+echo "Rendering cloud manifests with IMAGE_TAG=$IMAGE_TAG"
 render_provider_manifests "$RENDER_ROOT"
-RENDERED_EKS_JOB_DIR="$RENDER_ROOT/$EKS_JOB_DIR"
-RENDERED_MSA_OVERLAY_DIR="$RENDERED_EKS_JOB_DIR/overlays/$SCALING_MODE"
-bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
+RENDERED_APP_JOB_DIR="$RENDER_ROOT/$APP_JOB_DIR"
+RENDERED_MSA_OVERLAY_DIR="$RENDERED_APP_JOB_DIR/overlays/$SCALING_MODE"
+bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 
 # Namespaces
 $K8S apply -f deployments/k8s/namespaces/local.yaml
@@ -119,7 +119,7 @@ prepare_existing_workloads_for_redeploy
 # Migrations (parallel)
 for svc in auth item transaction; do
   $K8S delete job "${svc}-migration-job" -n msa --ignore-not-found
-  $K8S apply -f "${RENDERED_EKS_JOB_DIR}/${svc}-migration-job.yaml"
+  $K8S apply -f "${RENDERED_APP_JOB_DIR}/${svc}-migration-job.yaml"
 done
 for svc in auth item transaction; do
   $K8S wait --for=condition=complete job/"${svc}-migration-job" -n msa --timeout=180s
@@ -128,11 +128,11 @@ echo "Migrations complete"
 
 # Seed
 $K8S delete job reset-microservices-data-job -n msa --ignore-not-found
-$K8S apply -f "$RENDERED_EKS_JOB_DIR/reset-microservices-data-job.yaml"
+$K8S apply -f "$RENDERED_APP_JOB_DIR/reset-microservices-data-job.yaml"
 $K8S wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
 
 $K8S delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
-$K8S apply -f "$RENDERED_EKS_JOB_DIR/seed-microservices-benchmark-data-job.yaml"
+$K8S apply -f "$RENDERED_APP_JOB_DIR/seed-microservices-benchmark-data-job.yaml"
 $K8S wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
 echo "Seed complete"
 

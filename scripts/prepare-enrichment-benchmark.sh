@@ -3,8 +3,8 @@ set -euo pipefail
 
 MONO_K8S="kubectl --context=monolith"
 MSA_K8S="kubectl --context=msa"
-MONOLITH_PREPARE_MANIFEST_PATH="${MONOLITH_PREPARE_MANIFEST_PATH:-deployments/k8s/eks/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml}"
-MICROSERVICES_PREPARE_MANIFEST_PATH="${MICROSERVICES_PREPARE_MANIFEST_PATH:-deployments/k8s/eks/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml}"
+MONOLITH_PREPARE_MANIFEST_PATH="${MONOLITH_PREPARE_MANIFEST_PATH:-deployments/k8s/cloud/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml}"
+MICROSERVICES_PREPARE_MANIFEST_PATH="${MICROSERVICES_PREPARE_MANIFEST_PATH:-deployments/k8s/cloud/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml}"
 PREPARE_ENRICHMENT_TIMEOUT="${PREPARE_ENRICHMENT_TIMEOUT:-300s}"
 
 echo "Preparing enrichment benchmark data on both clusters..."

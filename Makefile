@@ -797,12 +797,12 @@ datadog-uninstall:
 	helm uninstall $(DATADOG_RELEASE) -n $(DATADOG_NAMESPACE)
 
 # =========================
-# EKS / Terraform
+# Benchmark / Terraform
 # =========================
 
 SCENARIO     ?= login
 TARGET_RPS   ?= 1000
-RUN_ID       ?= eks-run-001
+RUN_ID       ?= run-001
 ATTEMPT      ?= attempt-01
 EXPERIMENT_NAME ?=
 SCALING_MODE ?= fixed
@@ -996,12 +996,12 @@ dockerhub-push-all:
 dockerhub-list-images:
 	@DOCKERHUB_NAMESPACE="$(DOCKERHUB_NAMESPACE)" IMAGE_TAG="$(if $(filter command line environment,$(origin IMAGE_TAG)),$(IMAGE_TAG),)" bash scripts/dockerhub-image-list.sh
 
-.PHONY: eks-render-manifests eks-update-manifests
-eks-render-manifests eks-update-manifests:
+.PHONY: eks-render-manifests update-cloud-manifests
+eks-render-manifests update-cloud-manifests:
 	$(eval RENDER_DIR := $(shell mktemp -d))
 	@echo "Rendering EKS manifests to $(RENDER_DIR)"
 	@IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) OUTPUT_DIR="$(RENDER_DIR)" bash scripts/render-eks-manifests.sh >/dev/null
-	@bash scripts/validate-eks-assets.sh deploy "$(RENDER_DIR)"
+	@bash scripts/validate-cloud-assets.sh deploy "$(RENDER_DIR)"
 	@echo "Rendered manifests ready at $(RENDER_DIR)"
 
 .PHONY: eks-validate-manifests
@@ -1011,7 +1011,7 @@ eks-validate-manifests:
 	trap 'rm -rf "$$RENDER_DIR"' EXIT; \
 	echo "Validating rendered EKS manifests in $$RENDER_DIR"; \
 	IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) OUTPUT_DIR="$$RENDER_DIR" bash scripts/render-eks-manifests.sh >/dev/null; \
-	bash scripts/validate-eks-assets.sh deploy "$$RENDER_DIR"
+	bash scripts/validate-cloud-assets.sh deploy "$$RENDER_DIR"
 
 .PHONY: eks-render-tfvars
 eks-render-tfvars:
@@ -1139,7 +1139,7 @@ eks-deploy-sequential-architecture:
 .PHONY: eks-deploy-all
 eks-deploy-all:
 	$(MAKE) ecr-check-tag IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE)
-	SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/deploy-all-eks-clusters.sh
+	SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) AWS_REGION=$(AWS_REGION) ECR_NAMESPACE=$(ECR_NAMESPACE) bash scripts/deploy-all-clusters.sh
 
 .PHONY: eks-deploy-all-fixed
 eks-deploy-all-fixed:
@@ -1244,7 +1244,7 @@ hetzner-render-manifests:
 	trap 'rm -rf "$$RENDER_DIR"' EXIT; \
 	echo "Rendering Hetzner manifests to $$RENDER_DIR"; \
 	IMAGE_TAG=$(IMAGE_TAG) DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) OUTPUT_DIR="$$RENDER_DIR" bash scripts/render-hetzner-manifests.sh >/dev/null; \
-	bash scripts/validate-eks-assets.sh deploy "$$RENDER_DIR"; \
+	bash scripts/validate-cloud-assets.sh deploy "$$RENDER_DIR"; \
 	echo "Hetzner manifests rendered and validated successfully"
 
 .PHONY: hetzner-deploy-sequential-architecture
@@ -1254,7 +1254,7 @@ hetzner-deploy-sequential-architecture:
 .PHONY: hetzner-deploy-all
 hetzner-deploy-all:
 	DOCKERHUB_NAMESPACE=$(DOCKERHUB_NAMESPACE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/dockerhub-public-image-check.sh
-	CLOUD_PROVIDER=hetzner SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-all-eks-clusters.sh
+	CLOUD_PROVIDER=hetzner SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-all-clusters.sh
 
 .PHONY: vultr-render-tfvars
 vultr-render-tfvars:
@@ -1334,7 +1334,7 @@ vultr-render-manifests:
 	trap 'rm -rf "$$RENDER_DIR"' EXIT; \
 	echo "Rendering Vultr manifests to $$RENDER_DIR"; \
 	IMAGE_TAG=$(IMAGE_TAG) OUTPUT_DIR="$$RENDER_DIR" bash scripts/render-vultr-manifests.sh >/dev/null; \
-	bash scripts/validate-eks-assets.sh deploy "$$RENDER_DIR"; \
+	bash scripts/validate-cloud-assets.sh deploy "$$RENDER_DIR"; \
 	bash scripts/validate-rendered-provider-assets.sh vultr "$$RENDER_DIR"; \
 	echo "Vultr manifests rendered and validated successfully"
 
@@ -1345,7 +1345,7 @@ vultr-deploy-sequential-architecture:
 .PHONY: vultr-deploy-all
 vultr-deploy-all:
 	IMAGE_TAG=$(IMAGE_TAG) bash scripts/dockerhub-public-image-check.sh
-	CLOUD_PROVIDER=vultr SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-all-eks-clusters.sh
+	CLOUD_PROVIDER=vultr SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-all-clusters.sh
 
 .PHONY: vultr-verify-live-mode
 vultr-verify-live-mode:

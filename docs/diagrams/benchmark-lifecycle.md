@@ -7,7 +7,7 @@ flowchart TB
   start(["Start"])
   persistent["One-time persistent setup<br/>make aws-create-s3<br/>make aws-create-ecr"]
   images["Build and push images<br/>make ecr-push-all IMAGE_TAG=git-sha"]
-  renderManifests["Render EKS manifests<br/>make eks-render-manifests<br/>source manifests stay unchanged"]
+  renderManifests["Render cloud manifests<br/>make eks-render-manifests<br/>source manifests stay unchanged"]
   env["Render operator env and tfvars<br/>make env-init PLATFORM=eks EXECUTION_MODE=parallel<br/>or make env-init PLATFORM=eks EXECUTION_MODE=sequential<br/>then make eks-render-tfvars"]
   auth["Verify AWS auth for Terraform<br/>make terraform-auth-check"]
   shared["Apply shared Terraform<br/>VPC, subnets, NAT, k6 IAM role"]

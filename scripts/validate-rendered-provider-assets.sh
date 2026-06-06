@@ -33,16 +33,16 @@ if [ "$provider" = "vultr" ]; then
     echo "ERROR: rendered Vultr manifests do not contain Docker Hub image references" >&2
     exit 1
   fi
-  if find "$render_root/deployments/k8s/eks" -path '*/overlays/fixed/*hpa*.yaml' -print | grep -q .; then
+  if find "$render_root/deployments/k8s/cloud" -path '*/overlays/fixed/*hpa*.yaml' -print | grep -q .; then
     echo "ERROR: fixed overlay unexpectedly contains HPA manifests" >&2
     exit 1
   fi
   for expected in \
-    "$render_root/deployments/k8s/eks/monolith/overlays/hpa/hpa.yaml" \
-    "$render_root/deployments/k8s/eks/microservices/overlays/hpa/api-gateway-hpa.yaml" \
-    "$render_root/deployments/k8s/eks/microservices/overlays/hpa/auth-service-hpa.yaml" \
-    "$render_root/deployments/k8s/eks/microservices/overlays/hpa/item-service-hpa.yaml" \
-    "$render_root/deployments/k8s/eks/microservices/overlays/hpa/transaction-service-hpa.yaml"; do
+    "$render_root/deployments/k8s/cloud/monolith/overlays/hpa/hpa.yaml" \
+    "$render_root/deployments/k8s/cloud/microservices/overlays/hpa/api-gateway-hpa.yaml" \
+    "$render_root/deployments/k8s/cloud/microservices/overlays/hpa/auth-service-hpa.yaml" \
+    "$render_root/deployments/k8s/cloud/microservices/overlays/hpa/item-service-hpa.yaml" \
+    "$render_root/deployments/k8s/cloud/microservices/overlays/hpa/transaction-service-hpa.yaml"; do
     [ -f "$expected" ] || { echo "ERROR: missing expected HPA manifest: $expected" >&2; exit 1; }
   done
 fi

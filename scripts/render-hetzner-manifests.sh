@@ -40,8 +40,8 @@ cleanup() {
 trap cleanup ERR
 
 mkdir -p "$OUTPUT_DIR/deployments/k8s"
-rm -rf "$OUTPUT_DIR/deployments/k8s/eks" "$OUTPUT_DIR/deployments/k8s/benchmark"
-cp -R deployments/k8s/eks "$OUTPUT_DIR/deployments/k8s/"
+rm -rf "$OUTPUT_DIR/deployments/k8s/cloud" "$OUTPUT_DIR/deployments/k8s/benchmark"
+cp -R deployments/k8s/cloud "$OUTPUT_DIR/deployments/k8s/"
 cp -R deployments/k8s/benchmark "$OUTPUT_DIR/deployments/k8s/"
 
 registry_base="docker.io/${DOCKERHUB_NAMESPACE}"
@@ -95,14 +95,14 @@ patch_resource_baseline() {
 
   local file
   for file in \
-    "$manifest_root/deployments/k8s/eks/monolith/overlays/fixed/resourcequota.yaml" \
-    "$manifest_root/deployments/k8s/eks/monolith/overlays/hpa/resourcequota.yaml" \
-    "$manifest_root/deployments/k8s/eks/microservices/overlays/fixed/resourcequota.yaml" \
-    "$manifest_root/deployments/k8s/eks/microservices/overlays/hpa/resourcequota.yaml"; do
+    "$manifest_root/deployments/k8s/cloud/monolith/overlays/fixed/resourcequota.yaml" \
+    "$manifest_root/deployments/k8s/cloud/monolith/overlays/hpa/resourcequota.yaml" \
+    "$manifest_root/deployments/k8s/cloud/microservices/overlays/fixed/resourcequota.yaml" \
+    "$manifest_root/deployments/k8s/cloud/microservices/overlays/hpa/resourcequota.yaml"; do
     perl -0pi -e "s{requests\\.cpu:\\s*\"[^\"]+\"}{requests.cpu: \"${HETZNER_APP_CPU_QUOTA}\"}g; s{limits\\.cpu:\\s*\"[^\"]+\"}{limits.cpu: \"${HETZNER_APP_CPU_QUOTA}\"}g; s{requests\\.memory:\\s*\"[^\"]+\"}{requests.memory: \"${HETZNER_APP_MEMORY_QUOTA}\"}g; s{limits\\.memory:\\s*\"[^\"]+\"}{limits.memory: \"${HETZNER_APP_MEMORY_QUOTA}\"}g" "$file"
   done
 
-  for file in "$manifest_root"/deployments/k8s/eks/{monolith/overlays/fixed,monolith/overlays/hpa,microservices/overlays/fixed,microservices/overlays/hpa}/*patch.yaml; do
+  for file in "$manifest_root"/deployments/k8s/cloud/{monolith/overlays/fixed,monolith/overlays/hpa,microservices/overlays/fixed,microservices/overlays/hpa}/*patch.yaml; do
     [ -f "$file" ] || continue
     while IFS= read -r value; do
       replace_resource_value "$file" "$value" "$(scale_cpu "$value")"
@@ -115,37 +115,37 @@ patch_resource_baseline() {
 
 manifest_root="$OUTPUT_DIR"
 patch_resource_baseline
-patch_datadog_version "$manifest_root/deployments/k8s/eks/monolith/base/monolith.yaml"
+patch_datadog_version "$manifest_root/deployments/k8s/cloud/monolith/base/monolith.yaml"
 for svc in api-gateway auth-service item-service transaction-service; do
-  patch_datadog_version "$manifest_root/deployments/k8s/eks/microservices/base/${svc}.yaml"
+  patch_datadog_version "$manifest_root/deployments/k8s/cloud/microservices/base/${svc}.yaml"
 done
 
 for overlay in fixed hpa; do
-  patch_kustomize_image "$manifest_root/deployments/k8s/eks/monolith/overlays/${overlay}/kustomization.yaml" "REPLACE_WITH_MONOLITH_ECR_IMAGE" "monolith"
-  patch_kustomize_image "$manifest_root/deployments/k8s/eks/microservices/overlays/${overlay}/kustomization.yaml" "REPLACE_WITH_API_GATEWAY_ECR_IMAGE" "api-gateway"
-  patch_kustomize_image "$manifest_root/deployments/k8s/eks/microservices/overlays/${overlay}/kustomization.yaml" "REPLACE_WITH_AUTH_SERVICE_ECR_IMAGE" "auth-service"
-  patch_kustomize_image "$manifest_root/deployments/k8s/eks/microservices/overlays/${overlay}/kustomization.yaml" "REPLACE_WITH_ITEM_SERVICE_ECR_IMAGE" "item-service"
-  patch_kustomize_image "$manifest_root/deployments/k8s/eks/microservices/overlays/${overlay}/kustomization.yaml" "REPLACE_WITH_TRANSACTION_SERVICE_ECR_IMAGE" "transaction-service"
+  patch_kustomize_image "$manifest_root/deployments/k8s/cloud/monolith/overlays/${overlay}/kustomization.yaml" "REPLACE_WITH_MONOLITH_ECR_IMAGE" "monolith"
+  patch_kustomize_image "$manifest_root/deployments/k8s/cloud/microservices/overlays/${overlay}/kustomization.yaml" "REPLACE_WITH_API_GATEWAY_ECR_IMAGE" "api-gateway"
+  patch_kustomize_image "$manifest_root/deployments/k8s/cloud/microservices/overlays/${overlay}/kustomization.yaml" "REPLACE_WITH_AUTH_SERVICE_ECR_IMAGE" "auth-service"
+  patch_kustomize_image "$manifest_root/deployments/k8s/cloud/microservices/overlays/${overlay}/kustomization.yaml" "REPLACE_WITH_ITEM_SERVICE_ECR_IMAGE" "item-service"
+  patch_kustomize_image "$manifest_root/deployments/k8s/cloud/microservices/overlays/${overlay}/kustomization.yaml" "REPLACE_WITH_TRANSACTION_SERVICE_ECR_IMAGE" "transaction-service"
 done
 
 for file in \
-  "$manifest_root/deployments/k8s/eks/monolith/reset-monolith-data-job.yaml" \
-  "$manifest_root/deployments/k8s/eks/monolith/seed-monolith-smoke-data-job.yaml" \
-  "$manifest_root/deployments/k8s/eks/monolith/seed-monolith-benchmark-data-job.yaml" \
-  "$manifest_root/deployments/k8s/eks/monolith/prepare-monolith-enrichment-smoke-data-job.yaml" \
-  "$manifest_root/deployments/k8s/eks/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml" \
-  "$manifest_root/deployments/k8s/eks/microservices/reset-microservices-data-job.yaml" \
-  "$manifest_root/deployments/k8s/eks/microservices/seed-microservices-smoke-data-job.yaml" \
-  "$manifest_root/deployments/k8s/eks/microservices/seed-microservices-benchmark-data-job.yaml" \
-  "$manifest_root/deployments/k8s/eks/microservices/prepare-microservices-enrichment-smoke-data-job.yaml" \
-  "$manifest_root/deployments/k8s/eks/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml"; do
+  "$manifest_root/deployments/k8s/cloud/monolith/reset-monolith-data-job.yaml" \
+  "$manifest_root/deployments/k8s/cloud/monolith/seed-monolith-smoke-data-job.yaml" \
+  "$manifest_root/deployments/k8s/cloud/monolith/seed-monolith-benchmark-data-job.yaml" \
+  "$manifest_root/deployments/k8s/cloud/monolith/prepare-monolith-enrichment-smoke-data-job.yaml" \
+  "$manifest_root/deployments/k8s/cloud/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml" \
+  "$manifest_root/deployments/k8s/cloud/microservices/reset-microservices-data-job.yaml" \
+  "$manifest_root/deployments/k8s/cloud/microservices/seed-microservices-smoke-data-job.yaml" \
+  "$manifest_root/deployments/k8s/cloud/microservices/seed-microservices-benchmark-data-job.yaml" \
+  "$manifest_root/deployments/k8s/cloud/microservices/prepare-microservices-enrichment-smoke-data-job.yaml" \
+  "$manifest_root/deployments/k8s/cloud/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml"; do
   patch_image_file "$file" "seed-runner"
 done
 
-patch_image_file "$manifest_root/deployments/k8s/eks/monolith/migration-job.yaml" "monolith"
-patch_image_file "$manifest_root/deployments/k8s/eks/microservices/auth-migration-job.yaml" "auth-service"
-patch_image_file "$manifest_root/deployments/k8s/eks/microservices/item-migration-job.yaml" "item-service"
-patch_image_file "$manifest_root/deployments/k8s/eks/microservices/transaction-migration-job.yaml" "transaction-service"
+patch_image_file "$manifest_root/deployments/k8s/cloud/monolith/migration-job.yaml" "monolith"
+patch_image_file "$manifest_root/deployments/k8s/cloud/microservices/auth-migration-job.yaml" "auth-service"
+patch_image_file "$manifest_root/deployments/k8s/cloud/microservices/item-migration-job.yaml" "item-service"
+patch_image_file "$manifest_root/deployments/k8s/cloud/microservices/transaction-migration-job.yaml" "transaction-service"
 
 patch_image_file "$manifest_root/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml" "k6-runner"
 patch_image_file "$manifest_root/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml" "k6-runner"

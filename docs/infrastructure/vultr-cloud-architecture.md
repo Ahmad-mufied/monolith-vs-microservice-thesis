@@ -16,7 +16,7 @@ infra/terraform/vultr-sequential
 infra/terraform/modules/vultr-vke-benchmark-cluster
 scripts/*vultr*.sh
 scripts/lib/cloud-provider.sh
-deployments/k8s/eks
+deployments/k8s/cloud
 ```
 
 Vultr official references used by this design:

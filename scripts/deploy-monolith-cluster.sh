@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full deployment flow for the monolith EKS cluster.
+# Full deployment flow for the monolith application.
 # Run after terraform apply and setup-eks-contexts.sh.
 set -euo pipefail
 
@@ -35,14 +35,14 @@ fi
 CONTEXT="monolith"
 K8S="kubectl --context=$CONTEXT"
 SCALING_MODE="${SCALING_MODE:-fixed}"
-EKS_JOB_DIR="deployments/k8s/eks/monolith"
+APP_JOB_DIR="deployments/k8s/cloud/monolith"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
 DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
 CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
 RENDER_ROOT="$(mktemp -d)"
-RENDERED_EKS_JOB_DIR=""
+RENDERED_APP_JOB_DIR=""
 RENDERED_MONOLITH_OVERLAY_DIR=""
 
 cleanup() {
@@ -73,11 +73,11 @@ require_secret() {
 
 echo "=== Deploying monolith cluster (context: $CONTEXT) ==="
 
-echo "Rendering EKS manifests with IMAGE_TAG=$IMAGE_TAG"
+echo "Rendering cloud manifests with IMAGE_TAG=$IMAGE_TAG"
 render_provider_manifests "$RENDER_ROOT"
-RENDERED_EKS_JOB_DIR="$RENDER_ROOT/$EKS_JOB_DIR"
-RENDERED_MONOLITH_OVERLAY_DIR="$RENDERED_EKS_JOB_DIR/overlays/$SCALING_MODE"
-bash scripts/validate-eks-assets.sh deploy "$RENDER_ROOT"
+RENDERED_APP_JOB_DIR="$RENDER_ROOT/$APP_JOB_DIR"
+RENDERED_MONOLITH_OVERLAY_DIR="$RENDERED_APP_JOB_DIR/overlays/$SCALING_MODE"
+bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 
 # Namespaces
 $K8S apply -f deployments/k8s/namespaces/local.yaml
@@ -111,17 +111,17 @@ prepare_existing_workload_for_redeploy
 
 # Migration
 $K8S delete job monolith-migration-job -n mono --ignore-not-found
-$K8S apply -f "$RENDERED_EKS_JOB_DIR/migration-job.yaml"
+$K8S apply -f "$RENDERED_APP_JOB_DIR/migration-job.yaml"
 $K8S wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 echo "Migration complete"
 
 # Seed
 $K8S delete job reset-monolith-data-job -n mono --ignore-not-found
-$K8S apply -f "$RENDERED_EKS_JOB_DIR/reset-monolith-data-job.yaml"
+$K8S apply -f "$RENDERED_APP_JOB_DIR/reset-monolith-data-job.yaml"
 $K8S wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=120s
 
 $K8S delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
-$K8S apply -f "$RENDERED_EKS_JOB_DIR/seed-monolith-benchmark-data-job.yaml"
+$K8S apply -f "$RENDERED_APP_JOB_DIR/seed-monolith-benchmark-data-job.yaml"
 $K8S wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
 echo "Seed complete"
 
