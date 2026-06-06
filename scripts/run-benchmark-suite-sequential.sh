@@ -106,6 +106,158 @@ validate_seconds_value() {
   fi
 }
 
+duration_to_seconds() {
+  local value="$1"
+  local remainder="$value"
+  local total=0
+  local number unit
+
+  if [ -z "$value" ]; then
+    echo "ERROR: duration must not be empty" >&2
+    return 1
+  fi
+
+  while [[ "$remainder" =~ ^([0-9]+)(ms|s|m|h)(.*)$ ]]; do
+    number="${BASH_REMATCH[1]}"
+    unit="${BASH_REMATCH[2]}"
+    remainder="${BASH_REMATCH[3]}"
+    case "$unit" in
+      ms)
+        if [ "$number" -gt 0 ]; then
+          total=$((total + 1))
+        fi
+        ;;
+      s) total=$((total + number)) ;;
+      m) total=$((total + (number * 60))) ;;
+      h) total=$((total + (number * 3600))) ;;
+    esac
+  done
+
+  if [ -n "$remainder" ]; then
+    echo "ERROR: unsupported duration '$value' (expected k6-style values like 30s, 5m, 1h, or 1m30s)" >&2
+    return 1
+  fi
+
+  printf '%s\n' "$total"
+}
+
+format_duration() {
+  local seconds="$1"
+  local hours minutes remaining
+
+  hours=$((seconds / 3600))
+  minutes=$(((seconds % 3600) / 60))
+  remaining=$((seconds % 60))
+
+  if [ "$hours" -gt 0 ]; then
+    printf '%dh%02dm%02ds' "$hours" "$minutes" "$remaining"
+  elif [ "$minutes" -gt 0 ]; then
+    printf '%dm%02ds' "$minutes" "$remaining"
+  else
+    printf '%ds' "$remaining"
+  fi
+}
+
+format_eta_epoch() {
+  local epoch="$1"
+
+  date -d "@$epoch" '+%Y-%m-%d %H:%M:%S %Z'
+}
+
+custom_ramp_stages_seconds() {
+  local total=0
+  local duration seconds
+
+  while IFS= read -r duration; do
+    [ -z "$duration" ] && continue
+    seconds="$(duration_to_seconds "$duration")"
+    total=$((total + seconds))
+  done < <(jq -r '.[].duration // empty' <<<"$RAMP_STAGES_JSON")
+
+  printf '%s\n' "$total"
+}
+
+estimate_case_duration_seconds() {
+  local seconds
+
+  if [ -n "${RAMP_STAGES_JSON:-}" ]; then
+    custom_ramp_stages_seconds
+    return
+  fi
+
+  case "$K6_PROFILE" in
+    hpa)
+      seconds=0
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_1:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_2:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_3:-3m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_HOLD:-5m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_DOWN:-1m}")))
+      printf '%s\n' "$seconds"
+      ;;
+    ramp)
+      seconds=0
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_UP_DURATION:-1m}")))
+      seconds=$((seconds + $(duration_to_seconds "$TEST_DURATION")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_DOWN_DURATION:-30s}")))
+      printf '%s\n' "$seconds"
+      ;;
+    smoke|steady)
+      duration_to_seconds "$TEST_DURATION"
+      ;;
+    *)
+      echo "ERROR: unsupported K6_PROFILE '$K6_PROFILE' for ETA calculation" >&2
+      return 1
+      ;;
+  esac
+}
+
+print_case_eta() {
+  local architecture="$1"
+  local scenario="$2"
+  local target_rps="$3"
+  local suite_case_number="$4"
+  local suite_total_cases="$5"
+  local scenario_case_number="$6"
+  local scenario_total_cases="$7"
+  local completed_architecture_cases="$8"
+  local total_architecture_cases="$9"
+  local architecture_index="${10}"
+  local architecture_count="${11}"
+  local case_seconds="${12}"
+  local now_epoch case_eta_epoch scenario_eta_epoch suite_eta_epoch
+  local remaining_scenario_cases remaining_current_architecture_cases future_architectures
+  local suite_remaining_cases suite_remaining_case_seconds suite_remaining_delay_seconds
+
+  now_epoch="$(date +%s)"
+  case_eta_epoch=$((now_epoch + case_seconds))
+
+  remaining_scenario_cases=$((scenario_total_cases - scenario_case_number))
+  scenario_eta_epoch=$((now_epoch + case_seconds + (remaining_scenario_cases * case_seconds) + (remaining_scenario_cases * INTER_CASE_DELAY)))
+
+  remaining_current_architecture_cases=$((total_architecture_cases - completed_architecture_cases - 1))
+  future_architectures=$((architecture_count - architecture_index))
+  suite_remaining_cases=$((suite_total_cases - suite_case_number))
+  suite_remaining_case_seconds=$(((suite_remaining_cases + 1) * case_seconds))
+  suite_remaining_delay_seconds=0
+  if [ "$remaining_current_architecture_cases" -gt 0 ]; then
+    suite_remaining_delay_seconds=$((suite_remaining_delay_seconds + (remaining_current_architecture_cases * INTER_CASE_DELAY)))
+  fi
+  if [ "$future_architectures" -gt 0 ]; then
+    suite_remaining_delay_seconds=$((suite_remaining_delay_seconds + ARCHITECTURE_SWITCH_DELAY))
+    suite_remaining_delay_seconds=$((suite_remaining_delay_seconds + (future_architectures * (total_architecture_cases - 1) * INTER_CASE_DELAY)))
+  fi
+  suite_eta_epoch=$((now_epoch + suite_remaining_case_seconds + suite_remaining_delay_seconds))
+
+  echo "=== Sequential ETA ==="
+  echo "  case          : ${suite_case_number}/${suite_total_cases} ${architecture}/${scenario}/${target_rps}rps"
+  echo "  scenario      : ${scenario_case_number}/${scenario_total_cases} (${scenario})"
+  echo "  est_case      : $(format_duration "$case_seconds") -> $(format_eta_epoch "$case_eta_epoch")"
+  echo "  est_scenario  : $(format_eta_epoch "$scenario_eta_epoch")"
+  echo "  est_suite     : $(format_eta_epoch "$suite_eta_epoch")"
+  echo "  eta_basis     : k6 configured duration + configured delays; excludes deploy/reset/seed overhead"
+}
+
 validate_supported_scenario() {
   case "$1" in
     login|create-transaction|enriched-transactions|concurrent-mixed-workload|mixed-workload|sync-items) ;;
@@ -302,6 +454,7 @@ validate_architecture_order
 validate_seconds_value "INTER_CASE_DELAY" "$INTER_CASE_DELAY"
 validate_seconds_value "ARCHITECTURE_SWITCH_DELAY" "$ARCHITECTURE_SWITCH_DELAY"
 build_matrix_file
+CASE_ESTIMATE_SECONDS="$(estimate_case_duration_seconds)"
 
 if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
   BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_or_die "$S3_BUCKET" "sequential suite bootstrap" "false"
@@ -339,6 +492,8 @@ done < "$MATRIX_TSV"
 
 architecture_index=0
 architecture_count="$(wc -w <<<"$ARCHITECTURE_ORDER" | tr -d '[:space:]')"
+total_suite_cases=$((total_cases * architecture_count))
+completed_suite_cases=0
 for architecture in $ARCHITECTURE_ORDER; do
   architecture_index=$((architecture_index + 1))
   phase_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -348,6 +503,8 @@ for architecture in $ARCHITECTURE_ORDER; do
   completed_architecture_cases=0
   while IFS=$'\t' read -r scenario scenario_rps_levels; do
     [ -z "$scenario" ] && continue
+    scenario_case_index=0
+    scenario_case_count="$(wc -w <<<"$scenario_rps_levels" | tr -d '[:space:]')"
 
     # Check if we can skip the setup for this scenario (if all its target RPS levels are already in S3)
     skip_scenario_setup=true
@@ -368,6 +525,7 @@ for architecture in $ARCHITECTURE_ORDER; do
     fi
 
     for target_rps in $scenario_rps_levels; do
+      scenario_case_index=$((scenario_case_index + 1))
       case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
 
       echo "Checking if case already exists in S3: ${architecture}/${scenario}/${target_rps}rps"
@@ -417,6 +575,7 @@ for architecture in $ARCHITECTURE_ORDER; do
           '{architecture:$architecture, scenario:$scenario, target_rps:$target_rps, status:$status, exit_code:$exit_code, s3_uri:$s3_uri} + $timing' >> "$CASES_JSONL"
           
         completed_architecture_cases=$((completed_architecture_cases + 1))
+        completed_suite_cases=$((completed_suite_cases + 1))
         continue
       fi
 
@@ -426,6 +585,20 @@ for architecture in $ARCHITECTURE_ORDER; do
           prepare_enrichment_active "$architecture"
         fi
       fi
+
+      print_case_eta \
+        "$architecture" \
+        "$scenario" \
+        "$target_rps" \
+        "$((completed_suite_cases + 1))" \
+        "$total_suite_cases" \
+        "$scenario_case_index" \
+        "$scenario_case_count" \
+        "$completed_architecture_cases" \
+        "$total_cases" \
+        "$architecture_index" \
+        "$architecture_count" \
+        "$CASE_ESTIMATE_SECONDS"
 
       case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       set +e
@@ -475,6 +648,7 @@ for architecture in $ARCHITECTURE_ORDER; do
         '{architecture:$architecture, scenario:$scenario, target_rps:$target_rps, status:$status, exit_code:$exit_code, s3_uri:$s3_uri} + $timing' >> "$CASES_JSONL"
 
       completed_architecture_cases=$((completed_architecture_cases + 1))
+      completed_suite_cases=$((completed_suite_cases + 1))
       if [ "$INTER_CASE_DELAY" != "0" ] && [ "$completed_architecture_cases" -lt "$total_cases" ]; then
         sleep "$INTER_CASE_DELAY"
       fi

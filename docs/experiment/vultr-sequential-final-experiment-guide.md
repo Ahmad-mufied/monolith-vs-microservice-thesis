@@ -166,6 +166,18 @@ Before mutating or data-dependent scenarios, it resets and reseeds the active
 architecture. For enriched and mixed workloads, it also prepares enrichment
 benchmark data before running the case.
 
+ETA behavior:
+
+- Before each non-skipped case, the suite prints `Sequential ETA`.
+- `est_case` is the expected finish time for the current case.
+- `est_scenario` is the expected finish time for the remaining RPS levels in
+  the current scenario.
+- `est_suite` is the expected finish time for the remaining sequential suite.
+- ETA is based on the configured k6 profile duration plus
+  `INTER_CASE_DELAY` and `ARCHITECTURE_SWITCH_DELAY`. It intentionally excludes
+  deploy, reset, seed, enrichment prepare, Kubernetes scheduling, and S3 upload
+  overhead, so treat it as the lower-bound operational estimate.
+
 Resume behavior:
 
 - Before running a case, the suite checks whether
