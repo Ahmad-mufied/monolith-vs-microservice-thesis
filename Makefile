@@ -802,7 +802,6 @@ datadog-uninstall:
 
 SCENARIO     ?= login
 TARGET_RPS   ?= 1000
-  if rg -n 's3://replace-me|value:\s+(eks-run-001|run-001)|value:\s+attempt-01' "$BENCHMARK_DIR" > /tmp/cloud-asset-benchmark-check.txt; then
 ATTEMPT      ?= attempt-01
 EXPERIMENT_NAME ?=
 SCALING_MODE ?= fixed
