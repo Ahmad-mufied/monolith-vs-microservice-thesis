@@ -40,6 +40,9 @@ available_blocks=()
 
 format_time() {
   local raw="$1"
+  local formatted=""
+  local normalized_raw=""
+  local epoch=""
 
   if [ -z "$raw" ] || [ "$raw" = "unknown" ] || [ "$raw" = "null" ]; then
     printf 'unknown'
@@ -47,6 +50,13 @@ format_time() {
   fi
 
   if formatted="$(TZ="$time_zone" date -d "$raw" '+%Y-%m-%d %H:%M %Z' 2>/dev/null)"; then
+    printf '%s' "$formatted"
+    return
+  fi
+
+  normalized_raw="$(printf '%s' "$raw" | sed -E 's/\.[0-9]+Z$/Z/; s/Z$/+0000/; s/([+-][0-9]{2}):([0-9]{2})$/\1\2/')"
+  if epoch="$(date -j -f '%Y-%m-%dT%H:%M:%S%z' "$normalized_raw" '+%s' 2>/dev/null)" &&
+    formatted="$(TZ="$time_zone" date -r "$epoch" '+%Y-%m-%d %H:%M %Z' 2>/dev/null)"; then
     printf '%s' "$formatted"
     return
   fi
