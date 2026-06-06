@@ -112,6 +112,7 @@ help:
 	@echo "  make show-image-tag"
 	@echo "  make pin-image-tag IMAGE_TAG=<tag>"
 	@echo "  make unpin-image-tag"
+	@echo "  make dockerhub-list-images [IMAGE_TAG=<tag>]"
 	@echo "  make dockerhub-push-all DOCKERHUB_NAMESPACE=<namespace>"
 	@echo "  make ecr-push-all IMAGE_TAG=<tag>"
 	@echo ""
@@ -990,6 +991,10 @@ dockerhub-push-all:
 	docker build -t docker.io/$$namespace/k6-runner:$(IMAGE_TAG) -f k6/runner/Dockerfile .; \
 	docker push docker.io/$$namespace/k6-runner:$(IMAGE_TAG); \
 	DOCKERHUB_NAMESPACE="$$namespace" IMAGE_TAG="$(IMAGE_TAG)" bash scripts/dockerhub-public-image-check.sh
+
+.PHONY: dockerhub-list-images
+dockerhub-list-images:
+	@DOCKERHUB_NAMESPACE="$(DOCKERHUB_NAMESPACE)" IMAGE_TAG="$(if $(filter command line environment,$(origin IMAGE_TAG)),$(IMAGE_TAG),)" bash scripts/dockerhub-image-list.sh
 
 .PHONY: eks-render-manifests eks-update-manifests
 eks-render-manifests eks-update-manifests:
