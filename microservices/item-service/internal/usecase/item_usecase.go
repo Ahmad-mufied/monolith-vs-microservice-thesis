@@ -27,12 +27,19 @@ func NewItemUsecase(repo port.ItemRepository) *ItemUsecase {
 }
 
 func (u *ItemUsecase) SyncItems(ctx context.Context, items []domain.SyncItemInput) error {
-	normalized, err := normalizeSyncItems(items)
+	normalized, err := pkgerrors.CallIfActive(ctx, func() ([]domain.SyncItemInput, error) {
+		return normalizeSyncItems(items)
+	})
 	if err != nil {
 		return err
 	}
 
-	return u.repo.SyncItems(ctx, normalized)
+	if err := pkgerrors.DoIfActive(ctx, func() error {
+		return u.repo.SyncItems(ctx, normalized)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (u *ItemUsecase) ListItems(ctx context.Context, limit, offset int32) ([]*domain.Item, error) {
@@ -49,7 +56,9 @@ func (u *ItemUsecase) ListItems(ctx context.Context, limit, offset int32) ([]*do
 		return nil, invalidInputDetail("offset", "must be greater than or equal to 0")
 	}
 
-	return u.repo.ListItems(ctx, limit, offset)
+	return pkgerrors.CallIfActive(ctx, func() ([]*domain.Item, error) {
+		return u.repo.ListItems(ctx, limit, offset)
+	})
 }
 
 func (u *ItemUsecase) GetItemByID(ctx context.Context, itemID string) (*domain.Item, error) {
@@ -58,7 +67,9 @@ func (u *ItemUsecase) GetItemByID(ctx context.Context, itemID string) (*domain.I
 	}
 
 	normalizedID := normalizeUUID(itemID)
-	return u.repo.GetItemByID(ctx, normalizedID)
+	return pkgerrors.CallIfActive(ctx, func() (*domain.Item, error) {
+		return u.repo.GetItemByID(ctx, normalizedID)
+	})
 }
 
 func (u *ItemUsecase) GetItemSummariesByIDs(ctx context.Context, itemIDs []string) ([]*domain.ItemSummary, error) {
@@ -78,7 +89,9 @@ func (u *ItemUsecase) GetItemSummariesByIDs(ctx context.Context, itemIDs []strin
 		normalized = append(normalized, normalizedID)
 	}
 
-	return u.repo.GetItemSummariesByIDs(ctx, normalized)
+	return pkgerrors.CallIfActive(ctx, func() ([]*domain.ItemSummary, error) {
+		return u.repo.GetItemSummariesByIDs(ctx, normalized)
+	})
 }
 
 func (u *ItemUsecase) ValidateTransactionItems(ctx context.Context, items []domain.TransactionItemValidationInput) error {
@@ -105,7 +118,9 @@ func (u *ItemUsecase) ValidateTransactionItems(ctx context.Context, items []doma
 		})
 	}
 
-	return u.repo.ValidateTransactionItems(ctx, normalized)
+	return pkgerrors.DoIfActive(ctx, func() error {
+		return u.repo.ValidateTransactionItems(ctx, normalized)
+	})
 }
 
 func normalizeSyncItems(items []domain.SyncItemInput) ([]domain.SyncItemInput, error) {

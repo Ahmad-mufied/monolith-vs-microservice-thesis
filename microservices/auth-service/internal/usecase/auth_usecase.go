@@ -46,13 +46,19 @@ func (u *AuthUsecase) Register(ctx context.Context, name, email, password string
 	if err := validateRegisterInput(name, email, password); err != nil {
 		return nil, err
 	}
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), u.bcryptCost)
+	hashedPassword, err := pkgerrors.CallIfActive(ctx, func() ([]byte, error) {
+		return bcrypt.GenerateFromPassword([]byte(password), u.bcryptCost)
+	})
 	if err != nil {
+		if pkgerrors.IsContext(err) {
+			return nil, err
+		}
 		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("hash password: %w", err))
 	}
 
-	user, err := u.repo.Insert(ctx, name, email, string(hashedPassword))
+	user, err := pkgerrors.CallIfActive(ctx, func() (*domain.User, error) {
+		return u.repo.Insert(ctx, name, email, string(hashedPassword))
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +72,9 @@ func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token 
 	if err := validateLoginInput(email, password); err != nil {
 		return "", nil, err
 	}
-
-	user, err = u.repo.FindByEmail(ctx, email)
+	user, err = pkgerrors.CallIfActive(ctx, func() (*domain.User, error) {
+		return u.repo.FindByEmail(ctx, email)
+	})
 	if err != nil {
 		if errors.Is(err, pkgerrors.ErrNotFound) {
 			return "", nil, pkgerrors.InvalidCredentials("invalid email or password")
@@ -75,15 +82,25 @@ func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token 
 		return "", nil, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+	if err := pkgerrors.DoIfActive(ctx, func() error {
+		return bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+	}); err != nil {
+		if pkgerrors.IsContext(err) {
+			return "", nil, err
+		}
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 			return "", nil, pkgerrors.InvalidCredentials("invalid email or password")
 		}
 		return "", nil, pkgerrors.Internal("internal server error", fmt.Errorf("compare password: %w", err))
 	}
 
-	token, err = pkgjwt.Sign(user.ID, user.Email, u.jwtSecret, u.jwtExpiry)
+	token, err = pkgerrors.CallIfActive(ctx, func() (string, error) {
+		return pkgjwt.Sign(user.ID, user.Email, u.jwtSecret, u.jwtExpiry)
+	})
 	if err != nil {
+		if pkgerrors.IsContext(err) {
+			return "", nil, err
+		}
 		return "", nil, pkgerrors.Internal("internal server error", fmt.Errorf("sign jwt: %w", err))
 	}
 
@@ -95,8 +112,9 @@ func (u *AuthUsecase) GetUserByID(ctx context.Context, id string) (*domain.User,
 	if err := pkgvalidator.ValidateUUIDField(id, "user_id"); err != nil {
 		return nil, err
 	}
-
-	user, err := u.repo.FindByID(ctx, id)
+	user, err := pkgerrors.CallIfActive(ctx, func() (*domain.User, error) {
+		return u.repo.FindByID(ctx, id)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -111,8 +129,9 @@ func (u *AuthUsecase) GetUsersByIDs(ctx context.Context, ids []string) ([]*domai
 			return nil, err
 		}
 	}
-
-	users, err := u.repo.FindByIDs(ctx, ids)
+	users, err := pkgerrors.CallIfActive(ctx, func() ([]*domain.User, error) {
+		return u.repo.FindByIDs(ctx, ids)
+	})
 	if err != nil {
 		return nil, err
 	}

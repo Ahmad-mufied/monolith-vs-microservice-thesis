@@ -41,6 +41,7 @@ type fakeHasher struct {
 	hash            string
 	hashErr         error
 	compareErr      error
+	compareHook     func()
 	compareHash     *string
 	comparePassword *string
 }
@@ -58,6 +59,9 @@ func (f fakeHasher) Compare(hash, password string) error {
 	}
 	if f.comparePassword != nil {
 		*f.comparePassword = password
+	}
+	if f.compareHook != nil {
+		f.compareHook()
 	}
 	return f.compareErr
 }
@@ -181,6 +185,43 @@ func TestServiceLogin(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestServiceLoginContextCanceledBeforeRepository(t *testing.T) {
+	repo := &fakeRepo{findUser: User{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Email: "mufied@example.com", PasswordHash: "hashed"}}
+	service := NewService(
+		repo,
+		fakeHasher{},
+		fakeSigner{token: "token"},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := service.Login(ctx, LoginRequest{Email: "mufied@example.com", Password: "secret123"})
+	assertAppError(t, err, true, apperror.CodeClientCanceled)
+	if repo.findEmailReceived != "" {
+		t.Fatalf("expected repository lookup to be skipped, got %q", repo.findEmailReceived)
+	}
+}
+
+func TestServiceLoginContextCanceledAfterCompare(t *testing.T) {
+	now := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
+	user := User{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Name: "Ahmad", Email: "mufied@example.com", PasswordHash: "hashed", CreatedAt: now, UpdatedAt: now}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var signedUserID string
+	service := NewService(
+		&fakeRepo{findUser: user},
+		fakeHasher{compareHook: cancel},
+		fakeSigner{token: "token", signedUserID: &signedUserID},
+	)
+
+	_, err := service.Login(ctx, LoginRequest{Email: "mufied@example.com", Password: "secret123"})
+	assertAppError(t, err, true, apperror.CodeClientCanceled)
+	if signedUserID != "" {
+		t.Fatalf("expected signer not to be called after context cancellation, got user id %q", signedUserID)
 	}
 }
 

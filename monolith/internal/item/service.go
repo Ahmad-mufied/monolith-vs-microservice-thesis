@@ -31,15 +31,24 @@ func (s *Service) SyncItems(ctx context.Context, req SyncItemsRequest) error {
 	if err := validation.Struct(req); err != nil {
 		return err
 	}
-	items, err := normalizeSyncItems(req.Items)
+	items, err := apperror.CallIfActive(ctx, func() ([]SyncItem, error) {
+		return normalizeSyncItems(req.Items)
+	})
 	if err != nil {
 		return err
 	}
-	return s.repo.SyncItems(ctx, items)
+	if err := apperror.DoIfActive(ctx, func() error {
+		return s.repo.SyncItems(ctx, items)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Service) List(ctx context.Context, page pagination.Page) ([]Response, error) {
-	items, err := s.repo.List(ctx, page.Limit, page.Offset)
+	items, err := apperror.CallIfActive(ctx, func() ([]Item, error) {
+		return s.repo.List(ctx, page.Limit, page.Offset)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +60,9 @@ func (s *Service) GetByID(ctx context.Context, id string) (Response, error) {
 	if err != nil {
 		return Response{}, err
 	}
-	item, err := s.repo.GetByID(ctx, normalizedID)
+	item, err := apperror.CallIfActive(ctx, func() (Item, error) {
+		return s.repo.GetByID(ctx, normalizedID)
+	})
 	if err != nil {
 		return Response{}, err
 	}

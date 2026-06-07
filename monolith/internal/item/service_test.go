@@ -188,6 +188,14 @@ func TestServiceList(t *testing.T) {
 	}
 }
 
+func TestServiceListContextCanceledBeforeRepository(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := NewService(&fakeRepo{}).List(ctx, pagination.Page{Limit: 50, Offset: 0})
+	assertAppError(t, err, true, apperror.CodeClientCanceled)
+}
+
 func TestServiceGetByID(t *testing.T) {
 	now := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
 	itemID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001"

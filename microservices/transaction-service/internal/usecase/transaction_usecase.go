@@ -23,6 +23,11 @@ type TransactionUsecase struct {
 	itemService port.ItemService
 }
 
+type createTransactionInput struct {
+	userID string
+	items  []domain.TransactionItem
+}
+
 func NewTransactionUsecase(repo port.TransactionRepository, itemService port.ItemService) *TransactionUsecase {
 	return &TransactionUsecase{
 		repo:        repo,
@@ -31,7 +36,9 @@ func NewTransactionUsecase(repo port.TransactionRepository, itemService port.Ite
 }
 
 func (u *TransactionUsecase) CreateTransaction(ctx context.Context, userID string, items []domain.TransactionItem) (string, error) {
-	normalizedUserID, normalizedItems, err := normalizeCreateTransactionInput(userID, items)
+	input, err := pkgerrors.CallIfActive(ctx, func() (createTransactionInput, error) {
+		return normalizeCreateTransactionInput(userID, items)
+	})
 	if err != nil {
 		return "", err
 	}
@@ -39,7 +46,9 @@ func (u *TransactionUsecase) CreateTransaction(ctx context.Context, userID strin
 	validateCtx, cancel := context.WithTimeout(ctx, itemValidationTimeout)
 	defer cancel()
 
-	if err := u.itemService.ValidateTransactionItems(validateCtx, normalizedItems); err != nil {
+	if err := pkgerrors.DoIfActive(validateCtx, func() error {
+		return u.itemService.ValidateTransactionItems(validateCtx, input.items)
+	}); err != nil {
 		return "", err
 	}
 
@@ -54,13 +63,20 @@ func (u *TransactionUsecase) CreateTransaction(ctx context.Context, userID strin
 			_ = tx.Rollback()
 		}
 	}()
+	if err := pkgerrors.ContextError(ctx); err != nil {
+		return "", err
+	}
 
-	transactionID, err := tx.InsertTransaction(ctx, normalizedUserID)
+	transactionID, err := pkgerrors.CallIfActive(ctx, func() (string, error) {
+		return tx.InsertTransaction(ctx, input.userID)
+	})
 	if err != nil {
 		return "", err
 	}
 
-	if err := tx.InsertTransactionItems(ctx, transactionID, normalizedItems); err != nil {
+	if err := pkgerrors.DoIfActive(ctx, func() error {
+		return tx.InsertTransactionItems(ctx, transactionID, input.items)
+	}); err != nil {
 		return "", err
 	}
 
@@ -83,7 +99,9 @@ func (u *TransactionUsecase) GetOwnTransactions(ctx context.Context, userID stri
 		return nil, err
 	}
 
-	transactions, err := u.repo.ListByUserID(ctx, normalizedUserID, limit, offset)
+	transactions, err := pkgerrors.CallIfActive(ctx, func() ([]*domain.Transaction, error) {
+		return u.repo.ListByUserID(ctx, normalizedUserID, limit, offset)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +119,9 @@ func (u *TransactionUsecase) GetTransactionByID(ctx context.Context, transaction
 		return nil, err
 	}
 
-	transaction, err := u.repo.GetByIDAndUserID(ctx, normalizedTransactionID, normalizedUserID)
+	transaction, err := pkgerrors.CallIfActive(ctx, func() (*domain.Transaction, error) {
+		return u.repo.GetByIDAndUserID(ctx, normalizedTransactionID, normalizedUserID)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +140,9 @@ func (u *TransactionUsecase) GetTransactionsForEnrichment(ctx context.Context, l
 		return nil, err
 	}
 
-	transactions, err := u.repo.ListForEnrichment(ctx, limit, offset)
+	transactions, err := pkgerrors.CallIfActive(ctx, func() ([]*domain.Transaction, error) {
+		return u.repo.ListForEnrichment(ctx, limit, offset)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +160,9 @@ func (u *TransactionUsecase) attachItems(ctx context.Context, transactions []*do
 		transactionIDs = append(transactionIDs, transaction.ID)
 	}
 
-	itemsByTransactionID, err := u.repo.ListItemsByTransactionIDs(ctx, transactionIDs)
+	itemsByTransactionID, err := pkgerrors.CallIfActive(ctx, func() (map[string][]domain.TransactionItem, error) {
+		return u.repo.ListItemsByTransactionIDs(ctx, transactionIDs)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -150,17 +174,17 @@ func (u *TransactionUsecase) attachItems(ctx context.Context, transactions []*do
 	return transactions, nil
 }
 
-func normalizeCreateTransactionInput(userID string, items []domain.TransactionItem) (string, []domain.TransactionItem, error) {
+func normalizeCreateTransactionInput(userID string, items []domain.TransactionItem) (createTransactionInput, error) {
 	normalizedUserID, err := normalizeUUIDField(userID, "user_id")
 	if err != nil {
-		return "", nil, err
+		return createTransactionInput{}, err
 	}
 
 	if len(items) == 0 {
-		return "", nil, invalidInputDetail("items", "is required")
+		return createTransactionInput{}, invalidInputDetail("items", "is required")
 	}
 	if len(items) > maxCreateItems {
-		return "", nil, invalidInputDetail("items", "must contain at most 20 items")
+		return createTransactionInput{}, invalidInputDetail("items", "must contain at most 20 items")
 	}
 
 	normalizedItems := make([]domain.TransactionItem, 0, len(items))
@@ -168,13 +192,13 @@ func normalizeCreateTransactionInput(userID string, items []domain.TransactionIt
 	for _, item := range items {
 		normalizedItemID, err := normalizeUUIDField(item.ItemID, "item_id")
 		if err != nil {
-			return "", nil, err
+			return createTransactionInput{}, err
 		}
 		if item.Amount <= 0 {
-			return "", nil, invalidInputDetail("amount", "must be greater than 0")
+			return createTransactionInput{}, invalidInputDetail("amount", "must be greater than 0")
 		}
 		if _, exists := seen[normalizedItemID]; exists {
-			return "", nil, invalidInputDetail("item_id", "must not contain duplicate values")
+			return createTransactionInput{}, invalidInputDetail("item_id", "must not contain duplicate values")
 		}
 		seen[normalizedItemID] = struct{}{}
 
@@ -184,7 +208,7 @@ func normalizeCreateTransactionInput(userID string, items []domain.TransactionIt
 		})
 	}
 
-	return normalizedUserID, normalizedItems, nil
+	return createTransactionInput{userID: normalizedUserID, items: normalizedItems}, nil
 }
 
 func normalizePagination(limit, offset int32) (int32, int32, error) {

@@ -68,6 +68,75 @@ func TestFromContext(t *testing.T) {
 	}
 }
 
+func TestContextError(t *testing.T) {
+	if got := ContextError(context.Background()); got != nil {
+		t.Fatalf("ContextError(active) = %v, want nil", got)
+	}
+
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	got := ContextError(canceledCtx)
+	if got == nil {
+		t.Fatal("ContextError(canceled) = nil")
+	}
+	if got.Code != CodeClientCanceled {
+		t.Fatalf("code = %s, want %s", got.Code, CodeClientCanceled)
+	}
+	if !errors.Is(got, context.Canceled) {
+		t.Fatalf("ContextError(canceled) should preserve context.Canceled, got %v", got)
+	}
+}
+
+func TestContextAwareHelpers(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	called := false
+	if err := DoIfActive(ctx, func() error {
+		called = true
+		return nil
+	}); !IsContext(err) {
+		t.Fatalf("DoIfActive(canceled) = %v, want context error", err)
+	}
+	if called {
+		t.Fatal("DoIfActive should not call fn for canceled context")
+	}
+
+	got, err := CallIfActive(context.Background(), func() (string, error) {
+		return "ok", nil
+	})
+	if err != nil || got != "ok" {
+		t.Fatalf("CallIfActive(active) = %q, %v; want ok, nil", got, err)
+	}
+
+	_, err = CallIfActive(ctx, func() (string, error) {
+		t.Fatal("CallIfActive should not call fn for canceled context")
+		return "", nil
+	})
+	if !IsContext(err) {
+		t.Fatalf("CallIfActive(canceled) = %v, want context error", err)
+	}
+
+	driverErr := errors.New("driver error")
+	activeCtx, activeCancel := context.WithCancel(context.Background())
+	if err := DoIfActive(activeCtx, func() error {
+		activeCancel()
+		return driverErr
+	}); !IsContext(err) {
+		t.Fatalf("DoIfActive(error after cancel) = %v, want context error", err)
+	}
+
+	activeCtx, activeCancel = context.WithCancel(context.Background())
+	_, err = CallIfActive(activeCtx, func() (string, error) {
+		activeCancel()
+		return "", driverErr
+	})
+	if !IsContext(err) {
+		t.Fatalf("CallIfActive(error after cancel) = %v, want context error", err)
+	}
+}
+
 func TestInternalFromContext(t *testing.T) {
 	tests := []struct {
 		name       string
