@@ -56,7 +56,9 @@ func (u *AuthUsecase) Register(ctx context.Context, name, email, password string
 		return nil, pkgerrors.Internal("internal server error", fmt.Errorf("hash password: %w", err))
 	}
 
-	user, err := u.repo.Insert(ctx, name, email, string(hashedPassword))
+	user, err := pkgerrors.CallIfActive(ctx, func() (*domain.User, error) {
+		return u.repo.Insert(ctx, name, email, string(hashedPassword))
+	})
 	if err != nil {
 		return nil, err
 	}

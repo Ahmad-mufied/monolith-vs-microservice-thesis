@@ -67,7 +67,9 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (RegisterRe
 		return RegisterResponse{}, apperror.Internal("internal server error", fmt.Errorf("hashing password: %w", err))
 	}
 
-	user, err := s.repo.CreateUser(ctx, name, email, passwordHash)
+	user, err := apperror.CallIfActive(ctx, func() (User, error) {
+		return s.repo.CreateUser(ctx, name, email, passwordHash)
+	})
 	if err != nil {
 		return RegisterResponse{}, err
 	}
@@ -93,7 +95,9 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 	if err := validatePasswordBytes(req.Password); err != nil {
 		return LoginResponse{}, err
 	}
-	user, err := s.repo.FindUserByEmail(ctx, email)
+	user, err := apperror.CallIfActive(ctx, func() (User, error) {
+		return s.repo.FindUserByEmail(ctx, email)
+	})
 	if err != nil {
 		var appErr *apperror.Error
 		if errors.As(err, &appErr) {
