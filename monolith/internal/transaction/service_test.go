@@ -95,13 +95,17 @@ func TestServiceCreateValidationDetails(t *testing.T) {
 }
 
 func TestServiceCreateContextCanceledBeforeRepository(t *testing.T) {
+	repo := &fakeRepo{}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := NewService(&fakeRepo{}).Create(ctx, "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", CreateRequest{
+	_, err := NewService(repo).Create(ctx, "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", CreateRequest{
 		Items: []CreateItemRequest{{ItemID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", Amount: 1}},
 	})
 	assertAppError(t, err, true, apperror.CodeClientCanceled)
+	if len(repo.createItems) != 0 {
+		t.Fatalf("expected repository create to be skipped, got %#v", repo.createItems)
+	}
 }
 
 func TestServiceReadMethods(t *testing.T) {

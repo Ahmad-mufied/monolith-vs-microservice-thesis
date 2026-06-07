@@ -189,8 +189,9 @@ func TestServiceLogin(t *testing.T) {
 }
 
 func TestServiceLoginContextCanceledBeforeRepository(t *testing.T) {
+	repo := &fakeRepo{findUser: User{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Email: "mufied@example.com", PasswordHash: "hashed"}}
 	service := NewService(
-		&fakeRepo{findUser: User{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Email: "mufied@example.com", PasswordHash: "hashed"}},
+		repo,
 		fakeHasher{},
 		fakeSigner{token: "token"},
 	)
@@ -200,6 +201,9 @@ func TestServiceLoginContextCanceledBeforeRepository(t *testing.T) {
 
 	_, err := service.Login(ctx, LoginRequest{Email: "mufied@example.com", Password: "secret123"})
 	assertAppError(t, err, true, apperror.CodeClientCanceled)
+	if repo.findEmailReceived != "" {
+		t.Fatalf("expected repository lookup to be skipped, got %q", repo.findEmailReceived)
+	}
 }
 
 func TestServiceLoginContextCanceledAfterCompare(t *testing.T) {
