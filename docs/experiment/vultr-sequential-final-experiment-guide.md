@@ -24,12 +24,7 @@ make env-init PLATFORM=vultr EXECUTION_MODE=sequential
 make render-tfvars
 make shared-plan
 make shared-apply
-make experiment-plan
-make experiment-apply
-make setup-contexts
-make create-secrets
-make measure-resource-baseline
-make render-manifests
+make experiment-bootstrap
 ```
 
 Then choose one of these benchmark execution paths:
@@ -350,11 +345,21 @@ make shared-plan
 make shared-apply
 ```
 
-Apply the sequential experiment stack:
+Bootstrap the sequential experiment stack and Kubernetes runtime:
+
+```bash
+make experiment-bootstrap
+```
+
+`experiment-bootstrap` is the generic operator wrapper for:
 
 ```bash
 make experiment-plan
 make experiment-apply
+make setup-contexts
+make create-secrets
+make measure-resource-baseline
+make render-manifests
 ```
 
 For `PLATFORM=vultr` and `EXECUTION_MODE=sequential`,
@@ -368,6 +373,18 @@ For `PLATFORM=vultr` and `EXECUTION_MODE=sequential`,
 
 The Vultr experiment apply path also ensures the AWS S3 writer stack exists for
 k6 uploads.
+
+Use the individual commands above only when debugging a specific step or
+resuming from a known partial bootstrap point.
+
+For Vultr VKE, `setup-contexts` waits for both `node-group=app` and
+`node-group=testing` nodes to register before continuing. The default wait is
+15 minutes. If Vultr node pool registration is slower than usual, rerun
+`make experiment-bootstrap` or override the wait:
+
+```bash
+VULTR_NODE_READY_TIMEOUT_SECONDS=1200 make experiment-bootstrap
+```
 
 ## 5.1. Refresh Operator CIDR After Network Changes
 
@@ -410,6 +427,11 @@ experiment-stack inputs.
 
 ## 6. Setup Kubernetes Context
 
+This step is included in `make experiment-bootstrap`. Run it manually only when
+debugging context setup or refreshing kubeconfig after an experiment apply.
+For Vultr, this command waits for app/testing node groups and the testing-node
+`workload=benchmark:NoSchedule` taint before merging the kubeconfig.
+
 Create the local kubeconfig context:
 
 ```bash
@@ -425,6 +447,9 @@ node-group=testing  for k6 runner jobs
 ```
 
 ## 7. Create Kubernetes Secrets
+
+This step is included in `make experiment-bootstrap`. Run it manually only when
+secrets changed or you are recovering from a partial bootstrap.
 
 Create application and benchmark secrets:
 
@@ -449,6 +474,10 @@ The secret generation combines:
 
 ## 8. Measure Resource Baseline
 
+This step is included in `make experiment-bootstrap`. Run it manually when the
+cluster was recreated, node size changed, or you need to refresh the measured
+Vultr capacity before rendering manifests.
+
 Vultr must measure live allocatable app-node capacity before rendering final
 manifests:
 
@@ -468,6 +497,10 @@ The Vultr renderer uses these values for ResourceQuota and resource allocation
 so monolith and microservices use the same measured architecture ceiling.
 
 ## 9. Render Manifests
+
+This step is included in `make experiment-bootstrap`. Run it manually when the
+image tag, resource baseline, or rendered manifest inputs changed after the
+bootstrap.
 
 Render and validate manifests with the final image tag:
 

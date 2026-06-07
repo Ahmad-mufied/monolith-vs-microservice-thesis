@@ -79,6 +79,7 @@ help:
 	@echo "  make shared-apply"
 	@echo "  make experiment-plan"
 	@echo "  make experiment-apply"
+	@echo "  make experiment-bootstrap"
 	@echo "  make setup-contexts"
 	@echo "  make create-secrets"
 	@echo "  make preflight-check"
@@ -184,6 +185,15 @@ experiment-plan:
 .PHONY: experiment-apply
 experiment-apply:
 	bash scripts/operator-dispatch.sh experiment-apply
+
+.PHONY: experiment-bootstrap
+experiment-bootstrap:
+	$(MAKE) experiment-plan
+	$(MAKE) experiment-apply
+	$(MAKE) setup-contexts
+	$(MAKE) create-secrets
+	$(MAKE) measure-resource-baseline
+	$(MAKE) render-manifests
 
 .PHONY: experiment-destroy-confirmed
 experiment-destroy-confirmed:

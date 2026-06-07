@@ -226,13 +226,13 @@ done
 Pin the tag for this operator session:
 
 ```bash
-make eks-pin-image-tag IMAGE_TAG="$IMAGE_TAG"
-make eks-show-image-tag
+make pin-image-tag IMAGE_TAG="$IMAGE_TAG"
+make show-image-tag
 ```
 
-Although the target name still says `eks`, the pin file is shared by the
-provider-aware deploy and benchmark scripts. Passing `IMAGE_TAG="$IMAGE_TAG"`
-explicitly is still the clearest pattern for final runs.
+The pin file is shared by the provider-aware deploy and benchmark scripts.
+Passing `IMAGE_TAG="$IMAGE_TAG"` explicitly is still the clearest pattern for
+final runs.
 
 Rules for image tags:
 
@@ -328,6 +328,40 @@ Choose exactly one path for the first integration pass:
 
 Do not keep parallel and sequential stacks active together unless the quota and
 budget impact is intentional.
+
+### Generic Operator Shortcut
+
+After `make env-init PLATFORM=vultr EXECUTION_MODE=<parallel|sequential>`,
+`make render-tfvars`, and `make shared-apply`, the generic operator shortcut is:
+
+```bash
+make experiment-bootstrap
+```
+
+This is equivalent to:
+
+```bash
+make experiment-plan
+make experiment-apply
+make setup-contexts
+make create-secrets
+make measure-resource-baseline
+make render-manifests
+```
+
+Use this shortcut for the normal provider-aware workflow. Use the `vultr-*`
+commands below when debugging a specific Vultr-only step or when you need to
+inspect a partial bootstrap manually.
+
+For Vultr VKE, the context setup step waits for both `node-group=app` and
+`node-group=testing` nodes, plus the testing-node
+`workload=benchmark:NoSchedule` taint. The default wait is 15 minutes. If VKE
+node registration is slower than usual, rerun the bootstrap or override the
+wait:
+
+```bash
+VULTR_NODE_READY_TIMEOUT_SECONDS=1200 make experiment-bootstrap
+```
 
 ### Case A - Sequential First Smoke
 
@@ -770,7 +804,7 @@ Use this order when a command fails:
 Quick status bundle:
 
 ```bash
-make eks-show-image-tag
+make show-image-tag
 make vultr-preflight-check
 terraform -chdir=infra/terraform/vultr-shared output
 kubectl config get-contexts monolith msa benchmark
