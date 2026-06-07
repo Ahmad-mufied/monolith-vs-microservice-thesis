@@ -108,6 +108,45 @@ func FromContext(err error, deadlineMessage, canceledMessage string) error {
 	}
 }
 
+func ContextError(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return FromContext(err, "request timeout", "request canceled")
+	}
+	return nil
+}
+
+func IsContext(err error) bool {
+	return stderrors.Is(err, context.DeadlineExceeded) ||
+		stderrors.Is(err, context.Canceled) ||
+		stderrors.Is(err, ErrDeadlineExceeded) ||
+		stderrors.Is(err, ErrCanceled)
+}
+
+func DoIfActive(ctx context.Context, fn func() error) error {
+	if err := ContextError(ctx); err != nil {
+		return err
+	}
+	if err := fn(); err != nil {
+		return err
+	}
+	return ContextError(ctx)
+}
+
+func CallIfActive[T any](ctx context.Context, fn func() (T, error)) (T, error) {
+	var zero T
+	if err := ContextError(ctx); err != nil {
+		return zero, err
+	}
+	value, err := fn()
+	if err != nil {
+		return zero, err
+	}
+	if err := ContextError(ctx); err != nil {
+		return zero, err
+	}
+	return value, nil
+}
+
 func Internal(message string, cause error) error {
 	return &Error{kind: ErrInternal, message: message, cause: cause}
 }

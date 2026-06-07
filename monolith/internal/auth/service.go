@@ -57,9 +57,13 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (RegisterRe
 	if err := validatePasswordBytes(req.Password); err != nil {
 		return RegisterResponse{}, err
 	}
-
-	passwordHash, err := s.hasher.Hash(req.Password)
+	passwordHash, err := apperror.CallIfActive(ctx, func() (string, error) {
+		return s.hasher.Hash(req.Password)
+	})
 	if err != nil {
+		if apperror.IsContext(err) {
+			return RegisterResponse{}, err
+		}
 		return RegisterResponse{}, apperror.Internal("internal server error", fmt.Errorf("hashing password: %w", err))
 	}
 
@@ -89,7 +93,6 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 	if err := validatePasswordBytes(req.Password); err != nil {
 		return LoginResponse{}, err
 	}
-
 	user, err := s.repo.FindUserByEmail(ctx, email)
 	if err != nil {
 		var appErr *apperror.Error
@@ -103,15 +106,25 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 		}
 		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("finding user by email: %w", err))
 	}
-	if err := s.hasher.Compare(user.PasswordHash, req.Password); err != nil {
+	if err := apperror.DoIfActive(ctx, func() error {
+		return s.hasher.Compare(user.PasswordHash, req.Password)
+	}); err != nil {
+		if apperror.IsContext(err) {
+			return LoginResponse{}, err
+		}
 		if errors.Is(err, ErrPasswordMismatch) {
 			return LoginResponse{}, apperror.Unauthorized("invalid email or password")
 		}
 		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("comparing password: %w", err))
 	}
 
-	token, err := s.signer.Sign(user.ID)
+	token, err := apperror.CallIfActive(ctx, func() (string, error) {
+		return s.signer.Sign(user.ID)
+	})
 	if err != nil {
+		if apperror.IsContext(err) {
+			return LoginResponse{}, err
+		}
 		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("signing token: %w", err))
 	}
 

@@ -94,6 +94,49 @@ func FromContext(err error, deadlineMessage, canceledMessage string) *Error {
 	}
 }
 
+func ContextError(ctx context.Context) *Error {
+	if err := ctx.Err(); err != nil {
+		return FromContext(err, "request timeout", "request canceled")
+	}
+	return nil
+}
+
+func IsContext(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	var appErr *Error
+	return errors.As(err, &appErr) && (appErr.Code == CodeGatewayTimeout || appErr.Code == CodeClientCanceled)
+}
+
+func DoIfActive(ctx context.Context, fn func() error) error {
+	if err := ContextError(ctx); err != nil {
+		return err
+	}
+	if err := fn(); err != nil {
+		return err
+	}
+	if err := ContextError(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func CallIfActive[T any](ctx context.Context, fn func() (T, error)) (T, error) {
+	var zero T
+	if err := ContextError(ctx); err != nil {
+		return zero, err
+	}
+	value, err := fn()
+	if err != nil {
+		return zero, err
+	}
+	if err := ContextError(ctx); err != nil {
+		return zero, err
+	}
+	return value, nil
+}
+
 func FromHTTPStatus(status int, message string) *Error {
 	if message == "" {
 		message = http.StatusText(status)

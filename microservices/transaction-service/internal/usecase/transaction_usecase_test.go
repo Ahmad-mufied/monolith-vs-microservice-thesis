@@ -363,6 +363,22 @@ func TestTransactionUsecase_CreateTransaction(t *testing.T) {
 	}
 }
 
+func TestTransactionUsecaseCreateContextCanceledBeforeItemService(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	uc := NewTransactionUsecase(noListRepo(t), &fakeItemService{
+		validateTransactionItemsFn: noCallItemService(t),
+	})
+
+	_, err := uc.CreateTransaction(ctx, "01968ad4-98b1-79c8-a6f0-ec21f8f434c6", []domain.TransactionItem{
+		{ItemID: "01968ad4-98b1-79c8-a6f0-ec21f8f434c7", Amount: 1},
+	})
+	if !errors.Is(err, pkgerrors.ErrCanceled) {
+		t.Fatalf("error = %v, want ErrCanceled", err)
+	}
+}
+
 func TestTransactionUsecase_GetOwnTransactions(t *testing.T) {
 	validUserID := "01968ad4-98b1-79c8-a6f0-ec21f8f434c6"
 	transactionID := "01968ad4-98b1-79c8-a6f0-ec21f8f434d0"

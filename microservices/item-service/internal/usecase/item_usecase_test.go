@@ -249,6 +249,23 @@ func TestListItems(t *testing.T) {
 	}
 }
 
+func TestListItemsContextCanceledBeforeRepository(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	uc := NewItemUsecase(&fakeItemRepo{
+		listItemsFn: func(ctx context.Context, limit, offset int32) ([]*domain.Item, error) {
+			t.Fatalf("ListItems should not be called")
+			return nil, nil
+		},
+	})
+
+	_, err := uc.ListItems(ctx, 10, 0)
+	if !errors.Is(err, pkgerrors.ErrCanceled) {
+		t.Fatalf("error = %v, want ErrCanceled", err)
+	}
+}
+
 // --- TestGetItemByID ---
 
 func TestGetItemByID(t *testing.T) {

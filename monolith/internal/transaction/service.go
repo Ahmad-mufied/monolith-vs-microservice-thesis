@@ -31,7 +31,9 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 	if err := validation.Struct(req); err != nil {
 		return "", err
 	}
-	items, err := validateAndNormalizeCreateItems(req.Items)
+	items, err := apperror.CallIfActive(ctx, func() ([]CreateItemRequest, error) {
+		return validateAndNormalizeCreateItems(req.Items)
+	})
 	if err != nil {
 		return "", err
 	}
@@ -46,7 +48,9 @@ func (s *Service) ListOwn(ctx context.Context, userID string, page pagination.Pa
 	if err := validation.ValidateUUIDField(userID, "user_id"); err != nil {
 		return nil, err
 	}
-	transactions, err := s.repo.ListOwn(ctx, userID, page.Limit, page.Offset)
+	transactions, err := apperror.CallIfActive(ctx, func() ([]Transaction, error) {
+		return s.repo.ListOwn(ctx, userID, page.Limit, page.Offset)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +64,9 @@ func (s *Service) GetOwnByID(ctx context.Context, userID, transactionID string) 
 	if err := validation.ValidateUUIDField(transactionID, "transaction_id"); err != nil {
 		return Response{}, err
 	}
-	tx, err := s.repo.GetOwnByID(ctx, userID, transactionID)
+	tx, err := apperror.CallIfActive(ctx, func() (Transaction, error) {
+		return s.repo.GetOwnByID(ctx, userID, transactionID)
+	})
 	if err != nil {
 		return Response{}, err
 	}
@@ -68,7 +74,9 @@ func (s *Service) GetOwnByID(ctx context.Context, userID, transactionID string) 
 }
 
 func (s *Service) ListEnriched(ctx context.Context, page pagination.Page) ([]EnrichedResponse, error) {
-	transactions, err := s.repo.ListEnriched(ctx, page.Limit, page.Offset)
+	transactions, err := apperror.CallIfActive(ctx, func() ([]EnrichedTransaction, error) {
+		return s.repo.ListEnriched(ctx, page.Limit, page.Offset)
+	})
 	if err != nil {
 		return nil, err
 	}

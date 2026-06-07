@@ -253,6 +253,47 @@ func TestLoginRepositoryContextErrors(t *testing.T) {
 	}
 }
 
+func TestLoginContextCanceledBeforeRepository(t *testing.T) {
+	repo := &fakeUserRepo{
+		findByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {
+			t.Fatalf("FindByEmail should not be called after context cancellation")
+			return nil, nil
+		},
+	}
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, _, err := uc.Login(ctx, "ahmad@example.com", "Secret123!")
+	if !errors.Is(err, pkgerrors.ErrCanceled) {
+		t.Fatalf("expected ErrCanceled, got %v", err)
+	}
+}
+
+func TestLoginContextCanceledAfterRepository(t *testing.T) {
+	var cancel context.CancelFunc
+	repo := &fakeUserRepo{
+		findByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {
+			cancel()
+			return &domain.User{
+				ID:           "01968ad4-98b1-79c8-a6f0-ec21f8f434c6",
+				Email:        email,
+				PasswordHash: "hash-not-used-after-cancel",
+			}, nil
+		},
+	}
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	cancel = cancelFunc
+
+	_, _, err := uc.Login(ctx, "ahmad@example.com", "Secret123!")
+	if !errors.Is(err, pkgerrors.ErrCanceled) {
+		t.Fatalf("expected ErrCanceled, got %v", err)
+	}
+}
+
 func TestLoginWrongPassword(t *testing.T) {
 	repo := &fakeUserRepo{
 		findByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {

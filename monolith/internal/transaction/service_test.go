@@ -94,6 +94,16 @@ func TestServiceCreateValidationDetails(t *testing.T) {
 	assertValidationDetail(t, err, "item_id", "duplicate item in transaction")
 }
 
+func TestServiceCreateContextCanceledBeforeRepository(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := NewService(&fakeRepo{}).Create(ctx, "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", CreateRequest{
+		Items: []CreateItemRequest{{ItemID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f2001", Amount: 1}},
+	})
+	assertAppError(t, err, true, apperror.CodeClientCanceled)
+}
+
 func TestServiceReadMethods(t *testing.T) {
 	userID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001"
 	txID := "018f5f60-7c35-7ccf-9c3c-0a5e6f6f3001"
