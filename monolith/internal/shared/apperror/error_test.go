@@ -117,6 +117,24 @@ func TestContextAwareHelpers(t *testing.T) {
 	if !IsContext(err) {
 		t.Fatalf("CallIfActive(canceled) = %v, want context error", err)
 	}
+
+	driverErr := errors.New("driver error")
+	activeCtx, activeCancel := context.WithCancel(context.Background())
+	if err := DoIfActive(activeCtx, func() error {
+		activeCancel()
+		return driverErr
+	}); !IsContext(err) {
+		t.Fatalf("DoIfActive(error after cancel) = %v, want context error", err)
+	}
+
+	activeCtx, activeCancel = context.WithCancel(context.Background())
+	_, err = CallIfActive(activeCtx, func() (string, error) {
+		activeCancel()
+		return "", driverErr
+	})
+	if !IsContext(err) {
+		t.Fatalf("CallIfActive(error after cancel) = %v, want context error", err)
+	}
 }
 
 func TestInternalFromContext(t *testing.T) {

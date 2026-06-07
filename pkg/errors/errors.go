@@ -127,6 +127,9 @@ func DoIfActive(ctx context.Context, fn func() error) error {
 		return err
 	}
 	if err := fn(); err != nil {
+		if ctxErr := ContextError(ctx); ctxErr != nil {
+			return ctxErr
+		}
 		return err
 	}
 	return ContextError(ctx)
@@ -139,6 +142,9 @@ func CallIfActive[T any](ctx context.Context, fn func() (T, error)) (T, error) {
 	}
 	value, err := fn()
 	if err != nil {
+		if ctxErr := ContextError(ctx); ctxErr != nil {
+			return zero, ctxErr
+		}
 		return zero, err
 	}
 	if err := ContextError(ctx); err != nil {
