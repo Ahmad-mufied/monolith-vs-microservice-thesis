@@ -2,7 +2,68 @@
 set -euo pipefail
 
 mode="${VULTR_MODE:-sequential}"
+node_ready_timeout_seconds="${VULTR_NODE_READY_TIMEOUT_SECONDS:-900}"
+node_ready_poll_seconds="${VULTR_NODE_READY_POLL_SECONDS:-10}"
 mkdir -p env/kubeconfig
+
+validate_positive_integer() {
+  local name="$1"
+  local value="$2"
+
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: ${name} must be a positive integer, got '$value'" >&2
+    exit 1
+  fi
+}
+
+validate_positive_integer VULTR_NODE_READY_TIMEOUT_SECONDS "$node_ready_timeout_seconds"
+validate_positive_integer VULTR_NODE_READY_POLL_SECONDS "$node_ready_poll_seconds"
+
+node_group_count() {
+  local kubeconfig_path="$1"
+  local context="$2"
+  local node_group="$3"
+
+  KUBECONFIG="$kubeconfig_path" kubectl --context="$context" get nodes -l "node-group=${node_group}" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]'
+}
+
+testing_nodes_have_benchmark_taint() {
+  local kubeconfig_path="$1"
+  local context="$2"
+
+  KUBECONFIG="$kubeconfig_path" kubectl --context="$context" get nodes -l node-group=testing -o json 2>/dev/null |
+    jq -e '.items | length > 0 and all(.[]; any((.spec.taints // [])[]?; .key == "workload" and .value == "benchmark" and .effect == "NoSchedule"))' >/dev/null
+}
+
+wait_for_node_groups() {
+  local kubeconfig_path="$1"
+  local context="$2"
+  local started_at
+  local app_count
+  local testing_count
+
+  started_at="$(date +%s)"
+  echo "Waiting for context '$context' node groups (timeout: ${node_ready_timeout_seconds}s)..."
+
+  while true; do
+    app_count="$(node_group_count "$kubeconfig_path" "$context" app)"
+    testing_count="$(node_group_count "$kubeconfig_path" "$context" testing)"
+
+    if [ "${app_count:-0}" -ge 1 ] && [ "${testing_count:-0}" -ge 1 ] && testing_nodes_have_benchmark_taint "$kubeconfig_path" "$context"; then
+      echo "context '$context' node groups ready: app=${app_count}, testing=${testing_count}"
+      return 0
+    fi
+
+    if [ $(( $(date +%s) - started_at )) -ge "$node_ready_timeout_seconds" ]; then
+      echo "ERROR: context '$context' node groups not ready after ${node_ready_timeout_seconds}s (app=${app_count:-0}, testing=${testing_count:-0})" >&2
+      echo "Hint: VKE may still be attaching/registering node pools. Retry: make setup-contexts" >&2
+      return 1
+    fi
+
+    echo "context '$context' waiting for nodes: app=${app_count:-0}, testing=${testing_count:-0}"
+    sleep "$node_ready_poll_seconds"
+  done
+}
 
 write_kubeconfig() {
   local stack="$1"
@@ -30,21 +91,7 @@ write_kubeconfig() {
 
   KUBECONFIG="$path" kubectl config rename-context "$(KUBECONFIG="$path" kubectl config current-context)" "$context" >/dev/null 2>&1 || true
   KUBECONFIG="$path" kubectl --context="$context" get nodes >/dev/null
-
-  app_count="$(KUBECONFIG="$path" kubectl --context="$context" get nodes -l node-group=app --no-headers 2>/dev/null | wc -l | tr -d '[:space:]')"
-  testing_count="$(KUBECONFIG="$path" kubectl --context="$context" get nodes -l node-group=testing --no-headers 2>/dev/null | wc -l | tr -d '[:space:]')"
-  if [ "${app_count:-0}" -lt 1 ]; then
-    echo "ERROR: context '$context' has no node-group=app nodes" >&2
-    exit 1
-  fi
-  if [ "${testing_count:-0}" -lt 1 ]; then
-    echo "ERROR: context '$context' has no node-group=testing nodes" >&2
-    exit 1
-  fi
-  if ! KUBECONFIG="$path" kubectl --context="$context" get nodes -l node-group=testing -o json | jq -e '.items[] | select((.spec.taints // [])[]? | .key == "workload" and .value == "benchmark" and .effect == "NoSchedule")' >/dev/null; then
-    echo "ERROR: context '$context' testing nodes are missing workload=benchmark:NoSchedule taint" >&2
-    exit 1
-  fi
+  wait_for_node_groups "$path" "$context"
 
   mkdir -p "$HOME/.kube"
   old_umask="$(umask)"
