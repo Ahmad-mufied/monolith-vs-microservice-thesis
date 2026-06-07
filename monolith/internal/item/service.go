@@ -37,7 +37,9 @@ func (s *Service) SyncItems(ctx context.Context, req SyncItemsRequest) error {
 	if err != nil {
 		return err
 	}
-	if err := s.repo.SyncItems(ctx, items); err != nil {
+	if err := apperror.DoIfActive(ctx, func() error {
+		return s.repo.SyncItems(ctx, items)
+	}); err != nil {
 		return err
 	}
 	return nil

@@ -34,7 +34,9 @@ func (u *ItemUsecase) SyncItems(ctx context.Context, items []domain.SyncItemInpu
 		return err
 	}
 
-	if err := u.repo.SyncItems(ctx, normalized); err != nil {
+	if err := pkgerrors.DoIfActive(ctx, func() error {
+		return u.repo.SyncItems(ctx, normalized)
+	}); err != nil {
 		return err
 	}
 	return nil

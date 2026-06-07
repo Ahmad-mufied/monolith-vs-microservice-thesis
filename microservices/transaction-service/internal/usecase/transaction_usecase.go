@@ -46,7 +46,7 @@ func (u *TransactionUsecase) CreateTransaction(ctx context.Context, userID strin
 	validateCtx, cancel := context.WithTimeout(ctx, itemValidationTimeout)
 	defer cancel()
 
-	if err := pkgerrors.DoIfActive(ctx, func() error {
+	if err := pkgerrors.DoIfActive(validateCtx, func() error {
 		return u.itemService.ValidateTransactionItems(validateCtx, input.items)
 	}); err != nil {
 		return "", err

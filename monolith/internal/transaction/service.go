@@ -37,7 +37,9 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 	if err != nil {
 		return "", err
 	}
-	tx, err := s.repo.Create(ctx, userID, items)
+	tx, err := apperror.CallIfActive(ctx, func() (Transaction, error) {
+		return s.repo.Create(ctx, userID, items)
+	})
 	if err != nil {
 		return "", err
 	}
