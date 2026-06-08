@@ -228,6 +228,7 @@ Supporting indicators:
 HTTP 4xx/5xx patterns
 failed checks
 application logs
+```
 
 ### 5.4 Timeout and Cancellation Interpretation
 
@@ -287,10 +288,8 @@ This matters for thesis interpretation because a high `p95` should not be
 described automatically as "successful requests became slower". It may instead
 mean that a meaningful fraction of requests waited until the configured timeout
 boundary and then failed.
-Datadog error traces
-```
 
-### 5.4 Dropped Iterations
+### 5.6 Dropped Iterations
 
 Dropped iterations indicate that k6 could not start the expected number of iterations at the configured arrival rate.
 
@@ -301,7 +300,7 @@ High dropped_iterations means the target arrival rate may not have been achieved
 The run must be reviewed before being included in final analysis.
 ```
 
-### 5.5 Checks Rate
+### 5.7 Checks Rate
 
 Checks validate expected API behavior, such as:
 
