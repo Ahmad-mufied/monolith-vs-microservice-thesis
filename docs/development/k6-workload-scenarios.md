@@ -258,6 +258,49 @@ hpa
 names or malformed custom ramp-stage JSON now fail fast instead of silently
 falling back to another executor or generated stages.
 
+## 4.1 Request timeout precedence
+
+The benchmark client now uses one central per-request timeout knob in
+`k6/scripts/common/config.js`:
+
+```text
+K6_REQUEST_TIMEOUT_MS
+```
+
+Default value:
+
+```text
+60000
+```
+
+This value must remain larger than the application's own timeout budget so the
+application, not k6, is the first layer to declare a timeout.
+
+Current intended precedence:
+
+```text
+application-managed timeout boundary
+    <
+k6 HTTP request timeout (60s)
+```
+
+Current application-managed boundaries in this branch:
+
+- monolith request deadline: `APP_REQUEST_TIMEOUT=30s`
+- microservices outbound dependency deadline: `GRPC_CALL_TIMEOUT=10s`
+
+This keeps `k6` aligned with its historic long wait behavior while still making
+the timeout explicit and overridable from one place if a future experiment
+needs a tighter client guardrail.
+
+Interpretation:
+
+- `499` indicates the caller canceled or disconnected first.
+- `503` indicates the application hit its own managed timeout boundary first.
+- If k6 times out before the application, the run no longer reflects the
+  intended timeout policy and the benchmark setup should be corrected before
+  using the result for analysis.
+
 ---
 
 ## 5. Metrics

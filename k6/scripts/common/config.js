@@ -44,6 +44,22 @@ export const P90_THRESHOLD_MS = envInt("P90_THRESHOLD_MS", 1000);
 export const P95_THRESHOLD_MS = envInt("P95_THRESHOLD_MS", 1500);
 export const MAX_DROPPED_ITERATIONS = envInt("MAX_DROPPED_ITERATIONS", 1);
 
+// REQUEST_TIMEOUT_MS is the per-request HTTP timeout applied to all k6 http
+// calls. It must remain greater than the application-level request deadline
+// (APP_REQUEST_TIMEOUT, default 30s) so that the application always times out
+// first and the benchmark observes the app's 503 behavior rather than a k6
+// client cancellation.
+//
+// Default k6 behavior is effectively 60s. We keep that as the default here so
+// the application remains the first timeout authority, while still allowing a
+// tighter override via K6_REQUEST_TIMEOUT_MS when an experiment explicitly
+// needs it.
+//
+// Timeout precedence with the current defaults:
+// GRPC_CALL_TIMEOUT (10s) < APP_REQUEST_TIMEOUT (30s) < REQUEST_TIMEOUT_MS (60s)
+export const REQUEST_TIMEOUT_MS = envInt("K6_REQUEST_TIMEOUT_MS", 60000);
+
+
 export const USER_COUNT = envInt("USER_COUNT", 100);
 export const USER_EMAIL_PREFIX = envString("USER_EMAIL_PREFIX", "benchmark-user");
 export const USER_EMAIL_SEPARATOR = envString("USER_EMAIL_SEPARATOR", "-");

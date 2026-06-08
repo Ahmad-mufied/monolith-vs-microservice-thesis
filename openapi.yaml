@@ -123,8 +123,8 @@ paths:
           $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
-        '504':
-          $ref: '#/components/responses/GatewayTimeout'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/auth/login:
     post:
       tags:
@@ -166,8 +166,8 @@ paths:
           $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
-        '504':
-          $ref: '#/components/responses/GatewayTimeout'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/items:
     get:
       tags:
@@ -196,8 +196,8 @@ paths:
           $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
-        '504':
-          $ref: '#/components/responses/GatewayTimeout'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
     put:
       tags:
       - Items
@@ -274,8 +274,8 @@ paths:
           $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
-        '504':
-          $ref: '#/components/responses/GatewayTimeout'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/items/{item_id}:
     get:
       tags:
@@ -301,8 +301,8 @@ paths:
           $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
-        '504':
-          $ref: '#/components/responses/GatewayTimeout'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       description: Returns active item detail. If the item is soft-deleted, this endpoint returns 404 Not Found.
   /api/v1/transactions:
     post:
@@ -364,8 +364,8 @@ paths:
           $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
-        '504':
-          $ref: '#/components/responses/GatewayTimeout'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
     get:
       tags:
       - Transactions
@@ -394,8 +394,8 @@ paths:
           $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
-        '504':
-          $ref: '#/components/responses/GatewayTimeout'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/transactions/{transaction_id}:
     get:
       tags:
@@ -421,8 +421,8 @@ paths:
           $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
-        '504':
-          $ref: '#/components/responses/GatewayTimeout'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/admin/transactions:
     get:
       tags:
@@ -478,8 +478,8 @@ paths:
           $ref: '#/components/responses/ClientCanceled'
         '500':
           $ref: '#/components/responses/InternalServerError'
-        '504':
-          $ref: '#/components/responses/GatewayTimeout'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 components:
   securitySchemes:
     bearerAuth:
@@ -585,16 +585,16 @@ components:
             error:
               code: INTERNAL_SERVER_ERROR
               message: Internal server error
-    GatewayTimeout:
-      description: Request timeout
+    ServiceUnavailable:
+      description: Service temporarily unavailable
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
-              code: GATEWAY_TIMEOUT
-              message: Request timeout
+              code: SERVICE_UNAVAILABLE
+              message: Service temporarily unavailable
   schemas:
     HealthResponse:
       type: object
