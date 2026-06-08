@@ -58,6 +58,14 @@ func main() {
 	e.HidePort = true
 	e.Use(echomw.Recover())
 	e = echotrace.Wrap(e, echotrace.WithService(observability.ServiceName(cfg.ServiceName)))
+	// Use Echo's built-in context-timeout middleware so handlers receive a
+	// deadline-aware request context. The custom error handler preserves the
+	// repository's public timeout contract: deadline reached -> 503, caller
+	// canceled -> 499.
+	e.Use(echomw.ContextTimeoutWithConfig(echomw.ContextTimeoutConfig{
+		Timeout:      cfg.RequestTimeout,
+		ErrorHandler: authmw.ContextTimeoutErrorHandler,
+	}))
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
 		if c.Response().Committed {
 			return
@@ -104,7 +112,11 @@ func main() {
 
 	serverErrCh := make(chan error, 1)
 	go func() {
-		logger.Info("starting monolith", slog.String("addr", addr), slog.String("env", cfg.AppEnv))
+		logger.Info("starting monolith",
+			slog.String("addr", addr),
+			slog.String("env", cfg.AppEnv),
+			slog.Duration("request_timeout", cfg.RequestTimeout),
+		)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErrCh <- err
 		}

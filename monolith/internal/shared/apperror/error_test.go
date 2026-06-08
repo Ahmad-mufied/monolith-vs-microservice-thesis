@@ -18,7 +18,7 @@ func TestErrorConstructors(t *testing.T) {
 		{name: "unauthorized", err: Unauthorized("invalid token"), wantCode: CodeUnauthorized, wantStatus: http.StatusUnauthorized},
 		{name: "not found", err: NotFound("item not found"), wantCode: CodeNotFound, wantStatus: http.StatusNotFound},
 		{name: "conflict", err: Conflict("email already exists"), wantCode: CodeConflict, wantStatus: http.StatusConflict},
-		{name: "deadline exceeded", err: DeadlineExceeded("request timeout", context.DeadlineExceeded), wantCode: CodeGatewayTimeout, wantStatus: http.StatusGatewayTimeout},
+		{name: "deadline exceeded", err: DeadlineExceeded("request timeout", context.DeadlineExceeded), wantCode: CodeServiceUnavailable, wantStatus: http.StatusServiceUnavailable},
 		{name: "canceled", err: Canceled("request canceled", context.Canceled), wantCode: CodeClientCanceled, wantStatus: 499},
 		{name: "internal", err: Internal("internal server error", errors.New("db failed")), wantCode: CodeInternal, wantStatus: http.StatusInternalServerError},
 	}
@@ -45,7 +45,7 @@ func TestFromContext(t *testing.T) {
 		wantCode   Code
 		wantStatus int
 	}{
-		{name: "deadline exceeded", err: context.DeadlineExceeded, wantCode: CodeGatewayTimeout, wantStatus: http.StatusGatewayTimeout},
+		{name: "deadline exceeded", err: context.DeadlineExceeded, wantCode: CodeServiceUnavailable, wantStatus: http.StatusServiceUnavailable},
 		{name: "canceled", err: context.Canceled, wantCode: CodeClientCanceled, wantStatus: 499},
 	}
 
@@ -144,7 +144,7 @@ func TestInternalFromContext(t *testing.T) {
 		wantCode   Code
 		wantStatus int
 	}{
-		{name: "deadline exceeded", err: context.DeadlineExceeded, wantCode: CodeGatewayTimeout, wantStatus: http.StatusGatewayTimeout},
+		{name: "deadline exceeded", err: context.DeadlineExceeded, wantCode: CodeServiceUnavailable, wantStatus: http.StatusServiceUnavailable},
 		{name: "canceled", err: context.Canceled, wantCode: CodeClientCanceled, wantStatus: 499},
 		{name: "other", err: errors.New("driver error"), wantCode: CodeInternal, wantStatus: http.StatusInternalServerError},
 	}
