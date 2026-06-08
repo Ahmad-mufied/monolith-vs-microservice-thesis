@@ -43,7 +43,7 @@ func FromGRPCError(err error) *AppError {
 		case codes.Unavailable:
 			return &AppError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: msg}
 		case codes.DeadlineExceeded:
-			return &AppError{Status: http.StatusGatewayTimeout, Code: "GATEWAY_TIMEOUT", Message: msg}
+			return &AppError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: msg}
 		case codes.Canceled:
 			return &AppError{Status: statusClientClosedRequest, Code: "CLIENT_CANCELED", Message: msg}
 		}

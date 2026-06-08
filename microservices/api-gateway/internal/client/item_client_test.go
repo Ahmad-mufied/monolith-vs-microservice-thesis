@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
@@ -72,7 +73,7 @@ func TestItemClient_SyncItems(t *testing.T) {
 					return &itemv1.SyncItemsResponse{}, tt.grpcErr
 				},
 			}
-			c := NewItemClient(fake)
+			c := NewItemClient(fake, 5*time.Second)
 			err := c.SyncItems(context.Background(), tt.items)
 			assertClientError(t, err, tt.wantStatus)
 		})
@@ -129,7 +130,7 @@ func TestItemClient_ListItems(t *testing.T) {
 					return tt.grpcResp, tt.grpcErr
 				},
 			}
-			c := NewItemClient(fake)
+			c := NewItemClient(fake, 5*time.Second)
 			items, err := c.ListItems(context.Background(), tt.limit, tt.offset)
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)
@@ -173,7 +174,7 @@ func TestItemClient_GetItemByID(t *testing.T) {
 					return tt.grpcResp, tt.grpcErr
 				},
 			}
-			c := NewItemClient(fake)
+			c := NewItemClient(fake, 5*time.Second)
 			item, err := c.GetItemByID(context.Background(), "iid-1")
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)
@@ -217,7 +218,7 @@ func TestItemClient_GetItemSummariesByIDs(t *testing.T) {
 					return tt.grpcResp, tt.grpcErr
 				},
 			}
-			c := NewItemClient(fake)
+			c := NewItemClient(fake, 5*time.Second)
 			items, err := c.GetItemSummariesByIDs(context.Background(), []string{"iid-1", "iid-2"})
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)

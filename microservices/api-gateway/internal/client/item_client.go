@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
@@ -12,11 +13,14 @@ import (
 
 // ItemClient wraps the generated gRPC ItemServiceClient.
 type ItemClient struct {
-	grpc itemv1.ItemServiceClient
+	grpc        itemv1.ItemServiceClient
+	grpcTimeout time.Duration
 }
 
-func NewItemClient(grpc itemv1.ItemServiceClient) *ItemClient {
-	return &ItemClient{grpc: grpc}
+// NewItemClient creates an ItemClient. grpcTimeout is applied as a
+// context.WithTimeout deadline on every outbound RPC call.
+func NewItemClient(grpc itemv1.ItemServiceClient, grpcTimeout time.Duration) *ItemClient {
+	return &ItemClient{grpc: grpc, grpcTimeout: grpcTimeout}
 }
 
 func (c *ItemClient) SyncItems(ctx context.Context, items []dto.SyncItemInput) error {
@@ -37,6 +41,8 @@ func (c *ItemClient) SyncItems(ctx context.Context, items []dto.SyncItemInput) e
 		}
 		reqItems = append(reqItems, in)
 	}
+	ctx, cancel := context.WithTimeout(ctx, c.grpcTimeout)
+	defer cancel()
 	_, err := c.grpc.SyncItems(ctx, &itemv1.SyncItemsRequest{Items: reqItems})
 	if err != nil {
 		return httputil.FromGRPCError(err)
@@ -50,6 +56,8 @@ func (c *ItemClient) ListItems(ctx context.Context, limit, offset int) ([]dto.It
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, c.grpcTimeout)
+	defer cancel()
 	resp, err := c.grpc.ListItems(ctx, &itemv1.ListItemsRequest{Limit: protoLimit, Offset: protoOffset})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)
@@ -62,6 +70,8 @@ func (c *ItemClient) ListItems(ctx context.Context, limit, offset int) ([]dto.It
 }
 
 func (c *ItemClient) GetItemByID(ctx context.Context, itemID string) (*dto.Item, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.grpcTimeout)
+	defer cancel()
 	resp, err := c.grpc.GetItemById(ctx, &itemv1.GetItemByIdRequest{ItemId: itemID})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)
@@ -74,6 +84,8 @@ func (c *ItemClient) GetItemByID(ctx context.Context, itemID string) (*dto.Item,
 }
 
 func (c *ItemClient) GetItemSummariesByIDs(ctx context.Context, ids []string) ([]dto.ItemSummary, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.grpcTimeout)
+	defer cancel()
 	resp, err := c.grpc.GetItemSummariesByIds(ctx, &itemv1.GetItemSummariesByIdsRequest{ItemIds: ids})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)

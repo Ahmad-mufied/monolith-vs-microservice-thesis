@@ -71,10 +71,10 @@ func TestFromGRPCError(t *testing.T) {
 			wantCode:   "SERVICE_UNAVAILABLE",
 		},
 		{
-			name:       "DeadlineExceeded -> 504 GATEWAY_TIMEOUT",
+			name:       "DeadlineExceeded -> 503 SERVICE_UNAVAILABLE",
 			err:        status.Error(codes.DeadlineExceeded, "timeout"),
-			wantStatus: http.StatusGatewayTimeout,
-			wantCode:   "GATEWAY_TIMEOUT",
+			wantStatus: http.StatusServiceUnavailable,
+			wantCode:   "SERVICE_UNAVAILABLE",
 		},
 		{
 			name:       "Canceled -> 499 CLIENT_CANCELED",

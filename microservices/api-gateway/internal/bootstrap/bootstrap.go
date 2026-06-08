@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/client"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/config"
@@ -25,7 +24,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const shutdownTimeout = 10 * time.Second
 const grpcRoundRobinServiceConfig = `{"loadBalancingConfig":[{"round_robin":{}}]}`
 
 func Run() error {
@@ -62,10 +60,11 @@ func Run() error {
 	}
 	defer closeConn(txConn, "transaction")
 
-	// Instantiate clients.
-	authClient := client.NewAuthClient(authv1.NewAuthServiceClient(authConn))
-	itemClient := client.NewItemClient(itemv1.NewItemServiceClient(itemConn))
-	txClient := client.NewTransactionClient(transactionv1.NewTransactionServiceClient(txConn))
+	// Instantiate clients with the configured gRPC call timeout. Each client
+	// will wrap every outbound context with this deadline before the RPC call.
+	authClient := client.NewAuthClient(authv1.NewAuthServiceClient(authConn), cfg.GRPCCallTimeout)
+	itemClient := client.NewItemClient(itemv1.NewItemServiceClient(itemConn), cfg.GRPCCallTimeout)
+	txClient := client.NewTransactionClient(transactionv1.NewTransactionServiceClient(txConn), cfg.GRPCCallTimeout)
 
 	// Instantiate handlers.
 	healthH := handler.NewHealthHandler()
@@ -75,21 +74,35 @@ func Run() error {
 
 	// Setup router.
 	e := echotrace.Wrap(echo.New(), echotrace.WithService(serviceName))
-	defer closeEcho(e)
 	router.RegisterRoutes(e, healthH, authH, itemH, txH, cfg.JWTSecret)
 
-	// Start HTTP server.
+	// Start HTTP server with explicit transport timeouts from config.
+	// WriteTimeout is intentionally larger than GRPCCallTimeout so the gateway
+	// can write a proper 503/499 response before the transport closes the
+	// connection.
+	addr := ":" + cfg.HTTPPort
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           e,
+		ReadHeaderTimeout: cfg.HTTPServer.ReadHeaderTimeout,
+		ReadTimeout:       cfg.HTTPServer.ReadTimeout,
+		WriteTimeout:      cfg.HTTPServer.WriteTimeout,
+		IdleTimeout:       cfg.HTTPServer.IdleTimeout,
+	}
+
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Printf("api-gateway HTTP listening on :%s", cfg.HTTPPort)
-		serverErr <- e.Start(":" + cfg.HTTPPort)
+		log.Printf("api-gateway HTTP listening on %s (grpc_call_timeout=%s)", addr, cfg.GRPCCallTimeout)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+		}
 	}()
 
 	select {
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.HTTPServer.ShutdownTimeout)
 		defer cancel()
-		if err := e.Shutdown(shutdownCtx); err != nil {
+		if err := server.Shutdown(shutdownCtx); err != nil {
 			log.Printf("api-gateway graceful shutdown error: %v", err)
 		}
 		return nil
@@ -110,11 +123,5 @@ func grpcClientOptions(serviceName string) []grpc.DialOption {
 func closeConn(conn *grpc.ClientConn, name string) {
 	if err := conn.Close(); err != nil {
 		log.Printf("close %s service conn: %v", name, err)
-	}
-}
-
-func closeEcho(e *echo.Echo) {
-	if err := e.Close(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Printf("close api-gateway echo server: %v", err)
 	}
 }

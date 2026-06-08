@@ -340,7 +340,7 @@ func TestTransactionUsecase_CreateTransaction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			uc := NewTransactionUsecase(tt.repo, &fakeItemService{validateTransactionItemsFn: tt.itemSvcFn})
+			uc := NewTransactionUsecase(tt.repo, &fakeItemService{validateTransactionItemsFn: tt.itemSvcFn}, 5*time.Second)
 			gotID, err := uc.CreateTransaction(context.Background(), tt.userID, tt.items)
 
 			if tt.wantErr != nil {
@@ -369,7 +369,7 @@ func TestTransactionUsecaseCreateContextCanceledBeforeItemService(t *testing.T) 
 
 	uc := NewTransactionUsecase(noListRepo(t), &fakeItemService{
 		validateTransactionItemsFn: noCallItemService(t),
-	})
+	}, 5*time.Second)
 
 	_, err := uc.CreateTransaction(ctx, "01968ad4-98b1-79c8-a6f0-ec21f8f434c6", []domain.TransactionItem{
 		{ItemID: "01968ad4-98b1-79c8-a6f0-ec21f8f434c7", Amount: 1},
@@ -473,7 +473,7 @@ func TestTransactionUsecase_GetOwnTransactions(t *testing.T) {
 		},
 	}
 
-	uc := NewTransactionUsecase(nil, nil)
+	uc := NewTransactionUsecase(nil, nil, 5*time.Second)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			uc.repo = tt.repo
@@ -575,7 +575,7 @@ func TestTransactionUsecase_GetTransactionByID(t *testing.T) {
 		},
 	}
 
-	uc := NewTransactionUsecase(nil, nil)
+	uc := NewTransactionUsecase(nil, nil, 5*time.Second)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			uc.repo = tt.repo
@@ -672,7 +672,7 @@ func TestTransactionUsecase_GetTransactionsForEnrichment(t *testing.T) {
 		},
 	}
 
-	uc := NewTransactionUsecase(nil, nil)
+	uc := NewTransactionUsecase(nil, nil, 5*time.Second)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			uc.repo = tt.repo

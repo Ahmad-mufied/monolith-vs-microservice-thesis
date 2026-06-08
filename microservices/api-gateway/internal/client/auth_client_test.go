@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
 	authv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/auth/v1"
@@ -66,7 +67,7 @@ func TestAuthClient_Register(t *testing.T) {
 					return tt.grpcResp, tt.grpcErr
 				},
 			}
-			c := NewAuthClient(fake)
+			c := NewAuthClient(fake, 5*time.Second)
 			user, err := c.Register(context.Background(), "Ahmad", "a@b.com", "pass1234")
 
 			if tt.wantStatus != 0 {
@@ -122,7 +123,7 @@ func TestAuthClient_Login(t *testing.T) {
 					return tt.grpcResp, tt.grpcErr
 				},
 			}
-			c := NewAuthClient(fake)
+			c := NewAuthClient(fake, 5*time.Second)
 			token, user, err := c.Login(context.Background(), "a@b.com", "pass1234")
 
 			if tt.wantStatus != 0 {
@@ -182,7 +183,7 @@ func TestAuthClient_GetUsersByIDs(t *testing.T) {
 					return tt.grpcResp, tt.grpcErr
 				},
 			}
-			c := NewAuthClient(fake)
+			c := NewAuthClient(fake, 5*time.Second)
 			users, err := c.GetUsersByIDs(context.Background(), []string{"uid-1"})
 
 			if tt.wantStatus != 0 {
