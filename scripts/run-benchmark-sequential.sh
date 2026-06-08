@@ -140,6 +140,108 @@ if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
   BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_or_die "$S3_BUCKET" "sequential benchmark bootstrap" "false"
 fi
 
+# --- Auto-detect whether the target architecture needs deploying ---
+
+check_deployment_ready() {
+  local namespace="$1"
+  local deployment="$2"
+  local container="$3"
+  local desired ready image
+
+  if ! kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  desired="$(kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" -o jsonpath='{.spec.replicas}' 2>/dev/null || true)"
+  ready="$(kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+  image="$(kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" -o "jsonpath={.spec.template.spec.containers[?(@.name=='${container}')].image}" 2>/dev/null || true)"
+
+  desired="${desired:-0}"
+  ready="${ready:-0}"
+
+  if ! [[ "$desired" =~ ^[0-9]+$ ]] || ! [[ "$ready" =~ ^[0-9]+$ ]]; then
+    return 1
+  fi
+  [ "$desired" -ge 1 ] && [ "$ready" -ge "$desired" ] && [[ "$image" == *":${IMAGE_TAG}" ]]
+}
+
+check_scaled_down() {
+  local namespace="$1"
+  local deployment="$2"
+  local desired ready
+
+  if ! kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  desired="$(kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" -o jsonpath='{.spec.replicas}' 2>/dev/null || true)"
+  ready="$(kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+  desired="${desired:-0}"
+  ready="${ready:-0}"
+
+  [ "$desired" = "0" ] && [ "$ready" = "0" ]
+}
+
+check_scaling_mode_matches() {
+  local architecture="$1"
+  local hpa_count
+
+  case "$architecture:$SCALING_MODE" in
+    monolith:fixed)
+      ! kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
+      ;;
+    monolith:hpa)
+      kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
+      ;;
+    microservices:fixed)
+      hpa_count="$(kubectl --context="$SEQUENTIAL_CONTEXT" get hpa -n msa -o name 2>/dev/null | wc -l | tr -d '[:space:]' || true)"
+      [ "${hpa_count:-0}" = "0" ]
+      ;;
+    microservices:hpa)
+      hpa_count="$(kubectl --context="$SEQUENTIAL_CONTEXT" get hpa -n msa -o name 2>/dev/null | wc -l | tr -d '[:space:]' || true)"
+      [ "${hpa_count:-0}" -ge 4 ]
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+architecture_already_deployed() {
+  local architecture="$1"
+  local svc
+
+  check_scaling_mode_matches "$architecture" || return 1
+
+  if [ "$architecture" = "monolith" ]; then
+    check_scaled_down msa api-gateway || return 1
+    check_scaled_down msa auth-service || return 1
+    check_scaled_down msa item-service || return 1
+    check_scaled_down msa transaction-service || return 1
+    check_deployment_ready mono monolith monolith
+    return
+  fi
+
+  check_scaled_down mono monolith || return 1
+  for svc in api-gateway auth-service item-service transaction-service; do
+    check_deployment_ready msa "$svc" "$svc" || return 1
+  done
+}
+
+if architecture_already_deployed "$ARCHITECTURE"; then
+  echo "Architecture ${ARCHITECTURE} is already deployed with IMAGE_TAG=${IMAGE_TAG} and SCALING_MODE=${SCALING_MODE}; skipping deploy."
+else
+  echo "=== Deploying ${ARCHITECTURE} (${SCALING_MODE}) ==="
+  ARCHITECTURE="$ARCHITECTURE" \
+    SCALING_MODE="$SCALING_MODE" \
+    IMAGE_TAG="$IMAGE_TAG" \
+    AWS_REGION="$AWS_REGION" \
+    ECR_NAMESPACE="$ECR_NAMESPACE" \
+    CLOUD_PROVIDER="$CLOUD_PROVIDER" \
+    DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
+    bash scripts/deploy-sequential-architecture.sh
+fi
+
 render_provider_manifests "$RENDER_ROOT"
 MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/$MANIFEST_NAME"
 bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"

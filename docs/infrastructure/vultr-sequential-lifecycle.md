@@ -347,7 +347,18 @@ All jobs use `kubectl --context=benchmark`.
 
 ## Phase 7 — Run Benchmark
 
-### 7.1 Single case (smoke)
+### 7.1 Single case
+
+`run-benchmark-case` auto-detects whether the target architecture is already
+deployed before running the k6 job. It checks:
+
+1. Scaling mode matches the live cluster (HPA presence/absence)
+2. Target architecture is deployed, ready, and uses the correct `IMAGE_TAG`
+3. Inactive architecture is scaled to 0
+
+If all conditions are met, the deploy step is skipped. Otherwise, it runs
+`deploy-sequential-architecture.sh` automatically (scale down inactive,
+bootstrap, migration, reset, seed, deploy target).
 
 Run one architecture, one scenario, one RPS level:
 
@@ -360,6 +371,20 @@ ATTEMPT=attempt-01 \
 SCALING_MODE=fixed \
 K6_PROFILE=smoke \
 TEST_DURATION=1m \
+make run-benchmark-case
+```
+
+Switch architecture mid-session (auto-deploys the new target):
+
+```bash
+ARCHITECTURE=microservices \
+SCENARIO=login \
+TARGET_RPS=100 \
+RUN_ID=vultr-seq-fixed-smoke \
+ATTEMPT=attempt-01 \
+SCALING_MODE=fixed \
+K6_PROFILE=steady \
+TEST_DURATION=3m \
 make run-benchmark-case
 ```
 
@@ -600,7 +625,7 @@ VPC or firewall group.
 | `make render-manifests` | Render Kustomize manifests with final image tag |
 | `ARCHITECTURE=... SCALING_MODE=... make deploy-workloads` | Deploy one architecture (manual smoke) |
 | `make verify-live-mode` | Verify live cluster matches expected mode |
-| `ARCHITECTURE=... SCENARIO=... TARGET_RPS=... make run-benchmark-case` | Run single benchmark case |
+| `ARCHITECTURE=... SCENARIO=... TARGET_RPS=... make run-benchmark-case` | Run single case (auto-deploys architecture) |
 | `make run-benchmark-suite` | Run full sequential suite |
 | `S3_BENCHMARK_DATA_VERIFIED=true make experiment-destroy-confirmed` | Destroy experiment infra |
 | `S3_BENCHMARK_DATA_VERIFIED=true make shared-destroy-confirmed` | Destroy shared infra |
