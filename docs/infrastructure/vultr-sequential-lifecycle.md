@@ -236,6 +236,58 @@ make render-manifests      → render Kustomize manifests with final image tag
 - private network integration
 - AWS S3 writer stack for k6 result uploads
 
+### 5.2.1 AWS S3 Writer
+
+The k6 runner uploads benchmark results to an AWS S3 bucket using
+`aws s3 sync`. Because Vultr clusters do not have EKS Pod Identity, the
+k6 pod receives static AWS credentials through a Kubernetes Secret.
+
+The `infra/terraform/aws-s3-writer` stack creates a least-privilege IAM user
+scoped to `s3://<bucket>/experiments/*`. It is applied automatically by
+`experiment-apply`, so you do not need to run it separately.
+
+Credential flow:
+
+```text
+aws-s3-writer (Terraform, local state)
+  → creates IAM user + access key
+  → stores credentials in terraform.tfstate
+
+create-secrets (shell script)
+  → reads credentials from terraform.tfstate via "terraform output"
+  → injects into k6-runner-secret (K8s Secret)
+    AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY
+    AWS_REGION
+    S3_BUCKET
+
+k6-runner pod
+  → mounts k6-runner-secret as env vars
+  → runs "aws s3 sync" after k6 completes
+```
+
+Reading credentials from Terraform state (`terraform output`) does not require
+AWS authentication because the state file is local. You do **not** need to run
+`aws sso login` or have a valid `AWS_PROFILE` for the credential read step.
+
+If you prefer to set credentials manually instead of reading from Terraform
+state, add them to `env/vultr.env`:
+
+```text
+AWS_ACCESS_KEY_ID=<your-key>
+AWS_SECRET_ACCESS_KEY=<your-secret>
+```
+
+The `create-secrets` scripts check `env/vultr.env` first; Terraform output is
+the fallback only.
+
+To provision the writer stack independently (e.g., for debugging):
+
+```bash
+make aws-s3-writer-plan
+make aws-s3-writer-apply
+```
+
 ### 5.3 Individual steps (for debugging)
 
 Use these only when debugging a specific step or resuming from a known partial
@@ -739,6 +791,23 @@ Common causes:
 - `BASE_URL` not reachable (check app pods and Service)
 - No enrichment data (run prepare-enrichment before enriched-transactions)
 - S3 upload fails (check S3 writer credentials)
+
+### S3 upload fails with AccessDenied
+
+The k6 runner uploads results via `aws s3 sync` using the IAM access key from
+`aws-s3-writer`. If the upload fails:
+
+```bash
+kubectl --context=benchmark get secret k6-runner-secret -n benchmark -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d
+```
+
+Verify the key matches the Terraform output:
+
+```bash
+terraform -chdir=infra/terraform/aws-s3-writer output -raw vultr_k6_s3_access_key_id
+```
+
+If the key is stale or missing, re-run `make create-secrets`.
 
 ### Datadog not showing traces
 

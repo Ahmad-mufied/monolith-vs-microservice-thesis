@@ -17,7 +17,17 @@ for env_file in env/vultr.env env/hetzner.env env/terraform.shared.env; do
 done
 
 unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-export AWS_PROFILE="$terraform_aws_profile"
+
+terraform_command="${1:-}"
+
+# Only set AWS_PROFILE for commands that need provider auth (AWS API calls).
+# Commands like "output" and "init" only touch local state and do not need
+# AWS credentials — setting the profile here would force unnecessary SSO login.
+case "$terraform_command" in
+  plan|apply|destroy|import|refresh)
+    export AWS_PROFILE="$terraform_aws_profile"
+    ;;
+esac
 
 project="${explicit_project:-${PROJECT:-skripsi}}"
 aws_region="${explicit_aws_region:-${AWS_REGION:-ap-southeast-1}}"
@@ -32,7 +42,6 @@ case "$s3_results_bucket" in
     ;;
 esac
 
-terraform_command="${1:-}"
 if [[ "$terraform_command" == "destroy" ]]; then
   : "${S3_BENCHMARK_DATA_VERIFIED:?Refusing destroy. Verify benchmark data exists in S3, then rerun with S3_BENCHMARK_DATA_VERIFIED=true}"
   if [[ "$S3_BENCHMARK_DATA_VERIFIED" != "true" ]]; then
