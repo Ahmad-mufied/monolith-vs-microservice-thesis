@@ -208,6 +208,17 @@ make shared-plan
 make shared-apply
 ```
 
+This creates:
+
+- Legacy VPC (region-scoped)
+- SSH key for PostgreSQL VM access
+- PostgreSQL firewall group (port 5432 from VPC, port 22 from `OPERATOR_CIDRS`)
+- Bastion firewall group (port 2002 from auto-detected operator IP)
+
+The bastion firewall auto-detects your current public IP via `https://ifconfig.me`
+at plan/apply time. If your IP changes, re-run `make shared-apply` to update
+the firewall rule automatically.
+
 ### 5.2 Experiment bootstrap
 
 Bootstrap the sequential experiment stack and Kubernetes runtime:
@@ -667,7 +678,7 @@ VPC or firewall group.
 | `make render-tfvars` | Render Terraform tfvars from env files |
 | `make preflight-check` | Validate prerequisites |
 | `make shared-plan` | Plan shared Terraform |
-| `make shared-apply` | Apply shared Terraform (VPC, firewall) |
+| `make shared-apply` | Apply shared Terraform (VPC, firewall, bastion firewall) |
 | `make experiment-bootstrap` | Full infra bootstrap (plan+apply+context+secrets+baseline+manifests) |
 | `make experiment-plan` | Plan experiment Terraform |
 | `make experiment-apply` | Apply experiment Terraform |

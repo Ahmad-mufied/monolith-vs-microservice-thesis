@@ -23,3 +23,13 @@ output "postgres_firewall_group_id" {
   value       = vultr_firewall_group.postgres.id
 }
 
+output "bastion_firewall_group_id" {
+  description = "Firewall group ID for bastion instance."
+  value       = vultr_firewall_group.bastion.id
+}
+
+output "operator_public_ip" {
+  description = "Auto-detected operator public IP used for bastion firewall rule."
+  value       = local.operator_public_ip
+}
+
