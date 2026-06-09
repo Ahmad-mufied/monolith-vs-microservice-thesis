@@ -106,6 +106,16 @@ func TestLoad(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "item validation timeout must be smaller than grpc request timeout",
+			env: map[string]string{
+				"DATABASE_URL":            "postgres://localhost:5432/transaction_db?sslmode=disable",
+				"ITEM_SERVICE_ADDR":       "item:50052",
+				"GRPC_REQUEST_TIMEOUT":    "10s",
+				"ITEM_VALIDATION_TIMEOUT": "10s",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

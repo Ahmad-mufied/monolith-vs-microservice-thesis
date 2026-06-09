@@ -37,6 +37,13 @@ func Load() (*Config, error) {
 	if itemValidationTimeout <= 0 {
 		return nil, fmt.Errorf("ITEM_VALIDATION_TIMEOUT must be greater than 0")
 	}
+	if itemValidationTimeout >= grpcRequestTimeout {
+		return nil, fmt.Errorf(
+			"ITEM_VALIDATION_TIMEOUT (%s) must be smaller than GRPC_REQUEST_TIMEOUT (%s)",
+			itemValidationTimeout,
+			grpcRequestTimeout,
+		)
+	}
 
 	cfg := &Config{
 		GRPCPort:              pkgconfig.GetEnv("GRPC_PORT", "50053"),
