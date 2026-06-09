@@ -91,8 +91,8 @@ func Load() (Config, error) {
 	if cfg.BcryptCost < bcrypt.MinCost || cfg.BcryptCost > bcrypt.MaxCost {
 		return Config{}, fmt.Errorf("BCRYPT_COST must be between %d and %d", bcrypt.MinCost, bcrypt.MaxCost)
 	}
-	if cfg.RequestTimeout >= cfg.HTTPServer.WriteTimeout {
-		return Config{}, fmt.Errorf("APP_REQUEST_TIMEOUT (%s) must be smaller than HTTP_WRITE_TIMEOUT (%s)", cfg.RequestTimeout, cfg.HTTPServer.WriteTimeout)
+	if cfg.RequestTimeout > cfg.HTTPServer.WriteTimeout {
+		return Config{}, fmt.Errorf("APP_REQUEST_TIMEOUT (%s) must not exceed HTTP_WRITE_TIMEOUT (%s)", cfg.RequestTimeout, cfg.HTTPServer.WriteTimeout)
 	}
 
 	return cfg, nil

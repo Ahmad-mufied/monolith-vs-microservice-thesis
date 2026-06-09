@@ -115,11 +115,21 @@ func TestLoad(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name: "app request timeout must be smaller than write timeout",
+			name: "app request timeout equal to write timeout is allowed",
 			env: map[string]string{
 				"DATABASE_URL":        "postgres://localhost:5432/mono_db?sslmode=disable",
 				"JWT_SECRET":          testJWTSecret(t),
 				"APP_REQUEST_TIMEOUT": "30s",
+				"HTTP_WRITE_TIMEOUT":  "30s",
+			},
+			wantError: false,
+		},
+		{
+			name: "app request timeout must not exceed write timeout",
+			env: map[string]string{
+				"DATABASE_URL":        "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":          testJWTSecret(t),
+				"APP_REQUEST_TIMEOUT": "40s",
 				"HTTP_WRITE_TIMEOUT":  "30s",
 			},
 			wantError: true,
