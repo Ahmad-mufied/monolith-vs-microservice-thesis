@@ -38,6 +38,12 @@ type Config struct {
 	JWTTokenTTL    time.Duration
 	BcryptCost     int
 	DatadogEnabled bool
+	// RequestTimeout is the application-level per-request deadline applied as a
+	// context timeout inside the timeout middleware. This is distinct from the
+	// HTTP server transport timeouts (HTTPServer.WriteTimeout etc.). It must be
+	// smaller than HTTPServer.WriteTimeout so the app can write a proper error
+	// response before the transport closes the connection.
+	RequestTimeout time.Duration
 }
 
 func Load() (Config, error) {
@@ -54,6 +60,14 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("BCRYPT_COST: %w", err)
 	}
 
+	requestTimeout, err := getEnvDuration("APP_REQUEST_TIMEOUT", 30*time.Second)
+	if err != nil {
+		return Config{}, fmt.Errorf("APP_REQUEST_TIMEOUT: %w", err)
+	}
+	if requestTimeout <= 0 {
+		return Config{}, fmt.Errorf("APP_REQUEST_TIMEOUT must be greater than 0")
+	}
+
 	cfg := Config{
 		AppEnv:         getEnv("APP_ENV", "development"),
 		AppPort:        getEnv("APP_PORT", "8080"),
@@ -65,6 +79,7 @@ func Load() (Config, error) {
 		JWTTokenTTL:    24 * time.Hour,
 		BcryptCost:     bcryptCost,
 		DatadogEnabled: os.Getenv("DATADOG_ENABLED") == "true",
+		RequestTimeout: requestTimeout,
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -75,6 +90,9 @@ func Load() (Config, error) {
 	}
 	if cfg.BcryptCost < bcrypt.MinCost || cfg.BcryptCost > bcrypt.MaxCost {
 		return Config{}, fmt.Errorf("BCRYPT_COST must be between %d and %d", bcrypt.MinCost, bcrypt.MaxCost)
+	}
+	if cfg.RequestTimeout >= cfg.HTTPServer.WriteTimeout {
+		return Config{}, fmt.Errorf("APP_REQUEST_TIMEOUT (%s) must be smaller than HTTP_WRITE_TIMEOUT (%s)", cfg.RequestTimeout, cfg.HTTPServer.WriteTimeout)
 	}
 
 	return cfg, nil
@@ -150,7 +168,7 @@ func loadHTTPServerConfig() (HTTPServerConfig, error) {
 		return HTTPServerConfig{}, fmt.Errorf("HTTP_READ_TIMEOUT must be greater than 0")
 	}
 
-	writeTimeout, err := getEnvDuration("HTTP_WRITE_TIMEOUT", 30*time.Second)
+	writeTimeout, err := getEnvDuration("HTTP_WRITE_TIMEOUT", 35*time.Second)
 	if err != nil {
 		return HTTPServerConfig{}, fmt.Errorf("HTTP_WRITE_TIMEOUT: %w", err)
 	}

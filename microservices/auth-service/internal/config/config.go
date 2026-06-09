@@ -10,20 +10,30 @@ import (
 )
 
 type Config struct {
-	GRPCPort    string
-	DatabaseURL string
-	JWTSecret   string
-	JWTExpiry   time.Duration
-	BcryptCost  int
+	GRPCPort           string
+	DatabaseURL        string
+	JWTSecret          string
+	JWTExpiry          time.Duration
+	BcryptCost         int
+	GRPCRequestTimeout time.Duration
 }
 
 func Load() (*Config, error) {
+	grpcRequestTimeout, err := getEnvDuration("GRPC_REQUEST_TIMEOUT", 15*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("GRPC_REQUEST_TIMEOUT: %w", err)
+	}
+	if grpcRequestTimeout <= 0 {
+		return nil, fmt.Errorf("GRPC_REQUEST_TIMEOUT must be greater than 0")
+	}
+
 	cfg := &Config{
-		GRPCPort:    pkgconfig.GetEnv("GRPC_PORT", "50051"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		JWTSecret:   os.Getenv("JWT_SECRET"),
-		JWTExpiry:   pkgconfig.GetEnvDuration("JWT_EXPIRY", 24*time.Hour),
-		BcryptCost:  pkgconfig.GetEnvInt("BCRYPT_COST", bcrypt.DefaultCost),
+		GRPCPort:           pkgconfig.GetEnv("GRPC_PORT", "50051"),
+		DatabaseURL:        os.Getenv("DATABASE_URL"),
+		JWTSecret:          os.Getenv("JWT_SECRET"),
+		JWTExpiry:          pkgconfig.GetEnvDuration("JWT_EXPIRY", 24*time.Hour),
+		BcryptCost:         pkgconfig.GetEnvInt("BCRYPT_COST", bcrypt.DefaultCost),
+		GRPCRequestTimeout: grpcRequestTimeout,
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -40,4 +50,16 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func getEnvDuration(key string, fallback time.Duration) (time.Duration, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, fmt.Errorf("must be a valid duration: %w", err)
+	}
+	return d, nil
 }

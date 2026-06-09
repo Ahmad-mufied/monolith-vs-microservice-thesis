@@ -17,7 +17,7 @@ const (
 	CodeMethodNotAllowed     Code = "METHOD_NOT_ALLOWED"
 	CodeUnsupportedMediaType Code = "UNSUPPORTED_MEDIA_TYPE"
 	CodeConflict             Code = "CONFLICT"
-	CodeGatewayTimeout       Code = "GATEWAY_TIMEOUT"
+	CodeServiceUnavailable   Code = "SERVICE_UNAVAILABLE"
 	CodeClientCanceled       Code = "CLIENT_CANCELED"
 	CodeInternal             Code = "INTERNAL_SERVER_ERROR"
 )
@@ -65,7 +65,7 @@ func Conflict(message string) *Error {
 }
 
 func DeadlineExceeded(message string, err error) *Error {
-	return &Error{Code: CodeGatewayTimeout, Message: message, Status: http.StatusGatewayTimeout, Err: err}
+	return &Error{Code: CodeServiceUnavailable, Message: message, Status: http.StatusServiceUnavailable, Err: err}
 }
 
 func Canceled(message string, err error) *Error {
@@ -106,7 +106,7 @@ func IsContext(err error) bool {
 		return true
 	}
 	var appErr *Error
-	return errors.As(err, &appErr) && (appErr.Code == CodeGatewayTimeout || appErr.Code == CodeClientCanceled)
+	return errors.As(err, &appErr) && (appErr.Code == CodeServiceUnavailable || appErr.Code == CodeClientCanceled)
 }
 
 func DoIfActive(ctx context.Context, fn func() error) error {
@@ -162,6 +162,8 @@ func FromHTTPStatus(status int, message string) *Error {
 		return &Error{Code: CodeUnsupportedMediaType, Message: message, Status: status}
 	case http.StatusConflict:
 		return Conflict(message)
+	case http.StatusServiceUnavailable:
+		return &Error{Code: CodeServiceUnavailable, Message: message, Status: status}
 	default:
 		if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
 			return &Error{Code: CodeBadRequest, Message: message, Status: status}

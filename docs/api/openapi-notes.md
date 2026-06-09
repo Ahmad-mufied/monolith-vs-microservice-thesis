@@ -928,8 +928,7 @@ Common HTTP status codes:
 | 409 | conflict, allocation conflict, or insufficient item amount |
 | 499 | client canceled request |
 | 500 | internal server error |
-| 503 | upstream service unavailable |
-| 504 | upstream timeout |
+| 503 | service temporarily unavailable |
 
 For create transaction:
 
@@ -937,8 +936,17 @@ For create transaction:
 - invalid UUID should return `400`,
 - invalid JWT should return `401`,
 - canceled request should return `499`,
-- upstream service timeout in microservices should return `504`,
+- application-managed timeout should return `503`,
 - unexpected internal error should return `500`.
+
+Timeout semantics after the timeout-policy standardization:
+
+- `499` is reserved for client-side cancellation or disconnect behavior.
+- `503` is reserved for application-managed deadline expiration.
+- In microservices, `503` may be caused by an internal gRPC dependency timeout
+  or upstream unavailability before API Gateway completed the request.
+- In the monolith, `503` means the request exceeded the configured
+  application-level request deadline before completion.
 
 ---
 

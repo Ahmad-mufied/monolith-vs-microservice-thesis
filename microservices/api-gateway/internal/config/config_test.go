@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 )
 
 func TestLoad(t *testing.T) {
@@ -27,6 +28,16 @@ func TestLoad(t *testing.T) {
 				if cfg.JWTSecret != "secret" {
 					t.Errorf("JWTSecret = %q, want secret", cfg.JWTSecret)
 				}
+				if cfg.GRPCCallTimeout != 10*time.Second {
+					t.Errorf("GRPCCallTimeout = %s, want 10s", cfg.GRPCCallTimeout)
+				}
+				if cfg.HTTPServer.ReadHeaderTimeout != 5*time.Second ||
+					cfg.HTTPServer.ReadTimeout != 15*time.Second ||
+					cfg.HTTPServer.WriteTimeout != 15*time.Second ||
+					cfg.HTTPServer.IdleTimeout != time.Minute ||
+					cfg.HTTPServer.ShutdownTimeout != 10*time.Second {
+					t.Errorf("HTTPServer defaults = %+v", cfg.HTTPServer)
+				}
 			},
 		},
 		{
@@ -41,6 +52,33 @@ func TestLoad(t *testing.T) {
 			check: func(t *testing.T, cfg *Config) {
 				if cfg.HTTPPort != "9090" {
 					t.Errorf("HTTPPort = %q, want 9090", cfg.HTTPPort)
+				}
+			},
+		},
+		{
+			name: "loads timeout overrides",
+			env: map[string]string{
+				"JWT_SECRET":               "secret",
+				"AUTH_SERVICE_ADDR":        "auth:50051",
+				"ITEM_SERVICE_ADDR":        "item:50052",
+				"TRANSACTION_SERVICE_ADDR": "tx:50053",
+				"GRPC_CALL_TIMEOUT":        "9s",
+				"HTTP_READ_HEADER_TIMEOUT": "6s",
+				"HTTP_READ_TIMEOUT":        "12s",
+				"HTTP_WRITE_TIMEOUT":       "14s",
+				"HTTP_IDLE_TIMEOUT":        "45s",
+				"HTTP_SHUTDOWN_TIMEOUT":    "9s",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				if cfg.GRPCCallTimeout != 9*time.Second {
+					t.Errorf("GRPCCallTimeout = %s, want 9s", cfg.GRPCCallTimeout)
+				}
+				if cfg.HTTPServer.ReadHeaderTimeout != 6*time.Second ||
+					cfg.HTTPServer.ReadTimeout != 12*time.Second ||
+					cfg.HTTPServer.WriteTimeout != 14*time.Second ||
+					cfg.HTTPServer.IdleTimeout != 45*time.Second ||
+					cfg.HTTPServer.ShutdownTimeout != 9*time.Second {
+					t.Errorf("HTTPServer overrides = %+v", cfg.HTTPServer)
 				}
 			},
 		},
@@ -80,12 +118,58 @@ func TestLoad(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "invalid grpc timeout returns error",
+			env: map[string]string{
+				"JWT_SECRET":               "secret",
+				"AUTH_SERVICE_ADDR":        "auth:50051",
+				"ITEM_SERVICE_ADDR":        "item:50052",
+				"TRANSACTION_SERVICE_ADDR": "tx:50053",
+				"GRPC_CALL_TIMEOUT":        "soon",
+			},
+			wantErr: true,
+		},
+		{
+			name: "grpc timeout must be smaller than write timeout",
+			env: map[string]string{
+				"JWT_SECRET":               "secret",
+				"AUTH_SERVICE_ADDR":        "auth:50051",
+				"ITEM_SERVICE_ADDR":        "item:50052",
+				"TRANSACTION_SERVICE_ADDR": "tx:50053",
+				"GRPC_CALL_TIMEOUT":        "15s",
+				"HTTP_WRITE_TIMEOUT":       "15s",
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid http timeout returns error",
+			env: map[string]string{
+				"JWT_SECRET":               "secret",
+				"AUTH_SERVICE_ADDR":        "auth:50051",
+				"ITEM_SERVICE_ADDR":        "item:50052",
+				"TRANSACTION_SERVICE_ADDR": "tx:50053",
+				"HTTP_WRITE_TIMEOUT":       "later",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset all config keys for deterministic isolation.
-			for _, k := range []string{"HTTP_PORT", "JWT_SECRET", "AUTH_SERVICE_ADDR", "ITEM_SERVICE_ADDR", "TRANSACTION_SERVICE_ADDR"} {
+			for _, k := range []string{
+				"HTTP_PORT",
+				"JWT_SECRET",
+				"AUTH_SERVICE_ADDR",
+				"ITEM_SERVICE_ADDR",
+				"TRANSACTION_SERVICE_ADDR",
+				"GRPC_CALL_TIMEOUT",
+				"HTTP_READ_HEADER_TIMEOUT",
+				"HTTP_READ_TIMEOUT",
+				"HTTP_WRITE_TIMEOUT",
+				"HTTP_IDLE_TIMEOUT",
+				"HTTP_SHUTDOWN_TIMEOUT",
+			} {
 				t.Setenv(k, "")
 			}
 			for k, v := range tt.env {

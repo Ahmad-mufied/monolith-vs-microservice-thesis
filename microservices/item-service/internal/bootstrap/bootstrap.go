@@ -13,6 +13,7 @@ import (
 	postgresadapter "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/adapter/postgres"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/config"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/usecase"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/grpcutil"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/observability"
 	pkgpostgres "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/postgres"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
@@ -47,7 +48,7 @@ func Run() error {
 	uc := usecase.NewItemUsecase(repo)
 	srv := grpcserveradapter.NewItemServer(uc)
 
-	grpcServer := grpc.NewServer(grpcServerOptions(serviceName)...)
+	grpcServer := grpc.NewServer(grpcServerOptions(serviceName, cfg.GRPCRequestTimeout)...)
 	itemv1.RegisterItemServiceServer(grpcServer, srv)
 
 	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
@@ -60,7 +61,7 @@ func Run() error {
 		serverErr <- grpcServer.Serve(listener)
 	}()
 
-	log.Printf("item-service gRPC listening on :%s", cfg.GRPCPort)
+	log.Printf("item-service gRPC listening on :%s (grpc_request_timeout=%s)", cfg.GRPCPort, cfg.GRPCRequestTimeout)
 
 	select {
 	case <-ctx.Done():
@@ -83,9 +84,12 @@ func Run() error {
 	}
 }
 
-func grpcServerOptions(serviceName string) []grpc.ServerOption {
+func grpcServerOptions(serviceName string, requestTimeout time.Duration) []grpc.ServerOption {
 	return []grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(grpctrace.UnaryServerInterceptor(grpctrace.WithService(serviceName))),
+		grpc.ChainUnaryInterceptor(
+			grpcutil.UnaryServerTimeout(requestTimeout),
+			grpctrace.UnaryServerInterceptor(grpctrace.WithService(serviceName)),
+		),
 		grpc.ChainStreamInterceptor(grpctrace.StreamServerInterceptor(grpctrace.WithService(serviceName))),
 	}
 }

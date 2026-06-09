@@ -14,6 +14,7 @@ import (
 	postgresadapter "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/transaction-service/internal/adapter/postgres"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/transaction-service/internal/config"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/transaction-service/internal/usecase"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/grpcutil"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/observability"
 	pkgpostgres "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/postgres"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
@@ -23,8 +24,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const shutdownTimeout = 10 * time.Second
 const grpcRoundRobinServiceConfig = `{"loadBalancingConfig":[{"round_robin":{}}]}`
+
+// grpcShutdownTimeout is the maximum wait for graceful gRPC server stop.
+// Intentionally not configurable — gRPC shutdown is independent of application
+// request timeouts and kept simple.
+const grpcShutdownTimeout = 10 * time.Second
 
 func Run() error {
 	cfg, err := config.Load()
@@ -65,10 +70,10 @@ func Run() error {
 
 	repo := postgresadapter.NewTransactionRepository(pool)
 	itemClient := grpcclientadapter.NewItemClient(itemv1.NewItemServiceClient(itemConn))
-	uc := usecase.NewTransactionUsecase(repo, itemClient)
+	uc := usecase.NewTransactionUsecase(repo, itemClient, cfg.ItemValidationTimeout)
 	srv := grpcserveradapter.NewTransactionServer(uc)
 
-	grpcServer := grpc.NewServer(grpcServerOptions(serviceName)...)
+	grpcServer := grpc.NewServer(grpcServerOptions(serviceName, cfg.GRPCRequestTimeout)...)
 	transactionv1.RegisterTransactionServiceServer(grpcServer, srv)
 
 	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
@@ -81,7 +86,12 @@ func Run() error {
 		serverErr <- grpcServer.Serve(listener)
 	}()
 
-	log.Printf("transaction-service gRPC listening on :%s", cfg.GRPCPort)
+	log.Printf(
+		"transaction-service gRPC listening on :%s (grpc_request_timeout=%s item_validation_timeout=%s)",
+		cfg.GRPCPort,
+		cfg.GRPCRequestTimeout,
+		cfg.ItemValidationTimeout,
+	)
 
 	select {
 	case <-ctx.Done():
@@ -93,8 +103,8 @@ func Run() error {
 
 		select {
 		case <-stopped:
-		case <-time.After(shutdownTimeout):
-			log.Printf("transaction-service graceful shutdown timed out after %s; forcing stop", shutdownTimeout)
+		case <-time.After(grpcShutdownTimeout):
+			log.Printf("transaction-service graceful shutdown timed out after %s; forcing stop", grpcShutdownTimeout)
 			grpcServer.Stop()
 		}
 
@@ -104,9 +114,12 @@ func Run() error {
 	}
 }
 
-func grpcServerOptions(serviceName string) []grpc.ServerOption {
+func grpcServerOptions(serviceName string, requestTimeout time.Duration) []grpc.ServerOption {
 	return []grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(grpctrace.UnaryServerInterceptor(grpctrace.WithService(serviceName))),
+		grpc.ChainUnaryInterceptor(
+			grpcutil.UnaryServerTimeout(requestTimeout),
+			grpctrace.UnaryServerInterceptor(grpctrace.WithService(serviceName)),
+		),
 		grpc.ChainStreamInterceptor(grpctrace.StreamServerInterceptor(grpctrace.WithService(serviceName))),
 	}
 }

@@ -6,6 +6,7 @@ import {
   TRANSACTION_AMOUNT,
   OWN_TRANSACTION_LIMIT,
   ENRICHED_TRANSACTION_LIMIT,
+  REQUEST_TIMEOUT_MS,
 } from "./config.js";
 
 export function jsonHeaders(token = "") {
@@ -18,7 +19,10 @@ export function jsonHeaders(token = "") {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  return { headers };
+  // timeout is applied to every request so that the application-level deadline
+  // (APP_REQUEST_TIMEOUT, default 30s) still fires before k6's default 60s
+  // client timeout.
+  return { headers, timeout: REQUEST_TIMEOUT_MS };
 }
 
 function mergeRequestParams(baseParams, extraParams = {}) {
@@ -78,7 +82,7 @@ export function expectJsonValue(response, selector, label, tags = undefined) {
 }
 
 export function healthRequest() {
-  return http.get(`${BASE_URL}/healthz`);
+  return http.get(`${BASE_URL}/healthz`, { timeout: REQUEST_TIMEOUT_MS });
 }
 
 export function loginRequest(email, password, extraParams = {}) {

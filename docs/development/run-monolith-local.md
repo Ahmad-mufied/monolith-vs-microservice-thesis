@@ -144,9 +144,10 @@ DB_POOL_MIN_CONNS=2
 DB_POOL_MAX_CONN_LIFETIME=5m
 DB_POOL_MAX_CONN_IDLE_TIME=1m
 DB_PING_TIMEOUT=5s
+APP_REQUEST_TIMEOUT=30s
 HTTP_READ_HEADER_TIMEOUT=5s
 HTTP_READ_TIMEOUT=15s
-HTTP_WRITE_TIMEOUT=30s
+HTTP_WRITE_TIMEOUT=35s
 HTTP_IDLE_TIMEOUT=60s
 HTTP_SHUTDOWN_TIMEOUT=10s
 HTTP_MAX_HEADER_BYTES=1048576
@@ -166,6 +167,12 @@ current HPA cap of 4 monolith replicas, `DB_POOL_MAX_CONNS=25` means the
 application can open up to roughly 100 database connections in total during
 scale-out.
 
+`APP_REQUEST_TIMEOUT` is the monolith's application-level request deadline. It
+is enforced inside the Echo middleware as a per-request context timeout and is
+distinct from the HTTP server transport timeouts below. When this deadline is
+exceeded, the monolith returns `503` through the normal error envelope. When
+the client disconnects first, it returns `499`.
+
 The HTTP server values control request and connection timeouts for the monolith
 process. They keep slow or idle clients from holding resources too long and
 define how long graceful shutdown may wait for in-flight requests.
@@ -182,9 +189,12 @@ Meaning of each HTTP setting:
   This prevents a request from occupying a connection indefinitely while still
   allowing normal API payloads to arrive comfortably.
 
-- `HTTP_WRITE_TIMEOUT=30s`
+- `HTTP_WRITE_TIMEOUT=35s`
   Limits how long the server may spend writing the response. This keeps a slow
-  downstream client from holding a response connection open for too long.
+  downstream client from holding a response connection open for too long. It
+  must stay larger than `APP_REQUEST_TIMEOUT` so the monolith still has time to
+  serialize and send a timeout response before the transport layer closes the
+  connection.
 
 - `HTTP_IDLE_TIMEOUT=60s`
   Controls how long keep-alive connections may stay idle before the server

@@ -46,6 +46,15 @@ func TestLoad(t *testing.T) {
 			},
 		},
 		{
+			name: "loads app request timeout override",
+			env: map[string]string{
+				"DATABASE_URL":        "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":          testJWTSecret(t),
+				"APP_REQUEST_TIMEOUT": "12s",
+				"HTTP_WRITE_TIMEOUT":  "20s",
+			},
+		},
+		{
 			name: "missing database url",
 			env: map[string]string{
 				"JWT_SECRET": testJWTSecret(t),
@@ -97,6 +106,25 @@ func TestLoad(t *testing.T) {
 			wantError: true,
 		},
 		{
+			name: "invalid app request timeout",
+			env: map[string]string{
+				"DATABASE_URL":        "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":          testJWTSecret(t),
+				"APP_REQUEST_TIMEOUT": "later",
+			},
+			wantError: true,
+		},
+		{
+			name: "app request timeout must be smaller than write timeout",
+			env: map[string]string{
+				"DATABASE_URL":        "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":          testJWTSecret(t),
+				"APP_REQUEST_TIMEOUT": "30s",
+				"HTTP_WRITE_TIMEOUT":  "30s",
+			},
+			wantError: true,
+		},
+		{
 			name: "invalid http max header bytes",
 			env: map[string]string{
 				"DATABASE_URL":          "postgres://localhost:5432/mono_db?sslmode=disable",
@@ -135,6 +163,7 @@ func TestLoad(t *testing.T) {
 			t.Setenv("HTTP_IDLE_TIMEOUT", "")
 			t.Setenv("HTTP_SHUTDOWN_TIMEOUT", "")
 			t.Setenv("HTTP_MAX_HEADER_BYTES", "")
+			t.Setenv("APP_REQUEST_TIMEOUT", "")
 			for key, value := range tt.env {
 				t.Setenv(key, value)
 			}
@@ -163,13 +192,21 @@ func TestLoad(t *testing.T) {
 				}
 			}
 			if tt.name == "loads required config with defaults" {
-				if got.HTTPServer.ReadHeaderTimeout != 5*time.Second || got.HTTPServer.ReadTimeout != 15*time.Second || got.HTTPServer.WriteTimeout != 30*time.Second || got.HTTPServer.IdleTimeout != time.Minute || got.HTTPServer.ShutdownTimeout != 10*time.Second || got.HTTPServer.MaxHeaderBytes != 1048576 {
+				if got.RequestTimeout != 30*time.Second {
+					t.Fatalf("request timeout default = %s, want 30s", got.RequestTimeout)
+				}
+				if got.HTTPServer.ReadHeaderTimeout != 5*time.Second || got.HTTPServer.ReadTimeout != 15*time.Second || got.HTTPServer.WriteTimeout != 35*time.Second || got.HTTPServer.IdleTimeout != time.Minute || got.HTTPServer.ShutdownTimeout != 10*time.Second || got.HTTPServer.MaxHeaderBytes != 1048576 {
 					t.Fatalf("http server defaults = %+v", got.HTTPServer)
 				}
 			}
 			if tt.name == "loads http server overrides" {
 				if got.HTTPServer.ReadHeaderTimeout != 6*time.Second || got.HTTPServer.ReadTimeout != 20*time.Second || got.HTTPServer.WriteTimeout != 40*time.Second || got.HTTPServer.IdleTimeout != 75*time.Second || got.HTTPServer.ShutdownTimeout != 12*time.Second || got.HTTPServer.MaxHeaderBytes != 2097152 {
 					t.Fatalf("http server overrides = %+v", got.HTTPServer)
+				}
+			}
+			if tt.name == "loads app request timeout override" {
+				if got.RequestTimeout != 12*time.Second {
+					t.Fatalf("request timeout override = %s, want 12s", got.RequestTimeout)
 				}
 			}
 		})

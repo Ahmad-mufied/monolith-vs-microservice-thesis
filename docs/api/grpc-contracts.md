@@ -221,8 +221,20 @@ There is no external item delete endpoint in the final contract. Item deletion i
 | `Aborted` | 409 | Transaction or concurrency conflict |
 | `Unavailable` | 503 | Upstream service unavailable |
 | `Canceled` | 499 | Client canceled request |
-| `DeadlineExceeded` | 504 | Upstream timeout |
+| `DeadlineExceeded` | 503 | Upstream timeout surfaced as service unavailable |
 | `Internal` | 500 | Internal error |
+
+Timeout behavior notes:
+
+- API Gateway applies `GRPC_CALL_TIMEOUT` to every outbound gRPC call to Auth
+  Service, Item Service, and Transaction Service.
+- Auth Service, Item Service, and Transaction Service apply
+  `GRPC_REQUEST_TIMEOUT` as a server-side unary request deadline.
+- Transaction Service applies `ITEM_VALIDATION_TIMEOUT` when it calls Item
+  Service for `ValidateTransactionItems`.
+- If the caller disconnects first, the translated REST status remains `499`.
+- If the outbound gRPC deadline expires first, the translated REST status is
+  `503`.
 
 REST error envelope:
 

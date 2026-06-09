@@ -228,10 +228,68 @@ Supporting indicators:
 HTTP 4xx/5xx patterns
 failed checks
 application logs
-Datadog error traces
 ```
 
-### 5.4 Dropped Iterations
+### 5.4 Timeout and Cancellation Interpretation
+
+The benchmark now uses an explicit timeout policy, so timeout-related status
+codes must be interpreted consistently in Chapter 4.
+
+Current baseline:
+
+```text
+Monolith:
+- APP_REQUEST_TIMEOUT = 30s
+- HTTP_WRITE_TIMEOUT  = 35s
+
+Microservices:
+- GRPC_CALL_TIMEOUT        = 10s
+- GRPC_REQUEST_TIMEOUT     = 15s
+- ITEM_VALIDATION_TIMEOUT  = 10s
+- API Gateway HTTP_WRITE_TIMEOUT = 15s
+
+k6 client:
+- K6_REQUEST_TIMEOUT_MS = 60000 (60s)
+```
+
+Interpretation rules:
+
+```text
+499 = the caller/client canceled or disconnected first
+503 = the application-managed timeout boundary was reached first
+```
+
+Implications:
+
+- In the monolith, `503` means the request exceeded the configured
+  application-level request deadline.
+- In microservices, `503` usually means an outbound dependency call timed out
+  or a gRPC service request exceeded its configured request deadline before the
+  gateway finished the request.
+- Because the k6 timeout remains longer than the application-managed deadlines,
+  timeout-related failures should be interpreted primarily as application
+  behavior, not as client impatience.
+
+### 5.5 Relationship Between p95 and Timeout Errors
+
+`p95` in k6 is not limited to successful responses only. It can include slow
+failed responses such as `503`, as long as the request completes and k6 records
+its duration.
+
+Therefore:
+
+```text
+high p95 + many 503 = tail latency is being shaped by timeout-bound failures
+high p95 + low error rate = tail latency is high even though most requests still succeed
+low p95 + high dropped iterations = the load generator may not have sustained the intended arrival pressure
+```
+
+This matters for thesis interpretation because a high `p95` should not be
+described automatically as "successful requests became slower". It may instead
+mean that a meaningful fraction of requests waited until the configured timeout
+boundary and then failed.
+
+### 5.6 Dropped Iterations
 
 Dropped iterations indicate that k6 could not start the expected number of iterations at the configured arrival rate.
 
@@ -242,7 +300,7 @@ High dropped_iterations means the target arrival rate may not have been achieved
 The run must be reviewed before being included in final analysis.
 ```
 
-### 5.5 Checks Rate
+### 5.7 Checks Rate
 
 Checks validate expected API behavior, such as:
 
@@ -921,6 +979,15 @@ Datadog traces indicate that the request path involved API Gateway,
 Transaction Service, and Item Service. Therefore, the observed difference can be
 explained by the additional distributed communication path rather than by
 request failure.
+```
+
+```text
+If timeout-related errors appear, they must be interpreted together with the
+configured timeout policy. Under the active baseline, `499` indicates that the
+caller disconnected first, while `503` indicates that an application-managed
+timeout boundary was reached first. Consequently, a rise in p95 latency
+accompanied by many `503` responses should be explained as timeout-shaped tail
+latency, not simply as slower successful processing.
 ```
 
 ---

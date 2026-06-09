@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
@@ -10,14 +11,20 @@ import (
 
 // AuthClient wraps the generated gRPC AuthServiceClient.
 type AuthClient struct {
-	grpc authv1.AuthServiceClient
+	grpc        authv1.AuthServiceClient
+	grpcTimeout time.Duration
 }
 
-func NewAuthClient(grpc authv1.AuthServiceClient) *AuthClient {
-	return &AuthClient{grpc: grpc}
+// NewAuthClient creates an AuthClient. grpcTimeout is applied as a
+// context.WithTimeout deadline on every outbound RPC call, ensuring calls do
+// not remain open-ended when the upstream is slow.
+func NewAuthClient(grpc authv1.AuthServiceClient, grpcTimeout time.Duration) *AuthClient {
+	return &AuthClient{grpc: grpc, grpcTimeout: grpcTimeout}
 }
 
 func (c *AuthClient) Register(ctx context.Context, name, email, password string) (*dto.UserSummary, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.grpcTimeout)
+	defer cancel()
 	resp, err := c.grpc.Register(ctx, &authv1.RegisterRequest{Name: name, Email: email, Password: password})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)
@@ -26,6 +33,8 @@ func (c *AuthClient) Register(ctx context.Context, name, email, password string)
 }
 
 func (c *AuthClient) Login(ctx context.Context, email, password string) (string, *dto.UserSummary, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.grpcTimeout)
+	defer cancel()
 	resp, err := c.grpc.Login(ctx, &authv1.LoginRequest{Email: email, Password: password})
 	if err != nil {
 		return "", nil, httputil.FromGRPCError(err)
@@ -34,6 +43,8 @@ func (c *AuthClient) Login(ctx context.Context, email, password string) (string,
 }
 
 func (c *AuthClient) GetUsersByIDs(ctx context.Context, ids []string) ([]*dto.UserSummary, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.grpcTimeout)
+	defer cancel()
 	resp, err := c.grpc.GetUsersByIds(ctx, &authv1.GetUsersByIdsRequest{UserIds: ids})
 	if err != nil {
 		return nil, httputil.FromGRPCError(err)

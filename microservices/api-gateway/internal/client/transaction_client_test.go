@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	transactionv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/transaction/v1"
@@ -77,7 +78,7 @@ func TestTransactionClient_CreateTransaction(t *testing.T) {
 					return tt.grpcResp, tt.grpcErr
 				},
 			}
-			c := NewTransactionClient(fake)
+			c := NewTransactionClient(fake, 5*time.Second)
 			id, err := c.CreateTransaction(context.Background(), "uid-1", tt.items)
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)
@@ -143,7 +144,7 @@ func TestTransactionClient_GetOwnTransactions(t *testing.T) {
 					return tt.grpcResp, tt.grpcErr
 				},
 			}
-			c := NewTransactionClient(fake)
+			c := NewTransactionClient(fake, 5*time.Second)
 			txs, err := c.GetOwnTransactions(context.Background(), "uid-1", tt.limit, tt.offset)
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)
@@ -182,7 +183,7 @@ func TestTransactionClient_GetTransactionByID(t *testing.T) {
 					return tt.grpcResp, tt.grpcErr
 				},
 			}
-			c := NewTransactionClient(fake)
+			c := NewTransactionClient(fake, 5*time.Second)
 			tx, err := c.GetTransactionByID(context.Background(), "txid-1", "uid-1")
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)
@@ -248,7 +249,7 @@ func TestTransactionClient_GetTransactionsForEnrichment(t *testing.T) {
 					return tt.grpcResp, tt.grpcErr
 				},
 			}
-			c := NewTransactionClient(fake)
+			c := NewTransactionClient(fake, 5*time.Second)
 			txs, err := c.GetTransactionsForEnrichment(context.Background(), tt.limit, tt.offset)
 			if tt.wantStatus != 0 {
 				assertClientError(t, err, tt.wantStatus)

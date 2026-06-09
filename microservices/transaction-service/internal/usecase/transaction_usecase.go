@@ -12,15 +12,18 @@ import (
 )
 
 const (
-	defaultListLimit      = int32(50)
-	maxListLimit          = int32(100)
-	maxCreateItems        = 20
-	itemValidationTimeout = 5 * time.Second
+	defaultListLimit = int32(50)
+	maxListLimit     = int32(100)
+	maxCreateItems   = 20
 )
 
 type TransactionUsecase struct {
 	repo        port.TransactionRepository
 	itemService port.ItemService
+	// itemValidationTimeout is the deadline applied when calling the item
+	// service to validate transaction items. Configurable via
+	// ITEM_VALIDATION_TIMEOUT env var (default 5s).
+	itemValidationTimeout time.Duration
 }
 
 type createTransactionInput struct {
@@ -28,10 +31,13 @@ type createTransactionInput struct {
 	items  []domain.TransactionItem
 }
 
-func NewTransactionUsecase(repo port.TransactionRepository, itemService port.ItemService) *TransactionUsecase {
+// NewTransactionUsecase creates a TransactionUsecase. itemValidationTimeout
+// should be sourced from config.Config.ItemValidationTimeout.
+func NewTransactionUsecase(repo port.TransactionRepository, itemService port.ItemService, itemValidationTimeout time.Duration) *TransactionUsecase {
 	return &TransactionUsecase{
-		repo:        repo,
-		itemService: itemService,
+		repo:                  repo,
+		itemService:           itemService,
+		itemValidationTimeout: itemValidationTimeout,
 	}
 }
 
@@ -43,7 +49,7 @@ func (u *TransactionUsecase) CreateTransaction(ctx context.Context, userID strin
 		return "", err
 	}
 
-	validateCtx, cancel := context.WithTimeout(ctx, itemValidationTimeout)
+	validateCtx, cancel := context.WithTimeout(ctx, u.itemValidationTimeout)
 	defer cancel()
 
 	if err := pkgerrors.DoIfActive(validateCtx, func() error {

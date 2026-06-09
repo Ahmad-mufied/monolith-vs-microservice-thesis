@@ -370,9 +370,10 @@ kubectl --context=monolith create secret generic monolith-env \
   --from-literal=DB_POOL_MAX_CONN_LIFETIME=5m \
   --from-literal=DB_POOL_MAX_CONN_IDLE_TIME=1m \
   --from-literal=DB_PING_TIMEOUT=5s \
+  --from-literal=APP_REQUEST_TIMEOUT=30s \
   --from-literal=HTTP_READ_HEADER_TIMEOUT=5s \
   --from-literal=HTTP_READ_TIMEOUT=15s \
-  --from-literal=HTTP_WRITE_TIMEOUT=30s \
+  --from-literal=HTTP_WRITE_TIMEOUT=35s \
   --from-literal=HTTP_IDLE_TIMEOUT=1m \
   --from-literal=HTTP_SHUTDOWN_TIMEOUT=10s \
   --from-literal=HTTP_MAX_HEADER_BYTES=1048576 \
@@ -419,6 +420,12 @@ kubectl --context=msa create secret generic api-gateway-secret \
   --from-literal=AUTH_SERVICE_ADDR="dns:///auth-service-headless.msa.svc.cluster.local:${GRPC_PORT_AUTH}" \
   --from-literal=ITEM_SERVICE_ADDR="dns:///item-service-headless.msa.svc.cluster.local:${GRPC_PORT_ITEM}" \
   --from-literal=TRANSACTION_SERVICE_ADDR="dns:///transaction-service-headless.msa.svc.cluster.local:${GRPC_PORT_TX}" \
+  --from-literal=GRPC_CALL_TIMEOUT=10s \
+  --from-literal=HTTP_READ_HEADER_TIMEOUT=5s \
+  --from-literal=HTTP_READ_TIMEOUT=15s \
+  --from-literal=HTTP_WRITE_TIMEOUT=15s \
+  --from-literal=HTTP_IDLE_TIMEOUT=1m \
+  --from-literal=HTTP_SHUTDOWN_TIMEOUT=10s \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
 # Auth Service secret
@@ -430,6 +437,7 @@ kubectl --context=msa create secret generic auth-service-secret \
   --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD_URI_ENCODED}@${MSA_RDS}:5432/auth_db?sslmode=require" \
   --from-literal=BCRYPT_COST=10 \
   --from-literal=JWT_SECRET="$JWT_SECRET" \
+  --from-literal=GRPC_REQUEST_TIMEOUT=15s \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
 # Item Service secret
@@ -439,6 +447,7 @@ kubectl --context=msa create secret generic item-service-secret \
   --from-literal=GRPC_PORT="$GRPC_PORT_ITEM" \
   --from-literal=SERVICE_NAME=item-service \
   --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD_URI_ENCODED}@${MSA_RDS}:5432/item_db?sslmode=require" \
+  --from-literal=GRPC_REQUEST_TIMEOUT=15s \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
 # Transaction Service secret
@@ -449,6 +458,8 @@ kubectl --context=msa create secret generic transaction-service-secret \
   --from-literal=SERVICE_NAME=transaction-service \
   --from-literal=DATABASE_URL="postgres://postgres_admin:${DB_PASSWORD_URI_ENCODED}@${MSA_RDS}:5432/transaction_db?sslmode=require" \
   --from-literal=ITEM_SERVICE_ADDR="dns:///item-service-headless.msa.svc.cluster.local:${GRPC_PORT_ITEM}" \
+  --from-literal=GRPC_REQUEST_TIMEOUT=15s \
+  --from-literal=ITEM_VALIDATION_TIMEOUT=10s \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
 # k6 runner secret

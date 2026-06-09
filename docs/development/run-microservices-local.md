@@ -112,6 +112,12 @@ JWT_SECRET=<same-local-secret-as-auth-service>
 AUTH_SERVICE_ADDR=localhost:50051
 ITEM_SERVICE_ADDR=localhost:50052
 TRANSACTION_SERVICE_ADDR=localhost:50053
+GRPC_CALL_TIMEOUT=10s
+HTTP_READ_HEADER_TIMEOUT=5s
+HTTP_READ_TIMEOUT=15s
+HTTP_WRITE_TIMEOUT=15s
+HTTP_IDLE_TIMEOUT=60s
+HTTP_SHUTDOWN_TIMEOUT=10s
 ```
 
 ### Auth Service
@@ -131,6 +137,7 @@ AUTH_DATABASE_URL=postgres://postgres:<password>@localhost:5432/auth_db?sslmode=
 JWT_SECRET=<same-local-secret-as-api-gateway>
 JWT_EXPIRY=24h
 BCRYPT_COST=10
+GRPC_REQUEST_TIMEOUT=15s
 ```
 
 `DATABASE_URL` is used by the service process.
@@ -151,6 +158,7 @@ Expected keys:
 GRPC_PORT=50052
 DATABASE_URL=postgres://postgres:<password>@localhost:5432/item_db?sslmode=disable
 ITEM_DATABASE_URL=postgres://postgres:<password>@localhost:5432/item_db?sslmode=disable
+GRPC_REQUEST_TIMEOUT=15s
 ```
 
 ### Transaction Service
@@ -168,10 +176,42 @@ GRPC_PORT=50053
 DATABASE_URL=postgres://postgres:<password>@localhost:5432/transaction_db?sslmode=disable
 TRANSACTION_DATABASE_URL=postgres://postgres:<password>@localhost:5432/transaction_db?sslmode=disable
 ITEM_SERVICE_ADDR=localhost:50052
+GRPC_REQUEST_TIMEOUT=15s
+ITEM_VALIDATION_TIMEOUT=10s
 ```
 
 Transaction Service calls Item Service over gRPC for transaction item
 validation.
+
+## 4.1 Local timeout policy
+
+The local microservices flow now uses an explicit timeout chain:
+
+```text
+outbound gRPC call deadline (default 10s)
+    <
+gRPC service request deadline (default 15s)
+    <=
+API Gateway HTTP write timeout (default 15s)
+```
+
+Meaning:
+
+- `GRPC_CALL_TIMEOUT` is the per-call application deadline used by API Gateway
+  for every outbound gRPC request to Auth, Item, and Transaction Service.
+- `GRPC_REQUEST_TIMEOUT` is the per-request server-side deadline enforced by
+  Auth Service, Item Service, and Transaction Service for incoming unary gRPC
+  requests.
+- `ITEM_VALIDATION_TIMEOUT` is the per-call deadline used by Transaction
+  Service when it calls Item Service for transaction item validation.
+- `HTTP_WRITE_TIMEOUT` must remain larger than `GRPC_CALL_TIMEOUT` so API
+  Gateway can translate dependency deadline failures into a proper `503`
+  response before the transport layer closes the connection.
+
+Observed error semantics:
+
+- `499`: the caller canceled or disconnected before the request completed
+- `503`: an application-managed upstream dependency deadline was exceeded
 
 ## 5. Run Migrations
 
