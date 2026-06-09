@@ -191,7 +191,7 @@ The local microservices flow now uses an explicit timeout chain:
 outbound gRPC call deadline (default 10s)
     <
 gRPC service request deadline (default 15s)
-    <
+    <=
 API Gateway HTTP write timeout (default 15s)
 ```
 
