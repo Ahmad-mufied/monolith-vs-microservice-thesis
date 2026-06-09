@@ -289,6 +289,7 @@ function validateConfig() {
   assertCondition(MIN_CHECK_RATE >= 0 && MIN_CHECK_RATE <= 1, `MIN_CHECK_RATE must be between 0 and 1, got ${MIN_CHECK_RATE}.`);
   assertCondition(P90_THRESHOLD_MS > 0, `P90_THRESHOLD_MS must be > 0, got ${P90_THRESHOLD_MS}.`);
   assertCondition(P95_THRESHOLD_MS > 0, `P95_THRESHOLD_MS must be > 0, got ${P95_THRESHOLD_MS}.`);
+  assertCondition(REQUEST_TIMEOUT_MS > 0, `K6_REQUEST_TIMEOUT_MS must be > 0, got ${REQUEST_TIMEOUT_MS}.`);
 
   if (K6_PROFILE === "ramp" || K6_PROFILE === "hpa") {
     parseStages().forEach((stage, index) => validateStage(stage, index, "generated stages"));
