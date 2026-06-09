@@ -142,7 +142,7 @@ flowchart TB
 
 | Stack | Path | Resources Created |
 |---|---|---|
-| **Shared** | `infra/terraform/vultr-shared/` | Legacy VPC (10.20.0.0/16), SSH key, PostgreSQL firewall group with 3 rules, bastion firewall group (auto-detect operator IP, port 2002) |
+| **Shared** | `infra/terraform/vultr-shared/` | Legacy VPC (10.20.0.0/16), SSH key, PostgreSQL firewall group with 3 rules |
 | **Parallel** | `infra/terraform/vultr-parallel/` | 2 VKE clusters + 2 PostgreSQL VMs (one per architecture) |
 | **Sequential** | `infra/terraform/vultr-sequential/` | 1 VKE cluster + 1 PostgreSQL VM (shared, one arch at a time) |
 
@@ -158,10 +158,10 @@ Each cluster instance creates:
 
 ```text
 infra/terraform/vultr-shared/
-├── main.tf           # Legacy VPC, SSH key, firewall groups (postgres + bastion)
+├── main.tf           # Legacy VPC, SSH key, firewall group
 ├── variables.tf      # VULTR_VPC_CIDR, OPERATOR_CIDRS, SSH public key
-├── outputs.tf        # network_id, ssh_key_ids, firewall_group_ids, operator_public_ip
-└── versions.tf       # vultr/vultr ~> 2.31, hashicorp/http ~> 3.4, terraform >= 1.6
+├── outputs.tf        # network_id, ssh_key_ids, firewall_group_id
+└── versions.tf       # vultr/vultr ~> 2.31, terraform >= 1.6
 ```
 
 Resources:
@@ -172,7 +172,6 @@ Resources:
   - Rule 1: VPC CIDR → port 5432 (PostgreSQL)
   - Rule 2: Operator CIDR → port 22 (SSH)
   - Rule 3: VPC CIDR → port 22 (SSH from VKE nodes)
-- **Bastion Firewall Group**: Auto-detected operator IP → port 2002 (SSH)
 
 ### 5.5 Parallel Stack Resources
 

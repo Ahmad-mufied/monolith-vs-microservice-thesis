@@ -48,7 +48,7 @@ flow.
 | Stack | Path | Creates | Destroy target |
 |---|---|---|---|
 | AWS S3 writer | `infra/terraform/aws-s3-writer` | IAM user/access key/policy for external k6 uploads to the existing AWS S3 bucket. | `make aws-s3-writer-destroy-confirmed` |
-| Shared | `infra/terraform/vultr-shared` | Legacy VPC, SSH key, PostgreSQL firewall group, bastion firewall group (auto-detect IP). | `make vultr-shared-destroy-confirmed` |
+| Shared | `infra/terraform/vultr-shared` | Legacy VPC, SSH key, PostgreSQL firewall group. | `make vultr-shared-destroy-confirmed` |
 | Parallel | `infra/terraform/vultr-parallel` | Two VKE clusters and two PostgreSQL VMs. | `make vultr-parallel-destroy-confirmed` |
 | Sequential | `infra/terraform/vultr-sequential` | One VKE cluster and one PostgreSQL VM. | `make vultr-sequential-destroy-confirmed` |
 
@@ -65,8 +65,8 @@ networking and budget resources.
 | `make env-init-vultr` | Create or refresh `env/vultr.env` template. |
 | `make vultr-render-tfvars` | Render Vultr Terraform `terraform.tfvars` files. |
 | `make vultr-preflight-check` | Validate local env and catch placeholders before expensive steps. |
-| `make vultr-shared-plan` | Plan shared VPC/firewall/SSH/bastion resources. |
-| `make vultr-shared-apply` | Apply shared VPC/firewall/SSH/bastion resources. Auto-detects operator IP for bastion firewall. |
+| `make vultr-shared-plan` | Plan shared VPC/firewall/SSH resources. |
+| `make vultr-shared-apply` | Apply shared VPC/firewall/SSH resources. |
 | `make vultr-parallel-plan` | Plan two-cluster parallel stack. |
 | `make vultr-parallel-apply` | Apply two-cluster parallel stack. |
 | `make vultr-sequential-plan` | Plan single-cluster sequential stack. |

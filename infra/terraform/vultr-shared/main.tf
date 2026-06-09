@@ -63,31 +63,3 @@ resource "vultr_firewall_rule" "postgres_ssh_operator" {
   notes             = "Operator SSH access"
 }
 
-data "http" "operator_ip" {
-  url = "https://ifconfig.me"
-
-  retry {
-    attempts     = 3
-    min_delay_ms = 1000
-    max_delay_ms = 3000
-  }
-}
-
-locals {
-  operator_public_ip = "${chomp(data.http.operator_ip.response_body)}/32"
-}
-
-resource "vultr_firewall_group" "bastion" {
-  description = "${var.project}-vultr-bastion"
-}
-
-resource "vultr_firewall_rule" "bastion_ssh_operator" {
-  firewall_group_id = vultr_firewall_group.bastion.id
-  protocol          = "tcp"
-  ip_type           = "v4"
-  subnet            = split("/", local.operator_public_ip)[0]
-  subnet_size       = tonumber(split("/", local.operator_public_ip)[1])
-  port              = "2002"
-  notes             = "Operator SSH access (auto-detected IP)"
-}
-
