@@ -160,7 +160,7 @@ Each cluster instance creates:
 infra/terraform/vultr-shared/
 ├── main.tf           # Legacy VPC, SSH key, firewall group
 ├── variables.tf      # VULTR_VPC_CIDR, OPERATOR_CIDRS, SSH public key
-├── outputs.tf        # network_id, ssh_key_ids, firewall_group_id
+├── outputs.tf        # vpc_id, vpc_cidr, ssh_key_ids, postgres_firewall_group_id
 └── versions.tf       # vultr/vultr ~> 2.31, terraform >= 1.6
 ```
 
@@ -1018,6 +1018,22 @@ Without `S3_BENCHMARK_DATA_VERIFIED=true`, destroy commands are blocked.
 2. Verify no remaining resources in Vultr dashboard
 3. Destroy shared stack (VPC, SSH, firewall)
 ```
+
+### 18.4 Local-State Dependency Guard
+
+Experiment stacks (`vultr-sequential`, `vultr-parallel`) read shared outputs
+from `../vultr-shared/terraform.tfstate` via `terraform_remote_state` with
+`backend = "local"`. This means:
+
+- Manual deletion of shared resources in the Vultr dashboard breaks the state
+  reference for subsequent `terraform plan`/`apply`/`destroy` on experiment
+  stacks.
+- Destroying `shared` while experiment state still has resources leaves orphaned
+  Vultr infrastructure that requires manual cleanup.
+
+The `terraform-vultr.sh` script enforces ordered destroy: `terraform destroy` on
+`shared` checks both experiment state files for active resources using
+`terraform state list` and refuses to proceed if either is non-empty.
 
 ---
 

@@ -174,6 +174,12 @@ infra/terraform/vultr-sequential/terraform.tfvars
 
 Do not commit generated `terraform.tfvars` files.
 
+Operational note:
+
+- `vultr-sequential` and `vultr-parallel` consume `vultr-shared` outputs from
+  the local `infra/terraform/vultr-shared/terraform.tfstate` file.
+- Do not delete shared Vultr resources manually from the web console unless you
+  are also reconciling Terraform state.
 ---
 
 ## Phase 4 — Run Preflight
@@ -652,6 +658,29 @@ SSH keys created for the benchmark
 Do not destroy the shared stack while an experiment stack still references its
 VPC or firewall group.
 
+The `terraform-vultr.sh` script enforces this: `terraform destroy` on `shared`
+checks both `vultr-sequential` and `vultr-parallel` state files for active
+resources. If either state file still has resources, the destroy is refused
+with an actionable error message.
+
+### Scenario data setup
+
+The benchmark runners (`run-benchmark-sequential.sh` and
+`run-benchmark-suite-sequential.sh`) automatically perform scenario-appropriate
+data setup before each k6 run:
+
+| Scenario | Setup |
+|---|---|
+| `login` | reset + seed |
+| `create-transaction` | reset + seed |
+| `sync-items` | reset + seed |
+| `enriched-transactions` | reset + seed + enrichment |
+| `concurrent-mixed-workload` | reset + seed + enrichment |
+| `mixed-workload` | reset + seed + enrichment |
+
+In suite mode, setup runs once per scenario before the first pending case. In
+single-case mode, setup runs before the k6 job submission.
+
 ---
 
 ## Quick Reference
@@ -842,6 +871,22 @@ kubectl --context=benchmark delete hpa --all -n msa
 kubectl --context=benchmark scale deployment api-gateway auth-service item-service transaction-service --replicas=1 -n msa
 kubectl --context=benchmark delete job auth-migration-job item-migration-job transaction-migration-job -n msa --ignore-not-found
 ARCHITECTURE=microservices SCALING_MODE=fixed make deploy-workloads
+```
+
+### Shared destroy refused: experiment state still has resources
+
+If `make vultr-shared-destroy-confirmed` fails with:
+
+```text
+ERROR: Cannot destroy vultr-shared while infra/terraform/vultr-sequential/terraform.tfstate still has N resources.
+```
+
+Destroy the experiment stack first:
+
+```bash
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-sequential-destroy-confirmed
+# then
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-shared-destroy-confirmed
 ```
 
 ---

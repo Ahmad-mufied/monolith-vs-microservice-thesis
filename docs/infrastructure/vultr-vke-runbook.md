@@ -311,11 +311,18 @@ terraform -chdir=infra/terraform/vultr-shared output
 Expected outputs include:
 
 ```text
-network_id
-network_cidr
+vpc_id
+vpc_cidr
 ssh_key_ids
 postgres_firewall_group_id
 ```
+
+Operational note:
+
+- `vultr-sequential` and `vultr-parallel` consume `vultr-shared` outputs from
+  the local `infra/terraform/vultr-shared/terraform.tfstate` file.
+- Do not delete shared Vultr resources manually from the web console unless you
+  are also reconciling Terraform state.
 
 ## Phase 5 - Choose and Apply an Experiment Stack
 
@@ -789,6 +796,11 @@ SSH keys created for the benchmark
 Do not destroy the shared stack while an experiment stack still references the
 shared VPC or firewall group.
 
+The `terraform-vultr.sh` script enforces this: `terraform destroy` on `shared`
+checks both `vultr-sequential` and `vultr-parallel` state files for active
+resources. If either state file still has resources, the destroy is refused
+with an actionable error message.
+
 ## Troubleshooting
 
 Use this order when a command fails:
@@ -1153,3 +1165,11 @@ S3_BENCHMARK_DATA_VERIFIED=true make vultr-shared-destroy-confirmed
 If destroy fails, rerun `terraform plan` in the same stack and inspect whether
 the remaining dependency belongs to shared or experiment state before deleting
 anything manually in the Vultr dashboard.
+
+If `make vultr-shared-destroy-confirmed` fails with:
+
+```text
+ERROR: Cannot destroy vultr-shared while infra/terraform/vultr-sequential/terraform.tfstate still has N resources.
+```
+
+Destroy the experiment stack first, then retry the shared destroy.
