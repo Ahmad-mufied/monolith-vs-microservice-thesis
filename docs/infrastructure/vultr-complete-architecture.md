@@ -1004,7 +1004,7 @@ Every Vultr benchmark run must record:
   "provider": "vultr",
   "region": "sgp",
   "execution_mode": "parallel",
-  "terraform_stack": "vultr-parallel",
+  "terraform_stack": "vultr",
   "cluster": "skripsi-vultr-monolith",
   "app_node_pool": "app-nodes",
   "testing_node_pool": "testing-nodes",
