@@ -53,7 +53,7 @@ render_provider_manifests() {
 provider_parallel_stack_name() {
   case "${CLOUD_PROVIDER:-aws}" in
     aws) printf 'aws-parallel' ;;
-    vultr) printf 'vultr-parallel' ;;
+    vultr) printf 'vultr' ;;
     *) echo "ERROR: unsupported CLOUD_PROVIDER '${CLOUD_PROVIDER:-}'" >&2; return 1 ;;
   esac
 }
@@ -61,7 +61,7 @@ provider_parallel_stack_name() {
 provider_sequential_stack_name() {
   case "${CLOUD_PROVIDER:-aws}" in
     aws) printf 'aws-sequential' ;;
-    vultr) printf 'vultr-sequential' ;;
+    vultr) printf 'vultr' ;;
     *) echo "ERROR: unsupported CLOUD_PROVIDER '${CLOUD_PROVIDER:-}'" >&2; return 1 ;;
   esac
 }
@@ -69,7 +69,7 @@ provider_sequential_stack_name() {
 provider_parallel_destroy_target() {
   case "${CLOUD_PROVIDER:-aws}" in
     aws) printf 'eks-destroy-confirmed' ;;
-    vultr) printf 'vultr-parallel-destroy-confirmed' ;;
+    vultr) printf 'vultr-destroy-confirmed' ;;
     *) echo "ERROR: unsupported CLOUD_PROVIDER '${CLOUD_PROVIDER:-}'" >&2; return 1 ;;
   esac
 }
@@ -77,7 +77,7 @@ provider_parallel_destroy_target() {
 provider_sequential_destroy_target() {
   case "${CLOUD_PROVIDER:-aws}" in
     aws) printf 'eks-sequential-destroy-confirmed' ;;
-    vultr) printf 'vultr-sequential-destroy-confirmed' ;;
+    vultr) printf 'vultr-destroy-confirmed' ;;
     *) echo "ERROR: unsupported CLOUD_PROVIDER '${CLOUD_PROVIDER:-}'" >&2; return 1 ;;
   esac
 }

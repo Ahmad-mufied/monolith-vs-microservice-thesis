@@ -9,7 +9,7 @@ on the Vultr sequential setup.
 PLATFORM=vultr
 EXECUTION_MODE=sequential
 Kubernetes context=benchmark
-Terraform experiment stack=infra/terraform/vultr-sequential
+Terraform stack=infra/terraform/vultr (execution_mode=sequential)
 Image registry=Docker Hub
 Result storage=AWS S3
 ```
@@ -167,18 +167,16 @@ make render-tfvars
 This generates:
 
 ```text
-infra/terraform/vultr-shared/terraform.tfvars
-infra/terraform/vultr-parallel/terraform.tfvars
-infra/terraform/vultr-sequential/terraform.tfvars
+infra/terraform/vultr/terraform.tfvars
 ```
 
 Do not commit generated `terraform.tfvars` files.
 
 Operational note:
 
-- `vultr-sequential` and `vultr-parallel` consume `vultr-shared` outputs from
-  the local `infra/terraform/vultr-shared/terraform.tfstate` file.
-- Do not delete shared Vultr resources manually from the web console unless you
+- All Vultr resources (VPC, clusters, PostgreSQL VMs) are managed by the
+  single `infra/terraform/vultr` stack.
+- Do not delete Vultr resources manually from the web console unless you
   are also reconciling Terraform state.
 ---
 
@@ -638,7 +636,7 @@ S3_BENCHMARK_DATA_VERIFIED=true make experiment-destroy-confirmed
 
 This destroys the VKE cluster, PostgreSQL VM, and related resources.
 
-If all experiments are complete and no other stack uses shared Vultr
+If all experiments are complete and no other run needs the Vultr
 network/firewall resources:
 
 ```bash
@@ -655,13 +653,11 @@ Legacy VPC networks
 SSH keys created for the benchmark
 ```
 
-Do not destroy the shared stack while an experiment stack still references its
-VPC or firewall group.
+Do not destroy the stack while a benchmark run is still in progress or before
+S3 results are verified.
 
-The `terraform-vultr.sh` script enforces this: `terraform destroy` on `shared`
-checks both `vultr-sequential` and `vultr-parallel` state files for active
-resources. If either state file still has resources, the destroy is refused
-with an actionable error message.
+The `terraform-vultr.sh` script enforces ordered destroy to prevent accidental
+loss of infrastructure during an active benchmark session.
 
 ### Scenario data setup
 
@@ -756,7 +752,7 @@ Quick status bundle:
 ```bash
 make show-image-tag
 make preflight-check
-terraform -chdir=infra/terraform/vultr-shared output
+terraform -chdir=infra/terraform/vultr output
 kubectl --context=benchmark get nodes
 kubectl --context=benchmark get pods -A
 ```
@@ -873,20 +869,24 @@ kubectl --context=benchmark delete job auth-migration-job item-migration-job tra
 ARCHITECTURE=microservices SCALING_MODE=fixed make deploy-workloads
 ```
 
-### Shared destroy refused: experiment state still has resources
+### Destroy is blocked or unsafe
 
-If `make vultr-shared-destroy-confirmed` fails with:
-
-```text
-ERROR: Cannot destroy vultr-shared while infra/terraform/vultr-sequential/terraform.tfstate still has N resources.
-```
-
-Destroy the experiment stack first:
+Destroy is intentionally guarded. Verify S3 first:
 
 ```bash
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-sequential-destroy-confirmed
-# then
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-shared-destroy-confirmed
+aws s3 ls "s3://$S3_BUCKET/experiments/<run_id>/" --recursive
+```
+
+Then destroy:
+
+```bash
+S3_BENCHMARK_DATA_VERIFIED=true make experiment-destroy-confirmed
+```
+
+If all experiments are complete:
+
+```bash
+S3_BENCHMARK_DATA_VERIFIED=true make shared-destroy-confirmed
 ```
 
 ---

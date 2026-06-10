@@ -13,7 +13,16 @@ locals {
     for cidr in var.operator_cidrs : cidr
     if !strcontains(cidr, ":")
   ]
+
+  clusters = var.execution_mode == "parallel" ? {
+    monolith = { architecture = "monolith" }
+    msa      = { architecture = "msa" }
+    } : {
+    sequential = { architecture = "sequential" }
+  }
 }
+
+# ─── Shared Infrastructure ───────────────────────────────────────────────────
 
 resource "vultr_vpc" "benchmark" {
   region         = var.region
@@ -63,3 +72,25 @@ resource "vultr_firewall_rule" "postgres_ssh_operator" {
   notes             = "Operator SSH access"
 }
 
+# ─── Benchmark Clusters ──────────────────────────────────────────────────────
+
+module "cluster" {
+  for_each = local.clusters
+  source   = "../modules/vultr-vke-benchmark-cluster"
+
+  cluster_name               = lookup(var.cluster_names, each.key, "${var.project}-vultr-${each.key}")
+  architecture               = each.value.architecture
+  region                     = var.region
+  kubernetes_version         = var.kubernetes_version
+  vpc_id                     = vultr_vpc.benchmark.id
+  vpc_cidr                   = local.vpc_cidr
+  ssh_key_ids                = [vultr_ssh_key.operator.id]
+  postgres_firewall_group_id = vultr_firewall_group.postgres.id
+  app_node_plan              = var.app_node_plan
+  app_node_count             = var.app_node_count
+  testing_node_plan          = var.testing_node_plan
+  postgres_plan              = var.postgres_plan
+  postgres_os_id             = var.postgres_os_id
+  postgres_password          = var.postgres_password
+  labels                     = local.common_labels
+}

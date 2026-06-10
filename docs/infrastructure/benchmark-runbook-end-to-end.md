@@ -129,15 +129,14 @@ Choose the experiment topology before applying cost-heavy resources:
 |---|---|---|---|
 | Parallel | you need aligned Datadog time-series and have enough quota | `infra/terraform/aws-parallel` | `monolith`, `msa` |
 | Sequential | account quota or budget only allows one active benchmark stack | `infra/terraform/aws-sequential` | `benchmark` |
-| Vultr parallel | you need high-vCPU Vultr VKE execution with aligned Datadog windows | `infra/terraform/vultr-parallel` | `monolith`, `msa` |
-| Vultr sequential | Vultr quota or budget only allows one active benchmark cluster | `infra/terraform/vultr-sequential` | `benchmark` |
+| Vultr parallel | you need high-vCPU Vultr VKE execution with aligned Datadog windows | `infra/terraform/vultr` (`execution_mode=parallel`) | `monolith`, `msa` |
+| Vultr sequential | Vultr quota or budget only allows one active benchmark cluster | `infra/terraform/vultr` (`execution_mode=sequential`) | `benchmark` |
 
 The shared stack is common to both modes. Under a 24-vCPU quota, avoid keeping
 parallel and sequential experiment stacks active at the same time.
 
-For Vultr, apply `infra/terraform/vultr-shared` first, then either the Vultr
-parallel or Vultr sequential stack. Do not mix AWS and Vultr
-Terraform state.
+For Vultr, apply the single `infra/terraform/vultr` stack with the desired
+`execution_mode`. Do not mix AWS and Vultr Terraform state.
 
 ### Step 2.0 — Confirm EKS Version Support
 

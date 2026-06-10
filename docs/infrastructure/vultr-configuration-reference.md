@@ -16,7 +16,7 @@ flow.
 | `env/vultr.env` | `make env-init-vultr` | Local source for Vultr token, region, plans, S3 credentials, Docker Hub namespace, DB password, operator CIDR, and SSH key. | No |
 | `env/vultr-resource-baseline.env` | `make vultr-measure-resource-baseline` | Measurement-derived CPU and memory quota used by Vultr manifest rendering. | No |
 | `env/vultr-resource-baseline.json` | `make vultr-measure-resource-baseline` | Machine-readable copy of the measured baseline for audit and metadata. | No |
-| `infra/terraform/vultr-*/terraform.tfvars` | `make vultr-render-tfvars` | Terraform inputs rendered from `env/vultr.env`. | No |
+| `infra/terraform/vultr/terraform.tfvars` | `make vultr-render-tfvars` | Terraform inputs rendered from `env/vultr.env`. | No |
 
 ## Required `env/vultr.env` Values
 
@@ -48,9 +48,7 @@ flow.
 | Stack | Path | Creates | Destroy target |
 |---|---|---|---|
 | AWS S3 writer | `infra/terraform/aws-s3-writer` | IAM user/access key/policy for external k6 uploads to the existing AWS S3 bucket. | `make aws-s3-writer-destroy-confirmed` |
-| Shared | `infra/terraform/vultr-shared` | Legacy VPC, SSH key, PostgreSQL firewall group. | `make vultr-shared-destroy-confirmed` |
-| Parallel | `infra/terraform/vultr-parallel` | Two VKE clusters and two PostgreSQL VMs. | `make vultr-parallel-destroy-confirmed` |
-| Sequential | `infra/terraform/vultr-sequential` | One VKE cluster and one PostgreSQL VM. | `make vultr-sequential-destroy-confirmed` |
+| Vultr | `infra/terraform/vultr` | Legacy VPC, SSH key, PostgreSQL firewall group, VKE clusters, and PostgreSQL VMs. `execution_mode` variable selects parallel (2 clusters) or sequential (1 cluster). | `make vultr-destroy-confirmed` |
 
 State separation is intentional. Do not use `infra/terraform/aws-shared` for
 Vultr S3-only credentials because that stack also owns AWS/EKS shared
@@ -65,12 +63,8 @@ networking and budget resources.
 | `make env-init-vultr` | Create or refresh `env/vultr.env` template. |
 | `make vultr-render-tfvars` | Render Vultr Terraform `terraform.tfvars` files. |
 | `make vultr-preflight-check` | Validate local env and catch placeholders before expensive steps. |
-| `make vultr-shared-plan` | Plan shared VPC/firewall/SSH resources. |
-| `make vultr-shared-apply` | Apply shared VPC/firewall/SSH resources. |
-| `make vultr-parallel-plan` | Plan two-cluster parallel stack. |
-| `make vultr-parallel-apply` | Apply two-cluster parallel stack. |
-| `make vultr-sequential-plan` | Plan single-cluster sequential stack. |
-| `make vultr-sequential-apply` | Apply single-cluster sequential stack. |
+| `make vultr-plan` | Plan Vultr infrastructure (VPC, firewall, SSH, clusters, PG VMs). |
+| `make vultr-apply` | Apply Vultr infrastructure. |
 
 ### Kubernetes Setup
 
@@ -104,9 +98,7 @@ networking and budget resources.
 
 | Target | Purpose |
 |---|---|
-| `S3_BENCHMARK_DATA_VERIFIED=true make vultr-parallel-destroy-confirmed` | Destroy parallel experiment resources. |
-| `S3_BENCHMARK_DATA_VERIFIED=true make vultr-sequential-destroy-confirmed` | Destroy sequential experiment resources. |
-| `S3_BENCHMARK_DATA_VERIFIED=true make vultr-shared-destroy-confirmed` | Destroy shared Vultr resources. |
+| `S3_BENCHMARK_DATA_VERIFIED=true make vultr-destroy-confirmed` | Destroy all Vultr resources (clusters, PG VMs, VPC, firewall, SSH). |
 
 ## Cost Guardrails
 
@@ -119,11 +111,11 @@ VULTR_TESTING_NODE_PLAN
 VULTR_POSTGRES_PLAN
 ```
 
-The parallel stack deliberately creates two full benchmark clusters, one for
-monolith and one for microservices, to preserve same-wall-clock benchmark
-comparison. Do not make only one parallel module optional unless all downstream
-outputs, context setup, secret creation, deployment, benchmark, and metadata
-paths are also redesigned. Use the sequential stack as the supported
+The parallel execution mode deliberately creates two full benchmark clusters, one
+for monolith and one for microservices, to preserve same-wall-clock benchmark
+comparison. Do not make only one cluster optional unless all downstream outputs,
+context setup, secret creation, deployment, benchmark, and metadata paths are
+also redesigned. Use the sequential execution mode as the supported
 lower-cost/quota fallback.
 
 ## Kubernetes Contexts
@@ -204,7 +196,7 @@ Vultr benchmark runs should record:
 provider=vultr
 region=<VULTR_REGION>
 execution_mode=parallel or sequential
-terraform_stack=vultr-parallel or vultr-sequential
+terraform_stack=vultr
 cluster=<active VKE cluster name>
 app_node_pool=app-nodes
 testing_node_pool=testing-nodes

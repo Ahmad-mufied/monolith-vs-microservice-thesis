@@ -829,9 +829,7 @@ terraform-fmt:
 	cd infra/terraform/aws-shared && terraform fmt -recursive
 	cd infra/terraform/aws-parallel && terraform fmt -recursive
 	cd infra/terraform/aws-sequential && terraform fmt -recursive
-	cd infra/terraform/vultr-shared && terraform fmt -recursive
-	cd infra/terraform/vultr-sequential && terraform fmt -recursive
-	cd infra/terraform/vultr-parallel && terraform fmt -recursive
+	cd infra/terraform/vultr && terraform fmt -recursive
 
 # =========================
 # AWS Persistent Resources (one-time setup)
@@ -1029,9 +1027,7 @@ terraform-validate:
 	cd infra/terraform/aws-shared && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
 	cd infra/terraform/aws-parallel && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
 	cd infra/terraform/aws-sequential && AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) terraform validate
-	cd infra/terraform/vultr-shared && terraform validate
-	cd infra/terraform/vultr-sequential && terraform validate
-	cd infra/terraform/vultr-parallel && terraform validate
+	cd infra/terraform/vultr && terraform validate
 
 .PHONY: terraform-auth-check
 terraform-auth-check:
@@ -1176,47 +1172,19 @@ eks-create-secrets-sequential:
 vultr-render-tfvars:
 	bash scripts/render-vultr-tfvars.sh
 
-.PHONY: vultr-shared-plan
-vultr-shared-plan:
-	bash scripts/terraform-vultr.sh shared init
-	bash scripts/terraform-vultr.sh shared plan -out=tfplan
+.PHONY: vultr-plan
+vultr-plan:
+	bash scripts/terraform-vultr.sh init
+	bash scripts/terraform-vultr.sh plan -out=tfplan
 
-.PHONY: vultr-shared-apply
-vultr-shared-apply:
-	bash scripts/terraform-vultr.sh shared init
-	bash scripts/terraform-vultr.sh shared apply
+.PHONY: vultr-apply
+vultr-apply: aws-s3-writer-apply
+	bash scripts/terraform-vultr.sh init
+	bash scripts/terraform-vultr.sh apply
 
-.PHONY: vultr-shared-destroy-confirmed
-vultr-shared-destroy-confirmed:
-	S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-vultr.sh shared destroy
-
-.PHONY: vultr-sequential-plan
-vultr-sequential-plan:
-	bash scripts/terraform-vultr.sh sequential init
-	bash scripts/terraform-vultr.sh sequential plan -out=tfplan
-
-.PHONY: vultr-sequential-apply
-vultr-sequential-apply: aws-s3-writer-apply
-	bash scripts/terraform-vultr.sh sequential init
-	bash scripts/terraform-vultr.sh sequential apply
-
-.PHONY: vultr-sequential-destroy-confirmed
-vultr-sequential-destroy-confirmed:
-	S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-vultr.sh sequential destroy
-
-.PHONY: vultr-parallel-plan
-vultr-parallel-plan:
-	bash scripts/terraform-vultr.sh parallel init
-	bash scripts/terraform-vultr.sh parallel plan -out=tfplan
-
-.PHONY: vultr-parallel-apply
-vultr-parallel-apply: aws-s3-writer-apply
-	bash scripts/terraform-vultr.sh parallel init
-	bash scripts/terraform-vultr.sh parallel apply
-
-.PHONY: vultr-parallel-destroy-confirmed
-vultr-parallel-destroy-confirmed:
-	S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-vultr.sh parallel destroy
+.PHONY: vultr-destroy-confirmed
+vultr-destroy-confirmed:
+	S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-vultr.sh destroy
 
 .PHONY: vultr-setup-context-sequential
 vultr-setup-context-sequential:
