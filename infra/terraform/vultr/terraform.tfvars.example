@@ -1,0 +1,20 @@
+project                 = "skripsi"
+region                  = "sgp"
+execution_mode          = "sequential"
+kubernetes_version      = "v1.36.1+1"
+operator_cidrs          = ["REPLACE_WITH_YOUR_PUBLIC_IP/32"]
+operator_ssh_public_key = "ssh-ed25519 AAAA... operator@example"
+# postgres_password goes in env/vultr.env, not here
+
+# Cluster names — keys depend on execution_mode:
+#   sequential: { sequential = "..." }
+#   parallel:   { monolith = "...", msa = "..." }
+cluster_names = {
+  sequential = "skripsi-vultr-benchmark"
+}
+
+app_node_plan     = "voc-c-8c-16gb-150s-amd"
+app_node_count    = 1
+testing_node_plan = "vc2-2c-4gb"
+postgres_plan     = "voc-c-2c-4gb-50s-amd"
+postgres_os_id    = 1743
