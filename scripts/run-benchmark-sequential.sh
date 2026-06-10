@@ -36,6 +36,7 @@ fi
 
 source scripts/lib/resource-configuration.sh
 source scripts/lib/benchmark-preflight.sh
+source scripts/lib/sequential-benchmark-setup.sh
 
 ARCHITECTURE="${ARCHITECTURE:?ARCHITECTURE is required (monolith|microservices)}"
 SCENARIO="${SCENARIO:?SCENARIO is required (login|create-transaction|enriched-transactions|concurrent-mixed-workload|mixed-workload|sync-items)}"
@@ -230,6 +231,8 @@ architecture_already_deployed() {
 
 if architecture_already_deployed "$ARCHITECTURE"; then
   echo "Architecture ${ARCHITECTURE} is already deployed with IMAGE_TAG=${IMAGE_TAG} and SCALING_MODE=${SCALING_MODE}; skipping deploy."
+  echo "=== Running scenario data setup for ${SCENARIO} ==="
+  run_scenario_data_setup "$ARCHITECTURE" "$SCENARIO"
 else
   echo "=== Deploying ${ARCHITECTURE} (${SCALING_MODE}) ==="
   ARCHITECTURE="$ARCHITECTURE" \
@@ -240,6 +243,11 @@ else
     CLOUD_PROVIDER="$CLOUD_PROVIDER" \
     DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
     bash scripts/deploy-sequential-architecture.sh
+  setup_class="$(scenario_setup_class "$SCENARIO")"
+  if [ "$setup_class" = "enrichment" ]; then
+    echo "=== Preparing enrichment data for ${SCENARIO} ==="
+    prepare_enrichment_active "$ARCHITECTURE"
+  fi
 fi
 
 render_provider_manifests "$RENDER_ROOT"
