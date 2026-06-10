@@ -23,6 +23,7 @@ fi
 
 source scripts/lib/cloud-provider.sh
 load_cloud_provider_env
+source scripts/lib/sequential-benchmark-setup.sh
 
 image_tag_env_file="$(resolve_image_tag_env_file || true)"
 if [ -z "${IMAGE_TAG:-}" ] && [ -n "$image_tag_env_file" ]; then
@@ -33,6 +34,7 @@ fi
 
 ARCHITECTURE="${ARCHITECTURE:?ARCHITECTURE is required (monolith|microservices)}"
 CONTEXT="${SEQUENTIAL_CONTEXT:-benchmark}"
+SEQUENTIAL_CONTEXT="$CONTEXT"
 K8S="kubectl --context=$CONTEXT"
 SCALING_MODE="${SCALING_MODE:-fixed}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
@@ -66,41 +68,6 @@ require_secret() {
     echo "Missing required secret: ${namespace}/${secret_name} (${description})" >&2
     exit 1
   fi
-}
-
-recreate_job() {
-  local namespace="$1"
-  local job_name="$2"
-  local manifest="$3"
-  local complete_timeout="$4"
-
-  $K8S delete job "$job_name" -n "$namespace" --ignore-not-found
-  if $K8S get job "$job_name" -n "$namespace" >/dev/null 2>&1; then
-    $K8S wait --for=delete "job/${job_name}" -n "$namespace" --timeout=120s
-  fi
-  $K8S apply -f "$manifest"
-  $K8S wait --for=condition=complete "job/${job_name}" -n "$namespace" --timeout="$complete_timeout"
-}
-
-scale_down_monolith() {
-  $K8S delete hpa monolith -n mono --ignore-not-found
-  if $K8S get deployment monolith -n mono >/dev/null 2>&1; then
-    $K8S scale deployment monolith -n mono --replicas=0
-    $K8S rollout status deployment/monolith -n mono --timeout=300s
-  fi
-}
-
-scale_down_microservices() {
-  local svc
-  for svc in api-gateway auth-service item-service transaction-service; do
-    $K8S delete hpa "$svc" -n msa --ignore-not-found
-  done
-  for svc in api-gateway auth-service item-service transaction-service; do
-    if $K8S get deployment "$svc" -n msa >/dev/null 2>&1; then
-      $K8S scale deployment "$svc" -n msa --replicas=0
-      $K8S rollout status "deployment/${svc}" -n msa --timeout=300s
-    fi
-  done
 }
 
 install_datadog_if_configured() {
@@ -159,11 +126,13 @@ case "$ARCHITECTURE" in
     require_secret benchmark db-bootstrap-env "BOOTSTRAP_DATABASE_URL"
     require_secret mono monolith-env "DATABASE_URL, JWT_SECRET, and application config"
 
-    scale_down_microservices
+    for svc in api-gateway auth-service item-service transaction-service; do
+      scale_down_deployment msa "$svc"
+    done
 
     recreate_job benchmark db-bootstrap-job deployments/k8s/benchmark/monolith/db-bootstrap-job.yaml 120s
 
-    scale_down_monolith
+    scale_down_deployment mono monolith
 
     recreate_job mono monolith-migration-job "$rendered_job_dir/migration-job.yaml" 180s
 
@@ -189,11 +158,13 @@ case "$ARCHITECTURE" in
     require_secret msa item-service-secret "DATABASE_URL"
     require_secret msa transaction-service-secret "DATABASE_URL and service addresses"
 
-    scale_down_monolith
+    scale_down_deployment mono monolith
 
     recreate_job benchmark db-bootstrap-job deployments/k8s/benchmark/microservices/db-bootstrap-job.yaml 120s
 
-    scale_down_microservices
+    for svc in api-gateway auth-service item-service transaction-service; do
+      scale_down_deployment msa "$svc"
+    done
 
     for svc in auth item transaction; do
       recreate_job msa "${svc}-migration-job" "${rendered_job_dir}/${svc}-migration-job.yaml" 180s
