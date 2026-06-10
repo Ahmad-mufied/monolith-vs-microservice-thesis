@@ -47,6 +47,24 @@ if [[ "$terraform_command" == "destroy" ]]; then
     echo "S3_BENCHMARK_DATA_VERIFIED must be true to run Vultr terraform destroy" >&2
     exit 1
   fi
+
+  if [[ "$stack" == "shared" ]]; then
+    for experiment_state in \
+      "infra/terraform/vultr-sequential/terraform.tfstate" \
+      "infra/terraform/vultr-parallel/terraform.tfstate"; do
+      if [ -f "$experiment_state" ]; then
+        resource_count="$(terraform state list -state="$experiment_state" 2>/dev/null | wc -l | tr -d '[:space:]')"
+        if [ "${resource_count:-0}" -gt 0 ]; then
+          echo "ERROR: Cannot destroy vultr-shared while ${experiment_state} still has ${resource_count} resources." >&2
+          echo "Destroy the experiment stack first:" >&2
+          echo "  make vultr-sequential-destroy-confirmed" >&2
+          echo "  # or" >&2
+          echo "  make vultr-parallel-destroy-confirmed" >&2
+          exit 1
+        fi
+      fi
+    done
+  fi
 fi
 
 echo "=== Vultr Terraform ==="
