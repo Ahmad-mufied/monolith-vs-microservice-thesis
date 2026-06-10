@@ -25,6 +25,7 @@ load_cloud_provider_env
 source scripts/lib/resource-configuration.sh
 source scripts/lib/benchmark-preflight.sh
 source scripts/lib/benchmark-timing.sh
+source scripts/lib/sequential-benchmark-setup.sh
 
 SCALING_MODE="${SCALING_MODE:-fixed}"
 TEST_DURATION="${TEST_DURATION:-5m}"
@@ -560,76 +561,6 @@ sequential_case_timing_json() {
     }'
 }
 
-scale_down_active() {
-  local architecture="$1"
-  local svc
-  if [ "$architecture" = "monolith" ]; then
-    kubectl --context="$SEQUENTIAL_CONTEXT" delete hpa monolith -n mono --ignore-not-found
-    kubectl --context="$SEQUENTIAL_CONTEXT" scale deployment monolith -n mono --replicas=0
-    kubectl --context="$SEQUENTIAL_CONTEXT" rollout status deployment/monolith -n mono --timeout=300s
-    return
-  fi
-  for svc in api-gateway auth-service item-service transaction-service; do
-    kubectl --context="$SEQUENTIAL_CONTEXT" delete hpa "$svc" -n msa --ignore-not-found
-  done
-  for svc in api-gateway auth-service item-service transaction-service; do
-    kubectl --context="$SEQUENTIAL_CONTEXT" scale deployment "$svc" -n msa --replicas=0
-    kubectl --context="$SEQUENTIAL_CONTEXT" rollout status "deployment/${svc}" -n msa --timeout=300s
-  done
-}
-
-restore_active() {
-  local architecture="$1"
-  local svc
-  if [ "$architecture" = "monolith" ]; then
-    kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/cloud/monolith/overlays/$SCALING_MODE"
-    kubectl --context="$SEQUENTIAL_CONTEXT" rollout status deployment/monolith -n mono --timeout=300s
-    return
-  fi
-  kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/cloud/microservices/overlays/$SCALING_MODE"
-  for svc in auth-service item-service transaction-service api-gateway; do
-    kubectl --context="$SEQUENTIAL_CONTEXT" rollout status "deployment/${svc}" -n msa --timeout=300s
-  done
-}
-
-recreate_job() {
-  local namespace="$1"
-  local job_name="$2"
-  local manifest="$3"
-  local complete_timeout="$4"
-
-  kubectl --context="$SEQUENTIAL_CONTEXT" delete job "$job_name" -n "$namespace" --ignore-not-found
-  if kubectl --context="$SEQUENTIAL_CONTEXT" get job "$job_name" -n "$namespace" >/dev/null 2>&1; then
-    kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=delete "job/${job_name}" -n "$namespace" --timeout=120s
-  fi
-  kubectl --context="$SEQUENTIAL_CONTEXT" apply -f "$manifest"
-  kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=condition=complete "job/${job_name}" -n "$namespace" --timeout="$complete_timeout"
-}
-
-reset_seed_active() {
-  local architecture="$1"
-  scale_down_active "$architecture"
-  if [ "$architecture" = "monolith" ]; then
-    recreate_job mono reset-monolith-data-job "$RENDER_ROOT/deployments/k8s/cloud/monolith/reset-monolith-data-job.yaml" 120s
-    recreate_job mono seed-monolith-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/monolith/seed-monolith-benchmark-data-job.yaml" 300s
-  else
-    recreate_job msa reset-microservices-data-job "$RENDER_ROOT/deployments/k8s/cloud/microservices/reset-microservices-data-job.yaml" 120s
-    recreate_job msa seed-microservices-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/microservices/seed-microservices-benchmark-data-job.yaml" 300s
-  fi
-  restore_active "$architecture"
-}
-
-prepare_enrichment_active() {
-  local architecture="$1"
-  scale_down_active "$architecture"
-  if [ "$architecture" = "monolith" ]; then
-    recreate_job mono prepare-monolith-enrichment-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml" 600s
-  else
-    recreate_job msa prepare-microservices-enrichment-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml" 600s
-  fi
-  restore_active "$architecture"
-}
-
 if [ -z "$K6_PROFILE" ]; then
   if [ "$SCALING_MODE" = "hpa" ]; then
     K6_PROFILE="hpa"
@@ -741,12 +672,8 @@ for architecture in $ARCHITECTURE_ORDER; do
       fi
     done
 
-    if [ "$scenario" = "login" ] && [ "$skip_scenario_setup" = "false" ]; then
-      reset_seed_active "$architecture"
-    fi
-    if { [ "$scenario" = "enriched-transactions" ] || [ "$scenario" = "mixed-workload" ]; } && [ "$skip_scenario_setup" = "false" ]; then
-      reset_seed_active "$architecture"
-      prepare_enrichment_active "$architecture"
+    if [ "$skip_scenario_setup" = "false" ]; then
+      run_scenario_data_setup "$architecture" "$scenario"
     fi
 
     for target_rps in $scenario_rps_levels; do
@@ -802,13 +729,6 @@ for architecture in $ARCHITECTURE_ORDER; do
         completed_architecture_cases=$((completed_architecture_cases + 1))
         completed_suite_cases=$((completed_suite_cases + 1))
         continue
-      fi
-
-      if [ "$scenario" = "create-transaction" ] || [ "$scenario" = "sync-items" ] || [ "$scenario" = "concurrent-mixed-workload" ] || [ "$scenario" = "mixed-workload" ]; then
-        reset_seed_active "$architecture"
-        if [ "$scenario" = "concurrent-mixed-workload" ] || [ "$scenario" = "mixed-workload" ]; then
-          prepare_enrichment_active "$architecture"
-        fi
       fi
 
       print_case_eta \
