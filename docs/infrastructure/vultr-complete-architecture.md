@@ -586,12 +586,16 @@ budgets. Each service therefore carries a ceiling of:
 ```
 
 The HPA path preserves the same service-level ceiling by dividing each service
-budget across at most two replicas:
+budget across replicas:
 
 ```text
-975m CPU / 1920Mi memory per pod
-minReplicas = 1
-maxReplicas = 2
+Monolith:  minReplicas=1, maxReplicas=4
+
+Microservices (per service):
+  api-gateway:         minReplicas=1, maxReplicas=5
+  auth-service:        minReplicas=1, maxReplicas=2
+  item-service:        minReplicas=1, maxReplicas=5
+  transaction-service: minReplicas=1, maxReplicas=2
 ```
 
 ---

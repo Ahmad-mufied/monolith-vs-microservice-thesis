@@ -30,7 +30,7 @@ Terraform state, or kubeconfig files.
 
 For the full variable list and creation order, see
 `docs/infrastructure/vultr-configuration-reference.md` and
-`docs/infrastructure/vultr-vke-runbook.md`.
+`docs/infrastructure/vultr-operator-guide.md`.
 
 ## Purpose
 

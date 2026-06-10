@@ -28,16 +28,16 @@ The repository also supports a quota-constrained sequential topology:
 `skripsi-benchmark` runs one architecture at a time on the same resource
 ceiling. Use it when account quota cannot support the full parallel topology.
 The detailed operator flow is in
-`docs/infrastructure/sequential-benchmark-runbook.md`.
+`docs/infrastructure/eks-sequential-runbook.md`.
 
 An additive Vultr VKE path is available for high-vCPU benchmark execution when
 Vultr credit/quota is preferable. Vultr provides
 VKE app/testing worker pools, Vultr Compute PostgreSQL nodes, and legacy Vultr
 VPC networking. AWS S3 remains the benchmark artifact store and Docker Hub
 public images replace ECR for Vultr runs. See
-`docs/infrastructure/vultr-cloud-architecture.md`,
+`docs/infrastructure/vultr-complete-architecture.md`,
 `docs/infrastructure/vultr-configuration-reference.md`,
-`docs/infrastructure/vultr-vke-runbook.md`, and
+`docs/infrastructure/vultr-operator-guide.md`, and
 `docs/diagrams/vultr-vke-topology.md`.
 
 ---
@@ -987,8 +987,8 @@ RQ2 analyses.
 |---|---|
 | Detailed cluster design | `docs/infrastructure/eks-cluster-design.md` |
 | Terraform runbook | `docs/infrastructure/terraform-runbook.md` |
-| End-to-end benchmark runbook | `docs/infrastructure/benchmark-runbook-end-to-end.md` |
-| Parallel benchmark execution | `docs/infrastructure/parallel-benchmark-runbook.md` |
+| End-to-end benchmark runbook | `docs/infrastructure/eks-runbook-end-to-end.md` |
+| Parallel benchmark execution | `docs/infrastructure/eks-parallel-runbook.md` |
 | Scaling mode policy | `docs/experiment/scaling-mode-strategy.md` |
 | Datadog setup | `docs/infrastructure/datadog.md` |
 | Datadog dashboards | `docs/infrastructure/datadog-dashboard-design.md` |

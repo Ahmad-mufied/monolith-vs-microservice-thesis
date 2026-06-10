@@ -6,7 +6,7 @@ This document is the compact reference for Vultr-related environment variables,
 Terraform stacks, Make targets, Kubernetes contexts, rendered metadata, and
 operational guardrails.
 
-Use `docs/infrastructure/vultr-vke-runbook.md` for the step-by-step execution
+Use `docs/infrastructure/vultr-operator-guide.md` for the step-by-step execution
 flow.
 
 ## Local Env Files
@@ -184,7 +184,8 @@ Rules:
   microservices:
   `1950m CPU / 3840Mi memory` per service in fixed mode,
   `975m CPU / 1920Mi memory` per pod with `minReplicas=1` and
-  `maxReplicas=2` in HPA mode.
+  `maxReplicas=5` (api-gateway, item-service) or `maxReplicas=2` (auth-service,
+  transaction-service) in HPA mode. Monolith HPA uses `maxReplicas=4`.
 - Set `VULTR_EXPECTED_APP_NODE_COUNT=1` when verifying the current single app
   node topology.
 

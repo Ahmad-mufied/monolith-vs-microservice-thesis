@@ -7,7 +7,7 @@ time on a single EKS cluster. It is intended for AWS accounts where quota or
 budget cannot support the full dual-cluster parallel topology.
 
 Use this mode when the account only has enough vCPU for one benchmark stack at
-a time. Use `docs/infrastructure/parallel-benchmark-runbook.md` when you need
+a time. Use `docs/infrastructure/eks-parallel-runbook.md` when you need
 wall-clock aligned Datadog time-series from two isolated clusters.
 
 For the combined topology diagram, see

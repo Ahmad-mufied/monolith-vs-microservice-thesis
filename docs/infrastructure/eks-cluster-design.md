@@ -11,7 +11,7 @@ Datadog time-series for direct comparison.
 
 A quota-constrained sequential topology is also available. It uses one EKS
 cluster and one RDS instance, then runs monolith and microservices phases one
-after another. See `docs/infrastructure/sequential-benchmark-runbook.md`.
+after another. See `docs/infrastructure/eks-sequential-runbook.md`.
 
 ---
 

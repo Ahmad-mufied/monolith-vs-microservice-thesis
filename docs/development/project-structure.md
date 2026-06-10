@@ -180,9 +180,9 @@ docs/
 │   ├── eks-cluster-design.md
 │   ├── terraform-runbook.md
 │   ├── benchmark-execution-lifecycle.md
-│   ├── benchmark-runbook-end-to-end.md
-│   ├── parallel-benchmark-runbook.md
-│   ├── sequential-benchmark-runbook.md
+│   ├── eks-runbook-end-to-end.md
+│   ├── eks-parallel-runbook.md
+│   ├── eks-sequential-runbook.md
 │   ├── rds-postgres.md
 │   ├── datadog.md
 │   ├── datadog-resource-overhead.md

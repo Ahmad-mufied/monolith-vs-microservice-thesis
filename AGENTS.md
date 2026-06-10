@@ -59,7 +59,7 @@ Before making changes, inspect the relevant source:
 | Database | `docs/development/database-schema.md`, `docs/development/database-migration.md` |
 | Validation | `docs/development/validation-strategy.md` |
 | Benchmark | `docs/development/k6-workload-scenarios.md`, `docs/experiment/scaling-mode-strategy.md` |
-| Infrastructure | `docs/infrastructure/benchmark-runbook-end-to-end.md`, `docs/infrastructure/vultr-vke-runbook.md` |
+| Infrastructure | `docs/infrastructure/eks-runbook-end-to-end.md`, `docs/infrastructure/vultr-operator-guide.md` |
 
 ## Code Architecture
 

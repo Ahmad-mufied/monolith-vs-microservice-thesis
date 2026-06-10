@@ -18,9 +18,9 @@ This is a command cheat sheet, not the primary lifecycle runbook. For the full
 experiment sequence, use:
 
 - `docs/infrastructure/terraform-runbook.md`
-- `docs/infrastructure/benchmark-runbook-end-to-end.md`
-- `docs/infrastructure/parallel-benchmark-runbook.md`
-- `docs/infrastructure/sequential-benchmark-runbook.md`
+- `docs/infrastructure/eks-runbook-end-to-end.md`
+- `docs/infrastructure/eks-parallel-runbook.md`
+- `docs/infrastructure/eks-sequential-runbook.md`
 
 ---
 

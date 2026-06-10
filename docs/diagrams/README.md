@@ -21,8 +21,8 @@ thesis writing.
 
 For Vultr benchmark runs, prefer
 [`vultr-vke-topology.md`](vultr-vke-topology.md) together with
-`docs/infrastructure/vultr-cloud-architecture.md` and
-`docs/infrastructure/vultr-vke-runbook.md`. The AWS-oriented diagrams remain
+`docs/infrastructure/vultr-complete-architecture.md` and
+`docs/infrastructure/vultr-operator-guide.md`. The AWS-oriented diagrams remain
 available as historical engineering references.
 
 ## Rendering

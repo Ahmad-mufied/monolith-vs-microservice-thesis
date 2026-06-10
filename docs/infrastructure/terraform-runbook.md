@@ -19,9 +19,9 @@ make vultr-measure-resource-baseline
 ```
 
 The full Vultr execution flow is documented in
-`docs/infrastructure/vultr-vke-runbook.md`. Configuration details are in
+`docs/infrastructure/vultr-operator-guide.md`. Configuration details are in
 `docs/infrastructure/vultr-configuration-reference.md`; topology and network
-mechanism are in `docs/infrastructure/vultr-cloud-architecture.md`.
+mechanism are in `docs/infrastructure/vultr-complete-architecture.md`.
 
 Sequential fallback:
 

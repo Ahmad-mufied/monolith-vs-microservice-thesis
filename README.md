@@ -261,8 +261,8 @@ Generic targets (`shared-apply`, `experiment-apply`, `deploy-workloads`,
 
 For detailed provider runbooks:
 
-- AWS: [`docs/infrastructure/benchmark-runbook-end-to-end.md`](docs/infrastructure/benchmark-runbook-end-to-end.md)
-- Vultr: [`docs/infrastructure/vultr-vke-runbook.md`](docs/infrastructure/vultr-vke-runbook.md)
+- AWS: [`docs/infrastructure/eks-runbook-end-to-end.md`](docs/infrastructure/eks-runbook-end-to-end.md)
+- Vultr: [`docs/infrastructure/vultr-operator-guide.md`](docs/infrastructure/vultr-operator-guide.md)
 
 ## API Contract
 

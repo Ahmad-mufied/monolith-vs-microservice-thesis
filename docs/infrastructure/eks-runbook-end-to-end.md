@@ -7,7 +7,7 @@ fresh AWS account to completed k6 results in S3. It is written for the
 researcher, thesis reviewer, or anyone reproducing the experiment.
 
 For the Vultr VKE infrastructure path, use
-`docs/infrastructure/vultr-vke-runbook.md` as the primary execution runbook.
+`docs/infrastructure/vultr-operator-guide.md` as the primary execution runbook.
 That path still stores benchmark artifacts in AWS S3, but compute, Kubernetes,
 PostgreSQL VM nodes, and private networking are provisioned on Vultr.
 
