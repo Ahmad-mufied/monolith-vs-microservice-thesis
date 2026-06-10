@@ -19,9 +19,6 @@ case "$platform" in
   eks)
     bash scripts/env-init-eks.sh
     ;;
-  hetzner)
-    bash scripts/env-init-hetzner.sh
-    ;;
   vultr)
     bash scripts/env-init-vultr.sh
     ;;
