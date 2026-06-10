@@ -10,7 +10,7 @@ if [ ! -d "$render_root/deployments/k8s" ]; then
 fi
 
 case "$provider" in
-  vultr|hetzner|aws) ;;
+  vultr|aws) ;;
   *) echo "ERROR: unsupported provider '$provider'" >&2; exit 1 ;;
 esac
 
@@ -23,7 +23,7 @@ fi
 rm -f /tmp/render-provider-placeholders.txt
 
 if [ "$provider" = "vultr" ]; then
-  if rg -n '"provider":"(aws|eks|hetzner)"|provider: (aws|eks|hetzner)' "$render_root/deployments/k8s" >/tmp/render-provider-stale.txt; then
+  if rg -n '"provider":"(aws|eks)"|provider: (aws|eks)' "$render_root/deployments/k8s" >/tmp/render-provider-stale.txt; then
     cat /tmp/render-provider-stale.txt >&2
     echo "ERROR: rendered Vultr manifests contain stale provider metadata" >&2
     rm -f /tmp/render-provider-stale.txt

@@ -4,12 +4,9 @@ resources_configuration_json() {
   local architecture="$1"
   local scaling_mode="$2"
   local provider="${CLOUD_PROVIDER:-aws}"
-  local baseline_env="${HETZNER_RESOURCE_BASELINE_ENV:-env/hetzner-resource-baseline.env}"
-  if [ "$provider" = "vultr" ]; then
-    baseline_env="${VULTR_RESOURCE_BASELINE_ENV:-env/vultr-resource-baseline.env}"
-  fi
+  local baseline_env="${VULTR_RESOURCE_BASELINE_ENV:-env/vultr-resource-baseline.env}"
 
-  if [ "$provider" = "hetzner" ] || [ "$provider" = "vultr" ]; then
+  if [ "$provider" = "vultr" ]; then
     if [ ! -f "$baseline_env" ]; then
       echo "ERROR: missing $baseline_env; run the provider resource baseline measurement target first" >&2
       return 1
@@ -165,39 +162,6 @@ resources_configuration_json() {
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           }
         }
-      }'
-    return 0
-  fi
-
-  if [ "$provider" = "hetzner" ]; then
-    local cpu_quota memory_quota app_node_count allocatable_cpu allocatable_memory resource_profile
-    : "${HETZNER_APP_CPU_QUOTA:?HETZNER_APP_CPU_QUOTA must be set in $baseline_env}"
-    : "${HETZNER_APP_MEMORY_QUOTA:?HETZNER_APP_MEMORY_QUOTA must be set in $baseline_env}"
-    cpu_quota="$HETZNER_APP_CPU_QUOTA"
-    memory_quota="$HETZNER_APP_MEMORY_QUOTA"
-    app_node_count="${HETZNER_APP_NODE_COUNT:-2}"
-    allocatable_cpu="${HETZNER_APP_ALLOCATABLE_CPU:-unknown}"
-    allocatable_memory="${HETZNER_APP_ALLOCATABLE_MEMORY:-unknown}"
-    resource_profile="hetzner-measurement-derived"
-    jq -cn \
-      --arg provider "$provider" \
-      --arg architecture "$architecture" \
-      --arg autoscaling_mode "$scaling_mode" \
-      --arg cpu "$cpu_quota" \
-      --arg memory "$memory_quota" \
-      --arg app_node_count "$app_node_count" \
-      --arg allocatable_cpu "$allocatable_cpu" \
-      --arg allocatable_memory "$allocatable_memory" \
-      --arg resource_profile "$resource_profile" \
-      '{
-        provider: $provider,
-        architecture: $architecture,
-        autoscaling_mode: $autoscaling_mode,
-        hpa_enabled: ($autoscaling_mode == "hpa"),
-        namespace_resource_quota: {cpu: $cpu, memory: $memory},
-        measured_app_node_count: ($app_node_count | tonumber),
-        measured_app_allocatable: {cpu: $allocatable_cpu, memory: $allocatable_memory},
-        resource_profile: $resource_profile
       }'
     return 0
   fi

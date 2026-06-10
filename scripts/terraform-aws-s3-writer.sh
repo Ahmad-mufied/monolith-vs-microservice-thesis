@@ -8,7 +8,7 @@ explicit_project="${PROJECT:-}"
 explicit_aws_region="${AWS_REGION:-}"
 explicit_s3_bucket="${S3_RESULTS_BUCKET:-${S3_BUCKET:-}}"
 
-for env_file in env/vultr.env env/hetzner.env env/terraform.shared.env; do
+for env_file in env/vultr.env env/terraform.shared.env; do
   if [ -f "$env_file" ]; then
     set -a
     source "$env_file"

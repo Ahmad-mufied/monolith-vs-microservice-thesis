@@ -4,7 +4,7 @@ OPERATOR_PROFILE_FILE="${OPERATOR_PROFILE_FILE:-env/operator-profile.env}"
 OPERATOR_PROFILE_VERSION="1"
 
 operator_profile_missing_message() {
-  echo "operator profile is missing; run: make env-init PLATFORM=<eks|hetzner|vultr> EXECUTION_MODE=<parallel|sequential>" >&2
+  echo "operator profile is missing; run: make env-init PLATFORM=<eks|vultr> EXECUTION_MODE=<parallel|sequential>" >&2
 }
 
 normalize_operator_platform() {
@@ -13,14 +13,11 @@ normalize_operator_platform() {
     eks|aws)
       printf 'eks\n'
       ;;
-    hetzner)
-      printf 'hetzner\n'
-      ;;
     vultr)
       printf 'vultr\n'
       ;;
     *)
-      echo "ERROR: unsupported PLATFORM '$platform' (expected: eks|hetzner|vultr)" >&2
+      echo "ERROR: unsupported PLATFORM '$platform' (expected: eks|vultr)" >&2
       return 1
       ;;
   esac
@@ -30,7 +27,6 @@ platform_to_cloud_provider() {
   local platform="$1"
   case "$platform" in
     eks) printf 'aws\n' ;;
-    hetzner) printf 'hetzner\n' ;;
     vultr) printf 'vultr\n' ;;
     *)
       echo "ERROR: unsupported PLATFORM '$platform'" >&2
@@ -43,7 +39,7 @@ platform_to_image_registry() {
   local platform="$1"
   case "$platform" in
     eks) printf 'ecr\n' ;;
-    hetzner|vultr) printf 'dockerhub\n' ;;
+    vultr) printf 'dockerhub\n' ;;
     *)
       echo "ERROR: unsupported PLATFORM '$platform'" >&2
       return 1
@@ -54,7 +50,7 @@ platform_to_image_registry() {
 platform_to_result_storage() {
   local platform="$1"
   case "$platform" in
-    eks|hetzner|vultr) printf 'aws-s3\n' ;;
+    eks|vultr) printf 'aws-s3\n' ;;
     *)
       echo "ERROR: unsupported PLATFORM '$platform'" >&2
       return 1
