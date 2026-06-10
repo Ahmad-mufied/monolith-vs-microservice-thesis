@@ -1,20 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-stack="${VULTR_TERRAFORM_STACK:-${1:-}}"
-if [ -z "${VULTR_TERRAFORM_STACK:-}" ] && [ "$#" -gt 0 ]; then
-  shift
-fi
-
-case "$stack" in
-  shared|sequential|parallel) ;;
-  *)
-    echo "usage: VULTR_TERRAFORM_STACK=<shared|sequential|parallel> $0 [terraform args...]" >&2
-    echo "or: $0 <shared|sequential|parallel> [terraform args...]" >&2
-    exit 1
-    ;;
-esac
-
 env_file="env/vultr.env"
 if [ ! -f "$env_file" ]; then
   echo "missing $env_file; run: make env-init PLATFORM=vultr EXECUTION_MODE=<parallel|sequential>" >&2
@@ -28,15 +14,10 @@ set +a
 : "${VULTR_API_KEY:?VULTR_API_KEY must be set in env/vultr.env}"
 export VULTR_API_KEY
 
-terraform_dir="infra/terraform/vultr-${stack}"
-if [ "$stack" = "sequential" ]; then
-  terraform_dir="infra/terraform/vultr-sequential"
-elif [ "$stack" = "parallel" ]; then
-  terraform_dir="infra/terraform/vultr-parallel"
-fi
+terraform_dir="infra/terraform/vultr"
 
 terraform_command="${1:-}"
-if [[ "$terraform_command" != "output" && "$stack" != "shared" ]]; then
+if [[ "$terraform_command" != "output" ]]; then
   : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in env/vultr.env}"
   export TF_VAR_postgres_password="$POSTGRES_PASSWORD"
 fi
@@ -47,28 +28,9 @@ if [[ "$terraform_command" == "destroy" ]]; then
     echo "S3_BENCHMARK_DATA_VERIFIED must be true to run Vultr terraform destroy" >&2
     exit 1
   fi
-
-  if [[ "$stack" == "shared" ]]; then
-    for experiment_state in \
-      "infra/terraform/vultr-sequential/terraform.tfstate" \
-      "infra/terraform/vultr-parallel/terraform.tfstate"; do
-      if [ -f "$experiment_state" ]; then
-        resource_count="$(terraform state list -state="$experiment_state" 2>/dev/null | wc -l | tr -d '[:space:]')"
-        if [ "${resource_count:-0}" -gt 0 ]; then
-          echo "ERROR: Cannot destroy vultr-shared while ${experiment_state} still has ${resource_count} resources." >&2
-          echo "Destroy the experiment stack first:" >&2
-          echo "  make vultr-sequential-destroy-confirmed" >&2
-          echo "  # or" >&2
-          echo "  make vultr-parallel-destroy-confirmed" >&2
-          exit 1
-        fi
-      fi
-    done
-  fi
 fi
 
 echo "=== Vultr Terraform ==="
-echo "  stack : $stack"
 echo "  dir   : $terraform_dir"
 echo ""
 

@@ -65,39 +65,30 @@ vpc_cidr="${VULTR_VPC_CIDR:-10.20.0.0/16}"
 vpc_subnet="${vpc_cidr%/*}"
 vpc_mask="${vpc_cidr#*/}"
 
-cat > infra/terraform/vultr-shared/terraform.tfvars <<EOF
+execution_mode="${EXECUTION_MODE:-sequential}"
+
+if [ "$execution_mode" = "parallel" ]; then
+  cluster_names_hcl="{ monolith = \"${VULTR_MONOLITH_CLUSTER_NAME:-skripsi-vultr-monolith}\", msa = \"${VULTR_MSA_CLUSTER_NAME:-skripsi-vultr-msa}\" }"
+else
+  cluster_names_hcl="{ sequential = \"${VULTR_SEQUENTIAL_CLUSTER_NAME:-skripsi-vultr-benchmark}\" }"
+fi
+
+cat > infra/terraform/vultr/terraform.tfvars <<EOF
 project                 = "${PROJECT:-skripsi}"
 region                  = "${VULTR_REGION:-sgp}"
+execution_mode          = "${execution_mode}"
 vpc_subnet              = "${vpc_subnet}"
 vpc_subnet_mask         = ${vpc_mask}
 operator_cidrs          = ${operator_cidrs_hcl}
 operator_ssh_public_key = "${OPERATOR_SSH_PUBLIC_KEY}"
+kubernetes_version      = "${VULTR_KUBERNETES_VERSION:-v1.36.1+1}"
+cluster_names           = ${cluster_names_hcl}
+app_node_plan           = "${VULTR_APP_NODE_PLAN:-voc-c-8c-16gb-150s-amd}"
+app_node_count          = ${vultr_app_node_count}
+testing_node_plan       = "${VULTR_TESTING_NODE_PLAN:-vc2-2c-4gb}"
+postgres_plan           = "${VULTR_POSTGRES_PLAN:-voc-c-2c-4gb-50s-amd}"
+postgres_os_id          = ${VULTR_POSTGRES_OS_ID:-1743}
 EOF
 
-cat > infra/terraform/vultr-parallel/terraform.tfvars <<EOF
-project                   = "${PROJECT:-skripsi}"
-region                    = "${VULTR_REGION:-sgp}"
-kubernetes_version        = "${VULTR_KUBERNETES_VERSION:-v1.36.1+1}"
-monolith_cluster_name     = "${VULTR_MONOLITH_CLUSTER_NAME:-skripsi-vultr-monolith}"
-msa_cluster_name          = "${VULTR_MSA_CLUSTER_NAME:-skripsi-vultr-msa}"
-app_node_plan             = "${VULTR_APP_NODE_PLAN:-voc-c-8c-16gb-150s-amd}"
-app_node_count            = ${vultr_app_node_count}
-testing_node_plan         = "${VULTR_TESTING_NODE_PLAN:-vc2-2c-4gb}"
-postgres_plan             = "${VULTR_POSTGRES_PLAN:-voc-c-2c-4gb-50s-amd}"
-postgres_os_id            = ${VULTR_POSTGRES_OS_ID:-1743}
-EOF
-
-cat > infra/terraform/vultr-sequential/terraform.tfvars <<EOF
-project                   = "${PROJECT:-skripsi}"
-region                    = "${VULTR_REGION:-sgp}"
-kubernetes_version        = "${VULTR_KUBERNETES_VERSION:-v1.36.1+1}"
-sequential_cluster_name   = "${VULTR_SEQUENTIAL_CLUSTER_NAME:-skripsi-vultr-benchmark}"
-app_node_plan             = "${VULTR_APP_NODE_PLAN:-voc-c-8c-16gb-150s-amd}"
-app_node_count            = ${vultr_app_node_count}
-testing_node_plan         = "${VULTR_TESTING_NODE_PLAN:-vc2-2c-4gb}"
-postgres_plan             = "${VULTR_POSTGRES_PLAN:-voc-c-2c-4gb-50s-amd}"
-postgres_os_id            = ${VULTR_POSTGRES_OS_ID:-1743}
-EOF
-
-echo "Rendered Vultr Terraform tfvars files"
+echo "Rendered Vultr Terraform tfvars (execution_mode=${execution_mode})"
 echo "POSTGRES_PASSWORD is kept in env/vultr.env and passed by scripts/terraform-vultr.sh as TF_VAR_postgres_password"
