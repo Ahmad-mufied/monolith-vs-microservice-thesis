@@ -21,7 +21,7 @@ Vultr VKE final benchmark
 ```
 
 Final thesis benchmark data should be collected from Vultr Kubernetes Engine
-(VKE). EKS, Hetzner, Minikube, and Docker Compose results are useful only when
+(VKE). EKS, Minikube, and Docker Compose results are useful only when
 explicitly labeled as development, calibration, or historical evidence.
 
 ---

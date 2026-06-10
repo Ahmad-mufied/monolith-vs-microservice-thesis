@@ -41,9 +41,9 @@ Runtime architecture differs:
 
 - Go 1.26.2, Echo (REST), gRPC (internal)
 - PostgreSQL 18, pgx, Goose migrations
-- Docker, Kubernetes (AWS EKS / Hetzner k3s / Vultr VKE)
+- Docker, Kubernetes (AWS EKS / Vultr VKE)
 - Terraform, k6, Datadog
-- AWS ECR (EKS), Docker Hub (Hetzner, Vultr)
+- AWS ECR (EKS), Docker Hub (Vultr)
 - AWS S3 (benchmark results)
 
 ## Source of Truth
@@ -216,10 +216,9 @@ Three providers are supported. Each has Terraform stacks under
 | Provider | Stacks | K8s Runtime | Image Registry |
 |---|---|---|---|
 | AWS EKS | `aws-shared`, `aws-parallel`, `aws-sequential` | EKS | ECR |
-| Hetzner | `hetzner-shared`, `hetzner-parallel`, `hetzner-sequential` | k3s | Docker Hub |
 | Vultr | `vultr-shared`, `vultr-parallel`, `vultr-sequential` | VKE | Docker Hub |
 
-Provider-specific Makefile targets use prefixes: `eks-*`, `hetzner-*`, `vultr-*`.
+Provider-specific Makefile targets use prefixes: `eks-*`, `vultr-*`.
 Generic targets dispatch through `scripts/operator-dispatch.sh`.
 
 ### Execution Modes
@@ -243,14 +242,14 @@ Switching fixed/HPA is a redeploy action, not a runner-only change.
 ### Database Infrastructure
 
 - AWS: Amazon RDS PostgreSQL 18
-- Hetzner/Vultr: Dedicated compute VM with PostgreSQL 18
+- Vultr: Dedicated compute VM with PostgreSQL 18
 
 Database must be private. Do not allow `0.0.0.0/0` on port 5432.
 
 ### Resource Ceilings
 
 Resource values are provider-specific. AWS EKS uses a fixed reference ceiling.
-Hetzner and Vultr measure live node allocatable capacity and render manifests
+Vultr measures live node allocatable capacity and render manifests
 dynamically.
 
 See `docs/experiment/scaling-mode-strategy.md` for per-provider details.

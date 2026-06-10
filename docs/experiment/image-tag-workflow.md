@@ -34,8 +34,7 @@ make dockerhub-list-images
 ```
 
 By default, this lists available tags for the required Docker Hub repositories.
-It reads `DOCKERHUB_NAMESPACE` from the shell or from `env/vultr.env` /
-`env/hetzner.env`.
+It reads `DOCKERHUB_NAMESPACE` from the shell or from `env/vultr.env`.
 
 Optional hardening for repeated operator use:
 

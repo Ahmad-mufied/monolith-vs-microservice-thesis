@@ -1,45 +1,5 @@
 # Secret Management
 
-## Hetzner Hybrid Benchmark Secrets
-
-The Hetzner benchmark path does not have EKS Pod Identity. For v1, Terraform
-creates a least-privilege AWS IAM user in `infra/terraform/aws-s3-writer` and
-k6 receives that user's S3 credentials through the
-`benchmark/k6-runner-secret` Kubernetes Secret.
-
-Required `env/hetzner.env` values:
-
-```text
-HCLOUD_TOKEN
-POSTGRES_PASSWORD
-DOCKERHUB_NAMESPACE
-AWS_REGION
-S3_BUCKET
-```
-
-`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` can be set manually in
-`env/hetzner.env`, but the preferred path is to read them from Terraform
-outputs:
-
-```bash
-make aws-s3-writer-apply
-terraform -chdir=infra/terraform/aws-s3-writer output -raw hetzner_k6_s3_access_key_id
-terraform -chdir=infra/terraform/aws-s3-writer output -raw hetzner_k6_s3_secret_access_key
-```
-
-Rules:
-
-- Hetzner hybrid benchmark is the only exception in this repository where AWS
-  access keys may be present in `env/hetzner.env` and the
-  `benchmark/k6-runner-secret`. Those credentials must be scoped to the
-  benchmark bucket or prefix. The `aws-s3-writer` Terraform stack enforces
-  access only under `s3://<bucket>/experiments/*`.
-- PostgreSQL accepts private-network traffic only.
-- Docker Hub public images must never contain secrets, kubeconfigs, `.tfstate`,
-  `.tfvars`, or local env files.
-- The same app JWT and benchmark user credentials used by EKS env files are
-  reused for Hetzner unless the operator intentionally rotates them.
-
 ## Vultr VKE Benchmark Secrets
 
 The Vultr VKE path also does not have EKS Pod Identity. The k6 runner receives
@@ -98,8 +58,6 @@ Use ConfigMap for non-sensitive configuration.
 Use EKS Pod Identity or IRSA for AWS access on EKS-managed clusters.
 
 Do not store AWS access keys in Kubernetes Secrets for EKS-managed clusters.
-Hetzner hybrid benchmark is the documented exception and uses
-`benchmark/k6-runner-secret` plus shared Terraform outputs for S3 upload.
 
 ---
 

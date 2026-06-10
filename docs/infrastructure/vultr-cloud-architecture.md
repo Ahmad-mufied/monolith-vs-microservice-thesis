@@ -244,7 +244,7 @@ VKE cannot actually schedule.
 
 PostgreSQL runs on Vultr Compute, not as a managed database. This keeps the
 benchmark portable and avoids introducing a managed database feature that is
-not equivalent to the self-contained Hetzner path.
+not equivalent to a self-contained path.
 
 Parallel mode creates:
 

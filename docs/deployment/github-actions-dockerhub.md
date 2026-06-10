@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-This document describes the automated CI/CD pipeline that builds and pushes the 7 benchmark Docker images to Docker Hub. This automation ensures consistency between local code changes and deployed cluster images, eliminates manual push mistakes, and simplifies the operator's benchmark lifecycle on Vultr and Hetzner.
+This document describes the automated CI/CD pipeline that builds and pushes the 7 benchmark Docker images to Docker Hub. This automation ensures consistency between local code changes and deployed cluster images, eliminates manual push mistakes, and simplifies the operator's benchmark lifecycle on Vultr.
 
 The active workflow configuration is located in:
 [.github/workflows/docker-build-push.yml](file:///mnt/Cons/Amikom/semester/Semester%207/Skrips/experimen/april/code/monolith-vs-microservice-thesis/.github/workflows/docker-build-push.yml)
