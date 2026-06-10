@@ -11,6 +11,13 @@ set -a
 source "$env_file"
 set +a
 
+image_tag_env="env/image-tag.env"
+if [ -f "$image_tag_env" ] && [ -z "${IMAGE_TAG:-}" ]; then
+  set -a
+  source "$image_tag_env"
+  set +a
+fi
+
 source scripts/lib/vultr-s3-credentials.sh
 load_vultr_s3_credentials
 
