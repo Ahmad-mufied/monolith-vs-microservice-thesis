@@ -371,8 +371,9 @@ VULTR_NODE_READY_TIMEOUT_SECONDS=1200 make experiment-bootstrap
 Use this path for the first manual integration test:
 
 ```bash
+make vultr-render-tfvars        # writes execution_mode into terraform.tfvars
 make vultr-plan
-EXECUTION_MODE=sequential make vultr-apply
+make vultr-apply
 make vultr-setup-context-sequential
 kubectl config get-contexts benchmark
 kubectl --context=benchmark get nodes -o wide
@@ -395,8 +396,9 @@ Use sequential mode instead when quota, credit, or budget cannot support the
 full parallel topology, and destroy promptly after S3 results are verified.
 
 ```bash
+make vultr-render-tfvars        # writes execution_mode=parallel into terraform.tfvars
 make vultr-plan
-EXECUTION_MODE=parallel make vultr-apply
+make vultr-apply
 make vultr-setup-contexts-parallel
 kubectl config get-contexts monolith msa
 kubectl --context=monolith get nodes -o wide
@@ -866,8 +868,9 @@ created resources after checking the plan/state, then switch to sequential mode:
 ```bash
 S3_BENCHMARK_DATA_VERIFIED=true make vultr-destroy-confirmed
 # Re-apply with execution_mode=sequential
+EXECUTION_MODE=sequential make vultr-render-tfvars
 make vultr-plan
-EXECUTION_MODE=sequential make vultr-apply
+make vultr-apply
 ```
 
 Do not destroy resources while a benchmark run is still in progress or before
