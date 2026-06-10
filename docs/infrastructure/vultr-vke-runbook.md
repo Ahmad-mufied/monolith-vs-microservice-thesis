@@ -16,7 +16,7 @@ Use this document together with:
 - `docs/experiment/scaling-mode-strategy.md`
 - `docs/infrastructure/secret-management.md`
 
-The Vultr path is additive to the existing AWS EKS and Hetzner paths. It uses
+The Vultr path is additive to the existing AWS EKS path. It uses
 the same application manifests under `deployments/k8s/cloud/`, rendered at
 runtime for Vultr-specific image registry, metadata, and measured resource
 baseline values.

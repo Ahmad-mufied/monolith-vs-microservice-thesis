@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ -z "${DOCKERHUB_NAMESPACE:-}" ]; then
-  for env_file in env/vultr.env env/hetzner.env; do
+  for env_file in env/vultr.env; do
     if [ -f "$env_file" ]; then
       set -a
       source "$env_file"

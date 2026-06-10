@@ -50,7 +50,7 @@ make run-benchmark-suite
 
 Provider-specific `vultr-*` commands remain useful for debugging individual
 steps, but the final experiment should prefer the generic workflow so the same
-mental model works across EKS, Hetzner, and Vultr.
+mental model works across EKS and Vultr.
 
 ## Mental Model
 

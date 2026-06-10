@@ -30,15 +30,8 @@ ceiling. Use it when account quota cannot support the full parallel topology.
 The detailed operator flow is in
 `docs/infrastructure/sequential-benchmark-runbook.md`.
 
-An additive Hetzner Cloud path is also available for the CPU-optimized thesis
-baseline. In that path, Hetzner provides k3s compute, private networking, and
-PostgreSQL VM nodes; AWS S3 remains the benchmark artifact store; and Docker
-Hub public images replace ECR for Hetzner runs. See
-`docs/infrastructure/hetzner-cloud-architecture.md` and
-`docs/infrastructure/hetzner-benchmark-runbook.md`.
-
 An additive Vultr VKE path is available for high-vCPU benchmark execution when
-Hetzner quota is blocked or Vultr credit/quota is preferable. Vultr provides
+Vultr credit/quota is preferable. Vultr provides
 VKE app/testing worker pools, Vultr Compute PostgreSQL nodes, and legacy Vultr
 VPC networking. AWS S3 remains the benchmark artifact store and Docker Hub
 public images replace ECR for Vultr runs. See

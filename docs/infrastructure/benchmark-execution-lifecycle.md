@@ -17,7 +17,7 @@ The goal is to keep benchmark runs clean, repeatable, and easy to analyze
 without mixing results from different executions.
 
 The final thesis environment uses Vultr Kubernetes Engine (VKE). Older
-EKS-specific and Hetzner-specific examples remain relevant only as historical
+EKS-specific examples remain relevant only as historical
 or alternate operator workflows and are not the source of final thesis results.
 
 ## 2. Final Decision

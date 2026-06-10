@@ -183,11 +183,11 @@ Application pods run on `app-nodes`; k6 runner jobs run on `testing-nodes`.
 | Application | Go 1.26.2, Echo (REST), gRPC (internal) |
 | Database | PostgreSQL 18, pgx, Goose migrations |
 | Container | Docker |
-| Kubernetes | AWS EKS, Hetzner k3s, Vultr VKE |
+| Kubernetes | AWS EKS, Vultr VKE |
 | Infrastructure | Terraform |
 | Benchmarking | k6 |
 | Observability | Datadog |
-| Image Registry | AWS ECR (EKS), Docker Hub (Hetzner, Vultr) |
+| Image Registry | AWS ECR (EKS), Docker Hub (Vultr) |
 | Result Storage | AWS S3 |
 
 ## Project Structure
@@ -206,7 +206,7 @@ Application pods run on `app-nodes`; k6 runner jobs run on `testing-nodes`.
 │   ├── k8s/local/            # Minikube manifests
 │   ├── compose/              # Docker Compose for local dev
 │   └── helm/datadog/         # Datadog Helm values per environment
-├── infra/terraform/          # Terraform stacks for AWS, Hetzner, Vultr
+├── infra/terraform/          # Terraform stacks for AWS, Vultr
 ├── scripts/                  # operator and automation scripts
 ├── env/                      # generated environment files (gitignored)
 ├── docs/                     # project documentation
@@ -226,7 +226,7 @@ make env-init PLATFORM=vultr EXECUTION_MODE=sequential
 # 2. Build and push images
 export IMAGE_TAG=$(git rev-parse --short HEAD)
 make docker-build-all IMAGE_TAG=$IMAGE_TAG
-make dockerhub-push-all IMAGE_TAG=$IMAGE_TAG   # Hetzner/Vultr
+make dockerhub-push-all IMAGE_TAG=$IMAGE_TAG   # Vultr
 # or: make ecr-push-all IMAGE_TAG=$IMAGE_TAG   # AWS EKS
 
 # 3. Provision infrastructure
@@ -252,10 +252,9 @@ Run `make help` for the full command reference.
 | Provider | Terraform Stacks | K8s Runtime | Image Registry |
 |---|---|---|---|
 | AWS EKS | `aws-shared`, `aws-parallel`, `aws-sequential` | EKS | ECR |
-| Hetzner | `hetzner-shared`, `hetzner-parallel`, `hetzner-sequential` | k3s | Docker Hub |
 | Vultr | `vultr-shared`, `vultr-parallel`, `vultr-sequential` | VKE | Docker Hub |
 
-Provider-specific Makefile targets use prefixes: `eks-*`, `hetzner-*`, `vultr-*`.
+Provider-specific Makefile targets use prefixes: `eks-*`, `vultr-*`.
 Generic targets (`shared-apply`, `experiment-apply`, `deploy-workloads`,
 `run-benchmark-suite`) dispatch through `scripts/operator-dispatch.sh` based on
 `env/operator-profile.env`.
@@ -264,7 +263,6 @@ For detailed provider runbooks:
 
 - AWS: [`docs/infrastructure/benchmark-runbook-end-to-end.md`](docs/infrastructure/benchmark-runbook-end-to-end.md)
 - Vultr: [`docs/infrastructure/vultr-vke-runbook.md`](docs/infrastructure/vultr-vke-runbook.md)
-- Hetzner: [`docs/infrastructure/hetzner-benchmark-runbook.md`](docs/infrastructure/hetzner-benchmark-runbook.md)
 
 ## API Contract
 

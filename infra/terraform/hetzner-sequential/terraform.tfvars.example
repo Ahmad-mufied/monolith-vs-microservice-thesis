@@ -1,8 +1,0 @@
-hcloud_token              = "REPLACE_WITH_HCLOUD_TOKEN"
-project                   = "skripsi"
-location                  = "sin"
-sequential_cluster_name   = "skripsi-hetzner-benchmark"
-control_plane_server_type = "ccx13"
-app_server_type           = "ccx43"
-testing_server_type       = "ccx23"
-postgres_server_type      = "ccx33"

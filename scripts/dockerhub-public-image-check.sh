@@ -2,14 +2,12 @@
 set -euo pipefail
 
 if [ -z "${DOCKERHUB_NAMESPACE:-}" ]; then
-  for env_file in env/vultr.env env/hetzner.env; do
-    if [ -f "$env_file" ]; then
-      set -a
-      source "$env_file"
-      set +a
-      break
-    fi
-  done
+  env_file="env/vultr.env"
+  if [ -f "$env_file" ]; then
+    set -a
+    source "$env_file"
+    set +a
+  fi
 fi
 
 namespace="${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}"

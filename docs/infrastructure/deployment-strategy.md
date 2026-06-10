@@ -79,7 +79,7 @@ Purpose:
 
 Docker Compose is the fastest local validation layer.
 
-Use it before Minikube or Hetzner Kubernetes.
+Use it before Minikube.
 
 Suitable for:
 
@@ -158,7 +158,7 @@ Purpose:
 - collect Datadog telemetry,
 - store benchmark results in S3.
 
-Vultr VKE is the final experiment environment. Historical AWS EKS and Hetzner
+Vultr VKE is the final experiment environment. Historical AWS EKS
 paths may remain in the repository as alternate operator workflows, but they are
 not the final Chapter 4 evidence source unless explicitly labeled as
 historical/non-final.

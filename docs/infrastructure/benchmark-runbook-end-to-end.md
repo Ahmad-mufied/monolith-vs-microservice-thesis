@@ -136,7 +136,7 @@ The shared stack is common to both modes. Under a 24-vCPU quota, avoid keeping
 parallel and sequential experiment stacks active at the same time.
 
 For Vultr, apply `infra/terraform/vultr-shared` first, then either the Vultr
-parallel or Vultr sequential stack. Do not mix AWS, Hetzner, and Vultr
+parallel or Vultr sequential stack. Do not mix AWS and Vultr
 Terraform state.
 
 ### Step 2.0 — Confirm EKS Version Support

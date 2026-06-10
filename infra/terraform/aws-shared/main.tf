@@ -85,55 +85,6 @@ resource "aws_iam_role_policy" "k6_runner_s3" {
   })
 }
 
-# ─── IAM: external k6 runner S3 access for Hetzner ────────────────────────────
-# Hetzner pods cannot use EKS Pod Identity. This narrowly scoped IAM user is
-# only for uploading benchmark artifacts to the persistent S3 bucket.
-
-resource "aws_iam_user" "hetzner_k6_s3_writer" {
-  name = "${var.project}-hetzner-k6-s3-writer"
-  path = "/benchmark/"
-
-  tags = local.common_tags
-}
-
-resource "aws_iam_access_key" "hetzner_k6_s3_writer" {
-  user = aws_iam_user.hetzner_k6_s3_writer.name
-}
-
-resource "aws_iam_user_policy" "hetzner_k6_s3_writer" {
-  name = "s3-results-prefix-access"
-  user = aws_iam_user.hetzner_k6_s3_writer.name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid      = "ListBenchmarkExperimentPrefix"
-        Effect   = "Allow"
-        Action   = ["s3:ListBucket"]
-        Resource = "arn:aws:s3:::${var.s3_results_bucket}"
-        Condition = {
-          StringLike = {
-            "s3:prefix" = [
-              "experiments",
-              "experiments/*",
-            ]
-          }
-        }
-      },
-      {
-        Sid    = "ReadWriteBenchmarkArtifacts"
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-        ]
-        Resource = "arn:aws:s3:::${var.s3_results_bucket}/experiments/*"
-      },
-    ]
-  })
-}
-
 # ─── AWS Budget Nuclear Shutdown ──────────────────────────────────────────────
 # Budget lives in shared stack so it persists across experiment apply/destroy
 # cycles. Cluster names and RDS identifiers must stay aligned with the
