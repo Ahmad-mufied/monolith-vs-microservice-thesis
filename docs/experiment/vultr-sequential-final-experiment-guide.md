@@ -11,7 +11,7 @@ Use this document when the final experiment uses:
 PLATFORM=vultr
 EXECUTION_MODE=sequential
 Kubernetes context=benchmark
-Terraform experiment stack=infra/terraform/vultr-sequential
+Terraform stack=infra/terraform/vultr (execution_mode=sequential)
 Image registry=Docker Hub
 Result storage=AWS S3
 ```
@@ -310,9 +310,7 @@ make render-tfvars
 For Vultr, this renders:
 
 ```text
-infra/terraform/vultr-shared/terraform.tfvars
-infra/terraform/vultr-parallel/terraform.tfvars
-infra/terraform/vultr-sequential/terraform.tfvars
+infra/terraform/vultr/terraform.tfvars
 ```
 
 Do not commit generated `terraform.tfvars` files.
@@ -417,7 +415,7 @@ make shared-apply
 ```
 
 For Vultr, `OPERATOR_CIDRS` is rendered into
-`infra/terraform/vultr-shared/terraform.tfvars` and used by the shared firewall
+`infra/terraform/vultr/terraform.tfvars` and used by the firewall
 rules for PostgreSQL SSH access. If only the operator public IP changed, the
 experiment stack usually does not need to be applied again.
 

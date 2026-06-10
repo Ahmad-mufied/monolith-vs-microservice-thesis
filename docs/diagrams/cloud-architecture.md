@@ -177,13 +177,10 @@ flowchart TB
   s3["AWS S3<br/>benchmark artifacts"]
 
   subgraph vultr["Vultr account - sgp (Singapore)"]
-    subgraph shared["Shared stack: infra/terraform/vultr-shared"]
+    subgraph vultr_stack["Vultr stack: infra/terraform/vultr (execution_mode=parallel)"]
       vpc["Legacy VPC Network<br/>10.20.0.0/16"]
       ssh["Operator SSH key"]
       fw["PostgreSQL firewall group"]
-    end
-
-    subgraph parallel["Parallel stack: infra/terraform/vultr-parallel"]
       subgraph monoCluster["VKE: skripsi-vultr-monolith"]
         monoAppNodes["app-nodes<br/>1 x voc-c-8c-16gb-150s-amd<br/>node-group=app"]
         monoTesting["testing-nodes<br/>1 x vc2-2c-4gb<br/>node-group=testing<br/>taint workload=benchmark"]
@@ -206,7 +203,7 @@ flowchart TB
     end
   end
 
-  operator -->|"terraform apply / destroy"| parallel
+  operator -->|"terraform apply / destroy"| vultr_stack
   operator -->|"docker push"| dockerhub
   operator -->|"kubectl deploy"| monoCluster
   operator -->|"kubectl deploy"| msaCluster
@@ -241,12 +238,10 @@ flowchart TB
   s3["AWS S3"]
 
   subgraph vultr["Vultr account - sgp"]
-    subgraph shared["Shared stack"]
+    subgraph vultr_stack_seq["Vultr stack: infra/terraform/vultr (execution_mode=sequential)"]
       vpc["Legacy VPC Network<br/>10.20.0.0/16"]
       fw["PostgreSQL firewall group"]
-    end
 
-    subgraph sequential["Sequential stack: infra/terraform/vultr-sequential"]
       subgraph benchmarkCluster["VKE: skripsi-vultr-benchmark"]
         appPool["app-nodes<br/>1 x voc-c-8c-16gb-150s-amd<br/>node-group=app"]
         testPool["testing-nodes<br/>1 x vc2-2c-4gb<br/>node-group=testing<br/>taint workload=benchmark"]
@@ -260,7 +255,7 @@ flowchart TB
     end
   end
 
-  operator -->|"terraform apply"| sequential
+  operator -->|"terraform apply"| vultr_stack_seq
   operator -->|"docker push"| dockerhub
   operator -->|"deploy one arch at a time"| benchmarkCluster
 

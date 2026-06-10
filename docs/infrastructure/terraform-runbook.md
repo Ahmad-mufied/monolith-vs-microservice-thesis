@@ -5,9 +5,7 @@
 The Vultr path is additive and uses separate Terraform state:
 
 ```text
-infra/terraform/vultr-shared
-infra/terraform/vultr-sequential
-infra/terraform/vultr-parallel
+infra/terraform/vultr
 ```
 
 Use these targets for Vultr:
@@ -15,8 +13,7 @@ Use these targets for Vultr:
 ```bash
 make env-init-vultr
 make vultr-render-tfvars
-make vultr-shared-apply
-make vultr-parallel-apply
+make vultr-apply
 make vultr-setup-contexts-parallel
 make vultr-measure-resource-baseline
 ```
@@ -29,16 +26,14 @@ mechanism are in `docs/infrastructure/vultr-cloud-architecture.md`.
 Sequential fallback:
 
 ```bash
-make vultr-sequential-apply
+EXECUTION_MODE=sequential make vultr-apply
 make vultr-setup-context-sequential
 ```
 
 Destroy remains guarded by S3 verification:
 
 ```bash
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-parallel-destroy-confirmed
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-sequential-destroy-confirmed
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-shared-destroy-confirmed
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-destroy-confirmed
 ```
 
 VKE currently uses legacy Vultr VPC Networks, not VPC 2.0. Do not migrate the

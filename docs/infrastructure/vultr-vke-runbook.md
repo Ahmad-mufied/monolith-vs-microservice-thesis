@@ -35,8 +35,8 @@ provisioning                   : Terraform
 
 | Mode | Terraform stack | Kubernetes contexts | Use when |
 |---|---|---|---|
-| Parallel | `infra/terraform/vultr-parallel` | `monolith`, `msa` | Preferred thesis mode because monolith and MSA run in the same wall-clock benchmark window. |
-| Sequential | `infra/terraform/vultr-sequential` | `benchmark` | Fallback when Vultr quota or budget cannot support two full clusters at the same time. |
+| Parallel | `infra/terraform/vultr` (`execution_mode=parallel`) | `monolith`, `msa` | Preferred thesis mode because monolith and MSA run in the same wall-clock benchmark window. |
+| Sequential | `infra/terraform/vultr` (`execution_mode=sequential`) | `benchmark` | Fallback when Vultr quota or budget cannot support two full clusters at the same time. |
 
 Parallel mode is the default target for final benchmark runs. Sequential mode
 is valid for smoke tests, quota-constrained iteration, and fallback execution,
@@ -124,7 +124,7 @@ make aws-s3-writer-plan
 make aws-s3-writer-apply
 ```
 
-`make vultr-sequential-apply` and `make vultr-parallel-apply` run
+`make vultr-apply` runs
 `aws-s3-writer-apply` first, so the normal apply flow ensures the writer exists
 before the cluster is created. Manual `AWS_ACCESS_KEY_ID` and
 `AWS_SECRET_ACCESS_KEY` in `env/vultr.env` are still supported as a fallback,
@@ -273,39 +273,35 @@ make vultr-render-tfvars
 Generated files:
 
 ```text
-infra/terraform/vultr-shared/terraform.tfvars
-infra/terraform/vultr-parallel/terraform.tfvars
-infra/terraform/vultr-sequential/terraform.tfvars
+infra/terraform/vultr/terraform.tfvars
 ```
 
 Do not commit these files. They may contain local operator CIDRs and sensitive
 database configuration.
 
-After a stack has been initialized by its `make vultr-*-plan` target, validate
-the Vultr Terraform directories directly when you need a static check:
+After a stack has been initialized by its `make vultr-plan` target, validate
+the Vultr Terraform directory directly when you need a static check:
 
 ```bash
-terraform -chdir=infra/terraform/vultr-shared validate
-terraform -chdir=infra/terraform/vultr-parallel validate
-terraform -chdir=infra/terraform/vultr-sequential validate
+terraform -chdir=infra/terraform/vultr validate
 ```
 
-## Phase 4 - Apply Shared Infrastructure
+## Phase 4 - Apply Vultr Infrastructure
 
-The shared stack creates the Vultr legacy VPC, operator SSH key, and PostgreSQL
-firewall group.
+The stack creates the Vultr legacy VPC, operator SSH key, PostgreSQL
+firewall group, VKE clusters, and PostgreSQL VMs.
 
 Always inspect the reviewed plan before apply:
 
 ```bash
-make vultr-shared-plan
-make vultr-shared-apply
+make vultr-plan
+make vultr-apply
 ```
 
 Inspect outputs:
 
 ```bash
-terraform -chdir=infra/terraform/vultr-shared output
+terraform -chdir=infra/terraform/vultr output
 ```
 
 Expected outputs include:
@@ -319,9 +315,9 @@ postgres_firewall_group_id
 
 Operational note:
 
-- `vultr-sequential` and `vultr-parallel` consume `vultr-shared` outputs from
-  the local `infra/terraform/vultr-shared/terraform.tfstate` file.
-- Do not delete shared Vultr resources manually from the web console unless you
+- All Vultr resources (VPC, clusters, PostgreSQL VMs) are managed by the
+  single `infra/terraform/vultr` stack.
+- Do not delete Vultr resources manually from the web console unless you
   are also reconciling Terraform state.
 
 ## Phase 5 - Choose and Apply an Experiment Stack
@@ -330,8 +326,8 @@ Choose exactly one path for the first integration pass:
 
 | Path | Commands | Use case |
 |---|---|---|
-| Sequential | `vultr-sequential-plan`, `vultr-sequential-apply` | lowest cost and easiest first smoke |
-| Parallel | `vultr-parallel-plan`, `vultr-parallel-apply` | final thesis mode with aligned wall-clock windows |
+| Sequential | `vultr-plan`, `vultr-apply` (with `execution_mode=sequential`) | lowest cost and easiest first smoke |
+| Parallel | `vultr-plan`, `vultr-apply` (with `execution_mode=parallel`) | final thesis mode with aligned wall-clock windows |
 
 Do not keep parallel and sequential stacks active together unless the quota and
 budget impact is intentional.
@@ -375,8 +371,8 @@ VULTR_NODE_READY_TIMEOUT_SECONDS=1200 make experiment-bootstrap
 Use this path for the first manual integration test:
 
 ```bash
-make vultr-sequential-plan
-make vultr-sequential-apply
+make vultr-plan
+EXECUTION_MODE=sequential make vultr-apply
 make vultr-setup-context-sequential
 kubectl config get-contexts benchmark
 kubectl --context=benchmark get nodes -o wide
@@ -399,8 +395,8 @@ Use sequential mode instead when quota, credit, or budget cannot support the
 full parallel topology, and destroy promptly after S3 results are verified.
 
 ```bash
-make vultr-parallel-plan
-make vultr-parallel-apply
+make vultr-plan
+EXECUTION_MODE=parallel make vultr-apply
 make vultr-setup-contexts-parallel
 kubectl config get-contexts monolith msa
 kubectl --context=monolith get nodes -o wide
@@ -765,22 +761,8 @@ hpa mode:
 
 Destroy only after S3 artifacts are verified.
 
-Parallel:
-
 ```bash
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-parallel-destroy-confirmed
-```
-
-Sequential:
-
-```bash
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-sequential-destroy-confirmed
-```
-
-Shared:
-
-```bash
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-shared-destroy-confirmed
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-destroy-confirmed
 ```
 
 After destroy, check the Vultr dashboard for leftover:
@@ -792,14 +774,6 @@ firewall groups
 legacy VPC networks
 SSH keys created for the benchmark
 ```
-
-Do not destroy the shared stack while an experiment stack still references the
-shared VPC or firewall group.
-
-The `terraform-vultr.sh` script enforces this: `terraform destroy` on `shared`
-checks both `vultr-sequential` and `vultr-parallel` state files for active
-resources. If either state file still has resources, the destroy is refused
-with an actionable error message.
 
 ## Troubleshooting
 
@@ -818,7 +792,7 @@ Quick status bundle:
 ```bash
 make show-image-tag
 make vultr-preflight-check
-terraform -chdir=infra/terraform/vultr-shared output
+terraform -chdir=infra/terraform/vultr output
 kubectl config get-contexts monolith msa benchmark
 kubectl --context=benchmark get pods -A
 ```
@@ -883,21 +857,21 @@ or resource quota.
 Check Terraform failure details:
 
 ```bash
-terraform -chdir=infra/terraform/vultr-parallel plan
-terraform -chdir=infra/terraform/vultr-sequential plan
+terraform -chdir=infra/terraform/vultr plan
 ```
 
 If parallel apply fails because quota is not enough, destroy any partially
-created parallel resources after checking the plan/state, then use sequential:
+created resources after checking the plan/state, then switch to sequential mode:
 
 ```bash
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-parallel-destroy-confirmed
-make vultr-sequential-plan
-make vultr-sequential-apply
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-destroy-confirmed
+# Re-apply with execution_mode=sequential
+make vultr-plan
+EXECUTION_MODE=sequential make vultr-apply
 ```
 
-Do not destroy shared resources unless no experiment stack still depends on the
-shared VPC and firewall group.
+Do not destroy resources while a benchmark run is still in progress or before
+S3 results are verified.
 
 ### Terraform plan or apply fails before creating clusters
 
@@ -906,9 +880,7 @@ Check env and rendered tfvars:
 ```bash
 make vultr-preflight-check
 make vultr-render-tfvars
-terraform -chdir=infra/terraform/vultr-shared validate
-terraform -chdir=infra/terraform/vultr-parallel validate
-terraform -chdir=infra/terraform/vultr-sequential validate
+terraform -chdir=infra/terraform/vultr validate
 ```
 
 Common fixes:
@@ -926,8 +898,7 @@ Common fixes:
 Check Terraform outputs:
 
 ```bash
-terraform -chdir=infra/terraform/vultr-parallel output
-terraform -chdir=infra/terraform/vultr-sequential output
+terraform -chdir=infra/terraform/vultr output
 ```
 
 Fix for parallel:
@@ -1075,7 +1046,7 @@ For parallel, inspect the matching architecture context.
 Check private IP outputs and secret-generated URLs:
 
 ```bash
-terraform -chdir=infra/terraform/vultr-parallel output
+terraform -chdir=infra/terraform/vultr output
 kubectl --context=monolith get secret app-secret -n mono
 kubectl --context=monolith get pods -n mono
 kubectl --context=monolith logs -n mono deploy/monolith --tail=100
@@ -1149,27 +1120,11 @@ Destroy is intentionally guarded. Verify S3 first:
 aws s3 ls "s3://$S3_BUCKET/experiments/<run_id>/" --recursive
 ```
 
-Then choose the matching stack:
+Then destroy:
 
 ```bash
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-sequential-destroy-confirmed
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-parallel-destroy-confirmed
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-destroy-confirmed
 ```
 
-Destroy shared last:
-
-```bash
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-shared-destroy-confirmed
-```
-
-If destroy fails, rerun `terraform plan` in the same stack and inspect whether
-the remaining dependency belongs to shared or experiment state before deleting
-anything manually in the Vultr dashboard.
-
-If `make vultr-shared-destroy-confirmed` fails with:
-
-```text
-ERROR: Cannot destroy vultr-shared while infra/terraform/vultr-sequential/terraform.tfstate still has N resources.
-```
-
-Destroy the experiment stack first, then retry the shared destroy.
+If destroy fails, rerun `terraform plan` and inspect the remaining resources
+before deleting anything manually in the Vultr dashboard.

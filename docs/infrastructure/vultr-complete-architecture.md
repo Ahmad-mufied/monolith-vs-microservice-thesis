@@ -115,36 +115,30 @@ PostgreSQL VM   : 1 x 2 vCPU = 2 vCPU, 4 GB RAM
 
 ## 5. Terraform Architecture
 
-The Vultr infrastructure is organized into three Terraform stacks with one
-reusable module:
+The Vultr infrastructure is organized into a single Terraform stack with one
+reusable module. The `execution_mode` variable controls whether the stack
+creates parallel (two-cluster) or sequential (one-cluster) resources.
 
 ### 5.1 Stack Organization
 
 ```mermaid
 flowchart TB
-  subgraph stacks["Terraform Stacks"]
-    shared["vultr-shared<br/>VPC + SSH key + Firewall"]
-    parallel["vultr-parallel<br/>2 VKE clusters + 2 PG VMs"]
-    sequential["vultr-sequential<br/>1 VKE cluster + 1 PG VM"]
+  subgraph stacks["Terraform Stack"]
+    vultr["vultr<br/>VPC + SSH key + Firewall + VKE clusters + PG VMs"]
   end
 
   subgraph module["Reusable Module"]
     cluster["vultr-vke-benchmark-cluster<br/>VKE + testing pool + PG VM"]
   end
 
-  shared --> parallel
-  shared --> sequential
-  cluster --> parallel
-  cluster --> sequential
+  cluster --> vultr
 ```
 
 ### 5.2 Stack Details
 
 | Stack | Path | Resources Created |
 |---|---|---|
-| **Shared** | `infra/terraform/vultr-shared/` | Legacy VPC (10.20.0.0/16), SSH key, PostgreSQL firewall group with 3 rules |
-| **Parallel** | `infra/terraform/vultr-parallel/` | 2 VKE clusters + 2 PostgreSQL VMs (one per architecture) |
-| **Sequential** | `infra/terraform/vultr-sequential/` | 1 VKE cluster + 1 PostgreSQL VM (shared, one arch at a time) |
+| **Vultr** | `infra/terraform/vultr/` | Legacy VPC (10.20.0.0/16), SSH key, PostgreSQL firewall group, VKE clusters, and PostgreSQL VMs. `execution_mode=parallel` creates 2 clusters + 2 PG VMs; `execution_mode=sequential` creates 1 cluster + 1 PG VM. |
 
 ### 5.3 Reusable Module: vultr-vke-benchmark-cluster
 
@@ -154,17 +148,17 @@ Each cluster instance creates:
 - `vultr_kubernetes_node_pools` — Testing node pool (labeled `node-group=testing`, tainted `workload=benchmark:NoSchedule`)
 - `vultr_instance` — PostgreSQL Compute VM with cloud-init provisioning
 
-### 5.4 Shared Stack Resources
+### 5.4 Merged Stack Resources
 
 ```text
-infra/terraform/vultr-shared/
-├── main.tf           # Legacy VPC, SSH key, firewall group
-├── variables.tf      # VULTR_VPC_CIDR, OPERATOR_CIDRS, SSH public key
-├── outputs.tf        # vpc_id, vpc_cidr, ssh_key_ids, postgres_firewall_group_id
+infra/terraform/vultr/
+├── main.tf           # VPC, SSH key, firewall group, VKE clusters, PG VMs
+├── variables.tf      # execution_mode, cluster names, node plans, region
+├── outputs.tf        # Kubeconfig, PostgreSQL IPs for active clusters
 └── versions.tf       # vultr/vultr ~> 2.31, terraform >= 1.6
 ```
 
-Resources:
+Resources (shared regardless of execution mode):
 
 - **Legacy VPC Network**: CIDR 10.20.0.0/16, used by all VKE clusters and PostgreSQL VMs
 - **SSH Key**: Operator's public key for PostgreSQL VM access
@@ -173,17 +167,7 @@ Resources:
   - Rule 2: Operator CIDR → port 22 (SSH)
   - Rule 3: VPC CIDR → port 22 (SSH from VKE nodes)
 
-### 5.5 Parallel Stack Resources
-
-```text
-infra/terraform/vultr-parallel/
-├── main.tf           # 2x vultr-vke-benchmark-cluster module instances
-├── variables.tf      # Cluster names, node plans, region
-├── outputs.tf        # Kubeconfig, PostgreSQL IPs for both clusters
-└── versions.tf
-```
-
-Creates:
+Resources created when `execution_mode = "parallel"`:
 
 ```text
 VKE: skripsi-vultr-monolith
@@ -197,17 +181,7 @@ VKE: skripsi-vultr-msa
   └── PostgreSQL VM: auth_db, item_db, transaction_db
 ```
 
-### 5.6 Sequential Stack Resources
-
-```text
-infra/terraform/vultr-sequential/
-├── main.tf           # 1x vultr-vke-benchmark-cluster module instance
-├── variables.tf
-├── outputs.tf
-└── versions.tf
-```
-
-Creates:
+Resources created when `execution_mode = "sequential"`:
 
 ```text
 VKE: skripsi-vultr-benchmark
@@ -638,7 +612,7 @@ sequenceDiagram
   participant DD as Datadog SaaS
 
   Op->>DH: Build and push 7 images
-  Op->>TF: make vultr-shared-apply
+  Op->>TF: make vultr-apply
   TF->>VKE: Create VKE cluster + node pools
   TF->>PG: Create PostgreSQL VM + cloud-init
   Op->>VKE: Setup kubeconfig contexts
@@ -764,10 +738,8 @@ flowchart TB
   push["make dockerhub-push-all<br/>Push to Docker Hub"]
   preflight["make vultr-preflight-check<br/>Validate env + images"]
   tfvars["make vultr-render-tfvars<br/>Generate terraform.tfvars"]
-  shared["make vultr-shared-apply<br/>VPC + SSH + Firewall"]
   choice{"Execution mode?"}
-  parallel["make vultr-parallel-apply<br/>2 VKE + 2 PG VMs"]
-  sequential["make vultr-sequential-apply<br/>1 VKE + 1 PG VM"]
+  apply["make vultr-apply<br/>VPC + SSH + Firewall + clusters"]
   contexts["Setup kubeconfig contexts"]
   secrets["Create K8s secrets"]
   baseline["Measure resource baseline"]
@@ -779,9 +751,9 @@ flowchart TB
   destroy["Guarded destroy"]
   done(["Done"])
 
-  start --> env --> edit --> build --> push --> preflight --> tfvars --> shared --> choice
-  choice -->|"parallel"| parallel --> contexts
-  choice -->|"sequential"| sequential --> contexts
+  start --> env --> edit --> build --> push --> preflight --> tfvars --> choice
+  choice -->|"parallel (execution_mode=parallel)"| apply --> contexts
+  choice -->|"sequential (execution_mode=sequential)"| apply --> contexts
   contexts --> secrets --> baseline --> manifests --> deploy --> verify --> benchmark --> s3 --> destroy --> done
 ```
 
@@ -794,8 +766,7 @@ flowchart TB
 | Push | `dockerhub-push-all` | Push to Docker Hub |
 | Validate | `vultr-preflight-check` | Validate everything |
 | Terraform | `vultr-render-tfvars` | Generate tfvars |
-| Terraform | `vultr-shared-apply` | Apply shared infra |
-| Terraform | `vultr-parallel-apply` | Apply parallel stack |
+| Terraform | `vultr-apply` | Apply Vultr infra (mode selected by `execution_mode`) |
 | K8s | `vultr-setup-contexts-parallel` | Write kubeconfig |
 | K8s | `vultr-create-secrets` | Create K8s secrets |
 | K8s | `vultr-measure-resource-baseline` | Measure node capacity |
@@ -803,7 +774,7 @@ flowchart TB
 | Deploy | `vultr-deploy-all` | Deploy applications |
 | Verify | `vultr-verify-live-mode` | Verify fixed/HPA mode |
 | Benchmark | `run-benchmark-suite-vultr` | Run full benchmark suite |
-| Destroy | `vultr-parallel-destroy-confirmed` | Destroy (S3 verified) |
+| Destroy | `vultr-destroy-confirmed` | Destroy (S3 verified) |
 
 ---
 
@@ -984,7 +955,7 @@ Use the current Vultr pricing page for the selected region before applying.
 - Destroy infrastructure immediately after S3 verification
 - Use sequential mode for smoke tests and iteration
 - Use parallel mode only for final thesis runs
-- Do not keep both parallel and sequential stacks active simultaneously
+- The single `vultr` stack manages both execution modes via `execution_mode` variable
 
 ---
 
@@ -1006,7 +977,7 @@ The `vultr-preflight-check` validates:
 Destroy requires explicit S3 verification:
 
 ```bash
-S3_BENCHMARK_DATA_VERIFIED=true make vultr-parallel-destroy-confirmed
+S3_BENCHMARK_DATA_VERIFIED=true make vultr-destroy-confirmed
 ```
 
 Without `S3_BENCHMARK_DATA_VERIFIED=true`, destroy commands are blocked.
@@ -1014,26 +985,13 @@ Without `S3_BENCHMARK_DATA_VERIFIED=true`, destroy commands are blocked.
 ### 18.3 Ordered Destroy
 
 ```text
-1. Destroy experiment stack (parallel or sequential)
+1. Destroy experiment resources (VKE clusters, PG VMs)
 2. Verify no remaining resources in Vultr dashboard
-3. Destroy shared stack (VPC, SSH, firewall)
+3. Destroy shared resources (VPC, SSH, firewall)
 ```
 
-### 18.4 Local-State Dependency Guard
-
-Experiment stacks (`vultr-sequential`, `vultr-parallel`) read shared outputs
-from `../vultr-shared/terraform.tfstate` via `terraform_remote_state` with
-`backend = "local"`. This means:
-
-- Manual deletion of shared resources in the Vultr dashboard breaks the state
-  reference for subsequent `terraform plan`/`apply`/`destroy` on experiment
-  stacks.
-- Destroying `shared` while experiment state still has resources leaves orphaned
-  Vultr infrastructure that requires manual cleanup.
-
-The `terraform-vultr.sh` script enforces ordered destroy: `terraform destroy` on
-`shared` checks both experiment state files for active resources using
-`terraform state list` and refuses to proceed if either is non-empty.
+All resources are managed by the single `vultr` stack, so a single
+`terraform destroy` removes everything in the correct dependency order.
 
 ---
 

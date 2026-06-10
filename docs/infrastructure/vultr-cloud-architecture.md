@@ -10,9 +10,7 @@ data flow.
 The active implementation is in:
 
 ```text
-infra/terraform/vultr-shared
-infra/terraform/vultr-parallel
-infra/terraform/vultr-sequential
+infra/terraform/vultr
 infra/terraform/modules/vultr-vke-benchmark-cluster
 scripts/*vultr*.sh
 scripts/lib/cloud-provider.sh
@@ -76,14 +74,11 @@ time-series from monolith and MSA can be compared over the same load window.
 ```text
 Vultr region: sgp
 
-  Shared stack: infra/terraform/vultr-shared
+  Vultr stack: infra/terraform/vultr (execution_mode=parallel)
   ------------------------------------------------------------
   Legacy Vultr VPC network: 10.20.0.0/16
   Operator SSH key
   PostgreSQL firewall group
-
-  Experiment stack: infra/terraform/vultr-parallel
-  ------------------------------------------------------------
 
   +-----------------------------------+     +-----------------------------------+
   | VKE: skripsi-vultr-monolith       |     | VKE: skripsi-vultr-msa            |
@@ -124,14 +119,11 @@ Vultr region: sgp
 ```text
 Vultr region: sgp
 
-  Shared stack: infra/terraform/vultr-shared
+  Vultr stack: infra/terraform/vultr (execution_mode=sequential)
   ------------------------------------------------------------
   Legacy Vultr VPC network
   Operator SSH key
   PostgreSQL firewall group
-
-  Sequential stack: infra/terraform/vultr-sequential
-  ------------------------------------------------------------
 
   +-------------------------------------------------------------+
   | VKE: skripsi-vultr-benchmark                                |

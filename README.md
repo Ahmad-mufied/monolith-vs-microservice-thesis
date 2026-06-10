@@ -252,7 +252,7 @@ Run `make help` for the full command reference.
 | Provider | Terraform Stacks | K8s Runtime | Image Registry |
 |---|---|---|---|
 | AWS EKS | `aws-shared`, `aws-parallel`, `aws-sequential` | EKS | ECR |
-| Vultr | `vultr-shared`, `vultr-parallel`, `vultr-sequential` | VKE | Docker Hub |
+| Vultr | `vultr` (single stack with `execution_mode` toggle) | VKE | Docker Hub |
 
 Provider-specific Makefile targets use prefixes: `eks-*`, `vultr-*`.
 Generic targets (`shared-apply`, `experiment-apply`, `deploy-workloads`,

@@ -18,7 +18,7 @@ terraform -chdir=infra/terraform/aws-s3-writer output -raw vultr_k6_s3_access_ke
 terraform -chdir=infra/terraform/aws-s3-writer output -raw vultr_k6_s3_secret_access_key
 ```
 
-`make vultr-sequential-apply` and `make vultr-parallel-apply` run
+`make vultr-apply` runs
 `make aws-s3-writer-apply` first, so the standard Vultr apply flow prepares the
 S3 writer before creating cluster infrastructure. Manual `AWS_ACCESS_KEY_ID`
 and `AWS_SECRET_ACCESS_KEY` values in `env/vultr.env` remain a fallback only.
