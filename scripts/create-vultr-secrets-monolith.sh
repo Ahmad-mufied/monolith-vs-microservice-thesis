@@ -57,7 +57,7 @@ load_vultr_s3_credentials
 if [ -n "${VULTR_SEQUENTIAL_POSTGRES_IP:-}" ]; then
   postgres_ip="$VULTR_SEQUENTIAL_POSTGRES_IP"
 else
-  postgres_ip="$(terraform_output_required infra/terraform/vultr-parallel monolith_postgres_private_ip "monolith PostgreSQL private IP")"
+  postgres_ip="$(terraform_output_required infra/terraform/vultr monolith_postgres_private_ip "monolith PostgreSQL private IP")"
 fi
 encoded_db_password="$(url_encode "$POSTGRES_PASSWORD")"
 K8S="kubectl --context=${VULTR_CONTEXT:-monolith}"

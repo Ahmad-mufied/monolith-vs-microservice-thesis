@@ -61,8 +61,7 @@ dispatch_shared_terraform() {
       esac
       ;;
     vultr)
-      bash scripts/terraform-vultr.sh shared init
-      bash scripts/terraform-vultr.sh shared "$terraform_action" "$@"
+      dispatch_vultr_terraform "$terraform_action" "$@"
       ;;
   esac
 }
@@ -75,29 +74,40 @@ dispatch_experiment_terraform() {
     set -- -out=tfplan
   fi
 
-  if [[ "$terraform_action" == "apply" && "$PLATFORM" == "vultr" ]]; then
+  case "$PLATFORM" in
+    vultr)
+      dispatch_vultr_terraform "$terraform_action" "$@"
+      ;;
+    eks)
+      case "${EXECUTION_MODE}" in
+        parallel)
+          TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-parallel.sh init
+          TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-parallel.sh "$terraform_action" "$@"
+          ;;
+        sequential)
+          TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-sequential.sh init
+          TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-sequential.sh "$terraform_action" "$@"
+          ;;
+      esac
+      ;;
+  esac
+}
+
+dispatch_vultr_terraform() {
+  local terraform_action="$1"
+  shift || true
+
+  if [[ "$terraform_action" == "plan" && "$#" -eq 0 ]]; then
+    set -- -out=tfplan
+  fi
+
+  if [[ "$terraform_action" == "apply" ]]; then
     TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-s3-writer.sh init
     TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-s3-writer.sh apply
   fi
 
-  case "${PLATFORM}:${EXECUTION_MODE}" in
-    eks:parallel)
-      TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-parallel.sh init
-      TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-parallel.sh "$terraform_action" "$@"
-      ;;
-    eks:sequential)
-      TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-sequential.sh init
-      TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-sequential.sh "$terraform_action" "$@"
-      ;;
-    vultr:parallel)
-      bash scripts/terraform-vultr.sh parallel init
-      bash scripts/terraform-vultr.sh parallel "$terraform_action" "$@"
-      ;;
-    vultr:sequential)
-      bash scripts/terraform-vultr.sh sequential init
-      bash scripts/terraform-vultr.sh sequential "$terraform_action" "$@"
-      ;;
-  esac
+  bash scripts/terraform-vultr.sh init
+  bash scripts/terraform-vultr.sh "$terraform_action" "$@"
 }
 
 dispatch_setup_contexts() {

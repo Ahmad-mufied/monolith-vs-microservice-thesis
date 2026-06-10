@@ -109,14 +109,14 @@ write_kubeconfig() {
 
 case "$mode" in
   sequential)
-    expected_cluster="$(terraform -chdir=infra/terraform/vultr-sequential output -raw sequential_cluster_name)"
-    write_kubeconfig infra/terraform/vultr-sequential sequential_kube_config benchmark "$expected_cluster"
+    expected_cluster="$(terraform -chdir=infra/terraform/vultr output -raw sequential_cluster_name)"
+    write_kubeconfig infra/terraform/vultr sequential_kube_config benchmark "$expected_cluster"
     ;;
   parallel)
-    mono_cluster="$(terraform -chdir=infra/terraform/vultr-parallel output -raw monolith_cluster_name)"
-    msa_cluster="$(terraform -chdir=infra/terraform/vultr-parallel output -raw msa_cluster_name)"
-    write_kubeconfig infra/terraform/vultr-parallel monolith_kube_config monolith "$mono_cluster"
-    write_kubeconfig infra/terraform/vultr-parallel msa_kube_config msa "$msa_cluster"
+    mono_cluster="$(terraform -chdir=infra/terraform/vultr output -raw monolith_cluster_name)"
+    msa_cluster="$(terraform -chdir=infra/terraform/vultr output -raw msa_cluster_name)"
+    write_kubeconfig infra/terraform/vultr monolith_kube_config monolith "$mono_cluster"
+    write_kubeconfig infra/terraform/vultr msa_kube_config msa "$msa_cluster"
     ;;
   *)
     echo "VULTR_MODE must be sequential or parallel" >&2
