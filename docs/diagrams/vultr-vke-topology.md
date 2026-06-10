@@ -120,7 +120,6 @@ sequenceDiagram
 
   Op->>DH: Build and push public images
   Op->>TF: make vultr-render-tfvars
-  Op->>TF: make vultr-apply
   Op->>TF: make vultr-apply (execution_mode selects parallel or sequential)
   TF->>VKE: Create app/testing node pools
   TF->>PG: Create PostgreSQL compute VM on legacy VPC
