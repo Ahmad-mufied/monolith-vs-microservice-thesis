@@ -30,9 +30,17 @@ type Config struct {
 	HTTPServer             HTTPServerConfig
 	// GRPCCallTimeout is the application-level per-call deadline applied to
 	// every outbound gRPC request made by the API Gateway. It must be smaller
-	// than HTTPServer.WriteTimeout so the gateway has time to translate the
-	// deadline error into a 503 response before the transport cuts off.
+	// than RequestTimeout so the gateway can translate the gRPC deadline error
+	// into a proper HTTP response before the overall request deadline expires.
 	GRPCCallTimeout time.Duration
+	// RequestTimeout is the application-level per-request deadline applied as a
+	// context timeout inside the Echo ContextTimeout middleware. This ensures
+	// that even multi-call handlers (e.g. GetAllEnriched) have an overall
+	// deadline. It must be smaller than HTTPServer.WriteTimeout so the app can
+	// write a proper error response (503/499) before the transport closes the
+	// connection, and larger than GRPCCallTimeout so individual gRPC calls can
+	// complete within the request budget.
+	RequestTimeout time.Duration
 }
 
 func Load() (*Config, error) {
@@ -49,6 +57,14 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("GRPC_CALL_TIMEOUT must be greater than 0")
 	}
 
+	requestTimeout, err := getEnvDuration("REQUEST_TIMEOUT", 12*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("REQUEST_TIMEOUT: %w", err)
+	}
+	if requestTimeout <= 0 {
+		return nil, fmt.Errorf("REQUEST_TIMEOUT must be greater than 0")
+	}
+
 	cfg := &Config{
 		HTTPPort:               pkgconfig.GetEnv("HTTP_PORT", "8080"),
 		JWTSecret:              os.Getenv("JWT_SECRET"),
@@ -57,6 +73,7 @@ func Load() (*Config, error) {
 		TransactionServiceAddr: os.Getenv("TRANSACTION_SERVICE_ADDR"),
 		HTTPServer:             httpServer,
 		GRPCCallTimeout:        grpcCallTimeout,
+		RequestTimeout:         requestTimeout,
 	}
 
 	if cfg.JWTSecret == "" {
@@ -71,8 +88,11 @@ func Load() (*Config, error) {
 	if cfg.TransactionServiceAddr == "" {
 		return nil, fmt.Errorf("TRANSACTION_SERVICE_ADDR is required")
 	}
-	if cfg.GRPCCallTimeout >= cfg.HTTPServer.WriteTimeout {
-		return nil, fmt.Errorf("GRPC_CALL_TIMEOUT (%s) must be smaller than HTTP_WRITE_TIMEOUT (%s)", cfg.GRPCCallTimeout, cfg.HTTPServer.WriteTimeout)
+	if cfg.GRPCCallTimeout >= cfg.RequestTimeout {
+		return nil, fmt.Errorf("GRPC_CALL_TIMEOUT (%s) must be smaller than REQUEST_TIMEOUT (%s)", cfg.GRPCCallTimeout, cfg.RequestTimeout)
+	}
+	if cfg.RequestTimeout >= cfg.HTTPServer.WriteTimeout {
+		return nil, fmt.Errorf("REQUEST_TIMEOUT (%s) must be smaller than HTTP_WRITE_TIMEOUT (%s)", cfg.RequestTimeout, cfg.HTTPServer.WriteTimeout)
 	}
 
 	return cfg, nil

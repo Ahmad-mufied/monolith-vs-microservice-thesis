@@ -12,6 +12,7 @@ import (
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/client"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/config"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/handler"
+	mware "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/middleware"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/router"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/observability"
 	authv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/auth/v1"
@@ -20,6 +21,7 @@ import (
 	grpctrace "github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2"
 	echotrace "github.com/DataDog/dd-trace-go/contrib/labstack/echo.v4/v2"
 	"github.com/labstack/echo/v4"
+	echomw "github.com/labstack/echo/v4/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -74,6 +76,15 @@ func Run() error {
 
 	// Setup router.
 	e := echotrace.Wrap(echo.New(), echotrace.WithService(serviceName))
+	// Use Echo's built-in context-timeout middleware so handlers receive a
+	// deadline-aware request context. The custom error handler preserves the
+	// public timeout contract: deadline reached -> 503, caller canceled -> 499.
+	// This ensures multi-call handlers (e.g. GetAllEnriched) have an overall
+	// deadline and do not exceed the HTTP WriteTimeout.
+	e.Use(echomw.ContextTimeoutWithConfig(echomw.ContextTimeoutConfig{
+		Timeout:      cfg.RequestTimeout,
+		ErrorHandler: mware.ContextTimeoutErrorHandler,
+	}))
 	router.RegisterRoutes(e, healthH, authH, itemH, txH, cfg.JWTSecret)
 
 	// Start HTTP server with explicit transport timeouts from config.
@@ -92,7 +103,7 @@ func Run() error {
 
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Printf("api-gateway HTTP listening on %s (grpc_call_timeout=%s)", addr, cfg.GRPCCallTimeout)
+		log.Printf("api-gateway HTTP listening on %s (request_timeout=%s grpc_call_timeout=%s)", addr, cfg.RequestTimeout, cfg.GRPCCallTimeout)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}

@@ -31,6 +31,9 @@ func TestLoad(t *testing.T) {
 				if cfg.GRPCCallTimeout != 10*time.Second {
 					t.Errorf("GRPCCallTimeout = %s, want 10s", cfg.GRPCCallTimeout)
 				}
+				if cfg.RequestTimeout != 12*time.Second {
+					t.Errorf("RequestTimeout = %s, want 12s", cfg.RequestTimeout)
+				}
 				if cfg.HTTPServer.ReadHeaderTimeout != 5*time.Second ||
 					cfg.HTTPServer.ReadTimeout != 15*time.Second ||
 					cfg.HTTPServer.WriteTimeout != 15*time.Second ||
@@ -63,6 +66,7 @@ func TestLoad(t *testing.T) {
 				"ITEM_SERVICE_ADDR":        "item:50052",
 				"TRANSACTION_SERVICE_ADDR": "tx:50053",
 				"GRPC_CALL_TIMEOUT":        "9s",
+				"REQUEST_TIMEOUT":          "13s",
 				"HTTP_READ_HEADER_TIMEOUT": "6s",
 				"HTTP_READ_TIMEOUT":        "12s",
 				"HTTP_WRITE_TIMEOUT":       "14s",
@@ -72,6 +76,9 @@ func TestLoad(t *testing.T) {
 			check: func(t *testing.T, cfg *Config) {
 				if cfg.GRPCCallTimeout != 9*time.Second {
 					t.Errorf("GRPCCallTimeout = %s, want 9s", cfg.GRPCCallTimeout)
+				}
+				if cfg.RequestTimeout != 13*time.Second {
+					t.Errorf("RequestTimeout = %s, want 13s", cfg.RequestTimeout)
 				}
 				if cfg.HTTPServer.ReadHeaderTimeout != 6*time.Second ||
 					cfg.HTTPServer.ReadTimeout != 12*time.Second ||
@@ -142,6 +149,30 @@ func TestLoad(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "request timeout must be greater than grpc timeout",
+			env: map[string]string{
+				"JWT_SECRET":               "secret",
+				"AUTH_SERVICE_ADDR":        "auth:50051",
+				"ITEM_SERVICE_ADDR":        "item:50052",
+				"TRANSACTION_SERVICE_ADDR": "tx:50053",
+				"GRPC_CALL_TIMEOUT":        "12s",
+				"REQUEST_TIMEOUT":          "10s",
+			},
+			wantErr: true,
+		},
+		{
+			name: "request timeout must be smaller than write timeout",
+			env: map[string]string{
+				"JWT_SECRET":               "secret",
+				"AUTH_SERVICE_ADDR":        "auth:50051",
+				"ITEM_SERVICE_ADDR":        "item:50052",
+				"TRANSACTION_SERVICE_ADDR": "tx:50053",
+				"REQUEST_TIMEOUT":          "15s",
+				"HTTP_WRITE_TIMEOUT":       "15s",
+			},
+			wantErr: true,
+		},
+		{
 			name: "invalid http timeout returns error",
 			env: map[string]string{
 				"JWT_SECRET":               "secret",
@@ -164,6 +195,7 @@ func TestLoad(t *testing.T) {
 				"ITEM_SERVICE_ADDR",
 				"TRANSACTION_SERVICE_ADDR",
 				"GRPC_CALL_TIMEOUT",
+				"REQUEST_TIMEOUT",
 				"HTTP_READ_HEADER_TIMEOUT",
 				"HTTP_READ_TIMEOUT",
 				"HTTP_WRITE_TIMEOUT",
