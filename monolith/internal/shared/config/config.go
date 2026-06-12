@@ -74,24 +74,24 @@ func Load() (Config, error) {
 	}
 
 	loginAdmissionEnabled := os.Getenv("LOGIN_ADMISSION_ENABLED") == "true"
-	loginMaxConcurrency, err := getEnvInt("LOGIN_MAX_CONCURRENCY", 8)
-	if err != nil {
-		return Config{}, fmt.Errorf("LOGIN_MAX_CONCURRENCY: %w", err)
-	}
-	if loginMaxConcurrency <= 0 {
-		return Config{}, fmt.Errorf("LOGIN_MAX_CONCURRENCY must be greater than 0")
-	}
-	loginQueueTimeout, err := getEnvDuration("LOGIN_QUEUE_TIMEOUT", 2*time.Second)
-	if err != nil {
-		return Config{}, fmt.Errorf("LOGIN_QUEUE_TIMEOUT: %w", err)
-	}
-	if loginQueueTimeout <= 0 {
-		return Config{}, fmt.Errorf("LOGIN_QUEUE_TIMEOUT must be greater than 0")
-	}
-	loginAdmission := admission.Config{
-		Enabled:        loginAdmissionEnabled,
-		MaxConcurrency: loginMaxConcurrency,
-		QueueTimeout:   loginQueueTimeout,
+	loginAdmission := admission.Config{Enabled: loginAdmissionEnabled}
+	if loginAdmissionEnabled {
+		loginMaxConcurrency, err := getEnvInt("LOGIN_MAX_CONCURRENCY", 8)
+		if err != nil {
+			return Config{}, fmt.Errorf("LOGIN_MAX_CONCURRENCY: %w", err)
+		}
+		if loginMaxConcurrency <= 0 {
+			return Config{}, fmt.Errorf("LOGIN_MAX_CONCURRENCY must be greater than 0")
+		}
+		loginQueueTimeout, err := getEnvDuration("LOGIN_QUEUE_TIMEOUT", 2*time.Second)
+		if err != nil {
+			return Config{}, fmt.Errorf("LOGIN_QUEUE_TIMEOUT: %w", err)
+		}
+		if loginQueueTimeout <= 0 {
+			return Config{}, fmt.Errorf("LOGIN_QUEUE_TIMEOUT must be greater than 0")
+		}
+		loginAdmission.MaxConcurrency = loginMaxConcurrency
+		loginAdmission.QueueTimeout = loginQueueTimeout
 	}
 
 	cfg := Config{

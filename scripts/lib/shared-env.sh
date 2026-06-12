@@ -86,6 +86,9 @@ normalize_http_write_timeout() {
   local value="$1"
   local fallback="${2:-40s}"
 
+  # Migration helper: normalize_http_write_timeout maps legacy 30s/35s values
+  # to the 40s-era default (or the provided fallback) during env upgrades.
+
   case "$value" in
     ""|"30s"|"35s")
       printf '%s\n' "$fallback"

@@ -239,11 +239,11 @@ func TestLoad(t *testing.T) {
 				if got.LoginAdmission.Enabled {
 					t.Fatalf("login admission enabled = true, want false")
 				}
-				if got.LoginAdmission.MaxConcurrency != 8 {
-					t.Fatalf("login admission max concurrency = %d, want 8", got.LoginAdmission.MaxConcurrency)
+				if got.LoginAdmission.MaxConcurrency != 0 {
+					t.Fatalf("login admission max concurrency = %d, want 0", got.LoginAdmission.MaxConcurrency)
 				}
-				if got.LoginAdmission.QueueTimeout != 2*time.Second {
-					t.Fatalf("login admission queue timeout = %s, want 2s", got.LoginAdmission.QueueTimeout)
+				if got.LoginAdmission.QueueTimeout != 0 {
+					t.Fatalf("login admission queue timeout = %s, want 0s", got.LoginAdmission.QueueTimeout)
 				}
 				if got.HTTPServer.ReadHeaderTimeout != 5*time.Second || got.HTTPServer.ReadTimeout != 15*time.Second || got.HTTPServer.WriteTimeout != 40*time.Second || got.HTTPServer.IdleTimeout != time.Minute || got.HTTPServer.ShutdownTimeout != 10*time.Second || got.HTTPServer.MaxHeaderBytes != 1048576 {
 					t.Fatalf("http server defaults = %+v", got.HTTPServer)
