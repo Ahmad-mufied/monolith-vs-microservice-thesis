@@ -122,6 +122,9 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 			return LoginResponse{}, apperror.ServiceUnavailable("login service is temporarily overloaded", err)
 		}
 		if apperror.IsContext(err) {
+			if ctxErr := apperror.FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
+				return LoginResponse{}, ctxErr
+			}
 			return LoginResponse{}, err
 		}
 		if errors.Is(err, ErrPasswordMismatch) {

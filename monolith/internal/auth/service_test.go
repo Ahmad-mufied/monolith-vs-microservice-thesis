@@ -18,6 +18,7 @@ type fakeRepo struct {
 	findErr           error
 	createdPassword   string
 	findEmailReceived string
+	findHook          func()
 }
 
 func (f *fakeRepo) CreateUser(_ context.Context, name, email, passwordHash string) (User, error) {
@@ -32,6 +33,9 @@ func (f *fakeRepo) CreateUser(_ context.Context, name, email, passwordHash strin
 
 func (f *fakeRepo) FindUserByEmail(_ context.Context, email string) (User, error) {
 	f.findEmailReceived = email
+	if f.findHook != nil {
+		f.findHook()
+	}
 	if f.findErr != nil {
 		return User{}, f.findErr
 	}
@@ -187,6 +191,71 @@ func TestServiceLogin(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestServiceLoginAdmissionRejected(t *testing.T) {
+	service := NewService(
+		&fakeRepo{findUser: User{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Email: "mufied@example.com", PasswordHash: "hashed"}},
+		fakeHasher{},
+		fakeSigner{token: "token"},
+		newEnabledLimiter(t, 1, 10*time.Millisecond),
+	)
+
+	release := occupyLimiterSlot(t, service.limiter)
+	defer release()
+
+	_, err := service.Login(context.Background(), LoginRequest{Email: "mufied@example.com", Password: "secret123"})
+	assertAppError(t, err, true, apperror.CodeServiceUnavailable)
+}
+
+func TestServiceLoginAdmissionCanceledWhileQueued(t *testing.T) {
+	repoCalled := make(chan struct{})
+	service := NewService(
+		&fakeRepo{
+			findUser: User{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Email: "mufied@example.com", PasswordHash: "hashed"},
+			findHook: func() { close(repoCalled) },
+		},
+		fakeHasher{},
+		fakeSigner{token: "token"},
+		newEnabledLimiter(t, 1, time.Second),
+	)
+
+	release := occupyLimiterSlot(t, service.limiter)
+	defer release()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := service.Login(ctx, LoginRequest{Email: "mufied@example.com", Password: "secret123"})
+		errCh <- err
+	}()
+
+	<-repoCalled
+	cancel()
+
+	if err := <-errCh; err == nil {
+		t.Fatal("expected error, got nil")
+	} else {
+		assertAppError(t, err, true, apperror.CodeClientCanceled)
+	}
+}
+
+func TestServiceLoginAdmissionDeadlineWhileQueued(t *testing.T) {
+	service := NewService(
+		&fakeRepo{findUser: User{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Email: "mufied@example.com", PasswordHash: "hashed"}},
+		fakeHasher{},
+		fakeSigner{token: "token"},
+		newEnabledLimiter(t, 1, time.Second),
+	)
+
+	release := occupyLimiterSlot(t, service.limiter)
+	defer release()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	_, err := service.Login(ctx, LoginRequest{Email: "mufied@example.com", Password: "secret123"})
+	assertAppError(t, err, true, apperror.CodeServiceUnavailable)
 }
 
 func TestServiceLoginContextCanceledBeforeRepository(t *testing.T) {
@@ -345,4 +414,37 @@ func assertAppError(t *testing.T, err error, wantError bool, wantCode apperror.C
 func newDisabledLimiter() *admission.Limiter {
 	limiter, _ := admission.NewLimiter(admission.Config{Enabled: false})
 	return limiter
+}
+
+func newEnabledLimiter(t *testing.T, maxConcurrency int, queueTimeout time.Duration) *admission.Limiter {
+	t.Helper()
+
+	limiter, err := admission.NewLimiter(admission.Config{
+		Enabled:        true,
+		MaxConcurrency: maxConcurrency,
+		QueueTimeout:   queueTimeout,
+	})
+	if err != nil {
+		t.Fatalf("NewLimiter() error: %v", err)
+	}
+	return limiter
+}
+
+func occupyLimiterSlot(t *testing.T, limiter *admission.Limiter) func() {
+	t.Helper()
+
+	blocker := make(chan struct{})
+	slotAcquired := make(chan struct{})
+	go func() {
+		_ = limiter.Do(context.Background(), func() error {
+			close(slotAcquired)
+			<-blocker
+			return nil
+		})
+	}()
+
+	<-slotAcquired
+	return func() {
+		close(blocker)
+	}
 }
