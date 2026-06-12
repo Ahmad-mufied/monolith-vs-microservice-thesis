@@ -94,6 +94,9 @@ func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token 
 			return "", nil, pkgerrors.ResourceExhausted("auth service is temporarily overloaded")
 		}
 		if pkgerrors.IsContext(err) {
+			if ctxErr := pkgerrors.FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
+				return "", nil, ctxErr
+			}
 			return "", nil, err
 		}
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {

@@ -213,6 +213,101 @@ func TestLoginSuccess(t *testing.T) {
 	}
 }
 
+func TestLoginAdmissionRejected(t *testing.T) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("Secret123!"), 10)
+	if err != nil {
+		t.Fatalf("setup hash failed: %v", err)
+	}
+
+	repo := &fakeUserRepo{
+		findByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {
+			return &domain.User{
+				ID:           "01968ad4-98b1-79c8-a6f0-ec21f8f434c6",
+				Email:        email,
+				PasswordHash: string(hashedPassword),
+			}, nil
+		},
+	}
+	limiter := newEnabledLimiter(t, 1, 10*time.Millisecond)
+	release := occupyLimiterSlot(t, limiter)
+	defer release()
+
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, limiter)
+
+	_, _, err = uc.Login(context.Background(), "ahmad@example.com", "Secret123!")
+	if !errors.Is(err, pkgerrors.ErrResourceExhausted) {
+		t.Fatalf("expected ErrResourceExhausted, got %v", err)
+	}
+}
+
+func TestLoginAdmissionCanceledWhileQueued(t *testing.T) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("Secret123!"), 10)
+	if err != nil {
+		t.Fatalf("setup hash failed: %v", err)
+	}
+
+	repoCalled := make(chan struct{})
+	repo := &fakeUserRepo{
+		findByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {
+			close(repoCalled)
+			return &domain.User{
+				ID:           "01968ad4-98b1-79c8-a6f0-ec21f8f434c6",
+				Email:        email,
+				PasswordHash: string(hashedPassword),
+			}, nil
+		},
+	}
+	limiter := newEnabledLimiter(t, 1, time.Second)
+	release := occupyLimiterSlot(t, limiter)
+	defer release()
+
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, limiter)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		_, _, loginErr := uc.Login(ctx, "ahmad@example.com", "Secret123!")
+		errCh <- loginErr
+	}()
+
+	<-repoCalled
+	cancel()
+
+	if err := <-errCh; !errors.Is(err, pkgerrors.ErrCanceled) {
+		t.Fatalf("expected ErrCanceled, got %v", err)
+	}
+}
+
+func TestLoginAdmissionDeadlineWhileQueued(t *testing.T) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("Secret123!"), 10)
+	if err != nil {
+		t.Fatalf("setup hash failed: %v", err)
+	}
+
+	repo := &fakeUserRepo{
+		findByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {
+			return &domain.User{
+				ID:           "01968ad4-98b1-79c8-a6f0-ec21f8f434c6",
+				Email:        email,
+				PasswordHash: string(hashedPassword),
+			}, nil
+		},
+	}
+	limiter := newEnabledLimiter(t, 1, time.Second)
+	release := occupyLimiterSlot(t, limiter)
+	defer release()
+
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, limiter)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	_, _, err = uc.Login(ctx, "ahmad@example.com", "Secret123!")
+	if !errors.Is(err, pkgerrors.ErrDeadlineExceeded) {
+		t.Fatalf("expected ErrDeadlineExceeded, got %v", err)
+	}
+}
+
 func TestLoginUserNotFound(t *testing.T) {
 	repo := &fakeUserRepo{
 		findByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {
@@ -492,4 +587,37 @@ func assertValidationDetail(t *testing.T, err error, wantField, wantMessage stri
 func newDisabledLimiter() *admission.Limiter {
 	limiter, _ := admission.NewLimiter(admission.Config{Enabled: false})
 	return limiter
+}
+
+func newEnabledLimiter(t *testing.T, maxConcurrency int, queueTimeout time.Duration) *admission.Limiter {
+	t.Helper()
+
+	limiter, err := admission.NewLimiter(admission.Config{
+		Enabled:        true,
+		MaxConcurrency: maxConcurrency,
+		QueueTimeout:   queueTimeout,
+	})
+	if err != nil {
+		t.Fatalf("NewLimiter() error: %v", err)
+	}
+	return limiter
+}
+
+func occupyLimiterSlot(t *testing.T, limiter *admission.Limiter) func() {
+	t.Helper()
+
+	blocker := make(chan struct{})
+	slotAcquired := make(chan struct{})
+	go func() {
+		_ = limiter.Do(context.Background(), func() error {
+			close(slotAcquired)
+			<-blocker
+			return nil
+		})
+	}()
+
+	<-slotAcquired
+	return func() {
+		close(blocker)
+	}
 }
