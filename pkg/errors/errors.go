@@ -21,6 +21,7 @@ var (
 	ErrDeadlineExceeded   = stderrors.New("deadline exceeded")
 	ErrCanceled           = stderrors.New("canceled")
 	ErrInternal           = stderrors.New("internal")
+	ErrResourceExhausted  = stderrors.New("resource exhausted")
 )
 
 type Error struct {
@@ -87,6 +88,10 @@ func NotFound(message string) error {
 
 func Unavailable(message string) error {
 	return &Error{kind: ErrUnavailable, message: message}
+}
+
+func ResourceExhausted(message string) error {
+	return &Error{kind: ErrResourceExhausted, message: message}
 }
 
 func DeadlineExceeded(message string) error {
@@ -185,6 +190,8 @@ func ToGRPCStatus(err error) error {
 		code = codes.InvalidArgument
 	case stderrors.Is(err, ErrUnavailable):
 		code = codes.Unavailable
+	case stderrors.Is(err, ErrResourceExhausted):
+		code = codes.ResourceExhausted
 	case stderrors.Is(err, ErrDeadlineExceeded):
 		code = codes.DeadlineExceeded
 	case stderrors.Is(err, ErrCanceled):
@@ -224,6 +231,8 @@ func publicMessage(err error) string {
 		return "not found"
 	case stderrors.Is(err, ErrUnavailable):
 		return "service unavailable"
+	case stderrors.Is(err, ErrResourceExhausted):
+		return "service temporarily overloaded"
 	case stderrors.Is(err, ErrDeadlineExceeded):
 		return "request timeout"
 	case stderrors.Is(err, ErrCanceled):

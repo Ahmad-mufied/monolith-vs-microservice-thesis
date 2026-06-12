@@ -42,6 +42,8 @@ func FromGRPCError(err error) *AppError {
 			return &AppError{Status: http.StatusConflict, Code: "CONFLICT", Message: msg}
 		case codes.Unavailable:
 			return &AppError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: msg}
+		case codes.ResourceExhausted:
+			return &AppError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: msg}
 		case codes.DeadlineExceeded:
 			return &AppError{Status: http.StatusServiceUnavailable, Code: "SERVICE_UNAVAILABLE", Message: msg}
 		case codes.Canceled:

@@ -22,7 +22,7 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	grpcRequestTimeout, err := getEnvDuration("GRPC_REQUEST_TIMEOUT", 15*time.Second)
+	grpcRequestTimeout, err := getEnvDuration("GRPC_REQUEST_TIMEOUT", 30*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("GRPC_REQUEST_TIMEOUT: %w", err)
 	}
@@ -30,7 +30,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("GRPC_REQUEST_TIMEOUT must be greater than 0")
 	}
 
-	itemValidationTimeout, err := getEnvDuration("ITEM_VALIDATION_TIMEOUT", 10*time.Second)
+	itemValidationTimeout, err := getEnvDuration("ITEM_VALIDATION_TIMEOUT", 25*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("ITEM_VALIDATION_TIMEOUT: %w", err)
 	}

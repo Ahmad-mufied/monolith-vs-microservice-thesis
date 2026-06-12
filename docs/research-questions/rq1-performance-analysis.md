@@ -239,14 +239,17 @@ Current baseline:
 
 ```text
 Monolith:
-- APP_REQUEST_TIMEOUT = 30s
-- HTTP_WRITE_TIMEOUT  = 35s
+- APP_REQUEST_TIMEOUT = 35s
+- HTTP_WRITE_TIMEOUT  = 40s
+- LOGIN_ADMISSION_ENABLED = true
 
 Microservices:
-- GRPC_CALL_TIMEOUT        = 10s
-- GRPC_REQUEST_TIMEOUT     = 15s
-- ITEM_VALIDATION_TIMEOUT  = 10s
-- API Gateway HTTP_WRITE_TIMEOUT = 15s
+- API Gateway GRPC_CALL_TIMEOUT  = 32s
+- API Gateway REQUEST_TIMEOUT    = 35s
+- API Gateway HTTP_WRITE_TIMEOUT = 40s
+- Service GRPC_REQUEST_TIMEOUT   = 30s
+- ITEM_VALIDATION_TIMEOUT        = 25s
+- Auth Service LOGIN_ADMISSION_ENABLED = true
 
 k6 client:
 - K6_REQUEST_TIMEOUT_MS = 60000 (60s)
@@ -256,16 +259,19 @@ Interpretation rules:
 
 ```text
 499 = the caller/client canceled or disconnected first
-503 = the application-managed timeout boundary was reached first
+503 = the application-managed timeout or overload boundary was reached first
 ```
 
 Implications:
 
 - In the monolith, `503` means the request exceeded the configured
-  application-level request deadline.
+  application-level request deadline or login admission control rejected the
+  request while protecting bcrypt capacity.
 - In microservices, `503` usually means an outbound dependency call timed out
   or a gRPC service request exceeded its configured request deadline before the
-  gateway finished the request.
+  gateway finished the request. For login, `503` can also mean Auth Service
+  rejected the request with gRPC `ResourceExhausted` because its bcrypt
+  admission queue was full.
 - Because the k6 timeout remains longer than the application-managed deadlines,
   timeout-related failures should be interpreted primarily as application
   behavior, not as client impatience.

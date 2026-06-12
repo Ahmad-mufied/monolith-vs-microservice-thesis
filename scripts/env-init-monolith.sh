@@ -102,15 +102,28 @@ DB_POOL_MAX_CONN_IDLE_TIME=1m
 DB_PING_TIMEOUT=5s
 HTTP_READ_HEADER_TIMEOUT=5s
 HTTP_READ_TIMEOUT=15s
-HTTP_WRITE_TIMEOUT=30s
+HTTP_WRITE_TIMEOUT=40s
 HTTP_IDLE_TIMEOUT=60s
 HTTP_SHUTDOWN_TIMEOUT=10s
 HTTP_MAX_HEADER_BYTES=1048576
 BCRYPT_COST=10
 JWT_SECRET=${jwt_secret}
-DATADOG_ENABLED=false"
+DATADOG_ENABLED=false
+APP_REQUEST_TIMEOUT=35s
+LOGIN_ADMISSION_ENABLED=true
+LOGIN_MAX_CONCURRENCY=8
+LOGIN_QUEUE_TIMEOUT=2s"
 
 write_or_update_env_value "env/monolith.env" "BCRYPT_COST" "10"
+write_or_update_env_value "env/monolith.env" "APP_REQUEST_TIMEOUT" "35s"
+write_or_update_env_value "env/monolith.env" "LOGIN_ADMISSION_ENABLED" "true"
+write_or_update_env_value "env/monolith.env" "LOGIN_MAX_CONCURRENCY" "8"
+write_or_update_env_value "env/monolith.env" "LOGIN_QUEUE_TIMEOUT" "2s"
+if [[ "$(read_env_value env/monolith.env HTTP_WRITE_TIMEOUT)" == "30s" || "$(read_env_value env/monolith.env HTTP_WRITE_TIMEOUT)" == "35s" ]]; then
+  write_or_update_env_value "env/monolith.env" "HTTP_WRITE_TIMEOUT" "40s"
+else
+  echo "skip env/monolith.env (HTTP_WRITE_TIMEOUT has custom value)"
+fi
 
 write_or_update_env_value \
   "env/db-bootstrap.env" \

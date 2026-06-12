@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/validation"
 )
@@ -27,20 +28,22 @@ type TokenSigner interface {
 }
 
 type Service struct {
-	repo   Repository
-	hasher PasswordHasher
-	signer TokenSigner
+	repo    Repository
+	hasher  PasswordHasher
+	signer  TokenSigner
+	limiter *admission.Limiter
 }
 
 const (
 	maxPasswordBytes = 72
 )
 
-func NewService(repo Repository, hasher PasswordHasher, signer TokenSigner) *Service {
+func NewService(repo Repository, hasher PasswordHasher, signer TokenSigner, limiter *admission.Limiter) *Service {
 	mustNotBeNil("repo", repo)
 	mustNotBeNil("hasher", hasher)
 	mustNotBeNil("signer", signer)
-	return &Service{repo: repo, hasher: hasher, signer: signer}
+	mustNotBeNil("limiter", limiter)
+	return &Service{repo: repo, hasher: hasher, signer: signer, limiter: limiter}
 }
 
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (RegisterResponse, error) {
@@ -110,10 +113,18 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 		}
 		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("finding user by email: %w", err))
 	}
-	if err := apperror.DoIfActive(ctx, func() error {
-		return s.hasher.Compare(user.PasswordHash, req.Password)
+	if err := s.limiter.Do(ctx, func() error {
+		return apperror.DoIfActive(ctx, func() error {
+			return s.hasher.Compare(user.PasswordHash, req.Password)
+		})
 	}); err != nil {
+		if admission.IsRejected(err) {
+			return LoginResponse{}, apperror.ServiceUnavailable("login service is temporarily overloaded", err)
+		}
 		if apperror.IsContext(err) {
+			if ctxErr := apperror.FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
+				return LoginResponse{}, ctxErr
+			}
 			return LoginResponse{}, err
 		}
 		if errors.Is(err, ErrPasswordMismatch) {

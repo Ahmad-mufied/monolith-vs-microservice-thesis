@@ -38,6 +38,9 @@ source env/terraform.experiment.env
 source "$k6_runner_env_file"
 set +a
 
+HTTP_WRITE_TIMEOUT="$(normalize_http_write_timeout "${HTTP_WRITE_TIMEOUT:-}" "40s")"
+APP_REQUEST_TIMEOUT="$(derive_app_request_timeout "${APP_REQUEST_TIMEOUT:-}" "$HTTP_WRITE_TIMEOUT")"
+
 : "${DB_PASSWORD:?DB_PASSWORD must be set in env/terraform.experiment.env}"
 : "${JWT_SECRET:?JWT_SECRET must be set in ${monolith_env_file}}"
 : "${ADMIN_USER_EMAIL:?ADMIN_USER_EMAIL must be set in ${k6_runner_env_file}}"
@@ -74,11 +77,15 @@ $K8S create secret generic monolith-env \
   --from-literal=DB_PING_TIMEOUT="${DB_PING_TIMEOUT:-5s}" \
   --from-literal=HTTP_READ_HEADER_TIMEOUT="${HTTP_READ_HEADER_TIMEOUT:-5s}" \
   --from-literal=HTTP_READ_TIMEOUT="${HTTP_READ_TIMEOUT:-15s}" \
-  --from-literal=HTTP_WRITE_TIMEOUT="${HTTP_WRITE_TIMEOUT:-30s}" \
+  --from-literal=HTTP_WRITE_TIMEOUT="${HTTP_WRITE_TIMEOUT}" \
   --from-literal=HTTP_IDLE_TIMEOUT="${HTTP_IDLE_TIMEOUT:-1m}" \
   --from-literal=HTTP_SHUTDOWN_TIMEOUT="${HTTP_SHUTDOWN_TIMEOUT:-10s}" \
   --from-literal=HTTP_MAX_HEADER_BYTES="${HTTP_MAX_HEADER_BYTES:-1048576}" \
   --from-literal=BCRYPT_COST="${BCRYPT_COST:-10}" \
+  --from-literal=APP_REQUEST_TIMEOUT="${APP_REQUEST_TIMEOUT}" \
+  --from-literal=LOGIN_ADMISSION_ENABLED="${LOGIN_ADMISSION_ENABLED:-true}" \
+  --from-literal=LOGIN_MAX_CONCURRENCY="${LOGIN_MAX_CONCURRENCY:-8}" \
+  --from-literal=LOGIN_QUEUE_TIMEOUT="${LOGIN_QUEUE_TIMEOUT:-2s}" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic k6-runner-secret \

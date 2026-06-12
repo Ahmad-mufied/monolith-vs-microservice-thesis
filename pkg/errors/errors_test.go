@@ -62,6 +62,12 @@ func TestToGRPCStatus(t *testing.T) {
 			wantMsg:  "item service unavailable",
 		},
 		{
+			name:     "resource exhausted",
+			err:      ResourceExhausted("auth service is temporarily overloaded"),
+			wantCode: codes.ResourceExhausted,
+			wantMsg:  "auth service is temporarily overloaded",
+		},
+		{
 			name:     "deadline exceeded",
 			err:      DeadlineExceeded("item service request timed out"),
 			wantCode: codes.DeadlineExceeded,
@@ -126,6 +132,9 @@ func TestTypedErrorsPreserveSentinelIdentity(t *testing.T) {
 	}
 	if !stderrors.Is(Unavailable("item service unavailable"), ErrUnavailable) {
 		t.Fatal("expected Unavailable to match ErrUnavailable")
+	}
+	if !stderrors.Is(ResourceExhausted("auth service is temporarily overloaded"), ErrResourceExhausted) {
+		t.Fatal("expected ResourceExhausted to match ErrResourceExhausted")
 	}
 	if !stderrors.Is(DeadlineExceeded("item service request timed out"), ErrDeadlineExceeded) {
 		t.Fatal("expected DeadlineExceeded to match ErrDeadlineExceeded")

@@ -71,6 +71,12 @@ func TestFromGRPCError(t *testing.T) {
 			wantCode:   "SERVICE_UNAVAILABLE",
 		},
 		{
+			name:       "ResourceExhausted -> 503 SERVICE_UNAVAILABLE",
+			err:        status.Error(codes.ResourceExhausted, "auth service is temporarily overloaded"),
+			wantStatus: http.StatusServiceUnavailable,
+			wantCode:   "SERVICE_UNAVAILABLE",
+		},
+		{
 			name:       "DeadlineExceeded -> 503 SERVICE_UNAVAILABLE",
 			err:        status.Error(codes.DeadlineExceeded, "timeout"),
 			wantStatus: http.StatusServiceUnavailable,

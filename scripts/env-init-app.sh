@@ -169,12 +169,16 @@ DB_POOL_MAX_CONN_IDLE_TIME=1m
 DB_PING_TIMEOUT=5s
 HTTP_READ_HEADER_TIMEOUT=5s
 HTTP_READ_TIMEOUT=15s
-HTTP_WRITE_TIMEOUT=30s
+HTTP_WRITE_TIMEOUT=40s
 HTTP_IDLE_TIMEOUT=1m
 HTTP_SHUTDOWN_TIMEOUT=10s
 HTTP_MAX_HEADER_BYTES=1048576
 BCRYPT_COST=10
-JWT_SECRET=${jwt_secret}"
+JWT_SECRET=${jwt_secret}
+APP_REQUEST_TIMEOUT=35s
+LOGIN_ADMISSION_ENABLED=true
+LOGIN_MAX_CONCURRENCY=8
+LOGIN_QUEUE_TIMEOUT=2s"
 
 write_if_missing "env/api-gateway.app.env" "APP_ENV=production
 HTTP_PORT=8080
@@ -182,22 +186,32 @@ SERVICE_NAME=api-gateway
 JWT_SECRET=${jwt_secret}
 AUTH_SERVICE_ADDR=dns:///auth-service-headless.msa.svc.cluster.local:50051
 ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
-TRANSACTION_SERVICE_ADDR=dns:///transaction-service-headless.msa.svc.cluster.local:50053"
+TRANSACTION_SERVICE_ADDR=dns:///transaction-service-headless.msa.svc.cluster.local:50053
+GRPC_CALL_TIMEOUT=32s
+REQUEST_TIMEOUT=35s
+HTTP_WRITE_TIMEOUT=40s"
 
 write_if_missing "env/auth-service.app.env" "APP_ENV=production
 GRPC_PORT=50051
 SERVICE_NAME=auth-service
 BCRYPT_COST=10
-JWT_SECRET=${jwt_secret}"
+JWT_SECRET=${jwt_secret}
+GRPC_REQUEST_TIMEOUT=30s
+LOGIN_ADMISSION_ENABLED=true
+LOGIN_MAX_CONCURRENCY=2
+LOGIN_QUEUE_TIMEOUT=2s"
 
 write_if_missing "env/item-service.app.env" "APP_ENV=production
 GRPC_PORT=50052
-SERVICE_NAME=item-service"
+SERVICE_NAME=item-service
+GRPC_REQUEST_TIMEOUT=30s"
 
 write_if_missing "env/transaction-service.app.env" "APP_ENV=production
 GRPC_PORT=50053
 SERVICE_NAME=transaction-service
-ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052"
+ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
+GRPC_REQUEST_TIMEOUT=30s
+ITEM_VALIDATION_TIMEOUT=25s"
 
 write_if_missing "env/k6-runner.app.env" "ADMIN_USER_EMAIL=${k6_runner_email}
 ADMIN_USER_PASSWORD=${k6_runner_password}"
@@ -208,7 +222,22 @@ fi
 
 write_or_update_env_value "env/k6-runner.app.env" "ADMIN_USER_EMAIL" "$k6_runner_email"
 write_or_update_env_value "env/monolith.app.env" "BCRYPT_COST" "10"
+update_if_missing_or_default "env/monolith.app.env" "HTTP_WRITE_TIMEOUT" "30s" "40s"
+update_if_missing_or_default "env/monolith.app.env" "APP_REQUEST_TIMEOUT" "30s" "35s"
+write_or_update_env_value "env/monolith.app.env" "LOGIN_ADMISSION_ENABLED" "true"
+write_or_update_env_value "env/monolith.app.env" "LOGIN_MAX_CONCURRENCY" "8"
+write_or_update_env_value "env/monolith.app.env" "LOGIN_QUEUE_TIMEOUT" "2s"
 write_or_update_env_value "env/auth-service.app.env" "BCRYPT_COST" "10"
+update_if_missing_or_default "env/api-gateway.app.env" "GRPC_CALL_TIMEOUT" "10s" "32s"
+update_if_missing_or_default "env/api-gateway.app.env" "REQUEST_TIMEOUT" "30s" "35s"
+update_if_missing_or_default "env/api-gateway.app.env" "HTTP_WRITE_TIMEOUT" "15s" "40s"
+update_if_missing_or_default "env/auth-service.app.env" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
+write_or_update_env_value "env/auth-service.app.env" "LOGIN_ADMISSION_ENABLED" "true"
+write_or_update_env_value "env/auth-service.app.env" "LOGIN_MAX_CONCURRENCY" "2"
+write_or_update_env_value "env/auth-service.app.env" "LOGIN_QUEUE_TIMEOUT" "2s"
+update_if_missing_or_default "env/item-service.app.env" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
+update_if_missing_or_default "env/transaction-service.app.env" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
+update_if_missing_or_default "env/transaction-service.app.env" "ITEM_VALIDATION_TIMEOUT" "10s" "25s"
 update_if_missing_or_default "env/api-gateway.app.env" "AUTH_SERVICE_ADDR" "auth-service.msa.svc.cluster.local:50051" "dns:///auth-service-headless.msa.svc.cluster.local:50051"
 update_if_missing_or_default "env/api-gateway.app.env" "ITEM_SERVICE_ADDR" "item-service.msa.svc.cluster.local:50052" "dns:///item-service-headless.msa.svc.cluster.local:50052"
 update_if_missing_or_default "env/api-gateway.app.env" "TRANSACTION_SERVICE_ADDR" "transaction-service.msa.svc.cluster.local:50053" "dns:///transaction-service-headless.msa.svc.cluster.local:50053"

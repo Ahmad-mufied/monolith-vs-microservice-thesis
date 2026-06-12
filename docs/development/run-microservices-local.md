@@ -112,10 +112,11 @@ JWT_SECRET=<same-local-secret-as-auth-service>
 AUTH_SERVICE_ADDR=localhost:50051
 ITEM_SERVICE_ADDR=localhost:50052
 TRANSACTION_SERVICE_ADDR=localhost:50053
-GRPC_CALL_TIMEOUT=10s
+GRPC_CALL_TIMEOUT=32s
+REQUEST_TIMEOUT=35s
 HTTP_READ_HEADER_TIMEOUT=5s
 HTTP_READ_TIMEOUT=15s
-HTTP_WRITE_TIMEOUT=15s
+HTTP_WRITE_TIMEOUT=40s
 HTTP_IDLE_TIMEOUT=60s
 HTTP_SHUTDOWN_TIMEOUT=10s
 ```
@@ -137,7 +138,10 @@ AUTH_DATABASE_URL=postgres://postgres:<password>@localhost:5432/auth_db?sslmode=
 JWT_SECRET=<same-local-secret-as-api-gateway>
 JWT_EXPIRY=24h
 BCRYPT_COST=10
-GRPC_REQUEST_TIMEOUT=15s
+GRPC_REQUEST_TIMEOUT=30s
+LOGIN_ADMISSION_ENABLED=true
+LOGIN_MAX_CONCURRENCY=2
+LOGIN_QUEUE_TIMEOUT=2s
 ```
 
 `DATABASE_URL` is used by the service process.
@@ -158,7 +162,7 @@ Expected keys:
 GRPC_PORT=50052
 DATABASE_URL=postgres://postgres:<password>@localhost:5432/item_db?sslmode=disable
 ITEM_DATABASE_URL=postgres://postgres:<password>@localhost:5432/item_db?sslmode=disable
-GRPC_REQUEST_TIMEOUT=15s
+GRPC_REQUEST_TIMEOUT=30s
 ```
 
 ### Transaction Service
@@ -176,8 +180,8 @@ GRPC_PORT=50053
 DATABASE_URL=postgres://postgres:<password>@localhost:5432/transaction_db?sslmode=disable
 TRANSACTION_DATABASE_URL=postgres://postgres:<password>@localhost:5432/transaction_db?sslmode=disable
 ITEM_SERVICE_ADDR=localhost:50052
-GRPC_REQUEST_TIMEOUT=15s
-ITEM_VALIDATION_TIMEOUT=10s
+GRPC_REQUEST_TIMEOUT=30s
+ITEM_VALIDATION_TIMEOUT=25s
 ```
 
 Transaction Service calls Item Service over gRPC for transaction item
@@ -188,30 +192,46 @@ validation.
 The local microservices flow now uses an explicit timeout chain:
 
 ```text
-outbound gRPC call deadline (default 10s)
+outbound gRPC call deadline (default 32s)
     <
-gRPC service request deadline (default 15s)
-    <=
-API Gateway HTTP write timeout (default 15s)
+API Gateway request deadline (default 35s)
+    <
+API Gateway HTTP write timeout (default 40s)
+
+service-side gRPC request deadline (default 30s)
+    <
+API Gateway outbound gRPC call deadline (default 32s)
+
+Transaction Service item validation deadline (default 25s)
+    <
+service-side gRPC request deadline (default 30s)
 ```
 
 Meaning:
 
 - `GRPC_CALL_TIMEOUT` is the per-call application deadline used by API Gateway
   for every outbound gRPC request to Auth, Item, and Transaction Service.
+- `REQUEST_TIMEOUT` is the API Gateway's overall HTTP request deadline.
+  If this budget expires before the upstream gRPC response is translated back
+  to HTTP, the client also observes a `503`.
 - `GRPC_REQUEST_TIMEOUT` is the per-request server-side deadline enforced by
   Auth Service, Item Service, and Transaction Service for incoming unary gRPC
   requests.
 - `ITEM_VALIDATION_TIMEOUT` is the per-call deadline used by Transaction
   Service when it calls Item Service for transaction item validation.
-- `HTTP_WRITE_TIMEOUT` must remain larger than `GRPC_CALL_TIMEOUT` so API
-  Gateway can translate dependency deadline failures into a proper `503`
+- Auth Service login admission control bounds concurrent bcrypt comparisons.
+  Requests wait up to `LOGIN_QUEUE_TIMEOUT`; when no slot is available, Auth
+  Service returns gRPC `ResourceExhausted`, and API Gateway maps it to `503`.
+- `HTTP_WRITE_TIMEOUT` must remain larger than `REQUEST_TIMEOUT` so API Gateway
+  can translate dependency deadline or overload failures into a proper `503`
   response before the transport layer closes the connection.
 
 Observed error semantics:
 
 - `499`: the caller canceled or disconnected before the request completed
-- `503`: an application-managed upstream dependency deadline was exceeded
+- `503`: an application-managed upstream dependency deadline was exceeded, or
+  the API Gateway `REQUEST_TIMEOUT` budget expired, or login admission control
+  rejected overload with `ResourceExhausted`
 
 ## 5. Run Migrations
 
