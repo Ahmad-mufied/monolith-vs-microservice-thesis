@@ -55,6 +55,16 @@ func TestLoad(t *testing.T) {
 			},
 		},
 		{
+			name: "loads login admission overrides",
+			env: map[string]string{
+				"DATABASE_URL":            "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":              testJWTSecret(t),
+				"LOGIN_ADMISSION_ENABLED": "true",
+				"LOGIN_MAX_CONCURRENCY":   "3",
+				"LOGIN_QUEUE_TIMEOUT":     "1500ms",
+			},
+		},
+		{
 			name: "missing database url",
 			env: map[string]string{
 				"JWT_SECRET": testJWTSecret(t),
@@ -192,6 +202,9 @@ func TestLoad(t *testing.T) {
 			t.Setenv("HTTP_SHUTDOWN_TIMEOUT", "")
 			t.Setenv("HTTP_MAX_HEADER_BYTES", "")
 			t.Setenv("APP_REQUEST_TIMEOUT", "")
+			t.Setenv("LOGIN_ADMISSION_ENABLED", "")
+			t.Setenv("LOGIN_MAX_CONCURRENCY", "")
+			t.Setenv("LOGIN_QUEUE_TIMEOUT", "")
 			for key, value := range tt.env {
 				t.Setenv(key, value)
 			}
@@ -223,6 +236,15 @@ func TestLoad(t *testing.T) {
 				if got.RequestTimeout != 35*time.Second {
 					t.Fatalf("request timeout default = %s, want 35s", got.RequestTimeout)
 				}
+				if got.LoginAdmission.Enabled {
+					t.Fatalf("login admission enabled = true, want false")
+				}
+				if got.LoginAdmission.MaxConcurrency != 8 {
+					t.Fatalf("login admission max concurrency = %d, want 8", got.LoginAdmission.MaxConcurrency)
+				}
+				if got.LoginAdmission.QueueTimeout != 2*time.Second {
+					t.Fatalf("login admission queue timeout = %s, want 2s", got.LoginAdmission.QueueTimeout)
+				}
 				if got.HTTPServer.ReadHeaderTimeout != 5*time.Second || got.HTTPServer.ReadTimeout != 15*time.Second || got.HTTPServer.WriteTimeout != 40*time.Second || got.HTTPServer.IdleTimeout != time.Minute || got.HTTPServer.ShutdownTimeout != 10*time.Second || got.HTTPServer.MaxHeaderBytes != 1048576 {
 					t.Fatalf("http server defaults = %+v", got.HTTPServer)
 				}
@@ -235,6 +257,17 @@ func TestLoad(t *testing.T) {
 			if tt.name == "loads app request timeout override" {
 				if got.RequestTimeout != 12*time.Second {
 					t.Fatalf("request timeout override = %s, want 12s", got.RequestTimeout)
+				}
+			}
+			if tt.name == "loads login admission overrides" {
+				if !got.LoginAdmission.Enabled {
+					t.Fatalf("login admission enabled = false, want true")
+				}
+				if got.LoginAdmission.MaxConcurrency != 3 {
+					t.Fatalf("login admission max concurrency = %d, want 3", got.LoginAdmission.MaxConcurrency)
+				}
+				if got.LoginAdmission.QueueTimeout != 1500*time.Millisecond {
+					t.Fatalf("login admission queue timeout = %s, want 1500ms", got.LoginAdmission.QueueTimeout)
 				}
 			}
 		})
