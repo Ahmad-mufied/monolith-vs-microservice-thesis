@@ -531,9 +531,16 @@ AUTO_DESTROY_CONFIRMED=true RUN_ID=rq1-fixed-vultr SCALING_MODE=fixed make run-b
 aws s3 ls "s3://$S3_BUCKET/experiments/<run_id>/" --recursive
 ```
 
-Per attempt: `summary.json`, `raw.json.gz`, `stdout.log`, `metadata.json`,
-`k6-options.json`, `thresholds.json`, `result-status.json`,
-`datadog-time-window.json` (when Datadog enabled).
+Per attempt: `summary.json`, `raw.json.gz`, `status-summary.json`,
+`stdout.log`, `metadata.json`, `k6-options.json`, `thresholds.json`,
+`result-status.json`, `datadog-time-window.json` (when Datadog enabled).
+
+`summary.json` is the original aggregate k6 summary. Use
+`status-summary.json` when overload handling makes status-aware interpretation
+important, for example to separate latency percentiles for successful `2xx`
+responses from bounded overload responses such as `503`. The file also records
+status-family breakdown and successful RPS achievement against the configured
+target RPS.
 
 Metadata check:
 

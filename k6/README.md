@@ -712,6 +712,7 @@ Each k6 execution should produce:
 ```text
 summary.json
 raw.json.gz
+status-summary.json
 stdout.log
 metadata.json
 result-status.json
@@ -734,6 +735,13 @@ s3://{bucket}/experiments/{run_id}/{architecture}/{scenario_name}/{target_rps}rp
 The S3 path is for navigation and overwrite prevention.
 
 `metadata.json` is the source of truth for analysis.
+
+`summary.json` is the original k6 aggregate summary. `status-summary.json` is a
+derived artifact generated from `raw.json.gz`; it groups HTTP request duration
+points by response status so analysis can separate successful `2xx` latency from
+overload or error responses such as `503`. It also includes status-family
+breakdown, successful `2xx` aggregate latency, non-`2xx` aggregate latency, and
+success achievement against the configured target RPS.
 
 `thresholds.json` is the primary source for `PASS` vs `OVERLOAD`, while
 `result-status.json` records k6 exit code, S3 upload state, and artifact
