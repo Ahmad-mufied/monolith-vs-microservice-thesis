@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source scripts/lib/shared-env.sh
+
 required_files=(
   env/postgres.env
   env/api-gateway.env
@@ -46,9 +48,9 @@ api_gateway_jwt_secret="$(read_env_value env/api-gateway.env JWT_SECRET)"
 api_gateway_grpc_call_timeout="$(read_env_value env/api-gateway.env GRPC_CALL_TIMEOUT)"
 api_gateway_grpc_call_timeout="${api_gateway_grpc_call_timeout:-32s}"
 api_gateway_request_timeout="$(read_env_value env/api-gateway.env REQUEST_TIMEOUT)"
-api_gateway_request_timeout="${api_gateway_request_timeout:-35s}"
 api_gateway_http_write_timeout="$(read_env_value env/api-gateway.env HTTP_WRITE_TIMEOUT)"
-api_gateway_http_write_timeout="${api_gateway_http_write_timeout:-40s}"
+api_gateway_http_write_timeout="$(normalize_http_write_timeout "$api_gateway_http_write_timeout" "40s")"
+api_gateway_request_timeout="$(derive_gateway_request_timeout "$api_gateway_request_timeout" "$api_gateway_http_write_timeout" "$api_gateway_grpc_call_timeout")"
 
 auth_grpc_port="$(read_env_value env/auth-service.env GRPC_PORT)"
 auth_grpc_port="${auth_grpc_port:-50051}"

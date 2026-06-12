@@ -71,6 +71,94 @@ resolve_image_tag_env_file() {
   resolve_env_file "env/image-tag.env" "env/image-tag.eks.env" "shared image tag env"
 }
 
+parse_seconds_duration() {
+  local value="$1"
+
+  if [[ "$value" =~ ^([0-9]+)s$ ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+
+  return 1
+}
+
+normalize_http_write_timeout() {
+  local value="$1"
+  local fallback="${2:-40s}"
+
+  case "$value" in
+    ""|"30s"|"35s")
+      printf '%s\n' "$fallback"
+      ;;
+    *)
+      printf '%s\n' "$value"
+      ;;
+  esac
+}
+
+derive_gateway_request_timeout() {
+  local explicit_timeout="$1"
+  local http_write_timeout="$2"
+  local grpc_call_timeout="$3"
+  local write_seconds grpc_seconds candidate_seconds minimum_seconds
+
+  if [[ -n "$explicit_timeout" ]]; then
+    printf '%s\n' "$explicit_timeout"
+    return 0
+  fi
+
+  if ! write_seconds="$(parse_seconds_duration "$http_write_timeout")"; then
+    printf '35s\n'
+    return 0
+  fi
+
+  if ! grpc_seconds="$(parse_seconds_duration "$grpc_call_timeout")"; then
+    printf '35s\n'
+    return 0
+  fi
+
+  candidate_seconds=$((write_seconds - 5))
+  minimum_seconds=$((grpc_seconds + 1))
+  if (( candidate_seconds < minimum_seconds )); then
+    candidate_seconds=$minimum_seconds
+  fi
+
+  if (( candidate_seconds >= write_seconds )); then
+    printf '35s\n'
+    return 0
+  fi
+
+  printf '%ss\n' "$candidate_seconds"
+}
+
+derive_app_request_timeout() {
+  local explicit_timeout="$1"
+  local http_write_timeout="$2"
+  local write_seconds
+
+  if [[ -n "$explicit_timeout" ]]; then
+    printf '%s\n' "$explicit_timeout"
+    return 0
+  fi
+
+  if ! write_seconds="$(parse_seconds_duration "$http_write_timeout")"; then
+    printf '35s\n'
+    return 0
+  fi
+
+  if (( write_seconds <= 1 )); then
+    printf '35s\n'
+    return 0
+  fi
+
+  if (( write_seconds <= 5 )); then
+    printf '%ss\n' "$((write_seconds - 1))"
+    return 0
+  fi
+
+  printf '%ss\n' "$((write_seconds - 5))"
+}
+
 # Robust kubectl wrapper with retries for transient connection/DNS issues
 kubectl() {
   local max_attempts=3

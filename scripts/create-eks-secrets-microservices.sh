@@ -56,6 +56,8 @@ api_gateway_transaction_service_addr="$(read_env_value "$api_gateway_env_file" T
 api_gateway_grpc_call_timeout="$(read_env_value "$api_gateway_env_file" GRPC_CALL_TIMEOUT)"
 api_gateway_request_timeout="$(read_env_value "$api_gateway_env_file" REQUEST_TIMEOUT)"
 api_gateway_http_write_timeout="$(read_env_value "$api_gateway_env_file" HTTP_WRITE_TIMEOUT)"
+api_gateway_http_write_timeout="$(normalize_http_write_timeout "$api_gateway_http_write_timeout" "40s")"
+api_gateway_request_timeout="$(derive_gateway_request_timeout "$api_gateway_request_timeout" "$api_gateway_http_write_timeout" "${api_gateway_grpc_call_timeout:-32s}")"
 
 auth_service_app_env="$(read_env_value "$auth_service_env_file" APP_ENV)"
 auth_service_grpc_port="$(read_env_value "$auth_service_env_file" GRPC_PORT)"
@@ -112,8 +114,8 @@ $K8S create secret generic api-gateway-secret \
   --from-literal=ITEM_SERVICE_ADDR="${api_gateway_item_service_addr:-dns:///item-service-headless.msa.svc.cluster.local:50052}" \
   --from-literal=TRANSACTION_SERVICE_ADDR="${api_gateway_transaction_service_addr:-dns:///transaction-service-headless.msa.svc.cluster.local:50053}" \
   --from-literal=GRPC_CALL_TIMEOUT="${api_gateway_grpc_call_timeout:-32s}" \
-  --from-literal=REQUEST_TIMEOUT="${api_gateway_request_timeout:-35s}" \
-  --from-literal=HTTP_WRITE_TIMEOUT="${api_gateway_http_write_timeout:-40s}" \
+  --from-literal=REQUEST_TIMEOUT="${api_gateway_request_timeout}" \
+  --from-literal=HTTP_WRITE_TIMEOUT="${api_gateway_http_write_timeout}" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic auth-service-secret \

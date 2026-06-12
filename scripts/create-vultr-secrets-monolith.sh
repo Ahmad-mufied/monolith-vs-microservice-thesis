@@ -73,11 +73,13 @@ db_ping_timeout="$(read_env_value "$monolith_env_file" DB_PING_TIMEOUT)"
 http_read_header_timeout="$(read_env_value "$monolith_env_file" HTTP_READ_HEADER_TIMEOUT)"
 http_read_timeout="$(read_env_value "$monolith_env_file" HTTP_READ_TIMEOUT)"
 http_write_timeout="$(read_env_value "$monolith_env_file" HTTP_WRITE_TIMEOUT)"
+http_write_timeout="$(normalize_http_write_timeout "$http_write_timeout" "40s")"
 http_idle_timeout="$(read_env_value "$monolith_env_file" HTTP_IDLE_TIMEOUT)"
 http_shutdown_timeout="$(read_env_value "$monolith_env_file" HTTP_SHUTDOWN_TIMEOUT)"
 http_max_header_bytes="$(read_env_value "$monolith_env_file" HTTP_MAX_HEADER_BYTES)"
 bcrypt_cost="$(read_env_value "$monolith_env_file" BCRYPT_COST)"
 app_request_timeout="$(read_env_value "$monolith_env_file" APP_REQUEST_TIMEOUT)"
+app_request_timeout="$(derive_app_request_timeout "$app_request_timeout" "$http_write_timeout")"
 login_admission_enabled="$(read_env_value "$monolith_env_file" LOGIN_ADMISSION_ENABLED)"
 login_max_concurrency="$(read_env_value "$monolith_env_file" LOGIN_MAX_CONCURRENCY)"
 login_queue_timeout="$(read_env_value "$monolith_env_file" LOGIN_QUEUE_TIMEOUT)"
@@ -108,12 +110,12 @@ $K8S create secret generic monolith-env --namespace mono \
   --from-literal=DB_PING_TIMEOUT="${db_ping_timeout:-5s}" \
   --from-literal=HTTP_READ_HEADER_TIMEOUT="${http_read_header_timeout:-5s}" \
   --from-literal=HTTP_READ_TIMEOUT="${http_read_timeout:-15s}" \
-  --from-literal=HTTP_WRITE_TIMEOUT="${http_write_timeout:-40s}" \
+  --from-literal=HTTP_WRITE_TIMEOUT="${http_write_timeout}" \
   --from-literal=HTTP_IDLE_TIMEOUT="${http_idle_timeout:-1m}" \
   --from-literal=HTTP_SHUTDOWN_TIMEOUT="${http_shutdown_timeout:-10s}" \
   --from-literal=HTTP_MAX_HEADER_BYTES="${http_max_header_bytes:-1048576}" \
   --from-literal=BCRYPT_COST="${bcrypt_cost:-10}" \
-  --from-literal=APP_REQUEST_TIMEOUT="${app_request_timeout:-35s}" \
+  --from-literal=APP_REQUEST_TIMEOUT="${app_request_timeout}" \
   --from-literal=LOGIN_ADMISSION_ENABLED="${login_admission_enabled:-true}" \
   --from-literal=LOGIN_MAX_CONCURRENCY="${login_max_concurrency:-8}" \
   --from-literal=LOGIN_QUEUE_TIMEOUT="${login_queue_timeout:-2s}" \

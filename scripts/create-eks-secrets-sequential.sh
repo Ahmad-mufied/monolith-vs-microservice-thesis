@@ -66,11 +66,13 @@ monolith_db_ping_timeout="$(read_env_value "$monolith_env_file" DB_PING_TIMEOUT)
 monolith_read_header_timeout="$(read_env_value "$monolith_env_file" HTTP_READ_HEADER_TIMEOUT)"
 monolith_read_timeout="$(read_env_value "$monolith_env_file" HTTP_READ_TIMEOUT)"
 monolith_write_timeout="$(read_env_value "$monolith_env_file" HTTP_WRITE_TIMEOUT)"
+monolith_write_timeout="$(normalize_http_write_timeout "$monolith_write_timeout" "40s")"
 monolith_idle_timeout="$(read_env_value "$monolith_env_file" HTTP_IDLE_TIMEOUT)"
 monolith_shutdown_timeout="$(read_env_value "$monolith_env_file" HTTP_SHUTDOWN_TIMEOUT)"
 monolith_max_header_bytes="$(read_env_value "$monolith_env_file" HTTP_MAX_HEADER_BYTES)"
 monolith_bcrypt_cost="$(read_env_value "$monolith_env_file" BCRYPT_COST)"
 monolith_app_request_timeout="$(read_env_value "$monolith_env_file" APP_REQUEST_TIMEOUT)"
+monolith_app_request_timeout="$(derive_app_request_timeout "$monolith_app_request_timeout" "$monolith_write_timeout")"
 monolith_login_admission_enabled="$(read_env_value "$monolith_env_file" LOGIN_ADMISSION_ENABLED)"
 monolith_login_max_concurrency="$(read_env_value "$monolith_env_file" LOGIN_MAX_CONCURRENCY)"
 monolith_login_queue_timeout="$(read_env_value "$monolith_env_file" LOGIN_QUEUE_TIMEOUT)"
@@ -85,6 +87,8 @@ api_gateway_transaction_service_addr="$(read_env_value "$api_gateway_env_file" T
 api_gateway_grpc_call_timeout="$(read_env_value "$api_gateway_env_file" GRPC_CALL_TIMEOUT)"
 api_gateway_request_timeout="$(read_env_value "$api_gateway_env_file" REQUEST_TIMEOUT)"
 api_gateway_http_write_timeout="$(read_env_value "$api_gateway_env_file" HTTP_WRITE_TIMEOUT)"
+api_gateway_http_write_timeout="$(normalize_http_write_timeout "$api_gateway_http_write_timeout" "40s")"
+api_gateway_request_timeout="$(derive_gateway_request_timeout "$api_gateway_request_timeout" "$api_gateway_http_write_timeout" "${api_gateway_grpc_call_timeout:-32s}")"
 
 auth_service_app_env="$(read_env_value "$auth_service_env_file" APP_ENV)"
 auth_service_grpc_port="$(read_env_value "$auth_service_env_file" GRPC_PORT)"
@@ -180,12 +184,12 @@ create_secret_from_pairs mono monolith-env \
   DB_PING_TIMEOUT "${monolith_db_ping_timeout:-5s}" \
   HTTP_READ_HEADER_TIMEOUT "${monolith_read_header_timeout:-5s}" \
   HTTP_READ_TIMEOUT "${monolith_read_timeout:-15s}" \
-  HTTP_WRITE_TIMEOUT "${monolith_write_timeout:-40s}" \
+  HTTP_WRITE_TIMEOUT "${monolith_write_timeout}" \
   HTTP_IDLE_TIMEOUT "${monolith_idle_timeout:-1m}" \
   HTTP_SHUTDOWN_TIMEOUT "${monolith_shutdown_timeout:-10s}" \
   HTTP_MAX_HEADER_BYTES "${monolith_max_header_bytes:-1048576}" \
   BCRYPT_COST "${monolith_bcrypt_cost:-10}" \
-  APP_REQUEST_TIMEOUT "${monolith_app_request_timeout:-35s}" \
+  APP_REQUEST_TIMEOUT "${monolith_app_request_timeout}" \
   LOGIN_ADMISSION_ENABLED "${monolith_login_admission_enabled:-true}" \
   LOGIN_MAX_CONCURRENCY "${monolith_login_max_concurrency:-8}" \
   LOGIN_QUEUE_TIMEOUT "${monolith_login_queue_timeout:-2s}"
@@ -199,8 +203,8 @@ create_secret_from_pairs msa api-gateway-secret \
   ITEM_SERVICE_ADDR "${api_gateway_item_service_addr:-dns:///item-service-headless.msa.svc.cluster.local:50052}" \
   TRANSACTION_SERVICE_ADDR "${api_gateway_transaction_service_addr:-dns:///transaction-service-headless.msa.svc.cluster.local:50053}" \
   GRPC_CALL_TIMEOUT "${api_gateway_grpc_call_timeout:-32s}" \
-  REQUEST_TIMEOUT "${api_gateway_request_timeout:-35s}" \
-  HTTP_WRITE_TIMEOUT "${api_gateway_http_write_timeout:-40s}"
+  REQUEST_TIMEOUT "${api_gateway_request_timeout}" \
+  HTTP_WRITE_TIMEOUT "${api_gateway_http_write_timeout}"
 
 create_secret_from_pairs msa auth-service-secret \
   APP_ENV "${auth_service_app_env:-production}" \
