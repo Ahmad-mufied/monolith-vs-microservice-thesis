@@ -19,7 +19,7 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	grpcRequestTimeout, err := getEnvDuration("GRPC_REQUEST_TIMEOUT", 15*time.Second)
+	grpcRequestTimeout, err := getEnvDuration("GRPC_REQUEST_TIMEOUT", 30*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("GRPC_REQUEST_TIMEOUT: %w", err)
 	}

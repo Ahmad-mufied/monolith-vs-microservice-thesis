@@ -28,15 +28,15 @@ func TestLoad(t *testing.T) {
 				if cfg.JWTSecret != "secret" {
 					t.Errorf("JWTSecret = %q, want secret", cfg.JWTSecret)
 				}
-				if cfg.GRPCCallTimeout != 10*time.Second {
-					t.Errorf("GRPCCallTimeout = %s, want 10s", cfg.GRPCCallTimeout)
+				if cfg.GRPCCallTimeout != 32*time.Second {
+					t.Errorf("GRPCCallTimeout = %s, want 32s", cfg.GRPCCallTimeout)
 				}
-				if cfg.RequestTimeout != 12*time.Second {
-					t.Errorf("RequestTimeout = %s, want 12s", cfg.RequestTimeout)
+				if cfg.RequestTimeout != 35*time.Second {
+					t.Errorf("RequestTimeout = %s, want 35s", cfg.RequestTimeout)
 				}
 				if cfg.HTTPServer.ReadHeaderTimeout != 5*time.Second ||
 					cfg.HTTPServer.ReadTimeout != 15*time.Second ||
-					cfg.HTTPServer.WriteTimeout != 15*time.Second ||
+					cfg.HTTPServer.WriteTimeout != 40*time.Second ||
 					cfg.HTTPServer.IdleTimeout != time.Minute ||
 					cfg.HTTPServer.ShutdownTimeout != 10*time.Second {
 					t.Errorf("HTTPServer defaults = %+v", cfg.HTTPServer)

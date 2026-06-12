@@ -21,8 +21,8 @@ func TestLoad(t *testing.T) {
 				if cfg.GRPCPort != "50052" {
 					t.Errorf("GRPCPort = %q, want default 50052", cfg.GRPCPort)
 				}
-				if cfg.GRPCRequestTimeout != 15*time.Second {
-					t.Errorf("GRPCRequestTimeout = %s, want 15s", cfg.GRPCRequestTimeout)
+				if cfg.GRPCRequestTimeout != 30*time.Second {
+					t.Errorf("GRPCRequestTimeout = %s, want 30s", cfg.GRPCRequestTimeout)
 				}
 			},
 		},

@@ -49,7 +49,7 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	grpcCallTimeout, err := getEnvDuration("GRPC_CALL_TIMEOUT", 10*time.Second)
+	grpcCallTimeout, err := getEnvDuration("GRPC_CALL_TIMEOUT", 32*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("GRPC_CALL_TIMEOUT: %w", err)
 	}
@@ -57,7 +57,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("GRPC_CALL_TIMEOUT must be greater than 0")
 	}
 
-	requestTimeout, err := getEnvDuration("REQUEST_TIMEOUT", 12*time.Second)
+	requestTimeout, err := getEnvDuration("REQUEST_TIMEOUT", 35*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("REQUEST_TIMEOUT: %w", err)
 	}
@@ -115,7 +115,7 @@ func loadHTTPServerConfig() (HTTPServerConfig, error) {
 		return HTTPServerConfig{}, fmt.Errorf("HTTP_READ_TIMEOUT must be greater than 0")
 	}
 
-	writeTimeout, err := getEnvDuration("HTTP_WRITE_TIMEOUT", 15*time.Second)
+	writeTimeout, err := getEnvDuration("HTTP_WRITE_TIMEOUT", 40*time.Second)
 	if err != nil {
 		return HTTPServerConfig{}, fmt.Errorf("HTTP_WRITE_TIMEOUT: %w", err)
 	}

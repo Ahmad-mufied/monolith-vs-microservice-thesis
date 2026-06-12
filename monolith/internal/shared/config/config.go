@@ -60,7 +60,7 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("BCRYPT_COST: %w", err)
 	}
 
-	requestTimeout, err := getEnvDuration("APP_REQUEST_TIMEOUT", 30*time.Second)
+	requestTimeout, err := getEnvDuration("APP_REQUEST_TIMEOUT", 35*time.Second)
 	if err != nil {
 		return Config{}, fmt.Errorf("APP_REQUEST_TIMEOUT: %w", err)
 	}
@@ -168,7 +168,7 @@ func loadHTTPServerConfig() (HTTPServerConfig, error) {
 		return HTTPServerConfig{}, fmt.Errorf("HTTP_READ_TIMEOUT must be greater than 0")
 	}
 
-	writeTimeout, err := getEnvDuration("HTTP_WRITE_TIMEOUT", 35*time.Second)
+	writeTimeout, err := getEnvDuration("HTTP_WRITE_TIMEOUT", 40*time.Second)
 	if err != nil {
 		return HTTPServerConfig{}, fmt.Errorf("HTTP_WRITE_TIMEOUT: %w", err)
 	}

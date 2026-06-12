@@ -202,10 +202,10 @@ func TestLoad(t *testing.T) {
 				}
 			}
 			if tt.name == "loads required config with defaults" {
-				if got.RequestTimeout != 30*time.Second {
-					t.Fatalf("request timeout default = %s, want 30s", got.RequestTimeout)
+				if got.RequestTimeout != 35*time.Second {
+					t.Fatalf("request timeout default = %s, want 35s", got.RequestTimeout)
 				}
-				if got.HTTPServer.ReadHeaderTimeout != 5*time.Second || got.HTTPServer.ReadTimeout != 15*time.Second || got.HTTPServer.WriteTimeout != 35*time.Second || got.HTTPServer.IdleTimeout != time.Minute || got.HTTPServer.ShutdownTimeout != 10*time.Second || got.HTTPServer.MaxHeaderBytes != 1048576 {
+				if got.HTTPServer.ReadHeaderTimeout != 5*time.Second || got.HTTPServer.ReadTimeout != 15*time.Second || got.HTTPServer.WriteTimeout != 40*time.Second || got.HTTPServer.IdleTimeout != time.Minute || got.HTTPServer.ShutdownTimeout != 10*time.Second || got.HTTPServer.MaxHeaderBytes != 1048576 {
 					t.Fatalf("http server defaults = %+v", got.HTTPServer)
 				}
 			}

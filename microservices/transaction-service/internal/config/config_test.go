@@ -22,24 +22,25 @@ func TestLoad(t *testing.T) {
 				if cfg.GRPCPort != "50053" {
 					t.Errorf("GRPCPort = %q, want default 50053", cfg.GRPCPort)
 				}
-				if cfg.GRPCRequestTimeout != 15*time.Second {
-					t.Errorf("GRPCRequestTimeout = %s, want 15s", cfg.GRPCRequestTimeout)
+				if cfg.GRPCRequestTimeout != 30*time.Second {
+					t.Errorf("GRPCRequestTimeout = %s, want 30s", cfg.GRPCRequestTimeout)
 				}
-				if cfg.ItemValidationTimeout != 10*time.Second {
-					t.Errorf("ItemValidationTimeout = %s, want 10s", cfg.ItemValidationTimeout)
+				if cfg.ItemValidationTimeout != 25*time.Second {
+					t.Errorf("ItemValidationTimeout = %s, want 25s", cfg.ItemValidationTimeout)
 				}
 			},
 		},
 		{
 			name: "loads grpc request timeout override",
 			env: map[string]string{
-				"DATABASE_URL":         "postgres://localhost:5432/transaction_db?sslmode=disable",
-				"ITEM_SERVICE_ADDR":    "item:50052",
-				"GRPC_REQUEST_TIMEOUT": "12s",
+				"DATABASE_URL":            "postgres://localhost:5432/transaction_db?sslmode=disable",
+				"ITEM_SERVICE_ADDR":       "item:50052",
+				"GRPC_REQUEST_TIMEOUT":    "30s",
+				"ITEM_VALIDATION_TIMEOUT": "25s",
 			},
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.GRPCRequestTimeout != 12*time.Second {
-					t.Errorf("GRPCRequestTimeout = %s, want 12s", cfg.GRPCRequestTimeout)
+				if cfg.GRPCRequestTimeout != 30*time.Second {
+					t.Errorf("GRPCRequestTimeout = %s, want 30s", cfg.GRPCRequestTimeout)
 				}
 			},
 		},
