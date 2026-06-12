@@ -212,6 +212,8 @@ Meaning:
 - `GRPC_CALL_TIMEOUT` is the per-call application deadline used by API Gateway
   for every outbound gRPC request to Auth, Item, and Transaction Service.
 - `REQUEST_TIMEOUT` is the API Gateway's overall HTTP request deadline.
+  If this budget expires before the upstream gRPC response is translated back
+  to HTTP, the client also observes a `503`.
 - `GRPC_REQUEST_TIMEOUT` is the per-request server-side deadline enforced by
   Auth Service, Item Service, and Transaction Service for incoming unary gRPC
   requests.
@@ -228,7 +230,8 @@ Observed error semantics:
 
 - `499`: the caller canceled or disconnected before the request completed
 - `503`: an application-managed upstream dependency deadline was exceeded, or
-  login admission control rejected overload with `ResourceExhausted`
+  the API Gateway `REQUEST_TIMEOUT` budget expired, or login admission control
+  rejected overload with `ResourceExhausted`
 
 ## 5. Run Migrations
 

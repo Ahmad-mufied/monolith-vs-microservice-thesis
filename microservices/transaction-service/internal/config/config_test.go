@@ -35,12 +35,12 @@ func TestLoad(t *testing.T) {
 			env: map[string]string{
 				"DATABASE_URL":            "postgres://localhost:5432/transaction_db?sslmode=disable",
 				"ITEM_SERVICE_ADDR":       "item:50052",
-				"GRPC_REQUEST_TIMEOUT":    "30s",
+				"GRPC_REQUEST_TIMEOUT":    "45s",
 				"ITEM_VALIDATION_TIMEOUT": "25s",
 			},
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.GRPCRequestTimeout != 30*time.Second {
-					t.Errorf("GRPCRequestTimeout = %s, want 30s", cfg.GRPCRequestTimeout)
+				if cfg.GRPCRequestTimeout != 45*time.Second {
+					t.Errorf("GRPCRequestTimeout = %s, want 45s", cfg.GRPCRequestTimeout)
 				}
 			},
 		},
