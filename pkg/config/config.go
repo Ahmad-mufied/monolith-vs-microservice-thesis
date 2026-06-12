@@ -45,3 +45,15 @@ func GetEnvInt(key string, fallback int) int {
 	}
 	return i
 }
+
+func GetEnvInt32(key string, fallback int32) int32 {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.ParseInt(v, 10, 32)
+	if err != nil {
+		return fallback
+	}
+	return int32(n)
+}
