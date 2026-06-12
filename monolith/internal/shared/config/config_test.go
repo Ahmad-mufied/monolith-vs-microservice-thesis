@@ -115,6 +115,24 @@ func TestLoad(t *testing.T) {
 			wantError: true,
 		},
 		{
+			name: "login max concurrency must be positive",
+			env: map[string]string{
+				"DATABASE_URL":          "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":            testJWTSecret(t),
+				"LOGIN_MAX_CONCURRENCY": "0",
+			},
+			wantError: true,
+		},
+		{
+			name: "login queue timeout must be positive",
+			env: map[string]string{
+				"DATABASE_URL":        "postgres://localhost:5432/mono_db?sslmode=disable",
+				"JWT_SECRET":          testJWTSecret(t),
+				"LOGIN_QUEUE_TIMEOUT": "0s",
+			},
+			wantError: true,
+		},
+		{
 			name: "app request timeout equal to write timeout is allowed",
 			env: map[string]string{
 				"DATABASE_URL":        "postgres://localhost:5432/mono_db?sslmode=disable",
