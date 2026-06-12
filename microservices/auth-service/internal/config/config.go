@@ -8,6 +8,7 @@ import (
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
 	pkgconfig "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/config"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/postgres"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -19,6 +20,7 @@ type Config struct {
 	BcryptCost         int
 	GRPCRequestTimeout time.Duration
 	LoginAdmission     admission.Config
+	DBPool             *postgres.PoolConfig
 }
 
 func Load() (*Config, error) {
@@ -56,6 +58,7 @@ func Load() (*Config, error) {
 		BcryptCost:         pkgconfig.GetEnvInt("BCRYPT_COST", bcrypt.DefaultCost),
 		GRPCRequestTimeout: grpcRequestTimeout,
 		LoginAdmission:     loginAdmission,
+		DBPool:             loadDBPoolConfig(),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -108,4 +111,19 @@ func getEnvBool(key string, fallback bool) (bool, error) {
 		return false, fmt.Errorf("must be a valid boolean: %w", err)
 	}
 	return b, nil
+}
+
+func loadDBPoolConfig() *postgres.PoolConfig {
+	maxConns := pkgconfig.GetEnvInt32("DB_POOL_MAX_CONNS", 6)
+	minConns := pkgconfig.GetEnvInt32("DB_POOL_MIN_CONNS", 1)
+	maxConnLifetime := pkgconfig.GetEnvDuration("DB_POOL_MAX_CONN_LIFETIME", 15*time.Minute)
+	maxConnIdleTime := pkgconfig.GetEnvDuration("DB_POOL_MAX_CONN_IDLE_TIME", time.Minute)
+	pingTimeout := pkgconfig.GetEnvDuration("DB_PING_TIMEOUT", 5*time.Second)
+	return &postgres.PoolConfig{
+		MaxConns:        maxConns,
+		MinConns:        minConns,
+		MaxConnLifetime: maxConnLifetime,
+		MaxConnIdleTime: maxConnIdleTime,
+		PingTimeout:     pingTimeout,
+	}
 }

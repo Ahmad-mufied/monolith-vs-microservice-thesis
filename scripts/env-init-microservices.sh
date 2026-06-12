@@ -123,13 +123,23 @@ GRPC_REQUEST_TIMEOUT=30s
 DATADOG_ENABLED=false
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=2
-LOGIN_QUEUE_TIMEOUT=2s"
+LOGIN_QUEUE_TIMEOUT=2s
+DB_POOL_MAX_CONNS=6
+DB_POOL_MIN_CONNS=1
+DB_POOL_MAX_CONN_LIFETIME=15m
+DB_POOL_MAX_CONN_IDLE_TIME=1m
+DB_PING_TIMEOUT=5s"
 
 write_if_missing "env/item-service.env" "GRPC_PORT=50052
 DATABASE_URL=${item_database_url}
 ITEM_DATABASE_URL=${item_database_url}
 GRPC_REQUEST_TIMEOUT=30s
-DATADOG_ENABLED=false"
+DATADOG_ENABLED=false
+DB_POOL_MAX_CONNS=6
+DB_POOL_MIN_CONNS=1
+DB_POOL_MAX_CONN_LIFETIME=15m
+DB_POOL_MAX_CONN_IDLE_TIME=1m
+DB_PING_TIMEOUT=5s"
 
 write_if_missing "env/transaction-service.env" "GRPC_PORT=50053
 DATABASE_URL=${transaction_database_url}
@@ -137,7 +147,12 @@ TRANSACTION_DATABASE_URL=${transaction_database_url}
 ITEM_SERVICE_ADDR=localhost:50052
 GRPC_REQUEST_TIMEOUT=30s
 ITEM_VALIDATION_TIMEOUT=25s
-DATADOG_ENABLED=false"
+DATADOG_ENABLED=false
+DB_POOL_MAX_CONNS=6
+DB_POOL_MIN_CONNS=1
+DB_POOL_MAX_CONN_LIFETIME=15m
+DB_POOL_MAX_CONN_IDLE_TIME=1m
+DB_PING_TIMEOUT=5s"
 
 write_if_missing "env/api-gateway.env" "HTTP_PORT=8080
 JWT_SECRET=${jwt_secret}
@@ -159,13 +174,23 @@ GRPC_REQUEST_TIMEOUT=30s
 DATADOG_ENABLED=false
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=2
-LOGIN_QUEUE_TIMEOUT=2s"
+LOGIN_QUEUE_TIMEOUT=2s
+DB_POOL_MAX_CONNS=6
+DB_POOL_MIN_CONNS=1
+DB_POOL_MAX_CONN_LIFETIME=15m
+DB_POOL_MAX_CONN_IDLE_TIME=1m
+DB_PING_TIMEOUT=5s"
 
 write_if_missing "env/item-service.compose.env" "GRPC_PORT=50052
 DATABASE_URL=${compose_item_database_url}
 ITEM_DATABASE_URL=${compose_item_database_url}
 GRPC_REQUEST_TIMEOUT=30s
-DATADOG_ENABLED=false"
+DATADOG_ENABLED=false
+DB_POOL_MAX_CONNS=6
+DB_POOL_MIN_CONNS=1
+DB_POOL_MAX_CONN_LIFETIME=15m
+DB_POOL_MAX_CONN_IDLE_TIME=1m
+DB_PING_TIMEOUT=5s"
 
 write_if_missing "env/transaction-service.compose.env" "GRPC_PORT=50053
 DATABASE_URL=${compose_transaction_database_url}
@@ -173,7 +198,12 @@ TRANSACTION_DATABASE_URL=${compose_transaction_database_url}
 ITEM_SERVICE_ADDR=item-service:50052
 GRPC_REQUEST_TIMEOUT=30s
 ITEM_VALIDATION_TIMEOUT=25s
-DATADOG_ENABLED=false"
+DATADOG_ENABLED=false
+DB_POOL_MAX_CONNS=6
+DB_POOL_MIN_CONNS=1
+DB_POOL_MAX_CONN_LIFETIME=15m
+DB_POOL_MAX_CONN_IDLE_TIME=1m
+DB_PING_TIMEOUT=5s"
 
 write_if_missing "env/api-gateway.compose.env" "HTTP_PORT=8080
 JWT_SECRET=${jwt_secret}
@@ -192,13 +222,28 @@ for auth_env_file in env/auth-service.env env/auth-service.compose.env; do
   write_or_update_env_value "$auth_env_file" "LOGIN_ADMISSION_ENABLED" "true"
   write_or_update_env_value "$auth_env_file" "LOGIN_MAX_CONCURRENCY" "2"
   write_or_update_env_value "$auth_env_file" "LOGIN_QUEUE_TIMEOUT" "2s"
+  write_or_update_env_value "$auth_env_file" "DB_POOL_MAX_CONNS" "6"
+  write_or_update_env_value "$auth_env_file" "DB_POOL_MIN_CONNS" "1"
+  write_or_update_env_value "$auth_env_file" "DB_POOL_MAX_CONN_LIFETIME" "15m"
+  write_or_update_env_value "$auth_env_file" "DB_POOL_MAX_CONN_IDLE_TIME" "1m"
+  write_or_update_env_value "$auth_env_file" "DB_PING_TIMEOUT" "5s"
 done
 for item_env_file in env/item-service.env env/item-service.compose.env; do
   update_if_missing_or_default "$item_env_file" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
+  write_or_update_env_value "$item_env_file" "DB_POOL_MAX_CONNS" "6"
+  write_or_update_env_value "$item_env_file" "DB_POOL_MIN_CONNS" "1"
+  write_or_update_env_value "$item_env_file" "DB_POOL_MAX_CONN_LIFETIME" "15m"
+  write_or_update_env_value "$item_env_file" "DB_POOL_MAX_CONN_IDLE_TIME" "1m"
+  write_or_update_env_value "$item_env_file" "DB_PING_TIMEOUT" "5s"
 done
 for tx_env_file in env/transaction-service.env env/transaction-service.compose.env; do
   update_if_missing_or_default "$tx_env_file" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
   update_if_missing_or_default "$tx_env_file" "ITEM_VALIDATION_TIMEOUT" "10s" "25s"
+  write_or_update_env_value "$tx_env_file" "DB_POOL_MAX_CONNS" "6"
+  write_or_update_env_value "$tx_env_file" "DB_POOL_MIN_CONNS" "1"
+  write_or_update_env_value "$tx_env_file" "DB_POOL_MAX_CONN_LIFETIME" "15m"
+  write_or_update_env_value "$tx_env_file" "DB_POOL_MAX_CONN_IDLE_TIME" "1m"
+  write_or_update_env_value "$tx_env_file" "DB_PING_TIMEOUT" "5s"
 done
 for gateway_env_file in env/api-gateway.env env/api-gateway.compose.env; do
   update_if_missing_or_default "$gateway_env_file" "GRPC_CALL_TIMEOUT" "10s" "32s"

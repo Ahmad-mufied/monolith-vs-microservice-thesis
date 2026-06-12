@@ -6,6 +6,7 @@ import (
 	"time"
 
 	pkgconfig "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/config"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/postgres"
 )
 
 type Config struct {
@@ -19,6 +20,7 @@ type Config struct {
 	// that a slow item service is surfaced as a dependency error before the
 	// parent request budget is exhausted.
 	ItemValidationTimeout time.Duration
+	DBPool                *postgres.PoolConfig
 }
 
 func Load() (*Config, error) {
@@ -51,6 +53,7 @@ func Load() (*Config, error) {
 		ItemServiceAddr:       os.Getenv("ITEM_SERVICE_ADDR"),
 		GRPCRequestTimeout:    grpcRequestTimeout,
 		ItemValidationTimeout: itemValidationTimeout,
+		DBPool:                loadDBPoolConfig(),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -61,6 +64,21 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func loadDBPoolConfig() *postgres.PoolConfig {
+	maxConns := pkgconfig.GetEnvInt32("DB_POOL_MAX_CONNS", 6)
+	minConns := pkgconfig.GetEnvInt32("DB_POOL_MIN_CONNS", 1)
+	maxConnLifetime := pkgconfig.GetEnvDuration("DB_POOL_MAX_CONN_LIFETIME", 15*time.Minute)
+	maxConnIdleTime := pkgconfig.GetEnvDuration("DB_POOL_MAX_CONN_IDLE_TIME", time.Minute)
+	pingTimeout := pkgconfig.GetEnvDuration("DB_PING_TIMEOUT", 5*time.Second)
+	return &postgres.PoolConfig{
+		MaxConns:        maxConns,
+		MinConns:        minConns,
+		MaxConnLifetime: maxConnLifetime,
+		MaxConnIdleTime: maxConnIdleTime,
+		PingTimeout:     pingTimeout,
+	}
 }
 
 // getEnvDuration parses a duration env var. Returns (fallback, nil) when the

@@ -38,7 +38,7 @@ func Run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := pkgpostgres.Connect(ctx, cfg.DatabaseURL)
+	pool, err := pkgpostgres.Connect(ctx, cfg.DatabaseURL, cfg.DBPool)
 	if err != nil {
 		return fmt.Errorf("connect postgres: %w", err)
 	}
