@@ -304,6 +304,27 @@ full suite:   run-benchmark-suite auto-deploys each architecture phase
 
 For the full suite, do **not** run `deploy-workloads` first. The suite deploys
 each phase internally using the suite-level `SCALING_MODE` and `IMAGE_TAG`.
+For a single case, `run-benchmark-case` checks the requested architecture and
+mode first: if the target is already live and ready, it skips deploy; otherwise
+it deploys the target architecture before running the case.
+
+Mechanism for `run-benchmark-case` in Vultr sequential mode:
+
+1. Load `IMAGE_TAG` from the pinned env file if not passed explicitly.
+2. Validate benchmark inputs such as `ARCHITECTURE`, `SCENARIO`,
+   `TARGET_RPS`, `SCALING_MODE`, and `K6_PROFILE`.
+3. Run benchmark preflight for S3 access and cluster auth.
+4. Check whether the requested architecture is already valid for this run:
+   deployment(s) must be ready, image tags must match, the opposite
+   architecture must be scaled down, and the live scaling mode must match the
+   request.
+5. If those checks pass, deploy is skipped and the script proceeds to
+   scenario-specific setup.
+6. If those checks fail, the script calls `deploy-sequential-architecture.sh`
+   to scale down the inactive architecture, run bootstrap/migration/reset/seed,
+   apply the correct overlay, and wait for rollout.
+7. After the architecture is ready, the script renders and submits the k6 job,
+   waits for completion, then classifies the result from the S3 artifacts.
 
 ### Single case
 
@@ -314,6 +335,46 @@ ARCHITECTURE=monolith SCENARIO=login TARGET_RPS=100 RUN_ID=vultr-smoke \
 ```
 
 Auto-skips deploy if the target architecture is already live and ready.
+If the target architecture is not live, not ready, or running a different
+scaling mode than the request, `run-benchmark-case` deploys it first.
+
+Common single-case examples:
+
+```bash
+# Quick smoke login on monolith. Deploy runs only if monolith is not already ready.
+ARCHITECTURE=monolith \
+SCENARIO=login \
+TARGET_RPS=100 \
+RUN_ID=vultr-smoke-login \
+ATTEMPT=attempt-01 \
+SCALING_MODE=fixed \
+K6_PROFILE=smoke \
+TEST_DURATION=1m \
+make run-benchmark-case
+
+# Login smoke on microservices after pinning a new IMAGE_TAG. This usually
+# redeploys first because the live image no longer matches the requested tag.
+ARCHITECTURE=microservices \
+SCENARIO=login \
+TARGET_RPS=500 \
+RUN_ID=vultr-seq-fixed-smoke \
+ATTEMPT=attempt-01 \
+SCALING_MODE=fixed \
+K6_PROFILE=smoke \
+TEST_DURATION=3m \
+make run-benchmark-case
+
+# HPA validation on microservices. If the cluster is still in fixed mode,
+# `run-benchmark-case` redeploys the HPA overlay before running the case.
+ARCHITECTURE=microservices \
+SCENARIO=login \
+TARGET_RPS=2500 \
+RUN_ID=vultr-hpa-login-smoke \
+ATTEMPT=attempt-01 \
+SCALING_MODE=hpa \
+K6_PROFILE=hpa \
+make run-benchmark-case
+```
 
 ### Fixed suite
 
@@ -352,6 +413,68 @@ Two architecture phases: phase 1 deploys first arch, runs all cases, waits
 
 Default: `ARCHITECTURE_ORDER="monolith microservices"`. Override with spaces
 (not commas): `ARCHITECTURE_ORDER="microservices monolith"`.
+
+Mechanism for `run-benchmark-suite` in Vultr sequential mode:
+
+1. Parse the matrix from `SCENARIO_RPS_MATRIX` or from `SCENARIOS` plus
+   `RPS_LEVELS`.
+2. Validate `SCALING_MODE`, `K6_PROFILE`, `INTER_CASE_DELAY`, and
+   `ARCHITECTURE_SWITCH_DELAY`.
+3. Run suite preflight and upload suite metadata.
+4. Iterate through each architecture in `ARCHITECTURE_ORDER`.
+5. For each architecture phase:
+   - deploy the architecture if there are still pending cases for it,
+   - skip deploy if all cases for that phase already exist in S3,
+   - run scenario-specific reset/seed/setup only when needed.
+6. For each `scenario + RPS` pair, call the sequential single-case runner.
+7. Sleep `INTER_CASE_DELAY` between cases.
+8. Sleep `ARCHITECTURE_SWITCH_DELAY` before switching to the next architecture.
+9. Upload suite summary to S3 after all phases finish.
+
+Common suite examples:
+
+```bash
+# Narrow login-only smoke across both architectures.
+SCALING_MODE=fixed \
+K6_PROFILE=steady \
+TEST_DURATION=5m \
+RUN_ID=smoke-fixed-login-admission \
+ATTEMPT=attempt-01 \
+INTER_CASE_DELAY=120 \
+ARCHITECTURE_SWITCH_DELAY=300 \
+SCENARIO_RPS_MATRIX="login:100,250,500" \
+make run-benchmark-suite
+
+# Standard fixed suite with multiple scenarios.
+SCALING_MODE=fixed \
+K6_PROFILE=steady \
+TEST_DURATION=5m \
+RUN_ID=rq1-fixed-vultr \
+ATTEMPT=attempt-01 \
+INTER_CASE_DELAY=120 \
+ARCHITECTURE_SWITCH_DELAY=300 \
+SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000" \
+make run-benchmark-suite
+
+# Standard HPA suite. Note that TEST_DURATION is ignored for K6_PROFILE=hpa.
+SCALING_MODE=hpa \
+K6_PROFILE=hpa \
+RUN_ID=rq2-hpa-vultr \
+ATTEMPT=attempt-01 \
+INTER_CASE_DELAY=300 \
+ARCHITECTURE_SWITCH_DELAY=300 \
+SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000" \
+make run-benchmark-suite
+```
+
+Important distinction:
+
+- In **Vultr sequential**, `run-benchmark-case` can auto-deploy one target
+  architecture when needed.
+- In **Vultr sequential**, `run-benchmark-suite` manages deploys internally per
+  architecture phase.
+- In **parallel mode**, the benchmark runners assume both architectures are
+  already deployed; use `deploy-workloads` and `verify-live-mode` first.
 
 Data reset: all scenarios reset once per scenario before the first pending RPS
 level. Enrichment-dependent scenarios also prepare enrichment data after reset.
