@@ -132,14 +132,15 @@ func TestLimiter_QueueTimeoutRejects(t *testing.T) {
 	}
 
 	blocker := make(chan struct{})
+	slotAcquired := make(chan struct{})
 	go func() {
 		_ = limiter.Do(context.Background(), func() error {
+			close(slotAcquired)
 			<-blocker
 			return nil
 		})
 	}()
-
-	time.Sleep(10 * time.Millisecond)
+	<-slotAcquired
 
 	err = limiter.Do(context.Background(), func() error {
 		return nil
@@ -162,14 +163,15 @@ func TestLimiter_ContextCancellation(t *testing.T) {
 	}
 
 	blocker := make(chan struct{})
+	slotAcquired := make(chan struct{})
 	go func() {
 		_ = limiter.Do(context.Background(), func() error {
+			close(slotAcquired)
 			<-blocker
 			return nil
 		})
 	}()
-
-	time.Sleep(10 * time.Millisecond)
+	<-slotAcquired
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
