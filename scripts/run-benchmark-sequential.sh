@@ -229,6 +229,10 @@ architecture_already_deployed() {
   done
 }
 
+render_provider_manifests "$RENDER_ROOT"
+MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/$MANIFEST_NAME"
+bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
+
 if architecture_already_deployed "$ARCHITECTURE"; then
   echo "Architecture ${ARCHITECTURE} is already deployed with IMAGE_TAG=${IMAGE_TAG} and SCALING_MODE=${SCALING_MODE}; skipping deploy."
   echo "=== Running scenario data setup for ${SCENARIO} ==="
@@ -249,10 +253,6 @@ else
     prepare_enrichment_active "$ARCHITECTURE"
   fi
 fi
-
-render_provider_manifests "$RENDER_ROOT"
-MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/$MANIFEST_NAME"
-bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 
 resources_json="$(resources_configuration_json "$ARCHITECTURE" "$SCALING_MODE")"
 provider_region="${VULTR_REGION:-$AWS_REGION}"

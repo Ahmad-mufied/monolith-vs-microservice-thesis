@@ -31,6 +31,11 @@ recreate_job() {
   local manifest="$3"
   local complete_timeout="$4"
 
+  if [ ! -f "$manifest" ]; then
+    echo "ERROR: required benchmark setup manifest does not exist: $manifest" >&2
+    return 1
+  fi
+
   kubectl --context="$SEQUENTIAL_CONTEXT" delete job "$job_name" -n "$namespace" --ignore-not-found
   if kubectl --context="$SEQUENTIAL_CONTEXT" get job "$job_name" -n "$namespace" >/dev/null 2>&1; then
     kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=delete "job/${job_name}" -n "$namespace" --timeout=120s
