@@ -3,8 +3,10 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
 	pkgconfig "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/config"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -16,6 +18,7 @@ type Config struct {
 	JWTExpiry          time.Duration
 	BcryptCost         int
 	GRPCRequestTimeout time.Duration
+	LoginAdmission     admission.Config
 }
 
 func Load() (*Config, error) {
@@ -27,6 +30,21 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("GRPC_REQUEST_TIMEOUT must be greater than 0")
 	}
 
+	loginAdmissionEnabled := os.Getenv("LOGIN_ADMISSION_ENABLED") == "true"
+	loginMaxConcurrency, err := getEnvInt("LOGIN_MAX_CONCURRENCY", 2)
+	if err != nil {
+		return nil, fmt.Errorf("LOGIN_MAX_CONCURRENCY: %w", err)
+	}
+	loginQueueTimeout, err := getEnvDuration("LOGIN_QUEUE_TIMEOUT", 2*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("LOGIN_QUEUE_TIMEOUT: %w", err)
+	}
+	loginAdmission := admission.Config{
+		Enabled:        loginAdmissionEnabled,
+		MaxConcurrency: loginMaxConcurrency,
+		QueueTimeout:   loginQueueTimeout,
+	}
+
 	cfg := &Config{
 		GRPCPort:           pkgconfig.GetEnv("GRPC_PORT", "50051"),
 		DatabaseURL:        os.Getenv("DATABASE_URL"),
@@ -34,6 +52,7 @@ func Load() (*Config, error) {
 		JWTExpiry:          pkgconfig.GetEnvDuration("JWT_EXPIRY", 24*time.Hour),
 		BcryptCost:         pkgconfig.GetEnvInt("BCRYPT_COST", bcrypt.DefaultCost),
 		GRPCRequestTimeout: grpcRequestTimeout,
+		LoginAdmission:     loginAdmission,
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -62,4 +81,16 @@ func getEnvDuration(key string, fallback time.Duration) (time.Duration, error) {
 		return 0, fmt.Errorf("must be a valid duration: %w", err)
 	}
 	return d, nil
+}
+
+func getEnvInt(key string, fallback int) (int, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, fmt.Errorf("must be a valid integer: %w", err)
+	}
+	return n, nil
 }

@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
 	echotrace "github.com/DataDog/dd-trace-go/contrib/labstack/echo.v4/v2"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/auth"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/health"
@@ -83,8 +84,14 @@ func main() {
 
 	jwtManager := jwtutil.NewManager(cfg.JWTSecret, cfg.JWTTokenTTL)
 
+	loginLimiter, err := admission.NewLimiter(cfg.LoginAdmission)
+	if err != nil {
+		logger.Error("create login limiter", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
 	authRepo := auth.NewPostgresRepository(pool)
-	authService := auth.NewService(authRepo, auth.BcryptHasher{Cost: cfg.BcryptCost}, jwtManager)
+	authService := auth.NewService(authRepo, auth.BcryptHasher{Cost: cfg.BcryptCost}, jwtManager, loginLimiter)
 	auth.NewHandler(authService).RegisterRoutes(e)
 
 	health.NewHandler(cfg.ServiceName).Register(e)

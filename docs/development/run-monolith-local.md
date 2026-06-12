@@ -144,16 +144,19 @@ DB_POOL_MIN_CONNS=2
 DB_POOL_MAX_CONN_LIFETIME=5m
 DB_POOL_MAX_CONN_IDLE_TIME=1m
 DB_PING_TIMEOUT=5s
-APP_REQUEST_TIMEOUT=30s
+APP_REQUEST_TIMEOUT=35s
 HTTP_READ_HEADER_TIMEOUT=5s
 HTTP_READ_TIMEOUT=15s
-HTTP_WRITE_TIMEOUT=35s
+HTTP_WRITE_TIMEOUT=40s
 HTTP_IDLE_TIMEOUT=60s
 HTTP_SHUTDOWN_TIMEOUT=10s
 HTTP_MAX_HEADER_BYTES=1048576
 BCRYPT_COST=10
 JWT_SECRET=<generated-local-secret>
 DATADOG_ENABLED=false
+LOGIN_ADMISSION_ENABLED=true
+LOGIN_MAX_CONCURRENCY=8
+LOGIN_QUEUE_TIMEOUT=2s
 ```
 
 `DATABASE_URL` is used inside the monolith container. The hostname is the
@@ -173,6 +176,12 @@ distinct from the HTTP server transport timeouts below. When this deadline is
 exceeded, the monolith returns `503` through the normal error envelope. When
 the client disconnects first, it returns `499`.
 
+Login admission control bounds concurrent bcrypt comparisons so request volume
+does not oversubscribe CPU. When `LOGIN_ADMISSION_ENABLED=true`, at most
+`LOGIN_MAX_CONCURRENCY` login password checks run at the same time. Requests
+wait up to `LOGIN_QUEUE_TIMEOUT`; if no slot is available, the monolith returns
+`503 SERVICE_UNAVAILABLE` through the normal error envelope.
+
 The HTTP server values control request and connection timeouts for the monolith
 process. They keep slow or idle clients from holding resources too long and
 define how long graceful shutdown may wait for in-flight requests.
@@ -189,7 +198,7 @@ Meaning of each HTTP setting:
   This prevents a request from occupying a connection indefinitely while still
   allowing normal API payloads to arrive comfortably.
 
-- `HTTP_WRITE_TIMEOUT=35s`
+- `HTTP_WRITE_TIMEOUT=40s`
   Limits how long the server may spend writing the response. This keeps a slow
   downstream client from holding a response connection open for too long. It
   must stay larger than `APP_REQUEST_TIMEOUT` so the monolith still has time to

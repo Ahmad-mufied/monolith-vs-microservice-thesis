@@ -77,6 +77,10 @@ http_idle_timeout="$(read_env_value "$monolith_env_file" HTTP_IDLE_TIMEOUT)"
 http_shutdown_timeout="$(read_env_value "$monolith_env_file" HTTP_SHUTDOWN_TIMEOUT)"
 http_max_header_bytes="$(read_env_value "$monolith_env_file" HTTP_MAX_HEADER_BYTES)"
 bcrypt_cost="$(read_env_value "$monolith_env_file" BCRYPT_COST)"
+app_request_timeout="$(read_env_value "$monolith_env_file" APP_REQUEST_TIMEOUT)"
+login_admission_enabled="$(read_env_value "$monolith_env_file" LOGIN_ADMISSION_ENABLED)"
+login_max_concurrency="$(read_env_value "$monolith_env_file" LOGIN_MAX_CONCURRENCY)"
+login_queue_timeout="$(read_env_value "$monolith_env_file" LOGIN_QUEUE_TIMEOUT)"
 admin_user_email="$(read_env_value "$k6_runner_env_file" ADMIN_USER_EMAIL)"
 admin_user_password="$(read_env_value "$k6_runner_env_file" ADMIN_USER_PASSWORD)"
 
@@ -104,11 +108,15 @@ $K8S create secret generic monolith-env --namespace mono \
   --from-literal=DB_PING_TIMEOUT="${db_ping_timeout:-5s}" \
   --from-literal=HTTP_READ_HEADER_TIMEOUT="${http_read_header_timeout:-5s}" \
   --from-literal=HTTP_READ_TIMEOUT="${http_read_timeout:-15s}" \
-  --from-literal=HTTP_WRITE_TIMEOUT="${http_write_timeout:-30s}" \
+  --from-literal=HTTP_WRITE_TIMEOUT="${http_write_timeout:-40s}" \
   --from-literal=HTTP_IDLE_TIMEOUT="${http_idle_timeout:-1m}" \
   --from-literal=HTTP_SHUTDOWN_TIMEOUT="${http_shutdown_timeout:-10s}" \
   --from-literal=HTTP_MAX_HEADER_BYTES="${http_max_header_bytes:-1048576}" \
   --from-literal=BCRYPT_COST="${bcrypt_cost:-10}" \
+  --from-literal=APP_REQUEST_TIMEOUT="${app_request_timeout:-35s}" \
+  --from-literal=LOGIN_ADMISSION_ENABLED="${login_admission_enabled:-true}" \
+  --from-literal=LOGIN_MAX_CONCURRENCY="${login_max_concurrency:-8}" \
+  --from-literal=LOGIN_QUEUE_TIMEOUT="${login_queue_timeout:-2s}" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic k6-runner-secret --namespace benchmark \

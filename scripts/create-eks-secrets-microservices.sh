@@ -53,21 +53,31 @@ api_gateway_jwt_secret="$(read_env_value "$api_gateway_env_file" JWT_SECRET)"
 api_gateway_auth_service_addr="$(read_env_value "$api_gateway_env_file" AUTH_SERVICE_ADDR)"
 api_gateway_item_service_addr="$(read_env_value "$api_gateway_env_file" ITEM_SERVICE_ADDR)"
 api_gateway_transaction_service_addr="$(read_env_value "$api_gateway_env_file" TRANSACTION_SERVICE_ADDR)"
+api_gateway_grpc_call_timeout="$(read_env_value "$api_gateway_env_file" GRPC_CALL_TIMEOUT)"
+api_gateway_request_timeout="$(read_env_value "$api_gateway_env_file" REQUEST_TIMEOUT)"
+api_gateway_http_write_timeout="$(read_env_value "$api_gateway_env_file" HTTP_WRITE_TIMEOUT)"
 
 auth_service_app_env="$(read_env_value "$auth_service_env_file" APP_ENV)"
 auth_service_grpc_port="$(read_env_value "$auth_service_env_file" GRPC_PORT)"
 auth_service_name="$(read_env_value "$auth_service_env_file" SERVICE_NAME)"
 auth_service_bcrypt_cost="$(read_env_value "$auth_service_env_file" BCRYPT_COST)"
 auth_service_jwt_secret="$(read_env_value "$auth_service_env_file" JWT_SECRET)"
+auth_service_grpc_request_timeout="$(read_env_value "$auth_service_env_file" GRPC_REQUEST_TIMEOUT)"
+auth_service_login_admission_enabled="$(read_env_value "$auth_service_env_file" LOGIN_ADMISSION_ENABLED)"
+auth_service_login_max_concurrency="$(read_env_value "$auth_service_env_file" LOGIN_MAX_CONCURRENCY)"
+auth_service_login_queue_timeout="$(read_env_value "$auth_service_env_file" LOGIN_QUEUE_TIMEOUT)"
 
 item_service_app_env="$(read_env_value "$item_service_env_file" APP_ENV)"
 item_service_grpc_port="$(read_env_value "$item_service_env_file" GRPC_PORT)"
 item_service_name="$(read_env_value "$item_service_env_file" SERVICE_NAME)"
+item_service_grpc_request_timeout="$(read_env_value "$item_service_env_file" GRPC_REQUEST_TIMEOUT)"
 
 transaction_service_app_env="$(read_env_value "$transaction_service_env_file" APP_ENV)"
 transaction_service_grpc_port="$(read_env_value "$transaction_service_env_file" GRPC_PORT)"
 transaction_service_name="$(read_env_value "$transaction_service_env_file" SERVICE_NAME)"
 transaction_service_item_service_addr="$(read_env_value "$transaction_service_env_file" ITEM_SERVICE_ADDR)"
+transaction_service_grpc_request_timeout="$(read_env_value "$transaction_service_env_file" GRPC_REQUEST_TIMEOUT)"
+transaction_service_item_validation_timeout="$(read_env_value "$transaction_service_env_file" ITEM_VALIDATION_TIMEOUT)"
 
 : "${db_password:?DB_PASSWORD must be set in env/terraform.experiment.env}"
 : "${admin_user_email:?ADMIN_USER_EMAIL must be set in ${k6_runner_env_file}}"
@@ -101,6 +111,9 @@ $K8S create secret generic api-gateway-secret \
   --from-literal=AUTH_SERVICE_ADDR="${api_gateway_auth_service_addr:-dns:///auth-service-headless.msa.svc.cluster.local:50051}" \
   --from-literal=ITEM_SERVICE_ADDR="${api_gateway_item_service_addr:-dns:///item-service-headless.msa.svc.cluster.local:50052}" \
   --from-literal=TRANSACTION_SERVICE_ADDR="${api_gateway_transaction_service_addr:-dns:///transaction-service-headless.msa.svc.cluster.local:50053}" \
+  --from-literal=GRPC_CALL_TIMEOUT="${api_gateway_grpc_call_timeout:-32s}" \
+  --from-literal=REQUEST_TIMEOUT="${api_gateway_request_timeout:-35s}" \
+  --from-literal=HTTP_WRITE_TIMEOUT="${api_gateway_http_write_timeout:-40s}" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic auth-service-secret \
@@ -111,6 +124,10 @@ $K8S create secret generic auth-service-secret \
   --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MSA_RDS}:5432/auth_db?sslmode=require" \
   --from-literal=BCRYPT_COST="${auth_service_bcrypt_cost:-10}" \
   --from-literal=JWT_SECRET="$auth_service_jwt_secret" \
+  --from-literal=GRPC_REQUEST_TIMEOUT="${auth_service_grpc_request_timeout:-30s}" \
+  --from-literal=LOGIN_ADMISSION_ENABLED="${auth_service_login_admission_enabled:-true}" \
+  --from-literal=LOGIN_MAX_CONCURRENCY="${auth_service_login_max_concurrency:-2}" \
+  --from-literal=LOGIN_QUEUE_TIMEOUT="${auth_service_login_queue_timeout:-2s}" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic item-service-secret \
@@ -119,6 +136,7 @@ $K8S create secret generic item-service-secret \
   --from-literal=GRPC_PORT="${item_service_grpc_port:-50052}" \
   --from-literal=SERVICE_NAME="${item_service_name:-item-service}" \
   --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MSA_RDS}:5432/item_db?sslmode=require" \
+  --from-literal=GRPC_REQUEST_TIMEOUT="${item_service_grpc_request_timeout:-30s}" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic transaction-service-secret \
@@ -128,6 +146,8 @@ $K8S create secret generic transaction-service-secret \
   --from-literal=SERVICE_NAME="${transaction_service_name:-transaction-service}" \
   --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MSA_RDS}:5432/transaction_db?sslmode=require" \
   --from-literal=ITEM_SERVICE_ADDR="${transaction_service_item_service_addr:-dns:///item-service-headless.msa.svc.cluster.local:50052}" \
+  --from-literal=GRPC_REQUEST_TIMEOUT="${transaction_service_grpc_request_timeout:-30s}" \
+  --from-literal=ITEM_VALIDATION_TIMEOUT="${transaction_service_item_validation_timeout:-25s}" \
   --dry-run=client -o yaml | $K8S apply -f -
 
 $K8S create secret generic k6-runner-secret \

@@ -220,6 +220,7 @@ There is no external item delete endpoint in the final contract. Item deletion i
 | `FailedPrecondition` | 409 | Business conflict, such as amount exceeding available_amount |
 | `Aborted` | 409 | Transaction or concurrency conflict |
 | `Unavailable` | 503 | Upstream service unavailable |
+| `ResourceExhausted` | 503 | Service accepted no more work, such as login admission overload |
 | `Canceled` | 499 | Client canceled request |
 | `DeadlineExceeded` | 503 | Upstream timeout surfaced as service unavailable |
 | `Internal` | 500 | Internal error |
@@ -232,6 +233,9 @@ Timeout behavior notes:
   `GRPC_REQUEST_TIMEOUT` as a server-side unary request deadline.
 - Transaction Service applies `ITEM_VALIDATION_TIMEOUT` when it calls Item
   Service for `ValidateTransactionItems`.
+- Auth Service returns `ResourceExhausted` when login admission control rejects
+  a request because bcrypt capacity is full. API Gateway maps this to HTTP
+  `503` with the normal error envelope.
 - If the caller disconnects first, the translated REST status remains `499`.
 - If the outbound gRPC deadline expires first, the translated REST status is
   `503`.

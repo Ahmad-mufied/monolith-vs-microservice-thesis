@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 )
 
@@ -111,7 +112,7 @@ func TestServiceRegister(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service := NewService(tt.repo, tt.hasher, fakeSigner{})
+			service := NewService(tt.repo, tt.hasher, fakeSigner{}, newDisabledLimiter())
 			got, err := service.Register(context.Background(), tt.req)
 			assertAppError(t, err, tt.wantError, tt.wantCode)
 			if tt.wantError {
@@ -162,7 +163,7 @@ func TestServiceLogin(t *testing.T) {
 			tt.hasher.comparePassword = &comparedPassword
 			tt.signer.signedUserID = &signedUserID
 
-			service := NewService(tt.repo, tt.hasher, tt.signer)
+			service := NewService(tt.repo, tt.hasher, tt.signer, newDisabledLimiter())
 			got, err := service.Login(context.Background(), tt.req)
 			assertAppError(t, err, tt.wantError, tt.wantCode)
 			if tt.wantError {
@@ -194,6 +195,7 @@ func TestServiceLoginContextCanceledBeforeRepository(t *testing.T) {
 		repo,
 		fakeHasher{},
 		fakeSigner{token: "token"},
+		newDisabledLimiter(),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -216,6 +218,7 @@ func TestServiceLoginContextCanceledAfterCompare(t *testing.T) {
 		&fakeRepo{findUser: user},
 		fakeHasher{compareHook: cancel},
 		fakeSigner{token: "token", signedUserID: &signedUserID},
+		newDisabledLimiter(),
 	)
 
 	_, err := service.Login(ctx, LoginRequest{Email: "mufied@example.com", Password: "secret123"})
@@ -226,7 +229,7 @@ func TestServiceLoginContextCanceledAfterCompare(t *testing.T) {
 }
 
 func TestServiceRegisterValidationDetails(t *testing.T) {
-	service := NewService(&fakeRepo{}, fakeHasher{}, fakeSigner{})
+	service := NewService(&fakeRepo{}, fakeHasher{}, fakeSigner{}, newDisabledLimiter())
 
 	_, err := service.Register(context.Background(), RegisterRequest{
 		Name:     "Ahmad",
@@ -244,7 +247,7 @@ func TestServiceRegisterValidationDetails(t *testing.T) {
 }
 
 func TestServiceLoginValidationDetails(t *testing.T) {
-	service := NewService(&fakeRepo{}, fakeHasher{}, fakeSigner{})
+	service := NewService(&fakeRepo{}, fakeHasher{}, fakeSigner{}, newDisabledLimiter())
 
 	_, err := service.Login(context.Background(), LoginRequest{
 		Email:    "Ahmad <mufied@example.com>",
@@ -261,7 +264,7 @@ func TestServiceLoginValidationDetails(t *testing.T) {
 
 func TestNewServiceDependencyValidation(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		_ = NewService(&fakeRepo{}, fakeHasher{}, fakeSigner{})
+		_ = NewService(&fakeRepo{}, fakeHasher{}, fakeSigner{}, newDisabledLimiter())
 	})
 
 	tests := []struct {
@@ -272,21 +275,21 @@ func TestNewServiceDependencyValidation(t *testing.T) {
 			name: "nil repo",
 			run: func() {
 				var repo *fakeRepo
-				_ = NewService(repo, fakeHasher{}, fakeSigner{})
+				_ = NewService(repo, fakeHasher{}, fakeSigner{}, newDisabledLimiter())
 			},
 		},
 		{
 			name: "nil hasher",
 			run: func() {
 				var hasher *fakeHasher
-				_ = NewService(&fakeRepo{}, hasher, fakeSigner{})
+				_ = NewService(&fakeRepo{}, hasher, fakeSigner{}, newDisabledLimiter())
 			},
 		},
 		{
 			name: "nil signer",
 			run: func() {
 				var signer *fakeSigner
-				_ = NewService(&fakeRepo{}, fakeHasher{}, signer)
+				_ = NewService(&fakeRepo{}, fakeHasher{}, signer, newDisabledLimiter())
 			},
 		},
 	}
@@ -337,4 +340,9 @@ func assertAppError(t *testing.T, err error, wantError bool, wantCode apperror.C
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func newDisabledLimiter() *admission.Limiter {
+	limiter, _ := admission.NewLimiter(admission.Config{Enabled: false})
+	return limiter
 }

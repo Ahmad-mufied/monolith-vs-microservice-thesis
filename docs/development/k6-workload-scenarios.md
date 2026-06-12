@@ -286,8 +286,10 @@ k6 HTTP request timeout (60s)
 
 Current application-managed boundaries in this branch:
 
-- monolith request deadline: `APP_REQUEST_TIMEOUT=30s`
-- microservices outbound dependency deadline: `GRPC_CALL_TIMEOUT=10s`
+- monolith request deadline: `APP_REQUEST_TIMEOUT=35s`
+- microservices outbound dependency deadline: `GRPC_CALL_TIMEOUT=32s`
+- login overload boundary: `LOGIN_ADMISSION_ENABLED=true` with bounded bcrypt
+  concurrency and `LOGIN_QUEUE_TIMEOUT=2s`
 
 This keeps `k6` aligned with its historic long wait behavior while still making
 the timeout explicit and overridable from one place if a future experiment

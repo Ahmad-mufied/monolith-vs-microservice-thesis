@@ -68,6 +68,10 @@ func DeadlineExceeded(message string, err error) *Error {
 	return &Error{Code: CodeServiceUnavailable, Message: message, Status: http.StatusServiceUnavailable, Err: err}
 }
 
+func ServiceUnavailable(message string, err error) *Error {
+	return &Error{Code: CodeServiceUnavailable, Message: message, Status: http.StatusServiceUnavailable, Err: err}
+}
+
 func Canceled(message string, err error) *Error {
 	return &Error{Code: CodeClientCanceled, Message: message, Status: 499, Err: err}
 }

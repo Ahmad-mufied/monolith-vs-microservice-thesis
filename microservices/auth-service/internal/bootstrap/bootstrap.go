@@ -13,6 +13,7 @@ import (
 	postgresadapter "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/adapter/postgres"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/config"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/usecase"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/grpcutil"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/observability"
 	pkgpostgres "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/postgres"
@@ -45,7 +46,13 @@ func Run() error {
 	defer pool.Close()
 
 	repo := postgresadapter.NewUserRepository(pool)
-	uc := usecase.NewAuthUsecase(repo, cfg.JWTSecret, cfg.JWTExpiry, cfg.BcryptCost)
+
+	loginLimiter, err := admission.NewLimiter(cfg.LoginAdmission)
+	if err != nil {
+		return fmt.Errorf("create login limiter: %w", err)
+	}
+
+	uc := usecase.NewAuthUsecase(repo, cfg.JWTSecret, cfg.JWTExpiry, cfg.BcryptCost, loginLimiter)
 	srv := grpcserveradapter.NewAuthServer(uc)
 
 	grpcServer := grpc.NewServer(grpcServerOptions(serviceName, cfg.GRPCRequestTimeout)...)
@@ -61,7 +68,7 @@ func Run() error {
 		serverErr <- grpcServer.Serve(listener)
 	}()
 
-	log.Printf("auth-service gRPC listening on :%s (grpc_request_timeout=%s)", cfg.GRPCPort, cfg.GRPCRequestTimeout)
+	log.Printf("auth-service gRPC listening on :%s (grpc_request_timeout=%s login_admission=%v max_concurrency=%d)", cfg.GRPCPort, cfg.GRPCRequestTimeout, cfg.LoginAdmission.Enabled, cfg.LoginAdmission.MaxConcurrency)
 
 	select {
 	case <-ctx.Done():

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -44,6 +45,10 @@ type Config struct {
 	// smaller than HTTPServer.WriteTimeout so the app can write a proper error
 	// response before the transport closes the connection.
 	RequestTimeout time.Duration
+	// LoginAdmission controls concurrency limiting for bcrypt-heavy login
+	// operations. It prevents CPU oversubscription by bounding the number of
+	// concurrent bcrypt comparisons.
+	LoginAdmission admission.Config
 }
 
 func Load() (Config, error) {
@@ -68,6 +73,21 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("APP_REQUEST_TIMEOUT must be greater than 0")
 	}
 
+	loginAdmissionEnabled := os.Getenv("LOGIN_ADMISSION_ENABLED") == "true"
+	loginMaxConcurrency, err := getEnvInt("LOGIN_MAX_CONCURRENCY", 8)
+	if err != nil {
+		return Config{}, fmt.Errorf("LOGIN_MAX_CONCURRENCY: %w", err)
+	}
+	loginQueueTimeout, err := getEnvDuration("LOGIN_QUEUE_TIMEOUT", 2*time.Second)
+	if err != nil {
+		return Config{}, fmt.Errorf("LOGIN_QUEUE_TIMEOUT: %w", err)
+	}
+	loginAdmission := admission.Config{
+		Enabled:        loginAdmissionEnabled,
+		MaxConcurrency: loginMaxConcurrency,
+		QueueTimeout:   loginQueueTimeout,
+	}
+
 	cfg := Config{
 		AppEnv:         getEnv("APP_ENV", "development"),
 		AppPort:        getEnv("APP_PORT", "8080"),
@@ -80,6 +100,7 @@ func Load() (Config, error) {
 		BcryptCost:     bcryptCost,
 		DatadogEnabled: os.Getenv("DATADOG_ENABLED") == "true",
 		RequestTimeout: requestTimeout,
+		LoginAdmission: loginAdmission,
 	}
 
 	if cfg.DatabaseURL == "" {

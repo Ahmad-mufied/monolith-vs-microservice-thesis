@@ -187,8 +187,42 @@ Node roles: `node-group=app` (applications), `node-group=testing` (k6, tainted).
 
 Included in `experiment-bootstrap`. Manual: `make create-secrets`
 
-Creates `mono/app-secret`, `msa/app-secret`, `benchmark/k6-runner-secret`,
-`benchmark/db-bootstrap-secret` from env files + Terraform outputs.
+Creates application secrets in `mono`, `msa`, and `benchmark` from
+`env/*.app.env`, `env/vultr.env`, and Terraform outputs. The scripts preserve
+custom env values when present and otherwise use the benchmark defaults below.
+
+Login timeout and admission-control defaults:
+
+```text
+Monolith:
+APP_REQUEST_TIMEOUT=35s
+HTTP_WRITE_TIMEOUT=40s
+LOGIN_ADMISSION_ENABLED=true
+LOGIN_MAX_CONCURRENCY=8
+LOGIN_QUEUE_TIMEOUT=2s
+
+Microservices API Gateway:
+GRPC_CALL_TIMEOUT=32s
+REQUEST_TIMEOUT=35s
+HTTP_WRITE_TIMEOUT=40s
+
+Microservices services:
+GRPC_REQUEST_TIMEOUT=30s
+ITEM_VALIDATION_TIMEOUT=25s        # transaction-service only
+
+Auth Service login admission:
+LOGIN_ADMISSION_ENABLED=true
+LOGIN_MAX_CONCURRENCY=2
+LOGIN_QUEUE_TIMEOUT=2s
+```
+
+Expected overload behavior:
+
+```text
+Auth Service login queue full -> gRPC ResourceExhausted
+API Gateway maps ResourceExhausted -> HTTP 503 SERVICE_UNAVAILABLE
+Monolith login queue full -> HTTP 503 SERVICE_UNAVAILABLE
+```
 
 gRPC addresses must use headless services:
 
@@ -198,7 +232,15 @@ ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
 TRANSACTION_SERVICE_ADDR=dns:///transaction-service-headless.msa.svc.cluster.local:50053
 ```
 
-Validation: `kubectl --context=<ctx> get secret -A`
+Validation:
+
+```bash
+kubectl --context=<ctx> get secret -A
+kubectl --context=<ctx> get secret monolith-env -n mono -o jsonpath='{.data.APP_REQUEST_TIMEOUT}' | base64 -d && echo
+kubectl --context=<ctx> get secret monolith-env -n mono -o jsonpath='{.data.HTTP_WRITE_TIMEOUT}' | base64 -d && echo
+kubectl --context=<ctx> get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_ADMISSION_ENABLED}' | base64 -d && echo
+kubectl --context=<ctx> get secret api-gateway-secret -n msa -o jsonpath='{.data.GRPC_CALL_TIMEOUT}' | base64 -d && echo
+```
 
 ## Phase 8 — Measure Resource Baseline
 

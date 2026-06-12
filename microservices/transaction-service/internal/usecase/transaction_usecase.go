@@ -22,7 +22,7 @@ type TransactionUsecase struct {
 	itemService port.ItemService
 	// itemValidationTimeout is the deadline applied when calling the item
 	// service to validate transaction items. Configurable via
-	// ITEM_VALIDATION_TIMEOUT env var (default 5s).
+	// ITEM_VALIDATION_TIMEOUT env var (default 25s).
 	itemValidationTimeout time.Duration
 }
 

@@ -71,6 +71,21 @@ write_or_update_env_value() {
   echo "updated $file"
 }
 
+update_if_missing_or_default() {
+  local file="$1"
+  local key="$2"
+  local old_default="$3"
+  local new_default="$4"
+
+  local current_value
+  current_value="$(read_env_value "$file" "$key")"
+  if [[ -z "$current_value" || "$current_value" == "$old_default" ]]; then
+    write_or_update_env_value "$file" "$key" "$new_default"
+  else
+    echo "skip $file ($key has custom value)"
+  fi
+}
+
 if [[ ! -f env/postgres.env ]]; then
   echo "missing env/postgres.env; run: make env-init-base" >&2
   exit 1
@@ -104,17 +119,24 @@ AUTH_DATABASE_URL=${auth_database_url}
 JWT_SECRET=${jwt_secret}
 JWT_EXPIRY=24h
 BCRYPT_COST=10
-DATADOG_ENABLED=false"
+GRPC_REQUEST_TIMEOUT=30s
+DATADOG_ENABLED=false
+LOGIN_ADMISSION_ENABLED=true
+LOGIN_MAX_CONCURRENCY=2
+LOGIN_QUEUE_TIMEOUT=2s"
 
 write_if_missing "env/item-service.env" "GRPC_PORT=50052
 DATABASE_URL=${item_database_url}
 ITEM_DATABASE_URL=${item_database_url}
+GRPC_REQUEST_TIMEOUT=30s
 DATADOG_ENABLED=false"
 
 write_if_missing "env/transaction-service.env" "GRPC_PORT=50053
 DATABASE_URL=${transaction_database_url}
 TRANSACTION_DATABASE_URL=${transaction_database_url}
 ITEM_SERVICE_ADDR=localhost:50052
+GRPC_REQUEST_TIMEOUT=30s
+ITEM_VALIDATION_TIMEOUT=25s
 DATADOG_ENABLED=false"
 
 write_if_missing "env/api-gateway.env" "HTTP_PORT=8080
@@ -122,6 +144,9 @@ JWT_SECRET=${jwt_secret}
 AUTH_SERVICE_ADDR=localhost:50051
 ITEM_SERVICE_ADDR=localhost:50052
 TRANSACTION_SERVICE_ADDR=localhost:50053
+GRPC_CALL_TIMEOUT=32s
+REQUEST_TIMEOUT=35s
+HTTP_WRITE_TIMEOUT=40s
 DATADOG_ENABLED=false"
 
 write_if_missing "env/auth-service.compose.env" "GRPC_PORT=50051
@@ -130,17 +155,24 @@ AUTH_DATABASE_URL=${compose_auth_database_url}
 JWT_SECRET=${jwt_secret}
 JWT_EXPIRY=24h
 BCRYPT_COST=10
-DATADOG_ENABLED=false"
+GRPC_REQUEST_TIMEOUT=30s
+DATADOG_ENABLED=false
+LOGIN_ADMISSION_ENABLED=true
+LOGIN_MAX_CONCURRENCY=2
+LOGIN_QUEUE_TIMEOUT=2s"
 
 write_if_missing "env/item-service.compose.env" "GRPC_PORT=50052
 DATABASE_URL=${compose_item_database_url}
 ITEM_DATABASE_URL=${compose_item_database_url}
+GRPC_REQUEST_TIMEOUT=30s
 DATADOG_ENABLED=false"
 
 write_if_missing "env/transaction-service.compose.env" "GRPC_PORT=50053
 DATABASE_URL=${compose_transaction_database_url}
 TRANSACTION_DATABASE_URL=${compose_transaction_database_url}
 ITEM_SERVICE_ADDR=item-service:50052
+GRPC_REQUEST_TIMEOUT=30s
+ITEM_VALIDATION_TIMEOUT=25s
 DATADOG_ENABLED=false"
 
 write_if_missing "env/api-gateway.compose.env" "HTTP_PORT=8080
@@ -148,9 +180,30 @@ JWT_SECRET=${jwt_secret}
 AUTH_SERVICE_ADDR=auth-service:50051
 ITEM_SERVICE_ADDR=item-service:50052
 TRANSACTION_SERVICE_ADDR=transaction-service:50053
+GRPC_CALL_TIMEOUT=32s
+REQUEST_TIMEOUT=35s
+HTTP_WRITE_TIMEOUT=40s
 DATADOG_ENABLED=false"
 
 write_or_update_env_value "env/auth-service.env" "BCRYPT_COST" "10"
 write_or_update_env_value "env/auth-service.compose.env" "BCRYPT_COST" "10"
+for auth_env_file in env/auth-service.env env/auth-service.compose.env; do
+  update_if_missing_or_default "$auth_env_file" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
+  write_or_update_env_value "$auth_env_file" "LOGIN_ADMISSION_ENABLED" "true"
+  write_or_update_env_value "$auth_env_file" "LOGIN_MAX_CONCURRENCY" "2"
+  write_or_update_env_value "$auth_env_file" "LOGIN_QUEUE_TIMEOUT" "2s"
+done
+for item_env_file in env/item-service.env env/item-service.compose.env; do
+  update_if_missing_or_default "$item_env_file" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
+done
+for tx_env_file in env/transaction-service.env env/transaction-service.compose.env; do
+  update_if_missing_or_default "$tx_env_file" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
+  update_if_missing_or_default "$tx_env_file" "ITEM_VALIDATION_TIMEOUT" "10s" "25s"
+done
+for gateway_env_file in env/api-gateway.env env/api-gateway.compose.env; do
+  update_if_missing_or_default "$gateway_env_file" "GRPC_CALL_TIMEOUT" "10s" "32s"
+  update_if_missing_or_default "$gateway_env_file" "REQUEST_TIMEOUT" "30s" "35s"
+  update_if_missing_or_default "$gateway_env_file" "HTTP_WRITE_TIMEOUT" "15s" "40s"
+done
 
 echo "local microservices env initialization complete"

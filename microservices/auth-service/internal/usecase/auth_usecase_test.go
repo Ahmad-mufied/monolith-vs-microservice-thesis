@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/domain"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -49,7 +50,7 @@ func TestRegisterSuccess(t *testing.T) {
 			}, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	user, err := uc.Register(context.Background(), "Ahmad", "ahmad@example.com", "Secret123!")
 	if err != nil {
@@ -77,7 +78,7 @@ func TestRegisterTrimsNameAndNormalizesEmail(t *testing.T) {
 			}, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, err := uc.Register(context.Background(), "  Ahmad  ", "  Ahmad@Example.COM  ", "Secret123!")
 	if err != nil {
@@ -92,7 +93,7 @@ func TestRegisterEmptyFields(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, err := uc.Register(context.Background(), "", "ahmad@example.com", "Secret123!")
 	if !errors.Is(err, pkgerrors.ErrInvalidInput) {
@@ -108,7 +109,7 @@ func TestRegisterInvalidEmail(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, err := uc.Register(context.Background(), "Ahmad", "not-an-email", "Secret123!")
 	if !errors.Is(err, pkgerrors.ErrInvalidInput) {
@@ -124,7 +125,7 @@ func TestRegisterNameTooLong(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, err := uc.Register(context.Background(), strings.Repeat("a", 121), "ahmad@example.com", "Secret123!")
 	if !errors.Is(err, pkgerrors.ErrInvalidInput) {
@@ -140,7 +141,7 @@ func TestRegisterPasswordTooShort(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, err := uc.Register(context.Background(), "Ahmad", "ahmad@example.com", "short")
 	if !errors.Is(err, pkgerrors.ErrInvalidInput) {
@@ -156,7 +157,7 @@ func TestRegisterPasswordTooLong(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, err := uc.Register(context.Background(), "Ahmad", "ahmad@example.com", string(make([]byte, 73)))
 	if !errors.Is(err, pkgerrors.ErrInvalidInput) {
@@ -171,7 +172,7 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 			return nil, pkgerrors.ErrConflict
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, err := uc.Register(context.Background(), "Ahmad", "ahmad@example.com", "Secret123!")
 	if !errors.Is(err, pkgerrors.ErrConflict) {
@@ -198,7 +199,7 @@ func TestLoginSuccess(t *testing.T) {
 			}, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	token, user, err := uc.Login(context.Background(), "  Ahmad@Example.COM  ", "Secret123!")
 	if err != nil {
@@ -218,7 +219,7 @@ func TestLoginUserNotFound(t *testing.T) {
 			return nil, pkgerrors.ErrNotFound
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, _, err := uc.Login(context.Background(), "ahmad@example.com", "Secret123!")
 	if !errors.Is(err, pkgerrors.ErrInvalidCredentials) {
@@ -243,7 +244,7 @@ func TestLoginRepositoryContextErrors(t *testing.T) {
 					return nil, tt.err
 				},
 			}
-			uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+			uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 			_, _, err := uc.Login(context.Background(), "ahmad@example.com", "Secret123!")
 			if !errors.Is(err, tt.want) {
@@ -260,7 +261,7 @@ func TestLoginContextCanceledBeforeRepository(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -283,7 +284,7 @@ func TestLoginContextCanceledAfterRepository(t *testing.T) {
 			}, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	cancel = cancelFunc
@@ -304,7 +305,7 @@ func TestLoginWrongPassword(t *testing.T) {
 			}, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, _, err := uc.Login(context.Background(), "ahmad@example.com", "wrongpass")
 	if !errors.Is(err, pkgerrors.ErrInvalidCredentials) {
@@ -319,7 +320,7 @@ func TestLoginInvalidEmail(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, _, err := uc.Login(context.Background(), "not-an-email", "Secret123!")
 	if !errors.Is(err, pkgerrors.ErrInvalidInput) {
@@ -335,7 +336,7 @@ func TestLoginPasswordTooLong(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, _, err := uc.Login(context.Background(), "ahmad@example.com", string(make([]byte, 73)))
 	if !errors.Is(err, pkgerrors.ErrInvalidInput) {
@@ -351,7 +352,7 @@ func TestLoginPasswordTooShort(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, _, err := uc.Login(context.Background(), "ahmad@example.com", "short")
 	if !errors.Is(err, pkgerrors.ErrInvalidInput) {
@@ -370,7 +371,7 @@ func TestLoginPasswordCompareInternalError(t *testing.T) {
 			}, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, _, err := uc.Login(context.Background(), "ahmad@example.com", "Secret123!")
 	if !errors.Is(err, pkgerrors.ErrInternal) {
@@ -389,7 +390,7 @@ func TestGetUserByIDSuccess(t *testing.T) {
 			}, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	user, err := uc.GetUserByID(context.Background(), "01968ad4-98b1-79c8-a6f0-ec21f8f434c6")
 	if err != nil {
@@ -402,7 +403,7 @@ func TestGetUserByIDSuccess(t *testing.T) {
 
 func TestGetUserByIDInvalidUUID(t *testing.T) {
 	repo := &fakeUserRepo{}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, err := uc.GetUserByID(context.Background(), "invalid-id")
 	if !errors.Is(err, pkgerrors.ErrInvalidInput) {
@@ -417,7 +418,7 @@ func TestGetUserByIDNotFound(t *testing.T) {
 			return nil, pkgerrors.ErrNotFound
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, err := uc.GetUserByID(context.Background(), "01968ad4-98b1-79c8-a6f0-ec21f8f434c6")
 	if !errors.Is(err, pkgerrors.ErrNotFound) {
@@ -438,7 +439,7 @@ func TestGetUsersByIDsSuccess(t *testing.T) {
 			}, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	users, err := uc.GetUsersByIDs(context.Background(), []string{"01968ad4-98b1-79c8-a6f0-ec21f8f434c6"})
 	if err != nil {
@@ -459,7 +460,7 @@ func TestGetUsersByIDsInvalidUUID(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10)
+	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, newDisabledLimiter())
 
 	_, err := uc.GetUsersByIDs(context.Background(), []string{"invalid-id"})
 	if !errors.Is(err, pkgerrors.ErrInvalidInput) {
@@ -486,4 +487,9 @@ func assertValidationDetail(t *testing.T, err error, wantField, wantMessage stri
 	} else if gotMessage != wantMessage {
 		t.Fatalf("details[%q] = %q, want %q", wantField, gotMessage, wantMessage)
 	}
+}
+
+func newDisabledLimiter() *admission.Limiter {
+	limiter, _ := admission.NewLimiter(admission.Config{Enabled: false})
+	return limiter
 }

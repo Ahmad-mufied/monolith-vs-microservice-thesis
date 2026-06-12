@@ -43,6 +43,12 @@ cluster_transaction_database_url="postgres://${encoded_user}:${encoded_pass}@pos
 api_gateway_http_port="$(read_env_value env/api-gateway.env HTTP_PORT)"
 api_gateway_http_port="${api_gateway_http_port:-8080}"
 api_gateway_jwt_secret="$(read_env_value env/api-gateway.env JWT_SECRET)"
+api_gateway_grpc_call_timeout="$(read_env_value env/api-gateway.env GRPC_CALL_TIMEOUT)"
+api_gateway_grpc_call_timeout="${api_gateway_grpc_call_timeout:-32s}"
+api_gateway_request_timeout="$(read_env_value env/api-gateway.env REQUEST_TIMEOUT)"
+api_gateway_request_timeout="${api_gateway_request_timeout:-35s}"
+api_gateway_http_write_timeout="$(read_env_value env/api-gateway.env HTTP_WRITE_TIMEOUT)"
+api_gateway_http_write_timeout="${api_gateway_http_write_timeout:-40s}"
 
 auth_grpc_port="$(read_env_value env/auth-service.env GRPC_PORT)"
 auth_grpc_port="${auth_grpc_port:-50051}"
@@ -62,12 +68,26 @@ auth_jwt_expiry="$(read_env_value env/auth-service.env JWT_EXPIRY)"
 auth_jwt_expiry="${auth_jwt_expiry:-24h}"
 auth_bcrypt_cost="$(read_env_value env/auth-service.env BCRYPT_COST)"
 auth_bcrypt_cost="${auth_bcrypt_cost:-10}"
+auth_grpc_request_timeout="$(read_env_value env/auth-service.env GRPC_REQUEST_TIMEOUT)"
+auth_grpc_request_timeout="${auth_grpc_request_timeout:-30s}"
+auth_login_admission_enabled="$(read_env_value env/auth-service.env LOGIN_ADMISSION_ENABLED)"
+auth_login_admission_enabled="${auth_login_admission_enabled:-true}"
+auth_login_max_concurrency="$(read_env_value env/auth-service.env LOGIN_MAX_CONCURRENCY)"
+auth_login_max_concurrency="${auth_login_max_concurrency:-2}"
+auth_login_queue_timeout="$(read_env_value env/auth-service.env LOGIN_QUEUE_TIMEOUT)"
+auth_login_queue_timeout="${auth_login_queue_timeout:-2s}"
 
 item_grpc_port="$(read_env_value env/item-service.env GRPC_PORT)"
 item_grpc_port="${item_grpc_port:-50052}"
+item_grpc_request_timeout="$(read_env_value env/item-service.env GRPC_REQUEST_TIMEOUT)"
+item_grpc_request_timeout="${item_grpc_request_timeout:-30s}"
 
 tx_grpc_port="$(read_env_value env/transaction-service.env GRPC_PORT)"
 tx_grpc_port="${tx_grpc_port:-50053}"
+tx_grpc_request_timeout="$(read_env_value env/transaction-service.env GRPC_REQUEST_TIMEOUT)"
+tx_grpc_request_timeout="${tx_grpc_request_timeout:-30s}"
+tx_item_validation_timeout="$(read_env_value env/transaction-service.env ITEM_VALIDATION_TIMEOUT)"
+tx_item_validation_timeout="${tx_item_validation_timeout:-25s}"
 
 api_gateway_datadog_enabled="$(read_env_value env/api-gateway.env DATADOG_ENABLED)"
 api_gateway_datadog_enabled="${api_gateway_datadog_enabled:-false}"
@@ -91,6 +111,9 @@ AUTH_SERVICE_ADDR=auth-service:${auth_grpc_port}
 ITEM_SERVICE_ADDR=item-service:${item_grpc_port}
 TRANSACTION_SERVICE_ADDR=transaction-service:${tx_grpc_port}
 DATADOG_ENABLED=${api_gateway_datadog_enabled}
+GRPC_CALL_TIMEOUT=${api_gateway_grpc_call_timeout}
+REQUEST_TIMEOUT=${api_gateway_request_timeout}
+HTTP_WRITE_TIMEOUT=${api_gateway_http_write_timeout}
 EOFGW
 
 cat >"$tmp_auth_service_env" <<EOFAUTH
@@ -101,6 +124,10 @@ JWT_SECRET=${auth_jwt_secret}
 JWT_EXPIRY=${auth_jwt_expiry}
 BCRYPT_COST=${auth_bcrypt_cost}
 DATADOG_ENABLED=${auth_datadog_enabled}
+GRPC_REQUEST_TIMEOUT=${auth_grpc_request_timeout}
+LOGIN_ADMISSION_ENABLED=${auth_login_admission_enabled}
+LOGIN_MAX_CONCURRENCY=${auth_login_max_concurrency}
+LOGIN_QUEUE_TIMEOUT=${auth_login_queue_timeout}
 EOFAUTH
 
 cat >"$tmp_item_service_env" <<EOFITEM
@@ -108,6 +135,7 @@ GRPC_PORT=${item_grpc_port}
 DATABASE_URL=${cluster_item_database_url}
 ITEM_DATABASE_URL=${cluster_item_database_url}
 DATADOG_ENABLED=${item_datadog_enabled}
+GRPC_REQUEST_TIMEOUT=${item_grpc_request_timeout}
 EOFITEM
 
 cat >"$tmp_transaction_service_env" <<EOFTX
@@ -116,6 +144,8 @@ DATABASE_URL=${cluster_transaction_database_url}
 TRANSACTION_DATABASE_URL=${cluster_transaction_database_url}
 ITEM_SERVICE_ADDR=item-service:${item_grpc_port}
 DATADOG_ENABLED=${transaction_datadog_enabled}
+GRPC_REQUEST_TIMEOUT=${tx_grpc_request_timeout}
+ITEM_VALIDATION_TIMEOUT=${tx_item_validation_timeout}
 EOFTX
 
 kubectl create secret generic api-gateway-secret \

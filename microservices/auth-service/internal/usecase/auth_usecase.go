@@ -11,6 +11,7 @@ import (
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/domain"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/port"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
 	pkgjwt "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/jwt"
 	pkgvalidator "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/validator"
@@ -28,14 +29,16 @@ type AuthUsecase struct {
 	jwtSecret  string
 	jwtExpiry  time.Duration
 	bcryptCost int
+	limiter    *admission.Limiter
 }
 
-func NewAuthUsecase(repo port.UserRepository, jwtSecret string, jwtExpiry time.Duration, bcryptCost int) *AuthUsecase {
+func NewAuthUsecase(repo port.UserRepository, jwtSecret string, jwtExpiry time.Duration, bcryptCost int, limiter *admission.Limiter) *AuthUsecase {
 	return &AuthUsecase{
 		repo:       repo,
 		jwtSecret:  jwtSecret,
 		jwtExpiry:  jwtExpiry,
 		bcryptCost: bcryptCost,
+		limiter:    limiter,
 	}
 }
 
@@ -82,9 +85,14 @@ func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token 
 		return "", nil, err
 	}
 
-	if err := pkgerrors.DoIfActive(ctx, func() error {
-		return bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+	if err := u.limiter.Do(ctx, func() error {
+		return pkgerrors.DoIfActive(ctx, func() error {
+			return bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+		})
 	}); err != nil {
+		if admission.IsRejected(err) {
+			return "", nil, pkgerrors.ResourceExhausted("auth service is temporarily overloaded")
+		}
 		if pkgerrors.IsContext(err) {
 			return "", nil, err
 		}
