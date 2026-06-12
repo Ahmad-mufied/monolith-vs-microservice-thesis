@@ -78,11 +78,31 @@ auth_login_max_concurrency="$(read_env_value env/auth-service.env LOGIN_MAX_CONC
 auth_login_max_concurrency="${auth_login_max_concurrency:-2}"
 auth_login_queue_timeout="$(read_env_value env/auth-service.env LOGIN_QUEUE_TIMEOUT)"
 auth_login_queue_timeout="${auth_login_queue_timeout:-2s}"
+auth_db_pool_max_conns="$(read_env_value env/auth-service.env DB_POOL_MAX_CONNS)"
+auth_db_pool_max_conns="${auth_db_pool_max_conns:-6}"
+auth_db_pool_min_conns="$(read_env_value env/auth-service.env DB_POOL_MIN_CONNS)"
+auth_db_pool_min_conns="${auth_db_pool_min_conns:-1}"
+auth_db_pool_max_conn_lifetime="$(read_env_value env/auth-service.env DB_POOL_MAX_CONN_LIFETIME)"
+auth_db_pool_max_conn_lifetime="${auth_db_pool_max_conn_lifetime:-15m}"
+auth_db_pool_max_conn_idle_time="$(read_env_value env/auth-service.env DB_POOL_MAX_CONN_IDLE_TIME)"
+auth_db_pool_max_conn_idle_time="${auth_db_pool_max_conn_idle_time:-1m}"
+auth_db_ping_timeout="$(read_env_value env/auth-service.env DB_PING_TIMEOUT)"
+auth_db_ping_timeout="${auth_db_ping_timeout:-5s}"
 
 item_grpc_port="$(read_env_value env/item-service.env GRPC_PORT)"
 item_grpc_port="${item_grpc_port:-50052}"
 item_grpc_request_timeout="$(read_env_value env/item-service.env GRPC_REQUEST_TIMEOUT)"
 item_grpc_request_timeout="${item_grpc_request_timeout:-30s}"
+item_db_pool_max_conns="$(read_env_value env/item-service.env DB_POOL_MAX_CONNS)"
+item_db_pool_max_conns="${item_db_pool_max_conns:-6}"
+item_db_pool_min_conns="$(read_env_value env/item-service.env DB_POOL_MIN_CONNS)"
+item_db_pool_min_conns="${item_db_pool_min_conns:-1}"
+item_db_pool_max_conn_lifetime="$(read_env_value env/item-service.env DB_POOL_MAX_CONN_LIFETIME)"
+item_db_pool_max_conn_lifetime="${item_db_pool_max_conn_lifetime:-15m}"
+item_db_pool_max_conn_idle_time="$(read_env_value env/item-service.env DB_POOL_MAX_CONN_IDLE_TIME)"
+item_db_pool_max_conn_idle_time="${item_db_pool_max_conn_idle_time:-1m}"
+item_db_ping_timeout="$(read_env_value env/item-service.env DB_PING_TIMEOUT)"
+item_db_ping_timeout="${item_db_ping_timeout:-5s}"
 
 tx_grpc_port="$(read_env_value env/transaction-service.env GRPC_PORT)"
 tx_grpc_port="${tx_grpc_port:-50053}"
@@ -90,6 +110,16 @@ tx_grpc_request_timeout="$(read_env_value env/transaction-service.env GRPC_REQUE
 tx_grpc_request_timeout="${tx_grpc_request_timeout:-30s}"
 tx_item_validation_timeout="$(read_env_value env/transaction-service.env ITEM_VALIDATION_TIMEOUT)"
 tx_item_validation_timeout="${tx_item_validation_timeout:-25s}"
+tx_db_pool_max_conns="$(read_env_value env/transaction-service.env DB_POOL_MAX_CONNS)"
+tx_db_pool_max_conns="${tx_db_pool_max_conns:-6}"
+tx_db_pool_min_conns="$(read_env_value env/transaction-service.env DB_POOL_MIN_CONNS)"
+tx_db_pool_min_conns="${tx_db_pool_min_conns:-1}"
+tx_db_pool_max_conn_lifetime="$(read_env_value env/transaction-service.env DB_POOL_MAX_CONN_LIFETIME)"
+tx_db_pool_max_conn_lifetime="${tx_db_pool_max_conn_lifetime:-15m}"
+tx_db_pool_max_conn_idle_time="$(read_env_value env/transaction-service.env DB_POOL_MAX_CONN_IDLE_TIME)"
+tx_db_pool_max_conn_idle_time="${tx_db_pool_max_conn_idle_time:-1m}"
+tx_db_ping_timeout="$(read_env_value env/transaction-service.env DB_PING_TIMEOUT)"
+tx_db_ping_timeout="${tx_db_ping_timeout:-5s}"
 
 api_gateway_datadog_enabled="$(read_env_value env/api-gateway.env DATADOG_ENABLED)"
 api_gateway_datadog_enabled="${api_gateway_datadog_enabled:-false}"
@@ -130,6 +160,11 @@ GRPC_REQUEST_TIMEOUT=${auth_grpc_request_timeout}
 LOGIN_ADMISSION_ENABLED=${auth_login_admission_enabled}
 LOGIN_MAX_CONCURRENCY=${auth_login_max_concurrency}
 LOGIN_QUEUE_TIMEOUT=${auth_login_queue_timeout}
+DB_POOL_MAX_CONNS=${auth_db_pool_max_conns}
+DB_POOL_MIN_CONNS=${auth_db_pool_min_conns}
+DB_POOL_MAX_CONN_LIFETIME=${auth_db_pool_max_conn_lifetime}
+DB_POOL_MAX_CONN_IDLE_TIME=${auth_db_pool_max_conn_idle_time}
+DB_PING_TIMEOUT=${auth_db_ping_timeout}
 EOFAUTH
 
 cat >"$tmp_item_service_env" <<EOFITEM
@@ -138,6 +173,11 @@ DATABASE_URL=${cluster_item_database_url}
 ITEM_DATABASE_URL=${cluster_item_database_url}
 DATADOG_ENABLED=${item_datadog_enabled}
 GRPC_REQUEST_TIMEOUT=${item_grpc_request_timeout}
+DB_POOL_MAX_CONNS=${item_db_pool_max_conns}
+DB_POOL_MIN_CONNS=${item_db_pool_min_conns}
+DB_POOL_MAX_CONN_LIFETIME=${item_db_pool_max_conn_lifetime}
+DB_POOL_MAX_CONN_IDLE_TIME=${item_db_pool_max_conn_idle_time}
+DB_PING_TIMEOUT=${item_db_ping_timeout}
 EOFITEM
 
 cat >"$tmp_transaction_service_env" <<EOFTX
@@ -148,6 +188,11 @@ ITEM_SERVICE_ADDR=item-service:${item_grpc_port}
 DATADOG_ENABLED=${transaction_datadog_enabled}
 GRPC_REQUEST_TIMEOUT=${tx_grpc_request_timeout}
 ITEM_VALIDATION_TIMEOUT=${tx_item_validation_timeout}
+DB_POOL_MAX_CONNS=${tx_db_pool_max_conns}
+DB_POOL_MIN_CONNS=${tx_db_pool_min_conns}
+DB_POOL_MAX_CONN_LIFETIME=${tx_db_pool_max_conn_lifetime}
+DB_POOL_MAX_CONN_IDLE_TIME=${tx_db_pool_max_conn_idle_time}
+DB_PING_TIMEOUT=${tx_db_ping_timeout}
 EOFTX
 
 kubectl create secret generic api-gateway-secret \
