@@ -188,10 +188,19 @@ Node roles: `node-group=app` (applications), `node-group=testing` (k6, tainted).
 Included in `experiment-bootstrap`. Manual: `make create-secrets`
 
 Creates application secrets in `mono`, `msa`, and `benchmark` from
-`env/*.app.env`, `env/vultr.env`, and Terraform outputs. The scripts preserve
-custom env values when present and otherwise use the benchmark defaults below.
+`env/*.app.env`, `env/vultr.env`, and Terraform outputs. The scripts reconcile
+existing secrets with the current template:
 
-Login timeout and admission-control defaults:
+- Go remains the source of truth for runtime defaults; the scripts always pass
+  only required secrets, environment-specific values, and explicit overrides
+- preserved credentials such as `JWT_SECRET`, `ADMIN_USER_EMAIL`, and
+  `ADMIN_USER_PASSWORD` can fall back to the current in-cluster secret when the
+  local env file leaves them empty
+- when an operator supplies only part of a timeout chain, the scripts derive the
+  dependent timeout required to keep rollout-safe invariants
+- invalid timeout chains still fail before `kubectl apply`
+
+Runtime defaults that now live in Go unless explicitly overridden:
 
 ```text
 Monolith:

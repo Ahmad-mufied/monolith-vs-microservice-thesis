@@ -38,8 +38,11 @@ source env/terraform.experiment.env
 source "$k6_runner_env_file"
 set +a
 
-HTTP_WRITE_TIMEOUT="$(normalize_http_write_timeout "${HTTP_WRITE_TIMEOUT:-}" "40s")"
-APP_REQUEST_TIMEOUT="$(derive_app_request_timeout "${APP_REQUEST_TIMEOUT:-}" "$HTTP_WRITE_TIMEOUT")"
+context="monolith"
+
+JWT_SECRET="$(resolve_preserved_secret_value "${JWT_SECRET:-}" "$context" mono monolith-env JWT_SECRET || true)"
+ADMIN_USER_EMAIL="$(resolve_preserved_secret_value "${ADMIN_USER_EMAIL:-}" "$context" benchmark k6-runner-secret ADMIN_USER_EMAIL || true)"
+ADMIN_USER_PASSWORD="$(resolve_preserved_secret_value "${ADMIN_USER_PASSWORD:-}" "$context" benchmark k6-runner-secret ADMIN_USER_PASSWORD || true)"
 
 : "${DB_PASSWORD:?DB_PASSWORD must be set in env/terraform.experiment.env}"
 : "${JWT_SECRET:?JWT_SECRET must be set in ${monolith_env_file}}"
@@ -55,6 +58,43 @@ MONOLITH_RDS="$(terraform_with_profile -chdir=infra/terraform/aws-parallel outpu
 encoded_db_password="$(url_encode "$DB_PASSWORD")"
 K8S="kubectl --context=monolith"
 
+monolith_secret_pairs=()
+append_secret_pair monolith_secret_pairs APP_ENV "${APP_ENV:-production}"
+append_secret_pair monolith_secret_pairs APP_PORT "${APP_PORT:-8080}"
+append_secret_pair monolith_secret_pairs SERVICE_NAME "${SERVICE_NAME:-monolith}"
+append_secret_pair monolith_secret_pairs DATABASE_URL "postgres://postgres_admin:${encoded_db_password}@${MONOLITH_RDS}:5432/mono_db?sslmode=require"
+append_secret_pair monolith_secret_pairs JWT_SECRET "$JWT_SECRET"
+append_secret_pair_if_override monolith_secret_pairs DB_POOL_MAX_CONNS "${DB_POOL_MAX_CONNS:-}" "25"
+append_secret_pair_if_override monolith_secret_pairs DB_POOL_MIN_CONNS "${DB_POOL_MIN_CONNS:-}" "2"
+append_secret_pair_if_override monolith_secret_pairs DB_POOL_MAX_CONN_LIFETIME "${DB_POOL_MAX_CONN_LIFETIME:-}" "5m"
+append_secret_pair_if_override monolith_secret_pairs DB_POOL_MAX_CONN_IDLE_TIME "${DB_POOL_MAX_CONN_IDLE_TIME:-}" "1m"
+append_secret_pair_if_override monolith_secret_pairs DB_PING_TIMEOUT "${DB_PING_TIMEOUT:-}" "5s"
+append_secret_pair_if_override monolith_secret_pairs HTTP_READ_HEADER_TIMEOUT "${HTTP_READ_HEADER_TIMEOUT:-}" "5s"
+append_secret_pair_if_override monolith_secret_pairs HTTP_READ_TIMEOUT "${HTTP_READ_TIMEOUT:-}" "15s"
+append_secret_pair_if_override monolith_secret_pairs HTTP_IDLE_TIMEOUT "${HTTP_IDLE_TIMEOUT:-}" "1m"
+append_secret_pair_if_override monolith_secret_pairs HTTP_SHUTDOWN_TIMEOUT "${HTTP_SHUTDOWN_TIMEOUT:-}" "10s"
+append_secret_pair_if_override monolith_secret_pairs HTTP_MAX_HEADER_BYTES "${HTTP_MAX_HEADER_BYTES:-}" "1048576"
+append_secret_pair_if_override monolith_secret_pairs BCRYPT_COST "${BCRYPT_COST:-}" "10"
+
+effective_http_write_timeout="40s"
+if [[ -n "${HTTP_WRITE_TIMEOUT:-}" ]]; then
+  effective_http_write_timeout="$(normalize_http_write_timeout "${HTTP_WRITE_TIMEOUT:-}" "40s")"
+fi
+if [[ -n "${APP_REQUEST_TIMEOUT:-}" || "$effective_http_write_timeout" != "40s" ]]; then
+  effective_app_request_timeout="$(derive_app_request_timeout "${APP_REQUEST_TIMEOUT:-}" "$effective_http_write_timeout")"
+  validate_monolith_timeout_chain "$effective_app_request_timeout" "$effective_http_write_timeout"
+  append_secret_pair_if_override monolith_secret_pairs HTTP_WRITE_TIMEOUT "$effective_http_write_timeout" "40s"
+  append_secret_pair_if_override monolith_secret_pairs APP_REQUEST_TIMEOUT "$effective_app_request_timeout" "35s"
+fi
+
+if [[ -n "${LOGIN_ADMISSION_ENABLED:-}" ]]; then
+  append_secret_pair_if_override monolith_secret_pairs LOGIN_ADMISSION_ENABLED "${LOGIN_ADMISSION_ENABLED:-}" "true"
+fi
+if [[ "${LOGIN_ADMISSION_ENABLED:-true}" == "true" ]]; then
+  append_secret_pair_if_override monolith_secret_pairs LOGIN_MAX_CONCURRENCY "${LOGIN_MAX_CONCURRENCY:-}" "8"
+  append_secret_pair_if_override monolith_secret_pairs LOGIN_QUEUE_TIMEOUT "${LOGIN_QUEUE_TIMEOUT:-}" "2s"
+fi
+
 $K8S create namespace benchmark --dry-run=client -o yaml | $K8S apply -f -
 $K8S create namespace mono --dry-run=client -o yaml | $K8S apply -f -
 
@@ -63,30 +103,7 @@ $K8S create secret generic db-bootstrap-env \
   --from-literal=BOOTSTRAP_DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MONOLITH_RDS}:5432/bootstrap?sslmode=require" \
   --dry-run=client -o yaml | $K8S apply -f -
 
-$K8S create secret generic monolith-env \
-  --namespace mono \
-  --from-literal=APP_ENV="${APP_ENV:-production}" \
-  --from-literal=APP_PORT="${APP_PORT:-8080}" \
-  --from-literal=SERVICE_NAME="${SERVICE_NAME:-monolith}" \
-  --from-literal=DATABASE_URL="postgres://postgres_admin:${encoded_db_password}@${MONOLITH_RDS}:5432/mono_db?sslmode=require" \
-  --from-literal=JWT_SECRET="$JWT_SECRET" \
-  --from-literal=DB_POOL_MAX_CONNS="${DB_POOL_MAX_CONNS:-25}" \
-  --from-literal=DB_POOL_MIN_CONNS="${DB_POOL_MIN_CONNS:-2}" \
-  --from-literal=DB_POOL_MAX_CONN_LIFETIME="${DB_POOL_MAX_CONN_LIFETIME:-5m}" \
-  --from-literal=DB_POOL_MAX_CONN_IDLE_TIME="${DB_POOL_MAX_CONN_IDLE_TIME:-1m}" \
-  --from-literal=DB_PING_TIMEOUT="${DB_PING_TIMEOUT:-5s}" \
-  --from-literal=HTTP_READ_HEADER_TIMEOUT="${HTTP_READ_HEADER_TIMEOUT:-5s}" \
-  --from-literal=HTTP_READ_TIMEOUT="${HTTP_READ_TIMEOUT:-15s}" \
-  --from-literal=HTTP_WRITE_TIMEOUT="${HTTP_WRITE_TIMEOUT}" \
-  --from-literal=HTTP_IDLE_TIMEOUT="${HTTP_IDLE_TIMEOUT:-1m}" \
-  --from-literal=HTTP_SHUTDOWN_TIMEOUT="${HTTP_SHUTDOWN_TIMEOUT:-10s}" \
-  --from-literal=HTTP_MAX_HEADER_BYTES="${HTTP_MAX_HEADER_BYTES:-1048576}" \
-  --from-literal=BCRYPT_COST="${BCRYPT_COST:-10}" \
-  --from-literal=APP_REQUEST_TIMEOUT="${APP_REQUEST_TIMEOUT}" \
-  --from-literal=LOGIN_ADMISSION_ENABLED="${LOGIN_ADMISSION_ENABLED:-true}" \
-  --from-literal=LOGIN_MAX_CONCURRENCY="${LOGIN_MAX_CONCURRENCY:-8}" \
-  --from-literal=LOGIN_QUEUE_TIMEOUT="${LOGIN_QUEUE_TIMEOUT:-2s}" \
-  --dry-run=client -o yaml | $K8S apply -f -
+apply_secret_from_pairs "$context" mono monolith-env "${monolith_secret_pairs[@]}"
 
 $K8S create secret generic k6-runner-secret \
   --namespace benchmark \

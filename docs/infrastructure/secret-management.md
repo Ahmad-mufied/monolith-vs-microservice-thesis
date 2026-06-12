@@ -101,6 +101,28 @@ ARCHITECTURE
 S3_BUCKET
 ```
 
+Reconciliation policy for Kubernetes secret generation:
+
+- Sensitive credentials are preserved: if the local env file leaves a required
+  credential empty, the secret-generation scripts may reuse the current
+  in-cluster value for keys such as `JWT_SECRET`, `ADMIN_USER_EMAIL`, and
+  `ADMIN_USER_PASSWORD`.
+- Runtime defaults stay in Go. The secret-generation scripts always pass
+  required secrets and environment-specific keys such as database URLs, ports,
+  service names, and gRPC target addresses.
+- Optional runtime tuning is passed only when the env file explicitly overrides
+  the Go default. This keeps timeout, pool, bcrypt, and admission-control
+  defaults out of the secret unless an operator intentionally changes them.
+- Secret application is authoritative. If an older secret still contains stale
+  non-sensitive keys that are no longer rendered, those keys disappear on the
+  next `create-secrets` run instead of surviving as hidden drift.
+- When an operator provides a partial timeout override, the scripts derive the
+  dependent timeout needed to keep the chain valid before `kubectl apply`.
+  Validated chains remain:
+  `APP_REQUEST_TIMEOUT <= HTTP_WRITE_TIMEOUT`,
+  `GRPC_CALL_TIMEOUT < REQUEST_TIMEOUT < HTTP_WRITE_TIMEOUT`, and
+  `ITEM_VALIDATION_TIMEOUT < GRPC_REQUEST_TIMEOUT`.
+
 ---
 
 ## Env File Structure

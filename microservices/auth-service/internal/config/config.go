@@ -30,7 +30,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("GRPC_REQUEST_TIMEOUT must be greater than 0")
 	}
 
-	loginAdmissionEnabled, err := getEnvBool("LOGIN_ADMISSION_ENABLED", false)
+	loginAdmissionEnabled, err := getEnvBool("LOGIN_ADMISSION_ENABLED", true)
 	if err != nil {
 		return nil, fmt.Errorf("LOGIN_ADMISSION_ENABLED: %w", err)
 	}

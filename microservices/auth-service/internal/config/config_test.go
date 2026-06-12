@@ -25,14 +25,14 @@ func TestLoad(t *testing.T) {
 				if cfg.GRPCRequestTimeout != 30*time.Second {
 					t.Errorf("GRPCRequestTimeout = %s, want 30s", cfg.GRPCRequestTimeout)
 				}
-				if cfg.LoginAdmission.Enabled {
-					t.Errorf("LoginAdmission.Enabled = true, want false")
+				if !cfg.LoginAdmission.Enabled {
+					t.Errorf("LoginAdmission.Enabled = false, want true")
 				}
-				if cfg.LoginAdmission.MaxConcurrency != 0 {
-					t.Errorf("LoginAdmission.MaxConcurrency = %d, want 0", cfg.LoginAdmission.MaxConcurrency)
+				if cfg.LoginAdmission.MaxConcurrency != 2 {
+					t.Errorf("LoginAdmission.MaxConcurrency = %d, want 2", cfg.LoginAdmission.MaxConcurrency)
 				}
-				if cfg.LoginAdmission.QueueTimeout != 0 {
-					t.Errorf("LoginAdmission.QueueTimeout = %s, want 0s", cfg.LoginAdmission.QueueTimeout)
+				if cfg.LoginAdmission.QueueTimeout != 2*time.Second {
+					t.Errorf("LoginAdmission.QueueTimeout = %s, want 2s", cfg.LoginAdmission.QueueTimeout)
 				}
 			},
 		},

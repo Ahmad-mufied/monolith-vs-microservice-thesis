@@ -82,12 +82,114 @@ parse_seconds_duration() {
   return 1
 }
 
+read_secret_value_from_cluster() {
+  local context="$1"
+  local namespace="$2"
+  local secret_name="$3"
+  local key="$4"
+  local encoded
+
+  if [[ -z "$context" || -z "$namespace" || -z "$secret_name" || -z "$key" ]]; then
+    return 1
+  fi
+
+  if ! encoded="$(kubectl --context="$context" get secret "$secret_name" -n "$namespace" -o go-template="{{ index .data \"$key\" }}" 2>/dev/null)"; then
+    return 1
+  fi
+  if [[ -z "$encoded" ]]; then
+    return 1
+  fi
+
+  printf '%s' "$encoded" | base64 -d
+}
+
+resolve_preserved_secret_value() {
+  local explicit_value="$1"
+  local context="$2"
+  local namespace="$3"
+  local secret_name="$4"
+  local key="$5"
+  local existing_value
+
+  if [[ -n "$explicit_value" ]]; then
+    printf '%s\n' "$explicit_value"
+    return 0
+  fi
+
+  if existing_value="$(read_secret_value_from_cluster "$context" "$namespace" "$secret_name" "$key")"; then
+    printf '%s\n' "$existing_value"
+    return 0
+  fi
+
+  return 1
+}
+
+append_secret_pair() {
+  local -n pairs_ref="$1"
+  local key="$2"
+  local value="$3"
+
+  pairs_ref+=("$key" "$value")
+}
+
+append_secret_pair_if_set() {
+  local -n pairs_ref="$1"
+  local key="$2"
+  local value="$3"
+
+  if [[ -z "$value" ]]; then
+    return 0
+  fi
+
+  pairs_ref+=("$key" "$value")
+}
+
+append_secret_pair_if_override() {
+  local -n pairs_ref="$1"
+  local key="$2"
+  local value="$3"
+  local default_value="$4"
+
+  if [[ -z "$value" || "$value" == "$default_value" ]]; then
+    return 0
+  fi
+
+  pairs_ref+=("$key" "$value")
+}
+
+apply_secret_from_pairs() {
+  local context="$1"
+  local namespace="$2"
+  local secret_name="$3"
+  shift 3
+
+  if (( $# == 0 )) || (( $# % 2 != 0 )); then
+    echo "apply_secret_from_pairs requires key/value pairs for ${namespace}/${secret_name}" >&2
+    return 1
+  fi
+
+  local temp_env_file
+  temp_env_file="$(mktemp)"
+  chmod 600 "$temp_env_file"
+
+  while (( $# > 0 )); do
+    printf '%s=%s\n' "$1" "$2" >> "$temp_env_file"
+    shift 2
+  done
+
+  kubectl --context="$context" create secret generic "$secret_name" \
+    --namespace "$namespace" \
+    --from-env-file="$temp_env_file" \
+    --dry-run=client -o yaml | kubectl --context="$context" apply -f -
+
+  rm -f "$temp_env_file"
+}
+
 normalize_http_write_timeout() {
   local value="$1"
   local fallback="${2:-40s}"
 
-  # Migration helper: normalize_http_write_timeout maps legacy 30s/35s values
-  # to the 40s-era default (or the provided fallback) during env upgrades.
+  # Reconcile managed HTTP write timeout values to the current runtime policy.
 
   case "$value" in
     ""|"30s"|"35s")
@@ -160,6 +262,100 @@ derive_app_request_timeout() {
   fi
 
   printf '%ss\n' "$((write_seconds - 5))"
+}
+
+derive_item_validation_timeout() {
+  local explicit_timeout="$1"
+  local grpc_request_timeout="$2"
+  local grpc_seconds
+
+  if [[ -n "$explicit_timeout" ]]; then
+    printf '%s\n' "$explicit_timeout"
+    return 0
+  fi
+
+  if ! grpc_seconds="$(parse_seconds_duration "$grpc_request_timeout")"; then
+    printf '25s\n'
+    return 0
+  fi
+
+  if (( grpc_seconds <= 1 )); then
+    printf '0s\n'
+    return 0
+  fi
+
+  if (( grpc_seconds <= 5 )); then
+    printf '%ss\n' "$((grpc_seconds - 1))"
+    return 0
+  fi
+
+  printf '%ss\n' "$((grpc_seconds - 5))"
+}
+
+validate_monolith_timeout_chain() {
+  local app_request_timeout="$1"
+  local http_write_timeout="$2"
+  local app_seconds write_seconds
+
+  if ! app_seconds="$(parse_seconds_duration "$app_request_timeout")"; then
+    echo "ERROR: APP_REQUEST_TIMEOUT '$app_request_timeout' must be expressed in whole seconds (e.g. 35s)" >&2
+    return 1
+  fi
+  if ! write_seconds="$(parse_seconds_duration "$http_write_timeout")"; then
+    echo "ERROR: HTTP_WRITE_TIMEOUT '$http_write_timeout' must be expressed in whole seconds (e.g. 40s)" >&2
+    return 1
+  fi
+  if (( app_seconds > write_seconds )); then
+    echo "ERROR: APP_REQUEST_TIMEOUT (${app_request_timeout}) must not exceed HTTP_WRITE_TIMEOUT (${http_write_timeout})" >&2
+    return 1
+  fi
+}
+
+validate_gateway_timeout_chain() {
+  local grpc_call_timeout="$1"
+  local request_timeout="$2"
+  local http_write_timeout="$3"
+  local grpc_seconds request_seconds write_seconds
+
+  if ! grpc_seconds="$(parse_seconds_duration "$grpc_call_timeout")"; then
+    echo "ERROR: GRPC_CALL_TIMEOUT '$grpc_call_timeout' must be expressed in whole seconds (e.g. 32s)" >&2
+    return 1
+  fi
+  if ! request_seconds="$(parse_seconds_duration "$request_timeout")"; then
+    echo "ERROR: REQUEST_TIMEOUT '$request_timeout' must be expressed in whole seconds (e.g. 35s)" >&2
+    return 1
+  fi
+  if ! write_seconds="$(parse_seconds_duration "$http_write_timeout")"; then
+    echo "ERROR: HTTP_WRITE_TIMEOUT '$http_write_timeout' must be expressed in whole seconds (e.g. 40s)" >&2
+    return 1
+  fi
+  if (( grpc_seconds >= request_seconds )); then
+    echo "ERROR: GRPC_CALL_TIMEOUT (${grpc_call_timeout}) must be smaller than REQUEST_TIMEOUT (${request_timeout})" >&2
+    return 1
+  fi
+  if (( request_seconds >= write_seconds )); then
+    echo "ERROR: REQUEST_TIMEOUT (${request_timeout}) must be smaller than HTTP_WRITE_TIMEOUT (${http_write_timeout})" >&2
+    return 1
+  fi
+}
+
+validate_transaction_timeout_chain() {
+  local grpc_request_timeout="$1"
+  local item_validation_timeout="$2"
+  local grpc_seconds item_seconds
+
+  if ! grpc_seconds="$(parse_seconds_duration "$grpc_request_timeout")"; then
+    echo "ERROR: GRPC_REQUEST_TIMEOUT '$grpc_request_timeout' must be expressed in whole seconds (e.g. 30s)" >&2
+    return 1
+  fi
+  if ! item_seconds="$(parse_seconds_duration "$item_validation_timeout")"; then
+    echo "ERROR: ITEM_VALIDATION_TIMEOUT '$item_validation_timeout' must be expressed in whole seconds (e.g. 25s)" >&2
+    return 1
+  fi
+  if (( item_seconds >= grpc_seconds )); then
+    echo "ERROR: ITEM_VALIDATION_TIMEOUT (${item_validation_timeout}) must be smaller than GRPC_REQUEST_TIMEOUT (${grpc_request_timeout})" >&2
+    return 1
+  fi
 }
 
 # Robust kubectl wrapper with retries for transient connection/DNS issues

@@ -73,7 +73,10 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("APP_REQUEST_TIMEOUT must be greater than 0")
 	}
 
-	loginAdmissionEnabled := os.Getenv("LOGIN_ADMISSION_ENABLED") == "true"
+	loginAdmissionEnabled, err := getEnvBool("LOGIN_ADMISSION_ENABLED", true)
+	if err != nil {
+		return Config{}, fmt.Errorf("LOGIN_ADMISSION_ENABLED: %w", err)
+	}
 	loginAdmission := admission.Config{Enabled: loginAdmissionEnabled}
 	if loginAdmissionEnabled {
 		loginMaxConcurrency, err := getEnvInt("LOGIN_MAX_CONCURRENCY", 8)
@@ -280,6 +283,19 @@ func getEnvDuration(key string, fallback time.Duration) (time.Duration, error) {
 	parsed, err := time.ParseDuration(value)
 	if err != nil {
 		return 0, fmt.Errorf("must be a valid duration: %w", err)
+	}
+	return parsed, nil
+}
+
+func getEnvBool(key string, fallback bool) (bool, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("must be a valid boolean: %w", err)
 	}
 	return parsed, nil
 }
