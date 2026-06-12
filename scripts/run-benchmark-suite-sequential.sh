@@ -662,20 +662,6 @@ for architecture in $ARCHITECTURE_ORDER; do
     scenario_case_index=0
     scenario_case_count="$(wc -w <<<"$scenario_rps_levels" | tr -d '[:space:]')"
 
-    # Check if we can skip the setup for this scenario (if all its target RPS levels are already in S3)
-    skip_scenario_setup=true
-    for target_rps in $scenario_rps_levels; do
-      case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
-      if ! aws s3 ls "${case_s3_uri}/result-status.json" >/dev/null 2>&1; then
-        skip_scenario_setup=false
-        break
-      fi
-    done
-
-    if [ "$skip_scenario_setup" = "false" ]; then
-      run_scenario_data_setup "$architecture" "$scenario"
-    fi
-
     for target_rps in $scenario_rps_levels; do
       scenario_case_index=$((scenario_case_index + 1))
       case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
