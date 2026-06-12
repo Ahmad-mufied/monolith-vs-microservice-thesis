@@ -3,6 +3,7 @@ module github.com/ahmadmufied/skripsi-benchmark/monolith
 go 1.26.2
 
 require (
+	github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg v0.0.0
 	github.com/DataDog/dd-trace-go/contrib/labstack/echo.v4/v2 v2.8.2
 	github.com/DataDog/dd-trace-go/v2 v2.8.2
 	github.com/go-playground/validator/v10 v10.30.2
@@ -105,3 +106,5 @@ require (
 	gopkg.in/ini.v1 v1.67.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg => ../pkg

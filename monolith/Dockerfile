@@ -6,17 +6,19 @@ RUN apk add --no-cache ca-certificates git
 
 WORKDIR /src
 
+COPY pkg/go.mod pkg/go.sum ./pkg/
 COPY monolith/go.mod monolith/go.sum ./monolith/
 
 WORKDIR /src/monolith
-RUN go mod download
+RUN GOWORK=off go mod download
 RUN go install github.com/pressly/goose/v3/cmd/goose@${GOOSE_VERSION}
 
 WORKDIR /src
+COPY pkg ./pkg
 COPY monolith ./monolith
 
 WORKDIR /src/monolith
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/monolith ./cmd/server
+RUN GOWORK=off CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/monolith ./cmd/server
 
 FROM alpine:3.22
 
