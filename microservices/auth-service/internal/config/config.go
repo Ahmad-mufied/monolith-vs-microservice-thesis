@@ -30,19 +30,22 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("GRPC_REQUEST_TIMEOUT must be greater than 0")
 	}
 
-	loginAdmissionEnabled := os.Getenv("LOGIN_ADMISSION_ENABLED") == "true"
-	loginMaxConcurrency, err := getEnvInt("LOGIN_MAX_CONCURRENCY", 2)
+	loginAdmissionEnabled, err := getEnvBool("LOGIN_ADMISSION_ENABLED", false)
 	if err != nil {
-		return nil, fmt.Errorf("LOGIN_MAX_CONCURRENCY: %w", err)
+		return nil, fmt.Errorf("LOGIN_ADMISSION_ENABLED: %w", err)
 	}
-	loginQueueTimeout, err := getEnvDuration("LOGIN_QUEUE_TIMEOUT", 2*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("LOGIN_QUEUE_TIMEOUT: %w", err)
-	}
-	loginAdmission := admission.Config{
-		Enabled:        loginAdmissionEnabled,
-		MaxConcurrency: loginMaxConcurrency,
-		QueueTimeout:   loginQueueTimeout,
+	loginAdmission := admission.Config{Enabled: loginAdmissionEnabled}
+	if loginAdmissionEnabled {
+		loginMaxConcurrency, err := getEnvInt("LOGIN_MAX_CONCURRENCY", 2)
+		if err != nil {
+			return nil, fmt.Errorf("LOGIN_MAX_CONCURRENCY: %w", err)
+		}
+		loginQueueTimeout, err := getEnvDuration("LOGIN_QUEUE_TIMEOUT", 2*time.Second)
+		if err != nil {
+			return nil, fmt.Errorf("LOGIN_QUEUE_TIMEOUT: %w", err)
+		}
+		loginAdmission.MaxConcurrency = loginMaxConcurrency
+		loginAdmission.QueueTimeout = loginQueueTimeout
 	}
 
 	cfg := &Config{
@@ -93,4 +96,16 @@ func getEnvInt(key string, fallback int) (int, error) {
 		return 0, fmt.Errorf("must be a valid integer: %w", err)
 	}
 	return n, nil
+}
+
+func getEnvBool(key string, fallback bool) (bool, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback, nil
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, fmt.Errorf("must be a valid boolean: %w", err)
+	}
+	return b, nil
 }
