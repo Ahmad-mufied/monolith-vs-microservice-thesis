@@ -95,7 +95,60 @@ duration_seconds() {
   echo 0
 }
 
-CONFIGURED_DURATION_SECONDS="$(duration_seconds "$TEST_DURATION_VALUE")"
+sum_stage_duration_seconds() {
+  local stages_json="$1"
+  local total=0
+  local stage_duration=""
+
+  while IFS= read -r stage_duration; do
+    [ -z "$stage_duration" ] && continue
+    total=$((total + $(duration_seconds "$stage_duration")))
+  done < <(jq -r '.[]?.duration // empty' <<<"$stages_json")
+
+  echo "$total"
+}
+
+configured_duration_seconds() {
+  local profile="${K6_PROFILE:-steady}"
+  local custom_stages_json="${RAMP_STAGES_JSON:-}"
+
+  if [ -n "$custom_stages_json" ]; then
+    if ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$custom_stages_json"; then
+      echo "ERROR: RAMP_STAGES_JSON must be a JSON array when set." >&2
+      exit 1
+    fi
+
+    sum_stage_duration_seconds "$custom_stages_json"
+    return 0
+  fi
+
+  case "$profile" in
+    smoke|steady)
+      duration_seconds "$TEST_DURATION_VALUE"
+      ;;
+    ramp)
+      echo $(( \
+        $(duration_seconds "${RAMP_UP_DURATION:-1m}") + \
+        $(duration_seconds "$TEST_DURATION_VALUE") + \
+        $(duration_seconds "${RAMP_DOWN_DURATION:-30s}") \
+      ))
+      ;;
+    hpa)
+      echo $(( \
+        $(duration_seconds "${HPA_RAMP_UP_1:-2m}") + \
+        $(duration_seconds "${HPA_RAMP_UP_2:-2m}") + \
+        $(duration_seconds "${HPA_RAMP_UP_3:-3m}") + \
+        $(duration_seconds "${HPA_HOLD:-5m}") + \
+        $(duration_seconds "${HPA_RAMP_DOWN:-1m}") \
+      ))
+      ;;
+    *)
+      duration_seconds "$TEST_DURATION_VALUE"
+      ;;
+  esac
+}
+
+CONFIGURED_DURATION_SECONDS="$(configured_duration_seconds)"
 
 IMAGES_JSON="$(json_env_or IMAGES_JSON '[]')"
 SEED_SIZE_JSON="$(json_env_or SEED_SIZE_JSON 'null')"
