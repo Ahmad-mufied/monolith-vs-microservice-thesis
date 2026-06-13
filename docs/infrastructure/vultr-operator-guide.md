@@ -382,17 +382,23 @@ make run-benchmark-case
 
 ```bash
 SCALING_MODE=fixed K6_PROFILE=steady TEST_DURATION=5m \
-  RUN_ID=rq1-fixed-vultr ATTEMPT=attempt-01 \
+  EXPERIMENT_NAME=final-stable-v1 ATTEMPT=attempt-01 \
   INTER_CASE_DELAY=120 ARCHITECTURE_SWITCH_DELAY=300 \
   SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000" \
   make run-benchmark-suite
+```
+
+Example generated `RUN_ID` for the fixed suite above:
+
+```text
+vultr-sequential-fixed-final-stable-v1-670736c
 ```
 
 ### HPA suite
 
 ```bash
 SCALING_MODE=hpa K6_PROFILE=hpa \
-  RUN_ID=rq2-hpa-vultr ATTEMPT=attempt-01 \
+  EXPERIMENT_NAME=final-hpa-v1 ATTEMPT=attempt-01 \
   INTER_CASE_DELAY=300 ARCHITECTURE_SWITCH_DELAY=300 \
   SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000" \
   make run-benchmark-suite
@@ -444,7 +450,7 @@ Common suite examples:
 SCALING_MODE=fixed \
 K6_PROFILE=steady \
 TEST_DURATION=5m \
-RUN_ID=smoke-fixed-login-admission \
+EXPERIMENT_NAME=smoke-login-admission \
 ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=120 \
 ARCHITECTURE_SWITCH_DELAY=300 \
@@ -455,7 +461,7 @@ make run-benchmark-suite
 SCALING_MODE=fixed \
 K6_PROFILE=steady \
 TEST_DURATION=5m \
-RUN_ID=rq1-fixed-vultr \
+EXPERIMENT_NAME=final-stable-v1 \
 ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=120 \
 ARCHITECTURE_SWITCH_DELAY=300 \
@@ -465,7 +471,7 @@ make run-benchmark-suite
 # Standard HPA suite. Note that TEST_DURATION is ignored for K6_PROFILE=hpa.
 SCALING_MODE=hpa \
 K6_PROFILE=hpa \
-RUN_ID=rq2-hpa-vultr \
+EXPERIMENT_NAME=final-hpa-v1 \
 ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=300 \
 ARCHITECTURE_SWITCH_DELAY=300 \
@@ -496,6 +502,43 @@ level. Enrichment-dependent scenarios also prepare enrichment data after reset.
 
 Resume: checks S3 for existing `result-status.json`; completed cases are
 skipped. To rerun from scratch, use new `RUN_ID` or `ATTEMPT`.
+
+Default `RUN_ID` behavior for suite runs:
+
+- manual `RUN_ID` always wins when set explicitly;
+- when `RUN_ID` is blank and `EXPERIMENT_NAME` is set, the suite generates a
+  stable default `RUN_ID` as
+  `vultr-sequential-{mode}-{experiment_name}-{image_tag}`;
+- when both `RUN_ID` and `EXPERIMENT_NAME` are blank, the suite falls back to
+  `vultr-sequential-{mode}-{yyyymmdd}-{HHMM}`;
+- if an auto-named run is interrupted, reuse the printed `RUN_ID` explicitly on
+  the rerun command so the resume targets the same S3 run folder.
+
+Recommended operator workflow:
+
+1. Start a new measured suite with `EXPERIMENT_NAME` and leave `RUN_ID` blank.
+2. Copy the printed `RUN_ID` from the suite header.
+3. If the run completes, keep using the generated folder for verification and
+   reporting.
+4. If the run is interrupted:
+   - rerun with the same `EXPERIMENT_NAME` and unchanged `IMAGE_TAG` when you
+     want the default generated `RUN_ID` to stay the same; or
+   - rerun with the printed `RUN_ID` explicitly when you want the resume target
+     to be unambiguous regardless of local env changes.
+
+Resume example after interruption:
+
+```bash
+SCALING_MODE=fixed \
+K6_PROFILE=steady \
+TEST_DURATION=5m \
+RUN_ID=vultr-sequential-fixed-final-stable-v1-670736c \
+ATTEMPT=attempt-01 \
+INTER_CASE_DELAY=120 \
+ARCHITECTURE_SWITCH_DELAY=300 \
+SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000" \
+make run-benchmark-suite
+```
 
 ETA: `est_case`, `est_scenario`, `est_suite`. Per-case overhead buffer:
 `SEQUENTIAL_CASE_OVERHEAD_SECONDS=180`.
@@ -725,6 +768,7 @@ vultr-cli kubernetes list && vultr-cli instance list
 | `SCALING_MODE` | `fixed`/`hpa` | Deployment overlay. |
 | `K6_PROFILE` | `steady`/`hpa` | k6 profile. HPA must use `hpa`. |
 | `TEST_DURATION` | `5m` | Fixed duration. Ignored for HPA. |
+| `EXPERIMENT_NAME` | `final-stable-v1` | Human-readable experiment label used in default generated `RUN_ID`. |
 | `RUN_ID` | `rq1-fixed-vultr` | S3 run folder. |
 | `ATTEMPT` | `attempt-01` | Attempt folder. |
 | `ARCHITECTURE_ORDER` | `"microservices monolith"` | Override order (spaces). |

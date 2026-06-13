@@ -107,6 +107,20 @@ sanitize_experiment_name() {
   printf '%s' "$value"
 }
 
+sanitize_run_id_component() {
+  local label="$1"
+  local value="$2"
+  local sanitized
+
+  sanitized="$(sanitize_experiment_name "$value")"
+  if [ -z "$sanitized" ]; then
+    echo "ERROR: ${label} '$value' does not contain any usable slug characters" >&2
+    return 1
+  fi
+
+  printf '%s' "$sanitized"
+}
+
 trim_whitespace() {
   local value="$1"
 
@@ -257,7 +271,7 @@ validate_matrix_inputs() {
 validate_matrix_inputs
 INTER_CASE_DELAY="$(normalize_nonnegative_integer "$INTER_CASE_DELAY")"
 if [ -n "$EXPERIMENT_NAME" ]; then
-  EXPERIMENT_NAME="$(sanitize_experiment_name "$EXPERIMENT_NAME")"
+  EXPERIMENT_NAME="$(sanitize_run_id_component "EXPERIMENT_NAME" "$EXPERIMENT_NAME")"
 fi
 
 if [ -z "$K6_PROFILE" ]; then
@@ -311,9 +325,11 @@ run_suite_preflight() {
 }
 
 if [ -z "$RUN_ID" ]; then
+  sanitized_image_tag=""
   run_prefix="$(provider_default_run_prefix parallel)"
   if [ -n "$EXPERIMENT_NAME" ]; then
-    RUN_ID="${run_prefix}-${SCALING_MODE}-${EXPERIMENT_NAME}"
+    sanitized_image_tag="$(sanitize_run_id_component "IMAGE_TAG" "$IMAGE_TAG")"
+    RUN_ID="${run_prefix}-${SCALING_MODE}-${EXPERIMENT_NAME}-${sanitized_image_tag}"
   else
     RUN_ID="${run_prefix}-${SCALING_MODE}-$(date +%Y%m%d-%H%M)"
   fi

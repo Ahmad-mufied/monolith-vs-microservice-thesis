@@ -71,6 +71,20 @@ trim_whitespace() {
   sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' <<<"$1"
 }
 
+sanitize_run_id_component() {
+  local label="$1"
+  local value="$2"
+  local sanitized
+
+  sanitized="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')"
+  if [ -z "$sanitized" ]; then
+    echo "ERROR: ${label} '$value' does not contain any usable slug characters" >&2
+    exit 1
+  fi
+
+  printf '%s' "$sanitized"
+}
+
 validate_architecture_order() {
   local architecture seen_monolith=false seen_microservices=false count=0
   for architecture in $ARCHITECTURE_ORDER; do
@@ -582,10 +596,16 @@ case "$SCALING_MODE:$K6_PROFILE" in
     ;;
 esac
 
+if [ -n "$EXPERIMENT_NAME" ]; then
+  EXPERIMENT_NAME="$(sanitize_run_id_component "EXPERIMENT_NAME" "$EXPERIMENT_NAME")"
+fi
+
 if [ -z "$RUN_ID" ]; then
+  sanitized_image_tag=""
   run_prefix="$(provider_default_run_prefix sequential)"
   if [ -n "$EXPERIMENT_NAME" ]; then
-    RUN_ID="${run_prefix}-${SCALING_MODE}-${EXPERIMENT_NAME}"
+    sanitized_image_tag="$(sanitize_run_id_component "IMAGE_TAG" "$IMAGE_TAG")"
+    RUN_ID="${run_prefix}-${SCALING_MODE}-${EXPERIMENT_NAME}-${sanitized_image_tag}"
   else
     RUN_ID="${run_prefix}-${SCALING_MODE}-$(date +%Y%m%d-%H%M)"
   fi

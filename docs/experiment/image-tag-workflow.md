@@ -141,6 +141,11 @@ architecture phase internally with the suite-level `SCALING_MODE` and
 `IMAGE_TAG`. Run a new suite with `SCALING_MODE=hpa` when switching from fixed
 to HPA.
 
+When a suite run omits `RUN_ID` but sets `EXPERIMENT_NAME`, the current
+benchmark runners include the active `IMAGE_TAG` in the default generated
+`RUN_ID`. This keeps the run folder readable for operators while still tying it
+to the exact deployable image revision that was measured.
+
 ---
 
 ## 5. Final Experiment Rules

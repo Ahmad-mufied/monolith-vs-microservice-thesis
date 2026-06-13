@@ -736,7 +736,7 @@ Expected suite shape:
 
 ```text
 experiment   : rq1-fixed-final
-run_id       : eks-fixed-rq1-fixed-final
+run_id       : eks-fixed-rq1-fixed-final-670736c
 attempt      : attempt-01, then attempt-02/03 when the same run_id is reused
 scaling_mode : fixed
 k6_profile   : steady
@@ -836,7 +836,7 @@ Expected suite shape:
 
 ```text
 experiment   : rq2-hpa-final
-run_id       : eks-hpa-rq2-hpa-final
+run_id       : eks-hpa-rq2-hpa-final-670736c
 attempt      : attempt-01, then attempt-02/03 when the same run_id is reused
 scaling_mode : hpa
 k6_profile   : hpa
@@ -951,10 +951,13 @@ Use `120` seconds for fixed final runs and `300` seconds for HPA final runs
 unless the experiment log documents a different value.
 
 `RUN_ID` remains the strongest override. If `RUN_ID` is blank and
-`EXPERIMENT_NAME` is set, the suite generates a stable `RUN_ID` using
-`eks-{mode}-{experiment_name}` so rerunning the same command can advance
-automatically from `attempt-01` to `attempt-02` and beyond. If both are blank,
-the runner falls back to the timestamp-based `RUN_ID`.
+`EXPERIMENT_NAME` is set, the suite generates a stable default `RUN_ID` using
+`eks-{mode}-{experiment_name}-{image_tag}`. This keeps the experiment label and
+the deployed build visible in the same run identity. Rerunning the same command
+with the same `EXPERIMENT_NAME` and `IMAGE_TAG` can then advance automatically
+from `attempt-01` to `attempt-02` and beyond. If both `RUN_ID` and
+`EXPERIMENT_NAME` are blank, the runner falls back to the timestamp-based
+`RUN_ID`.
 
 `SCENARIO_RPS_MATRIX` is optional. When set, it overrides the usual
 `SCENARIOS` x `RPS_LEVELS` cross-product with a per-scenario mapping in the

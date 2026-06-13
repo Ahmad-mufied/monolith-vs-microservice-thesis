@@ -327,7 +327,7 @@ Default suite behavior:
 - `RPS_LEVELS` defaults to `1000 2500 5000 7500 10000`
 - `SCENARIO_RPS_MATRIX`, when set, overrides the cross-product behavior of `SCENARIOS` x `RPS_LEVELS`
 - `RUN_ID` stays highest-precedence when set manually
-- `EXPERIMENT_NAME`, when provided and `RUN_ID` is blank, generates a stable `RUN_ID` as `eks-{mode}-{experiment_name}`
+- `EXPERIMENT_NAME`, when provided and `RUN_ID` is blank, generates a stable default `RUN_ID` as `eks-{mode}-{experiment_name}-{image_tag}`
 - `RUN_ID` falls back to `eks-{mode}-{yyyymmdd}-{HHMM}` only when both `RUN_ID` and `EXPERIMENT_NAME` are blank
 - `ATTEMPT` is auto-detected from S3 and starts at `attempt-01`
 - `K6_PROFILE` defaults to `steady` for fixed mode and `hpa` for HPA mode
@@ -356,9 +356,11 @@ make run-benchmark-suite \
   RPS_LEVELS="1000 2500 5000"
 ```
 
-With the same `EXPERIMENT_NAME`, the suite resolves to the same `RUN_ID`, so
-rerunning the command with `ATTEMPT` left blank will auto-increment from
-`attempt-01` to `attempt-02`, `attempt-03`, and so on.
+With the same `EXPERIMENT_NAME` and `IMAGE_TAG`, the suite resolves to the
+same default `RUN_ID`, so rerunning the command with `ATTEMPT` left blank will
+auto-increment from `attempt-01` to `attempt-02`, `attempt-03`, and so on. If
+the run is interrupted, rerun the suite with the `RUN_ID` printed at startup to
+continue explicitly from that run identity.
 
 Scenario-specific RPS matrix workflow:
 
