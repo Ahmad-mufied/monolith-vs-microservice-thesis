@@ -69,6 +69,22 @@ trap cleanup EXIT
 : > "$PHASES_JSONL"
 declare -A CASE_RESULT_STATUS_CACHE=()
 
+log_timestamp() {
+  date '+%Y-%m-%d %H:%M:%S %Z'
+}
+
+log_info() {
+  printf '[%s] %s\n' "$(log_timestamp)" "$*"
+}
+
+log_warn() {
+  printf '[%s] WARNING: %s\n' "$(log_timestamp)" "$*" >&2
+}
+
+log_error() {
+  printf '[%s] ERROR: %s\n' "$(log_timestamp)" "$*" >&2
+}
+
 trim_whitespace() {
   sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' <<<"$1"
 }
@@ -80,7 +96,7 @@ sanitize_run_id_component() {
 
   sanitized="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')"
   if [ -z "$sanitized" ]; then
-    echo "ERROR: ${label} '$value' does not contain any usable slug characters" >&2
+    log_error "${label} '$value' does not contain any usable slug characters"
     exit 1
   fi
 
@@ -94,26 +110,26 @@ validate_architecture_order() {
     case "$architecture" in
       monolith)
         if [ "$seen_monolith" = "true" ]; then
-          echo "ERROR: ARCHITECTURE_ORDER must not contain duplicate monolith entries" >&2
+          log_error "ARCHITECTURE_ORDER must not contain duplicate monolith entries"
           exit 1
         fi
         seen_monolith=true
         ;;
       microservices)
         if [ "$seen_microservices" = "true" ]; then
-          echo "ERROR: ARCHITECTURE_ORDER must not contain duplicate microservices entries" >&2
+          log_error "ARCHITECTURE_ORDER must not contain duplicate microservices entries"
           exit 1
         fi
         seen_microservices=true
         ;;
       *)
-        echo "ERROR: unsupported architecture in ARCHITECTURE_ORDER: $architecture" >&2
+        log_error "unsupported architecture in ARCHITECTURE_ORDER: $architecture"
         exit 1
         ;;
     esac
   done
   if [ "$count" -ne 2 ] || [ "$seen_monolith" != "true" ] || [ "$seen_microservices" != "true" ]; then
-    echo "ERROR: ARCHITECTURE_ORDER must include exactly both monolith and microservices" >&2
+    log_error "ARCHITECTURE_ORDER must include exactly both monolith and microservices"
     exit 1
   fi
 }
@@ -122,7 +138,7 @@ validate_seconds_value() {
   local name="$1"
   local value="$2"
   if ! [[ "$value" =~ ^[0-9]+$ ]]; then
-    echo "ERROR: ${name} must be an integer number of seconds, got '$value'" >&2
+    log_error "${name} must be an integer number of seconds, got '$value'"
     exit 1
   fi
 }
@@ -134,7 +150,7 @@ duration_to_seconds() {
   local number unit
 
   if [ -z "$value" ]; then
-    echo "ERROR: duration must not be empty" >&2
+    log_error "duration must not be empty"
     return 1
   fi
 
@@ -155,7 +171,7 @@ duration_to_seconds() {
   done
 
   if [ -n "$remainder" ]; then
-    echo "ERROR: unsupported duration '$value' (expected k6-style values like 30s, 5m, 1h, or 1m30s)" >&2
+    log_error "unsupported duration '$value' (expected k6-style values like 30s, 5m, 1h, or 1m30s)"
     return 1
   fi
 
@@ -227,7 +243,7 @@ estimate_case_duration_seconds() {
       duration_to_seconds "$TEST_DURATION"
       ;;
     *)
-      echo "ERROR: unsupported K6_PROFILE '$K6_PROFILE' for ETA calculation" >&2
+      log_error "unsupported K6_PROFILE '$K6_PROFILE' for ETA calculation"
       return 1
       ;;
   esac
@@ -277,22 +293,22 @@ print_case_eta() {
   fi
   suite_eta_epoch=$((now_epoch + suite_remaining_case_seconds + suite_remaining_delay_seconds))
 
-  echo "=== Sequential ETA ==="
-  echo "  case          : ${suite_case_number}/${suite_total_cases} ${architecture}/${scenario}/${target_rps}rps"
-  echo "  scenario      : ${scenario_case_number}/${scenario_total_cases} (${scenario})"
-  echo "  est_case      : $(format_duration "$case_seconds") -> $(format_eta_epoch "$case_eta_epoch")"
-  echo "  est_scenario  : $(format_eta_epoch "$scenario_eta_epoch")"
-  echo "  est_suite     : $(format_eta_epoch "$suite_eta_epoch")"
-  echo "  pending       : scenario=${pending_scenario_cases}, architecture=${pending_current_architecture_cases}, future_architecture=${pending_future_architecture_cases}"
-  echo "  eta_basis     : k6=$(format_duration "$k6_case_seconds") + full_overhead=$(format_duration "$SEQUENTIAL_CASE_OVERHEAD_SECONDS") or reused_overhead=$(format_duration "$SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS") + retry_buffer=$(format_duration "$SEQUENTIAL_RETRY_BUFFER_SECONDS") + configured delays"
-  echo "  eta_mode      : $eta_mode"
+  log_info "=== Sequential ETA ==="
+  log_info "  case          : ${suite_case_number}/${suite_total_cases} ${architecture}/${scenario}/${target_rps}rps"
+  log_info "  scenario      : ${scenario_case_number}/${scenario_total_cases} (${scenario})"
+  log_info "  est_case      : $(format_duration "$case_seconds") -> $(format_eta_epoch "$case_eta_epoch")"
+  log_info "  est_scenario  : $(format_eta_epoch "$scenario_eta_epoch")"
+  log_info "  est_suite     : $(format_eta_epoch "$suite_eta_epoch")"
+  log_info "  pending       : scenario=${pending_scenario_cases}, architecture=${pending_current_architecture_cases}, future_architecture=${pending_future_architecture_cases}"
+  log_info "  eta_basis     : k6=$(format_duration "$k6_case_seconds") + full_overhead=$(format_duration "$SEQUENTIAL_CASE_OVERHEAD_SECONDS") or reused_overhead=$(format_duration "$SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS") + retry_buffer=$(format_duration "$SEQUENTIAL_RETRY_BUFFER_SECONDS") + configured delays"
+  log_info "  eta_mode      : $eta_mode"
 }
 
 validate_supported_scenario() {
   case "$1" in
     login|create-transaction|enriched-transactions|concurrent-mixed-workload|mixed-workload|sync-items) ;;
     *)
-      echo "ERROR: unsupported scenario '$1'" >&2
+      log_error "unsupported scenario '$1'"
       exit 1
       ;;
   esac
@@ -375,7 +391,7 @@ prime_case_result_status_cache() {
   done < "$MATRIX_TSV"
 
   if ! result_status_listing="$(benchmark_aws s3 ls "${S3_RUN_URI}/" --recursive 2>/dev/null)"; then
-    echo "WARNING: initial S3 result-status cache warmup failed; falling back to on-demand checks." >&2
+    log_warn "initial S3 result-status cache warmup failed; falling back to on-demand checks."
     CASE_RESULT_STATUS_CACHE=()
     return 1
   fi
@@ -757,6 +773,7 @@ sequential_case_timing_json() {
   local attempt_timing_json
   local case_timing_source
 
+  log_info "Resolving timing window for ${architecture}/${s3_uri##*/} from S3 artifacts..." >&2
   attempt_timing_json="$(
     resolve_attempt_timing_json \
       "$s3_uri" \
@@ -765,6 +782,7 @@ sequential_case_timing_json() {
       "sequential ${architecture} ${s3_uri##*/}"
   )"
   case_timing_source="$(normalize_case_timing_source "$(jq -r '.timing_source' <<<"$attempt_timing_json")")"
+  log_info "Timing window resolved for ${architecture}/${s3_uri##*/} (source: ${case_timing_source})." >&2
 
   jq -cn \
     --arg architecture "$architecture" \
@@ -791,11 +809,11 @@ fi
 case "$SCALING_MODE:$K6_PROFILE" in
   fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa) ;;
   fixed:hpa)
-    echo "ERROR: K6_PROFILE=hpa must not be used with SCALING_MODE=fixed." >&2
+    log_error "K6_PROFILE=hpa must not be used with SCALING_MODE=fixed."
     exit 1
     ;;
   hpa:steady|hpa:ramp|hpa:smoke)
-    echo "ERROR: SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment." >&2
+    log_error "SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment."
     exit 1
     ;;
 esac
@@ -854,7 +872,10 @@ jq -n \
   '{provider:$provider, execution_mode:"sequential", terraform_stack:$terraform_stack, run_id:$run_id, attempt:$attempt, scaling_mode:$scaling_mode, k6_profile:$k6_profile, test_duration:$test_duration, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, architecture_order:$architecture_order, scenario_rps_matrix:$scenario_rps_matrix, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc}' \
   > "$manifest_path"
 benchmark_aws s3 cp "$manifest_path" "${S3_RUN_URI}/_suite/manifest.json" >/dev/null
+log_info "Sequential suite manifest uploaded to ${S3_RUN_URI}/_suite/manifest.json"
+log_info "Warming S3 result-status cache for sequential suite resume and ETA checks..."
 prime_case_result_status_cache || true
+log_info "Initial S3 result-status cache warmup finished."
 
 suite_failed=0
 total_cases=0
@@ -871,25 +892,26 @@ completed_suite_cases=0
 for architecture in $ARCHITECTURE_ORDER; do
   architecture_index=$((architecture_index + 1))
   phase_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "=== Sequential Architecture: ${architecture} ==="
+  log_info "=== Sequential Architecture: ${architecture} ==="
   phase_has_pending_cases=false
   phase_deployed_now=false
   if architecture_has_pending_cases "$architecture"; then
     phase_has_pending_cases=true
     if [ "$SEQUENTIAL_RESUME_SKIP_READY_DEPLOY" = "true" ] && architecture_ready_for_resume "$architecture"; then
-      echo "Architecture ${architecture} is already ready with IMAGE_TAG=${IMAGE_TAG} and SCALING_MODE=${SCALING_MODE}; skipping resume redeploy."
+      log_info "Architecture ${architecture} is already ready with IMAGE_TAG=${IMAGE_TAG} and SCALING_MODE=${SCALING_MODE}; skipping resume redeploy."
     else
       phase_deployed_now=true
       ARCHITECTURE="$architecture" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" CLOUD_PROVIDER="$CLOUD_PROVIDER" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" bash scripts/deploy-sequential-architecture.sh
     fi
   else
-    echo "All cases for ${architecture} already exist in S3; skipping architecture deploy."
+    log_info "All cases for ${architecture} already exist in S3; skipping architecture deploy."
   fi
 
   completed_architecture_cases=0
   architecture_ran_case=false
   while IFS=$'\t' read -r scenario scenario_rps_levels; do
     [ -z "$scenario" ] && continue
+    log_info "=== Sequential Scenario: ${architecture}/${scenario} ==="
     scenario_case_index=0
     scenario_case_count="$(wc -w <<<"$scenario_rps_levels" | tr -d '[:space:]')"
     scenario_skip_case_setup=false
@@ -898,37 +920,40 @@ for architecture in $ARCHITECTURE_ORDER; do
       setup_reuse_scope="$(scenario_setup_reuse_scope "$scenario")"
       if [ "$setup_reuse_scope" = "per_scenario" ]; then
         setup_class="$(scenario_setup_class "$scenario")"
-        echo "=== Sequential Scenario Setup ==="
-        echo "  architecture  : $architecture"
-        echo "  scenario      : $scenario"
-        echo "  setup_scope   : $setup_reuse_scope"
+        log_info "=== Sequential Scenario Setup ==="
+        log_info "  architecture  : $architecture"
+        log_info "  scenario      : $scenario"
+        log_info "  setup_scope   : $setup_reuse_scope"
         if [ "$phase_deployed_now" = "true" ] && [ "$architecture_ran_case" = "false" ]; then
           if [ "$setup_class" = "enrichment" ]; then
-            echo "  action        : prepare enrichment once using fresh deploy baseline"
+            log_info "  action        : prepare enrichment once using fresh deploy baseline"
             prepare_enrichment_active "$architecture"
           else
-            echo "  action        : reuse fresh deploy reset+seed baseline"
+            log_info "  action        : reuse fresh deploy reset+seed baseline"
           fi
         else
-          echo "  action        : run scenario setup once before pending RPS cases"
+          log_info "  action        : run scenario setup once before pending RPS cases"
           run_scenario_data_setup "$architecture" "$scenario"
         fi
         scenario_skip_case_setup=true
       fi
+    else
+      log_info "No pending RPS cases remain for ${architecture}/${scenario}; skipping scenario setup and reusing existing S3 results where available."
     fi
 
     for target_rps in $scenario_rps_levels; do
       scenario_case_index=$((scenario_case_index + 1))
       case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
+      log_info "--- Sequential Case Start: ${architecture}/${scenario}/${target_rps}rps (${scenario_case_index}/${scenario_case_count} in scenario) ---"
 
-      echo "Checking if case already exists in S3: ${architecture}/${scenario}/${target_rps}rps"
+      log_info "Checking if case already exists in S3: ${architecture}/${scenario}/${target_rps}rps"
       result_status_json=""
       if ! case_missing_in_s3 "$architecture" "$scenario" "$target_rps"; then
         result_status_json="$(benchmark_aws s3 cp "${case_s3_uri}/result-status.json" - 2>/dev/null || true)"
       fi
       if [ -n "$result_status_json" ] && jq -e . >/dev/null 2>&1 <<<"$result_status_json"; then
         set_case_result_status_cache "$architecture" "$scenario" "$target_rps" "present"
-        echo "=== Case already completed in S3: ${architecture}/${scenario}/${target_rps}rps (SKIPPING RUN) ==="
+        log_info "=== Case already completed in S3: ${architecture}/${scenario}/${target_rps}rps (SKIPPING RUN) ==="
         k6_exit_code="$(jq -r '.k6_exit_code // "null"' <<<"$result_status_json")"
         s3_exit_code="$(jq -r '.s3_exit_code // "null"' <<<"$result_status_json")"
         classification_hint="$(jq -r '.classification_hint // "unknown"' <<<"$result_status_json")"
@@ -973,9 +998,10 @@ for architecture in $ARCHITECTURE_ORDER; do
           
         completed_architecture_cases=$((completed_architecture_cases + 1))
         completed_suite_cases=$((completed_suite_cases + 1))
+        log_info "--- Sequential Case End: ${architecture}/${scenario}/${target_rps}rps (reused existing S3 result) ---"
         continue
       elif [ -n "$result_status_json" ]; then
-        echo "WARNING: existing result-status.json for ${architecture}/${scenario}/${target_rps}rps is unreadable; rerunning case." >&2
+        log_warn "existing result-status.json for ${architecture}/${scenario}/${target_rps}rps is unreadable; rerunning case."
         set_case_result_status_cache "$architecture" "$scenario" "$target_rps" "missing"
       fi
 
@@ -1015,6 +1041,7 @@ for architecture in $ARCHITECTURE_ORDER; do
         "$((pending_current_architecture_case_seconds + pending_future_architecture_case_seconds))"
 
       case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      log_info "Launching sequential benchmark case runner for ${architecture}/${scenario}/${target_rps}rps..."
       set +e
       ARCHITECTURE="$architecture" \
       ARCHITECTURE_ORDER="$ARCHITECTURE_ORDER" \
@@ -1038,6 +1065,7 @@ for architecture in $ARCHITECTURE_ORDER; do
       case_exit_code=$?
       set -e
       case_finished_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      log_info "Sequential benchmark case runner finished for ${architecture}/${scenario}/${target_rps}rps with exit code ${case_exit_code}."
       case_timing_json="$(
         sequential_case_timing_json \
           "$architecture" \
@@ -1051,6 +1079,7 @@ for architecture in $ARCHITECTURE_ORDER; do
         case_status="non_pass"
         suite_failed=1
       fi
+      log_info "Sequential case classification for ${architecture}/${scenario}/${target_rps}rps: ${case_status}"
 
       jq -cn \
         --arg architecture "$architecture" \
@@ -1062,20 +1091,26 @@ for architecture in $ARCHITECTURE_ORDER; do
         --argjson timing "$case_timing_json" \
         '{architecture:$architecture, scenario:$scenario, target_rps:$target_rps, status:$status, exit_code:$exit_code, s3_uri:$s3_uri} + $timing' >> "$CASES_JSONL"
 
+      log_info "Refreshing S3 result-status cache for ${architecture}/${scenario}/${target_rps}rps..."
       if ! case_result_present_in_s3_uncached "$architecture" "$scenario" "$target_rps"; then
-        echo "WARNING: result-status.json is still missing in S3 after sequential case ${architecture}/${scenario}/${target_rps}rps; future ETA checks will treat it as pending." >&2
+        log_warn "result-status.json is still missing in S3 after sequential case ${architecture}/${scenario}/${target_rps}rps; future ETA checks will treat it as pending."
+      else
+        log_info "S3 result-status cache refreshed for ${architecture}/${scenario}/${target_rps}rps."
       fi
 
       completed_architecture_cases=$((completed_architecture_cases + 1))
       completed_suite_cases=$((completed_suite_cases + 1))
       architecture_ran_case=true
+      log_info "--- Sequential Case End: ${architecture}/${scenario}/${target_rps}rps ---"
       if [ "$INTER_CASE_DELAY" != "0" ] && [ "$completed_architecture_cases" -lt "$total_cases" ]; then
+        log_info "Waiting ${INTER_CASE_DELAY}s before the next sequential case to let the system stabilize..."
         sleep "$INTER_CASE_DELAY"
       fi
     done
   done < "$MATRIX_TSV"
 
   phase_finished_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  log_info "Sequential architecture phase finished for ${architecture}."
   jq -cn \
     --arg architecture "$architecture" \
     --arg started_at_utc "$phase_started_at_utc" \
@@ -1087,7 +1122,7 @@ for architecture in $ARCHITECTURE_ORDER; do
     '{architecture:$architecture, architecture_index:$architecture_index, architecture_count:$architecture_count, case_count:$case_count, started_at_utc:$started_at_utc, finished_at_utc:$finished_at_utc, next_switch_delay_seconds:(if $architecture_index < $architecture_count then $next_switch_delay_seconds else 0 end)}' >> "$PHASES_JSONL"
 
   if [ "$phase_has_pending_cases" = "true" ] && [ "$architecture_index" -lt "$architecture_count" ] && [ "$ARCHITECTURE_SWITCH_DELAY" != "0" ]; then
-    echo "Waiting ${ARCHITECTURE_SWITCH_DELAY}s before switching to the next architecture for cleaner Datadog windows..."
+    log_info "Waiting ${ARCHITECTURE_SWITCH_DELAY}s before switching to the next architecture for cleaner Datadog windows..."
     sleep "$ARCHITECTURE_SWITCH_DELAY"
   fi
 done
@@ -1099,6 +1134,7 @@ if [ "$suite_failed" -ne 0 ]; then
   suite_status="completed_with_non_pass_cases"
 fi
 
+log_info "Writing sequential suite summary to ${summary_path}..."
 jq -s \
   --arg provider "$CLOUD_PROVIDER" \
   --arg terraform_stack "$(provider_sequential_stack_name)" \
@@ -1115,15 +1151,16 @@ jq -s \
   '{provider:$provider, execution_mode:"sequential", terraform_stack:$terraform_stack, run_id:$run_id, attempt:$attempt, suite_status:$suite_status, architecture_order:$architecture_order, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc, finished_at_utc:$finished_at_utc, architecture_phases:$phases, cases:.}' \
   "$CASES_JSONL" > "$summary_path"
 benchmark_aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary.json" >/dev/null
+log_info "Sequential suite summary uploaded to ${S3_RUN_URI}/_suite/summary.json"
 
 if [ "$AUTO_DESTROY_CONFIRMED" = "true" ]; then
   make "$(provider_sequential_destroy_target)"
 fi
 
-echo "=== Sequential Benchmark Suite Complete ==="
-echo "  run_id       : $RUN_ID"
-echo "  suite_status : $suite_status"
-echo "  report_s3_uri: $S3_RUN_URI"
+log_info "=== Sequential Benchmark Suite Complete ==="
+log_info "  run_id       : $RUN_ID"
+log_info "  suite_status : $suite_status"
+log_info "  report_s3_uri: $S3_RUN_URI"
 
 if [ "$suite_failed" -ne 0 ]; then
   exit 1

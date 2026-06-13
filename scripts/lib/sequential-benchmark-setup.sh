@@ -2,6 +2,22 @@
 # Shared helpers for sequential benchmark scenario setup and Kubernetes job management.
 # Expects: SEQUENTIAL_CONTEXT, RENDER_ROOT, SCALING_MODE set by caller.
 
+log_setup_timestamp() {
+  date '+%Y-%m-%d %H:%M:%S %Z'
+}
+
+log_setup_info() {
+  printf '[%s] %s\n' "$(log_setup_timestamp)" "$*"
+}
+
+log_setup_warn() {
+  printf '[%s] WARNING: %s\n' "$(log_setup_timestamp)" "$*" >&2
+}
+
+log_setup_error() {
+  printf '[%s] ERROR: %s\n' "$(log_setup_timestamp)" "$*" >&2
+}
+
 # Classify a k6 scenario by its data-setup requirements.
 # Outputs: "readonly", "mutating", or "enrichment"
 scenario_setup_class() {
@@ -17,7 +33,7 @@ scenario_setup_class() {
       printf 'enrichment'
       ;;
     *)
-      echo "ERROR: unknown scenario '$scenario'" >&2
+      log_setup_error "unknown scenario '$scenario'"
       return 1
       ;;
   esac
@@ -36,7 +52,7 @@ scenario_setup_reuse_scope() {
       printf 'per_case'
       ;;
     *)
-      echo "ERROR: unknown scenario '$scenario'" >&2
+      log_setup_error "unknown scenario '$scenario'"
       return 1
       ;;
   esac
@@ -51,16 +67,21 @@ recreate_job() {
   local complete_timeout="$4"
 
   if [ ! -f "$manifest" ]; then
-    echo "ERROR: required benchmark setup manifest does not exist: $manifest" >&2
+    log_setup_error "required benchmark setup manifest does not exist: $manifest"
     return 1
   fi
 
+  log_setup_info "Recreating Kubernetes job ${namespace}/${job_name} from ${manifest##*/} (timeout: ${complete_timeout})..."
   kubectl --context="$SEQUENTIAL_CONTEXT" delete job "$job_name" -n "$namespace" --ignore-not-found
   if kubectl --context="$SEQUENTIAL_CONTEXT" get job "$job_name" -n "$namespace" >/dev/null 2>&1; then
+    log_setup_info "Waiting for previous job ${namespace}/${job_name} deletion..."
     kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=delete "job/${job_name}" -n "$namespace" --timeout=120s
   fi
+  log_setup_info "Applying manifest for ${namespace}/${job_name}..."
   kubectl --context="$SEQUENTIAL_CONTEXT" apply -f "$manifest"
+  log_setup_info "Waiting for ${namespace}/${job_name} completion..."
   kubectl --context="$SEQUENTIAL_CONTEXT" wait --for=condition=complete "job/${job_name}" -n "$namespace" --timeout="$complete_timeout"
+  log_setup_info "Kubernetes job ${namespace}/${job_name} completed."
 }
 
 # Scale down a single deployment.
@@ -68,11 +89,14 @@ scale_down_deployment() {
   local namespace="$1"
   local deployment="$2"
 
+  log_setup_info "Scaling down deployment ${namespace}/${deployment}..."
   kubectl --context="$SEQUENTIAL_CONTEXT" delete hpa "$deployment" -n "$namespace" --ignore-not-found
   if kubectl --context="$SEQUENTIAL_CONTEXT" get deployment "$deployment" -n "$namespace" >/dev/null 2>&1; then
     kubectl --context="$SEQUENTIAL_CONTEXT" scale deployment "$deployment" -n "$namespace" --replicas=0
+    log_setup_info "Waiting for deployment ${namespace}/${deployment} to scale down..."
     kubectl --context="$SEQUENTIAL_CONTEXT" rollout status "deployment/${deployment}" -n "$namespace" --timeout=300s
   fi
+  log_setup_info "Deployment ${namespace}/${deployment} is scaled down or absent."
 }
 
 # Scale down the active architecture (both mono and msa handled).
@@ -96,15 +120,20 @@ restore_active() {
   local architecture="$1"
   local svc
 
+  log_setup_info "Restoring active ${architecture} workloads with ${SCALING_MODE} overlay..."
   if [ "$architecture" = "monolith" ]; then
     kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/cloud/monolith/overlays/$SCALING_MODE"
+    log_setup_info "Waiting for deployment mono/monolith rollout..."
     kubectl --context="$SEQUENTIAL_CONTEXT" rollout status deployment/monolith -n mono --timeout=300s
+    log_setup_info "Active ${architecture} workloads restored."
     return
   fi
   kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/cloud/microservices/overlays/$SCALING_MODE"
   for svc in auth-service item-service transaction-service api-gateway; do
+    log_setup_info "Waiting for deployment msa/${svc} rollout..."
     kubectl --context="$SEQUENTIAL_CONTEXT" rollout status "deployment/${svc}" -n msa --timeout=300s
   done
+  log_setup_info "Active ${architecture} workloads restored."
 }
 
 # Reset and seed benchmark data for one architecture.
@@ -112,6 +141,7 @@ restore_active() {
 reset_seed_active() {
   local architecture="$1"
 
+  log_setup_info "Starting reset + seed workflow for ${architecture}..."
   scale_down_active "$architecture"
   if [ "$architecture" = "monolith" ]; then
     recreate_job mono reset-monolith-data-job "$RENDER_ROOT/deployments/k8s/cloud/monolith/reset-monolith-data-job.yaml" 120s
@@ -121,6 +151,7 @@ reset_seed_active() {
     recreate_job msa seed-microservices-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/microservices/seed-microservices-benchmark-data-job.yaml" 300s
   fi
   restore_active "$architecture"
+  log_setup_info "Reset + seed workflow finished for ${architecture}."
 }
 
 # Prepare enrichment data for one architecture (for enriched-transactions and mixed-workload).
@@ -128,6 +159,7 @@ reset_seed_active() {
 prepare_enrichment_active() {
   local architecture="$1"
 
+  log_setup_info "Starting enrichment preparation workflow for ${architecture}..."
   scale_down_active "$architecture"
   if [ "$architecture" = "monolith" ]; then
     recreate_job mono prepare-monolith-enrichment-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/monolith/prepare-monolith-enrichment-benchmark-data-job.yaml" 600s
@@ -135,6 +167,7 @@ prepare_enrichment_active() {
     recreate_job msa prepare-microservices-enrichment-benchmark-data-job "$RENDER_ROOT/deployments/k8s/cloud/microservices/prepare-microservices-enrichment-benchmark-data-job.yaml" 600s
   fi
   restore_active "$architecture"
+  log_setup_info "Enrichment preparation workflow finished for ${architecture}."
 }
 
 # Run scenario-appropriate data setup for one architecture.
@@ -145,6 +178,7 @@ run_scenario_data_setup() {
   local setup_class
 
   setup_class="$(scenario_setup_class "$scenario")"
+  log_setup_info "Running scenario data setup for ${architecture}/${scenario} (class: ${setup_class})..."
   case "$setup_class" in
     readonly)
       reset_seed_active "$architecture"
@@ -157,4 +191,5 @@ run_scenario_data_setup() {
       prepare_enrichment_active "$architecture"
       ;;
   esac
+  log_setup_info "Scenario data setup completed for ${architecture}/${scenario}."
 }
