@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+BENCHMARK_AWS_ENV_PREPARED_FOR=""
+
 benchmark_aws_provider() {
   printf '%s' "${CLOUD_PROVIDER:-aws}"
 }
@@ -36,14 +38,20 @@ prepare_benchmark_aws_env() {
   local provider
 
   provider="$(benchmark_aws_provider)"
+  if [[ "$BENCHMARK_AWS_ENV_PREPARED_FOR" = "$provider" ]]; then
+    return 0
+  fi
+
   case "$provider" in
     aws)
+      BENCHMARK_AWS_ENV_PREPARED_FOR="$provider"
       return 0
       ;;
     vultr)
       source scripts/lib/vultr-s3-credentials.sh
-      load_vultr_s3_credentials
+      load_vultr_s3_credentials || return 1
       export AWS_REGION="${AWS_REGION:-ap-southeast-1}"
+      BENCHMARK_AWS_ENV_PREPARED_FOR="$provider"
       return 0
       ;;
     *)
