@@ -14,7 +14,7 @@ fetch_benchmark_timing_s3_artifact() {
   local error_file
 
   error_file="$(mktemp)"
-  if output="$(aws s3 cp "${s3_uri%/}/${artifact_name}" - 2>"$error_file")"; then
+  if output="$(benchmark_aws s3 cp "${s3_uri%/}/${artifact_name}" - 2>"$error_file")"; then
     rm -f "$error_file"
     printf '%s' "$output"
     return 0

@@ -16,6 +16,7 @@ fi
 
 source scripts/lib/cloud-provider.sh
 load_cloud_provider_env
+source scripts/lib/benchmark-aws-credentials.sh
 
 if [ -n "$explicit_aws_region" ]; then
   AWS_REGION="$explicit_aws_region"
@@ -323,7 +324,7 @@ fi
 
 fetch_s3_artifact() {
   local artifact_name="$1"
-  aws s3 cp "${S3_URI%/}/${artifact_name}" - 2>/dev/null || true
+  benchmark_aws s3 cp "${S3_URI%/}/${artifact_name}" - 2>/dev/null || true
 }
 
 thresholds_json="$(fetch_s3_artifact thresholds.json)"

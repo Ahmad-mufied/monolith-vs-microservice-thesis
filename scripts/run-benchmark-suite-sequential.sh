@@ -22,6 +22,7 @@ fi
 
 source scripts/lib/cloud-provider.sh
 load_cloud_provider_env
+source scripts/lib/benchmark-aws-credentials.sh
 source scripts/lib/resource-configuration.sh
 source scripts/lib/benchmark-preflight.sh
 source scripts/lib/benchmark-timing.sh
@@ -319,7 +320,7 @@ architecture_has_pending_cases() {
     [ -z "$scenario" ] && continue
     for target_rps in $scenario_rps_levels; do
       case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
-      if ! aws s3 ls "${case_s3_uri}/result-status.json" >/dev/null 2>&1; then
+      if ! benchmark_aws s3 ls "${case_s3_uri}/result-status.json" >/dev/null 2>&1; then
         return 0
       fi
     done
@@ -334,7 +335,7 @@ case_missing_in_s3() {
   local target_rps="$3"
   local case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
 
-  ! aws s3 ls "${case_s3_uri}/result-status.json" >/dev/null 2>&1
+  ! benchmark_aws s3 ls "${case_s3_uri}/result-status.json" >/dev/null 2>&1
 }
 
 count_pending_scenario_cases_from() {
@@ -626,7 +627,7 @@ jq -n \
   --argjson scenario_rps_matrix "$(matrix_json)" \
   '{provider:$provider, execution_mode:"sequential", terraform_stack:$terraform_stack, run_id:$run_id, attempt:$attempt, scaling_mode:$scaling_mode, k6_profile:$k6_profile, test_duration:$test_duration, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, architecture_order:$architecture_order, scenario_rps_matrix:$scenario_rps_matrix, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc}' \
   > "$manifest_path"
-aws s3 cp "$manifest_path" "${S3_RUN_URI}/_suite/manifest.json" >/dev/null
+benchmark_aws s3 cp "$manifest_path" "${S3_RUN_URI}/_suite/manifest.json" >/dev/null
 
 suite_failed=0
 total_cases=0
@@ -667,7 +668,7 @@ for architecture in $ARCHITECTURE_ORDER; do
       case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
 
       echo "Checking if case already exists in S3: ${architecture}/${scenario}/${target_rps}rps"
-      result_status_json="$(aws s3 cp "${case_s3_uri}/result-status.json" - 2>/dev/null || true)"
+      result_status_json="$(benchmark_aws s3 cp "${case_s3_uri}/result-status.json" - 2>/dev/null || true)"
       if [ -n "$result_status_json" ] && jq -e . >/dev/null 2>&1 <<<"$result_status_json"; then
         echo "=== Case already completed in S3: ${architecture}/${scenario}/${target_rps}rps (SKIPPING RUN) ==="
         k6_exit_code="$(jq -r '.k6_exit_code // "null"' <<<"$result_status_json")"
@@ -675,7 +676,7 @@ for architecture in $ARCHITECTURE_ORDER; do
         classification_hint="$(jq -r '.classification_hint // "unknown"' <<<"$result_status_json")"
         
         # Download thresholds.json if it exists to classify properly
-        thresholds_json="$(aws s3 cp "${case_s3_uri}/thresholds.json" - 2>/dev/null || true)"
+        thresholds_json="$(benchmark_aws s3 cp "${case_s3_uri}/thresholds.json" - 2>/dev/null || true)"
         
         case_exit_code=0
         if [ "$s3_exit_code" != "0" ] || [ "$classification_hint" = "runtime_failed" ] || { [ "$k6_exit_code" != "null" ] && [ "$k6_exit_code" != "0" ] && [ "$k6_exit_code" != "99" ]; }; then
@@ -829,7 +830,7 @@ jq -s \
   --slurpfile phases "$PHASES_JSONL" \
   '{provider:$provider, execution_mode:"sequential", terraform_stack:$terraform_stack, run_id:$run_id, attempt:$attempt, suite_status:$suite_status, architecture_order:$architecture_order, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc, finished_at_utc:$finished_at_utc, architecture_phases:$phases, cases:.}' \
   "$CASES_JSONL" > "$summary_path"
-aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary.json" >/dev/null
+benchmark_aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary.json" >/dev/null
 
 if [ "$AUTO_DESTROY_CONFIRMED" = "true" ]; then
   make "$(provider_sequential_destroy_target)"

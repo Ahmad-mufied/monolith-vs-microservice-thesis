@@ -22,6 +22,11 @@ terraform -chdir=infra/terraform/aws-s3-writer output -raw vultr_k6_s3_secret_ac
 `make aws-s3-writer-apply` first, so the standard Vultr apply flow prepares the
 S3 writer before creating cluster infrastructure. Manual `AWS_ACCESS_KEY_ID`
 and `AWS_SECRET_ACCESS_KEY` values in `env/vultr.env` remain a fallback only.
+The same credential source is also used by the local Vultr benchmark runners
+for benchmark preflight, suite manifest/summary uploads, resume checks, and
+artifact inspection. If you rotate or recreate the writer, rerun
+`make create-secrets` so the in-cluster `k6-runner-secret` matches the local
+runner path again.
 
 Application secrets reuse the current Kubernetes Secret names consumed by the
 cloud manifests. PostgreSQL URLs point to Vultr private VPC IPs from Terraform
