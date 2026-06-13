@@ -41,6 +41,7 @@ AUTO_DESTROY_CONFIRMED="${AUTO_DESTROY_CONFIRMED:-false}"
 SKIP_BENCHMARK_PREFLIGHT="${SKIP_BENCHMARK_PREFLIGHT:-false}"
 SEQUENTIAL_RESUME_SKIP_READY_DEPLOY="${SEQUENTIAL_RESUME_SKIP_READY_DEPLOY:-true}"
 SEQUENTIAL_CASE_OVERHEAD_SECONDS="${SEQUENTIAL_CASE_OVERHEAD_SECONDS:-180}"
+SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS="${SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS:-60}"
 SEQUENTIAL_RETRY_BUFFER_SECONDS="${SEQUENTIAL_RETRY_BUFFER_SECONDS:-0}"
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
 DATADOG_ENV="${DATADOG_ENV:-benchmark}"
@@ -245,22 +246,24 @@ print_case_eta() {
   local architecture_count="${11}"
   local case_seconds="${12}"
   local k6_case_seconds="${13}"
-  local pending_scenario_cases="${14}"
-  local pending_current_architecture_cases="${15}"
-  local pending_future_architecture_cases="${16}"
+  local eta_mode="${14}"
+  local pending_scenario_cases="${15}"
+  local pending_current_architecture_cases="${16}"
+  local pending_future_architecture_cases="${17}"
+  local scenario_remaining_case_seconds="${18}"
+  local suite_remaining_case_seconds="${19}"
   local now_epoch case_eta_epoch scenario_eta_epoch suite_eta_epoch
-  local suite_pending_cases suite_remaining_case_seconds suite_remaining_delay_seconds
+  local suite_pending_cases suite_remaining_delay_seconds
 
   now_epoch="$(date +%s)"
   case_eta_epoch=$((now_epoch + case_seconds))
 
-  scenario_eta_epoch=$((now_epoch + (pending_scenario_cases * case_seconds)))
+  scenario_eta_epoch=$((now_epoch + scenario_remaining_case_seconds))
   if [ "$pending_scenario_cases" -gt 1 ]; then
     scenario_eta_epoch=$((scenario_eta_epoch + ((pending_scenario_cases - 1) * INTER_CASE_DELAY)))
   fi
 
   suite_pending_cases=$((pending_current_architecture_cases + pending_future_architecture_cases))
-  suite_remaining_case_seconds=$((suite_pending_cases * case_seconds))
   suite_remaining_delay_seconds=0
   if [ "$pending_current_architecture_cases" -gt 1 ]; then
     suite_remaining_delay_seconds=$((suite_remaining_delay_seconds + ((pending_current_architecture_cases - 1) * INTER_CASE_DELAY)))
@@ -280,7 +283,8 @@ print_case_eta() {
   echo "  est_scenario  : $(format_eta_epoch "$scenario_eta_epoch")"
   echo "  est_suite     : $(format_eta_epoch "$suite_eta_epoch")"
   echo "  pending       : scenario=${pending_scenario_cases}, architecture=${pending_current_architecture_cases}, future_architecture=${pending_future_architecture_cases}"
-  echo "  eta_basis     : k6=$(format_duration "$k6_case_seconds") + overhead=$(format_duration "$SEQUENTIAL_CASE_OVERHEAD_SECONDS") + retry_buffer=$(format_duration "$SEQUENTIAL_RETRY_BUFFER_SECONDS") + configured delays"
+  echo "  eta_basis     : k6=$(format_duration "$k6_case_seconds") + full_overhead=$(format_duration "$SEQUENTIAL_CASE_OVERHEAD_SECONDS") or reused_overhead=$(format_duration "$SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS") + retry_buffer=$(format_duration "$SEQUENTIAL_RETRY_BUFFER_SECONDS") + configured delays"
+  echo "  eta_mode      : $eta_mode"
 }
 
 validate_supported_scenario() {
@@ -369,6 +373,46 @@ scenario_has_pending_cases() {
   return 1
 }
 
+count_pending_scenario_cases() {
+  local architecture="$1"
+  local current_scenario="$2"
+  local scenario scenario_rps_levels target_rps
+  local count=0
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ "$scenario" = "$current_scenario" ] || continue
+    for target_rps in $scenario_rps_levels; do
+      if case_missing_in_s3 "$architecture" "$scenario" "$target_rps"; then
+        count=$((count + 1))
+      fi
+    done
+  done < "$MATRIX_TSV"
+
+  printf '%s\n' "$count"
+}
+
+scenario_pending_case_seconds() {
+  local scope="$1"
+  local pending_case_count="$2"
+  local setup_already_done="$3"
+
+  if [ "$pending_case_count" -le 0 ]; then
+    printf '0\n'
+    return
+  fi
+
+  if [ "$scope" = "per_scenario" ]; then
+    if [ "$setup_already_done" = "true" ]; then
+      printf '%s\n' $((pending_case_count * REUSED_CASE_ESTIMATE_SECONDS))
+      return
+    fi
+    printf '%s\n' $((CASE_ESTIMATE_SECONDS + ((pending_case_count - 1) * REUSED_CASE_ESTIMATE_SECONDS)))
+    return
+  fi
+
+  printf '%s\n' $((pending_case_count * CASE_ESTIMATE_SECONDS))
+}
+
 count_pending_scenario_cases_from() {
   local current_scenario="$1"
   local current_target_rps="$2"
@@ -441,6 +485,68 @@ count_pending_future_architecture_cases() {
   done
 
   printf '%s\n' "$count"
+}
+
+count_pending_architecture_case_seconds_from() {
+  local architecture="$1"
+  local current_scenario="$2"
+  local current_target_rps="$3"
+  local scenario scenario_rps_levels target_rps
+  local count=0
+  local seen_current=false
+  local total_seconds=0
+  local scope pending_case_count
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ -z "$scenario" ] && continue
+    for target_rps in $scenario_rps_levels; do
+      if [ "$scenario" = "$current_scenario" ] && [ "$target_rps" = "$current_target_rps" ]; then
+        seen_current=true
+        pending_case_count="$(count_pending_scenario_cases_from "$current_scenario" "$current_target_rps" "$architecture")"
+        scope="$(scenario_setup_reuse_scope "$current_scenario")"
+        total_seconds=$((total_seconds + $(scenario_pending_case_seconds "$scope" "$pending_case_count" "true")))
+        break
+      fi
+    done
+
+    if [ "$seen_current" = "true" ] && [ "$scenario" != "$current_scenario" ]; then
+      pending_case_count="$(count_pending_scenario_cases "$architecture" "$scenario")"
+      if [ "$pending_case_count" -gt 0 ]; then
+        scope="$(scenario_setup_reuse_scope "$scenario")"
+        total_seconds=$((total_seconds + $(scenario_pending_case_seconds "$scope" "$pending_case_count" "false")))
+      fi
+    fi
+  done < "$MATRIX_TSV"
+
+  printf '%s\n' "$total_seconds"
+}
+
+count_pending_future_architecture_case_seconds() {
+  local current_architecture="$1"
+  local architecture scenario
+  local total_seconds=0
+  local seen_current_architecture=false
+  local pending_case_count scope
+
+  for architecture in $ARCHITECTURE_ORDER; do
+    if [ "$architecture" = "$current_architecture" ]; then
+      seen_current_architecture=true
+      continue
+    fi
+    [ "$seen_current_architecture" = "true" ] || continue
+
+    while IFS=$'\t' read -r scenario _; do
+      [ -z "$scenario" ] && continue
+      pending_case_count="$(count_pending_scenario_cases "$architecture" "$scenario")"
+      if [ "$pending_case_count" -le 0 ]; then
+        continue
+      fi
+      scope="$(scenario_setup_reuse_scope "$scenario")"
+      total_seconds=$((total_seconds + $(scenario_pending_case_seconds "$scope" "$pending_case_count" "false")))
+    done < "$MATRIX_TSV"
+  done
+
+  printf '%s\n' "$total_seconds"
 }
 
 deployment_ready_with_image_tag() {
@@ -635,10 +741,12 @@ validate_architecture_order
 validate_seconds_value "INTER_CASE_DELAY" "$INTER_CASE_DELAY"
 validate_seconds_value "ARCHITECTURE_SWITCH_DELAY" "$ARCHITECTURE_SWITCH_DELAY"
 validate_seconds_value "SEQUENTIAL_CASE_OVERHEAD_SECONDS" "$SEQUENTIAL_CASE_OVERHEAD_SECONDS"
+validate_seconds_value "SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS" "$SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS"
 validate_seconds_value "SEQUENTIAL_RETRY_BUFFER_SECONDS" "$SEQUENTIAL_RETRY_BUFFER_SECONDS"
 build_matrix_file
 K6_CASE_ESTIMATE_SECONDS="$(estimate_case_duration_seconds)"
 CASE_ESTIMATE_SECONDS=$((K6_CASE_ESTIMATE_SECONDS + SEQUENTIAL_CASE_OVERHEAD_SECONDS + SEQUENTIAL_RETRY_BUFFER_SECONDS))
+REUSED_CASE_ESTIMATE_SECONDS=$((K6_CASE_ESTIMATE_SECONDS + SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS + SEQUENTIAL_RETRY_BUFFER_SECONDS))
 
 if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
   BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_or_die "$S3_BUCKET" "sequential suite bootstrap" "false"
@@ -782,6 +890,13 @@ for architecture in $ARCHITECTURE_ORDER; do
         continue
       fi
 
+      current_case_estimate_seconds="$CASE_ESTIMATE_SECONDS"
+      current_eta_mode="per_case_setup"
+      if [ "$scenario_skip_case_setup" = "true" ]; then
+        current_case_estimate_seconds="$REUSED_CASE_ESTIMATE_SECONDS"
+        current_eta_mode="per_scenario_reuse"
+      fi
+
       print_case_eta \
         "$architecture" \
         "$scenario" \
@@ -794,11 +909,14 @@ for architecture in $ARCHITECTURE_ORDER; do
         "$total_cases" \
         "$architecture_index" \
         "$architecture_count" \
-        "$CASE_ESTIMATE_SECONDS" \
+        "$current_case_estimate_seconds" \
         "$K6_CASE_ESTIMATE_SECONDS" \
+        "$current_eta_mode" \
         "$(count_pending_scenario_cases_from "$scenario" "$target_rps" "$architecture")" \
         "$(count_pending_architecture_cases_from "$architecture" "$scenario" "$target_rps")" \
-        "$(count_pending_future_architecture_cases "$architecture")"
+        "$(count_pending_future_architecture_cases "$architecture")" \
+        "$(scenario_pending_case_seconds "$(scenario_setup_reuse_scope "$scenario")" "$(count_pending_scenario_cases_from "$scenario" "$target_rps" "$architecture")" "$scenario_skip_case_setup")" \
+        "$(( $(count_pending_architecture_case_seconds_from "$architecture" "$scenario" "$target_rps") + $(count_pending_future_architecture_case_seconds "$architecture") ))"
 
       case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       set +e
