@@ -16,6 +16,7 @@ K6_OPTIONS_PATH="${K6_OPTIONS_PATH:-$RESULT_DIR/k6-options.json}"
 THRESHOLDS_PATH="${THRESHOLDS_PATH:-$RESULT_DIR/thresholds.json}"
 DATADOG_TIME_WINDOW_PATH="${DATADOG_TIME_WINDOW_PATH:-$RESULT_DIR/datadog-time-window.json}"
 RESULT_STATUS_PATH="${RESULT_STATUS_PATH:-$RESULT_DIR/result-status.json}"
+STATUS_SUMMARY_PATH="${STATUS_SUMMARY_PATH:-$RESULT_DIR/status-summary.json}"
 
 export SUMMARY_PATH
 export METADATA_PARTIAL_PATH
@@ -66,6 +67,88 @@ for value_name in TARGET_RPS_VALUE PRE_ALLOCATED_VUS_VALUE MAX_VUS_VALUE; do
   fi
 done
 unset value_name value
+
+duration_seconds() {
+  local raw="$1"
+  local number unit
+
+  if [[ "$raw" =~ ^([0-9]+)(ms|s|m|h)$ ]]; then
+    number="${BASH_REMATCH[1]}"
+    unit="${BASH_REMATCH[2]}"
+    case "$unit" in
+      ms)
+        echo 0
+        ;;
+      s)
+        echo "$number"
+        ;;
+      m)
+        echo $((number * 60))
+        ;;
+      h)
+        echo $((number * 3600))
+        ;;
+    esac
+    return 0
+  fi
+
+  echo 0
+}
+
+sum_stage_duration_seconds() {
+  local stages_json="$1"
+  local total=0
+  local stage_duration=""
+
+  while IFS= read -r stage_duration; do
+    [ -z "$stage_duration" ] && continue
+    total=$((total + $(duration_seconds "$stage_duration")))
+  done < <(jq -r '.[]?.duration // empty' <<<"$stages_json")
+
+  echo "$total"
+}
+
+configured_duration_seconds() {
+  local profile="${K6_PROFILE:-steady}"
+  local custom_stages_json="${RAMP_STAGES_JSON:-}"
+
+  if [ -n "$custom_stages_json" ]; then
+    if ! jq -e 'type == "array"' >/dev/null 2>&1 <<<"$custom_stages_json"; then
+      echo "ERROR: RAMP_STAGES_JSON must be a JSON array when set." >&2
+      exit 1
+    fi
+
+    sum_stage_duration_seconds "$custom_stages_json"
+    return 0
+  fi
+
+  case "$profile" in
+    smoke|steady)
+      duration_seconds "$TEST_DURATION_VALUE"
+      ;;
+    ramp)
+      echo $(( \
+        $(duration_seconds "${RAMP_UP_DURATION:-1m}") + \
+        $(duration_seconds "$TEST_DURATION_VALUE") + \
+        $(duration_seconds "${RAMP_DOWN_DURATION:-30s}") \
+      ))
+      ;;
+    hpa)
+      echo $(( \
+        $(duration_seconds "${HPA_RAMP_UP_1:-2m}") + \
+        $(duration_seconds "${HPA_RAMP_UP_2:-2m}") + \
+        $(duration_seconds "${HPA_RAMP_UP_3:-3m}") + \
+        $(duration_seconds "${HPA_HOLD:-5m}") + \
+        $(duration_seconds "${HPA_RAMP_DOWN:-1m}") \
+      ))
+      ;;
+    *)
+      duration_seconds "$TEST_DURATION_VALUE"
+      ;;
+  esac
+}
+
+CONFIGURED_DURATION_SECONDS="$(configured_duration_seconds)"
 
 IMAGES_JSON="$(json_env_or IMAGES_JSON '[]')"
 SEED_SIZE_JSON="$(json_env_or SEED_SIZE_JSON 'null')"
@@ -211,6 +294,15 @@ if [ -f "$RAW_PATH" ]; then
   gzip -f "$RAW_PATH"
 fi
 
+status_summary_present=false
+if [ -f "${RAW_PATH}.gz" ]; then
+  if "$SCRIPT_DIR/build-status-summary.sh" "${RAW_PATH}.gz" "$STATUS_SUMMARY_PATH" "$CONFIGURED_DURATION_SECONDS" "$TARGET_RPS_VALUE"; then
+    status_summary_present=true
+  else
+    echo "WARNING: failed to generate status-summary.json from raw k6 output" >&2
+  fi
+fi
+
 if [ -f "$METADATA_PARTIAL_PATH" ]; then
   METADATA_MERGED_PATH="$RESULT_DIR/metadata.merged.json"
   jq -s '.[0] * .[1]' "$METADATA_PATH" "$METADATA_PARTIAL_PATH" > "$METADATA_MERGED_PATH"
@@ -257,11 +349,12 @@ s3_upload_attempted=false
 
 jq -n \
   --argjson k6_exit_code "$STATUS" \
-  --argjson artifacts_generated "$( [ "$summary_present" = true ] && [ "$thresholds_present" = true ] && [ "$metadata_present" = true ] && printf 'true' || printf 'false' )" \
+  --argjson artifacts_generated "$( [ "$summary_present" = true ] && [ "$thresholds_present" = true ] && [ "$metadata_present" = true ] && [ "$status_summary_present" = true ] && printf 'true' || printf 'false' )" \
   --argjson summary_file_present "$( [ "$summary_present" = true ] && printf 'true' || printf 'false' )" \
   --argjson thresholds_file_present "$( [ "$thresholds_present" = true ] && printf 'true' || printf 'false' )" \
   --argjson metadata_file_present "$( [ "$metadata_present" = true ] && printf 'true' || printf 'false' )" \
   --argjson raw_file_present "$( [ "$raw_gzip_present" = true ] && printf 'true' || printf 'false' )" \
+  --argjson status_summary_file_present "$( [ "$status_summary_present" = true ] && printf 'true' || printf 'false' )" \
   --arg classification_hint "$classification_hint" \
   '{
     k6_exit_code: $k6_exit_code,
@@ -271,6 +364,7 @@ jq -n \
     thresholds_file_present: $thresholds_file_present,
     metadata_file_present: $metadata_file_present,
     raw_file_present: $raw_file_present,
+    status_summary_file_present: $status_summary_file_present,
     classification_hint: $classification_hint
   }' > "$RESULT_STATUS_PATH"
 

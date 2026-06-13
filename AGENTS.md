@@ -299,8 +299,9 @@ Results upload to S3 before infrastructure is destroyed:
 s3://{bucket}/experiments/{run_id}/{architecture}/{scenario}/{rps}rps/{attempt}/
 ```
 
-Required files: `summary.json`, `raw.json.gz`, `stdout.log`, `metadata.json`,
-`k6-options.json`, `thresholds.json`, `result-status.json`.
+Required files: `summary.json`, `raw.json.gz`, `status-summary.json`,
+`stdout.log`, `metadata.json`, `k6-options.json`, `thresholds.json`,
+`result-status.json`.
 
 `metadata.json` is the source of truth for analysis automation and for
 determining whether an attempt used HPA or fixed replicas.

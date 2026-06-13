@@ -50,11 +50,17 @@ The main evidence comes from k6 artifacts:
 ```text
 summary.json
 raw.json.gz
+status-summary.json
 stdout.log
 metadata.json
 ```
 
 Datadog is used as supporting evidence to explain why the k6 result occurred.
+
+`summary.json` preserves the original aggregate k6 view. When overload handling
+returns bounded non-success responses, `status-summary.json` should be used to
+separate successful `2xx` latency and goodput from overload/error responses
+before drawing conclusions from latency percentiles.
 
 Conceptual relationship:
 
@@ -727,6 +733,7 @@ A measured run is considered valid only if:
 ```text
 summary.json exists
 raw.json.gz exists
+status-summary.json exists
 stdout.log exists
 metadata.json exists
 target RPS and achieved RPS are recorded

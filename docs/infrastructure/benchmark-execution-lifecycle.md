@@ -265,6 +265,7 @@ Required files per attempt:
 ```text
 summary.json
 raw.json.gz
+status-summary.json
 stdout.log
 metadata.json
 result-status.json
@@ -303,6 +304,16 @@ blocks when the run was executed through a suite runner. Attempt
 `metadata.json` remains the source of truth for attempt-local timing.
 
 Raw collection must stay separated by attempt.
+
+`summary.json` is kept as the original k6 aggregate summary. Because aggregate
+latency percentiles can mix successful and overload responses, each attempt also
+writes `status-summary.json` as a derived artifact from `raw.json.gz`. This file
+groups `http_req_duration` points by HTTP response status and status family,
+then records counts, configured RPS, target-achievement ratios, successful
+`2xx` latency, non-`2xx` latency, and per-status latency percentiles. When
+workload tags are present, it includes both `all_http_requests` and
+`workload_http_requests` scopes so setup traffic does not pollute final workload
+analysis.
 
 Aggregated data should be produced later during analysis.
 
