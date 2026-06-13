@@ -443,6 +443,12 @@ Mechanism for `run-benchmark-suite` in Vultr sequential mode:
 8. Sleep `ARCHITECTURE_SWITCH_DELAY` before switching to the next architecture.
 9. Upload suite summary to S3 after all phases finish.
 
+For the thesis-methodology version of this flow, including Mermaid diagrams for
+the sequential suite lifecycle, data setup decision, and inter-case gap
+components, see
+[`docs/diagrams/vultr-sequential-suite-lifecycle.md`](../diagrams/vultr-sequential-suite-lifecycle.md).
+
+
 Common suite examples:
 
 ```bash

@@ -194,6 +194,11 @@ before the k6 job by default. The optimized reuse behavior applies in suite
 mode, where the suite can explicitly reuse one prepared dataset across multiple
 pending RPS levels for data-stable scenarios.
 
+For the Vultr sequential suite lifecycle diagram and the data setup decision
+flowchart used by the final operator path, see
+[`docs/diagrams/vultr-sequential-suite-lifecycle.md`](../diagrams/vultr-sequential-suite-lifecycle.md).
+
+
 Measured final suites should use `INTER_CASE_DELAY` between independent cases.
 Recommended values are `120` seconds for fixed mode and `300` seconds for HPA
 mode. The value must be an integer number of seconds, so use `300` for five

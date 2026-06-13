@@ -13,6 +13,7 @@ thesis writing.
 | [`cloud-architecture.md`](cloud-architecture.md) | Historical AWS-oriented infrastructure topology retained for engineering reference |
 | [`sequential-parallel-topology.md`](sequential-parallel-topology.md) | Historical AWS-oriented parallel vs sequential topology retained for engineering reference |
 | [`vultr-vke-topology.md`](vultr-vke-topology.md) | Active Vultr VKE parallel, sequential, and end-to-end execution topology |
+| [`vultr-sequential-suite-lifecycle.md`](vultr-sequential-suite-lifecycle.md) | Vultr sequential suite lifecycle, data setup decision, and inter-case gap breakdown for thesis methodology |
 | [`architecture-comparison.md`](architecture-comparison.md) | Side-by-side monolith and microservices runtime comparison |
 | [`benchmark-lifecycle.md`](benchmark-lifecycle.md) | End-to-end benchmark execution lifecycle |
 | [`login-sequence.md`](login-sequence.md) | Benchmark 1 login request flow |
@@ -20,7 +21,9 @@ thesis writing.
 | [`enriched-transactions-sequence.md`](enriched-transactions-sequence.md) | Benchmark 3 enriched transaction read flow |
 
 For Vultr benchmark runs, prefer
-[`vultr-vke-topology.md`](vultr-vke-topology.md) together with
+[`vultr-vke-topology.md`](vultr-vke-topology.md) and
+[`vultr-sequential-suite-lifecycle.md`](vultr-sequential-suite-lifecycle.md)
+together with
 `docs/infrastructure/vultr-complete-architecture.md` and
 `docs/infrastructure/vultr-operator-guide.md`. The AWS-oriented diagrams remain
 available as historical engineering references.
