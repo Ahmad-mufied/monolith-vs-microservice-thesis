@@ -352,6 +352,23 @@ case_missing_in_s3() {
   ! benchmark_aws s3 ls "${case_s3_uri}/result-status.json" >/dev/null 2>&1
 }
 
+scenario_has_pending_cases() {
+  local architecture="$1"
+  local current_scenario="$2"
+  local scenario scenario_rps_levels target_rps
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ "$scenario" = "$current_scenario" ] || continue
+    for target_rps in $scenario_rps_levels; do
+      if case_missing_in_s3 "$architecture" "$scenario" "$target_rps"; then
+        return 0
+      fi
+    done
+  done < "$MATRIX_TSV"
+
+  return 1
+}
+
 count_pending_scenario_cases_from() {
   local current_scenario="$1"
   local current_target_rps="$2"
@@ -666,11 +683,13 @@ for architecture in $ARCHITECTURE_ORDER; do
   phase_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "=== Sequential Architecture: ${architecture} ==="
   phase_has_pending_cases=false
+  phase_deployed_now=false
   if architecture_has_pending_cases "$architecture"; then
     phase_has_pending_cases=true
     if [ "$SEQUENTIAL_RESUME_SKIP_READY_DEPLOY" = "true" ] && architecture_ready_for_resume "$architecture"; then
       echo "Architecture ${architecture} is already ready with IMAGE_TAG=${IMAGE_TAG} and SCALING_MODE=${SCALING_MODE}; skipping resume redeploy."
     else
+      phase_deployed_now=true
       ARCHITECTURE="$architecture" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="$IMAGE_TAG" AWS_REGION="$AWS_REGION" ECR_NAMESPACE="$ECR_NAMESPACE" CLOUD_PROVIDER="$CLOUD_PROVIDER" DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" bash scripts/deploy-sequential-architecture.sh
     fi
   else
@@ -678,10 +697,35 @@ for architecture in $ARCHITECTURE_ORDER; do
   fi
 
   completed_architecture_cases=0
+  architecture_ran_case=false
   while IFS=$'\t' read -r scenario scenario_rps_levels; do
     [ -z "$scenario" ] && continue
     scenario_case_index=0
     scenario_case_count="$(wc -w <<<"$scenario_rps_levels" | tr -d '[:space:]')"
+    scenario_skip_case_setup=false
+
+    if scenario_has_pending_cases "$architecture" "$scenario"; then
+      setup_reuse_scope="$(scenario_setup_reuse_scope "$scenario")"
+      if [ "$setup_reuse_scope" = "per_scenario" ]; then
+        setup_class="$(scenario_setup_class "$scenario")"
+        echo "=== Sequential Scenario Setup ==="
+        echo "  architecture  : $architecture"
+        echo "  scenario      : $scenario"
+        echo "  setup_scope   : $setup_reuse_scope"
+        if [ "$phase_deployed_now" = "true" ] && [ "$architecture_ran_case" = "false" ]; then
+          if [ "$setup_class" = "enrichment" ]; then
+            echo "  action        : prepare enrichment once using fresh deploy baseline"
+            prepare_enrichment_active "$architecture"
+          else
+            echo "  action        : reuse fresh deploy reset+seed baseline"
+          fi
+        else
+          echo "  action        : run scenario setup once before pending RPS cases"
+          run_scenario_data_setup "$architecture" "$scenario"
+        fi
+        scenario_skip_case_setup=true
+      fi
+    fi
 
     for target_rps in $scenario_rps_levels; do
       scenario_case_index=$((scenario_case_index + 1))
@@ -774,6 +818,7 @@ for architecture in $ARCHITECTURE_ORDER; do
       ECR_NAMESPACE="$ECR_NAMESPACE" \
       CLOUD_PROVIDER="$CLOUD_PROVIDER" \
       DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
+      SKIP_SCENARIO_DATA_SETUP="$scenario_skip_case_setup" \
       IMAGE_TAG="$IMAGE_TAG" \
       bash scripts/run-benchmark-sequential.sh
       case_exit_code=$?
@@ -805,6 +850,7 @@ for architecture in $ARCHITECTURE_ORDER; do
 
       completed_architecture_cases=$((completed_architecture_cases + 1))
       completed_suite_cases=$((completed_suite_cases + 1))
+      architecture_ran_case=true
       if [ "$INTER_CASE_DELAY" != "0" ] && [ "$completed_architecture_cases" -lt "$total_cases" ]; then
         sleep "$INTER_CASE_DELAY"
       fi

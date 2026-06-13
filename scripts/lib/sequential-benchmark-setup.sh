@@ -23,6 +23,25 @@ scenario_setup_class() {
   esac
 }
 
+# Classify whether scenario setup can be reused across multiple RPS levels in
+# sequential suite mode.
+# Outputs: "per_scenario" or "per_case"
+scenario_setup_reuse_scope() {
+  local scenario="$1"
+  case "$scenario" in
+    login|enriched-transactions)
+      printf 'per_scenario'
+      ;;
+    create-transaction|sync-items|concurrent-mixed-workload|mixed-workload)
+      printf 'per_case'
+      ;;
+    *)
+      echo "ERROR: unknown scenario '$scenario'" >&2
+      return 1
+      ;;
+  esac
+}
+
 # Delete a Kubernetes job, wait for deletion, apply new manifest, wait for completion.
 # Args: namespace job_name manifest_path timeout
 recreate_job() {

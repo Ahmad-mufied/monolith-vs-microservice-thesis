@@ -71,6 +71,10 @@ POST /api/v1/auth/login
 
 The scenario uses seeded users and performs one login request per iteration.
 
+In sequential suite mode, the same seeded dataset may be reused across multiple
+pending RPS levels for `login` because the measured workload does not mutate the
+benchmark data.
+
 ### 3.2 Create Transaction
 
 Lifecycle:
@@ -135,6 +139,10 @@ GET /api/v1/admin/transactions
 The enrichment preparation step inserts transactions and transaction_items before the measured read benchmark begins.
 
 That preparation step is not part of the measured k6 result.
+
+In sequential suite mode, the prepared enrichment dataset may be reused across
+multiple pending RPS levels for `enriched-transactions` because the measured
+workload is read-only after setup completes.
 
 ### 3.4 Concurrent Mixed Workload
 
