@@ -166,7 +166,7 @@ Migration does not need to run again in that case.
 
 ## 7. Reset and Seed Policy
 
-Reset and seed are required before every mutating k6 execution. For read-only
+Reset and seed are required before every mutating k6 execution. For data-stable
 scenarios, a single reset and seed before the first RPS level is enough when
 the same dataset remains valid for the whole scenario.
 
@@ -184,7 +184,20 @@ Suite-runner policy:
 | `login` | Once before the first RPS level. |
 | `create-transaction` | Before every RPS level. |
 | `enriched-transactions` | Once before the first RPS level, followed by enrichment preparation. |
-| `mixed-workload` | Treat as mutating unless the workload definition is explicitly changed. |
+| `sync-items` | Before every RPS level. |
+| `concurrent-mixed-workload` | Before every RPS level because it includes a transaction-creation branch. |
+| `mixed-workload` | Before every RPS level because it includes a transaction-creation branch. |
+
+Direct single-case sequential runs remain conservative. If the architecture is
+already deployed, the single-case runner still performs scenario data setup
+before the k6 job by default. The optimized reuse behavior applies in suite
+mode, where the suite can explicitly reuse one prepared dataset across multiple
+pending RPS levels for data-stable scenarios.
+
+For the Vultr sequential suite lifecycle diagram and the data setup decision
+flowchart used by the final operator path, see
+[`docs/diagrams/vultr-sequential-suite-lifecycle.md`](../diagrams/vultr-sequential-suite-lifecycle.md).
+
 
 Measured final suites should use `INTER_CASE_DELAY` between independent cases.
 Recommended values are `120` seconds for fixed mode and `300` seconds for HPA

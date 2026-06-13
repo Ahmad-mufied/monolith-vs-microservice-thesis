@@ -48,6 +48,7 @@ SCALING_MODE="${SCALING_MODE:-fixed}"
 K6_PROFILE="${K6_PROFILE:-steady}"
 ALLOW_NONSTANDARD_SCALING_PROFILE="${ALLOW_NONSTANDARD_SCALING_PROFILE:-false}"
 SKIP_BENCHMARK_PREFLIGHT="${SKIP_BENCHMARK_PREFLIGHT:-false}"
+SKIP_SCENARIO_DATA_SETUP="${SKIP_SCENARIO_DATA_SETUP:-false}"
 TEST_DURATION="${TEST_DURATION:-5m}"
 S3_BUCKET="${S3_BUCKET:?S3_BUCKET is required}"
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
@@ -102,6 +103,14 @@ case "$ALLOW_NONSTANDARD_SCALING_PROFILE" in
   true|false) ;;
   *)
     echo "ERROR: invalid ALLOW_NONSTANDARD_SCALING_PROFILE value '$ALLOW_NONSTANDARD_SCALING_PROFILE' (expected: true|false)" >&2
+    exit 1
+    ;;
+esac
+
+case "$SKIP_SCENARIO_DATA_SETUP" in
+  true|false) ;;
+  *)
+    echo "ERROR: invalid SKIP_SCENARIO_DATA_SETUP value '$SKIP_SCENARIO_DATA_SETUP' (expected: true|false)" >&2
     exit 1
     ;;
 esac
@@ -236,8 +245,12 @@ bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 
 if architecture_already_deployed "$ARCHITECTURE"; then
   echo "Architecture ${ARCHITECTURE} is already deployed with IMAGE_TAG=${IMAGE_TAG} and SCALING_MODE=${SCALING_MODE}; skipping deploy."
-  echo "=== Running scenario data setup for ${SCENARIO} ==="
-  run_scenario_data_setup "$ARCHITECTURE" "$SCENARIO"
+  if [ "$SKIP_SCENARIO_DATA_SETUP" = "true" ]; then
+    echo "=== Skipping scenario data setup for ${SCENARIO} because the sequential suite already prepared it ==="
+  else
+    echo "=== Running scenario data setup for ${SCENARIO} ==="
+    run_scenario_data_setup "$ARCHITECTURE" "$SCENARIO"
+  fi
 else
   echo "=== Deploying ${ARCHITECTURE} (${SCALING_MODE}) ==="
   ARCHITECTURE="$ARCHITECTURE" \

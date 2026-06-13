@@ -443,6 +443,12 @@ Mechanism for `run-benchmark-suite` in Vultr sequential mode:
 8. Sleep `ARCHITECTURE_SWITCH_DELAY` before switching to the next architecture.
 9. Upload suite summary to S3 after all phases finish.
 
+For the thesis-methodology version of this flow, including Mermaid diagrams for
+the sequential suite lifecycle, data setup decision, and inter-case gap
+components, see
+[`docs/diagrams/vultr-sequential-suite-lifecycle.md`](../diagrams/vultr-sequential-suite-lifecycle.md).
+
+
 Common suite examples:
 
 ```bash
@@ -488,17 +494,27 @@ Important distinction:
 - In **parallel mode**, the benchmark runners assume both architectures are
   already deployed; use `deploy-workloads` and `verify-live-mode` first.
 
-Data reset: all scenarios reset once per scenario before the first pending RPS
-level. Enrichment-dependent scenarios also prepare enrichment data after reset.
+Data setup in the sequential suite depends on whether the workload mutates the
+benchmark dataset across RPS levels.
 
-| Scenario | Class | Setup |
-|---|---|---|
-| `login` | readonly | reset + seed |
-| `create-transaction` | mutating | reset + seed |
-| `sync-items` | mutating | reset + seed |
-| `enriched-transactions` | enrichment | reset + seed + prepare enrichment |
-| `concurrent-mixed-workload` | enrichment | reset + seed + prepare enrichment |
-| `mixed-workload` | enrichment | reset + seed + prepare enrichment |
+- Data-stable scenarios reuse one setup across pending RPS cases in the same
+  architecture phase.
+- Mutating scenarios still reset before every pending RPS case.
+- Enrichment preparation is reused only when the workload itself is data-stable.
+
+| Scenario | Class | Setup | Suite setup reuse |
+|---|---|---|---|
+| `login` | readonly | reset + seed | once before the first pending RPS level |
+| `create-transaction` | mutating | reset + seed | before every pending RPS level |
+| `sync-items` | mutating | reset + seed | before every pending RPS level |
+| `enriched-transactions` | enrichment | reset + seed + prepare enrichment | once before the first pending RPS level |
+| `concurrent-mixed-workload` | enrichment | reset + seed + prepare enrichment | before every pending RPS level |
+| `mixed-workload` | enrichment | reset + seed + prepare enrichment | before every pending RPS level |
+
+Direct single-case sequential runs remain conservative: if the target
+architecture is already deployed, the runner still performs scenario data setup
+before the k6 job unless the suite explicitly tells it to reuse a setup that it
+already performed.
 
 Resume: checks S3 for existing `result-status.json`; completed cases are
 skipped. To rerun from scratch, use new `RUN_ID` or `ATTEMPT`.
@@ -540,8 +556,13 @@ SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,250
 make run-benchmark-suite
 ```
 
-ETA: `est_case`, `est_scenario`, `est_suite`. Per-case overhead buffer:
-`SEQUENTIAL_CASE_OVERHEAD_SECONDS=180`.
+ETA: `est_case`, `est_scenario`, `est_suite`.
+
+- `SEQUENTIAL_CASE_OVERHEAD_SECONDS=180` is the full-case overhead buffer used
+  when a case still performs its own reset/seed/setup.
+- `SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS=60` is the lighter overhead buffer
+  used when the sequential suite is reusing one prepared dataset across pending
+  RPS levels for a data-stable scenario.
 
 ### SCENARIO_RPS_MATRIX
 
