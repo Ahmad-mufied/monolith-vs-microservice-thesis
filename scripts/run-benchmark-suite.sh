@@ -30,6 +30,7 @@ fi
 
 source scripts/lib/cloud-provider.sh
 load_cloud_provider_env
+source scripts/lib/benchmark-aws-credentials.sh
 source scripts/lib/resource-configuration.sh
 source scripts/lib/benchmark-preflight.sh
 source scripts/lib/benchmark-timing.sh
@@ -513,7 +514,7 @@ next_attempt_from_s3() {
   local next
 
   listing_error="$(mktemp)"
-  if ! listing="$(aws s3 ls "$run_uri/" --recursive 2>"$listing_error")"; then
+  if ! listing="$(benchmark_aws s3 ls "$run_uri/" --recursive 2>"$listing_error")"; then
     if [ -s "$listing_error" ]; then
       cat "$listing_error" >&2
       rm -f "$listing_error"
@@ -570,7 +571,7 @@ next_attempt_from_s3_per_rps() {
   local attempt_num
 
   listing_error="$(mktemp)"
-  if ! listing="$(aws s3 ls "$run_uri/" --recursive 2>"$listing_error")"; then
+  if ! listing="$(benchmark_aws s3 ls "$run_uri/" --recursive 2>"$listing_error")"; then
     if [ -s "$listing_error" ]; then
       cat "$listing_error" >&2
       rm -f "$listing_error"
@@ -850,7 +851,7 @@ upload_suite_manifest() {
       started_at_utc: $started_at_utc
     }' > "$manifest_path"
 
-  aws s3 cp "$manifest_path" "${S3_RUN_URI}/_suite/manifest.json" >/dev/null
+  benchmark_aws s3 cp "$manifest_path" "${S3_RUN_URI}/_suite/manifest.json" >/dev/null
 }
 
 append_case_summary() {
@@ -927,7 +928,7 @@ upload_suite_summary() {
       cases: .
     }' "$SUITE_CASES_JSONL" > "$summary_path"
 
-  aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary.json" >/dev/null
+  benchmark_aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary.json" >/dev/null
 }
 
 maybe_destroy_experiment_stack() {

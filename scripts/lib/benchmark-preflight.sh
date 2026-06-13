@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source scripts/lib/benchmark-aws-credentials.sh
+
 benchmark_preflight_check() {
   local s3_bucket="$1"
   local context_label="${2:-benchmark preflight}"
@@ -9,10 +11,14 @@ benchmark_preflight_check() {
   local context_error_file
   local contexts="${BENCHMARK_PREFLIGHT_CONTEXTS:-monolith msa}"
   local context
+  local auth_label
+  local auth_fix_hint
 
   aws_error_file="$(mktemp)"
   s3_error_file="$(mktemp)"
   context_error_file="$(mktemp)"
+  auth_label="$(benchmark_aws_auth_label)"
+  auth_fix_hint="$(benchmark_aws_auth_fix_hint)"
 
   cleanup_benchmark_preflight_files() {
     rm -f "$aws_error_file" "$s3_error_file" "$context_error_file"
@@ -24,18 +30,18 @@ benchmark_preflight_check() {
     echo "  s3_bucket    : $s3_bucket"
   fi
 
-  if ! aws sts get-caller-identity >/dev/null 2>"$aws_error_file"; then
-    echo "ERROR: AWS session is not valid for ${context_label}." >&2
+  if ! benchmark_aws sts get-caller-identity >/dev/null 2>"$aws_error_file"; then
+    echo "ERROR: ${auth_label} is not valid for ${context_label}." >&2
     cat "$aws_error_file" >&2
-    echo "Fix: refresh AWS auth first, for example with 'aws login' or 'aws sso login --profile <profile>'." >&2
+    echo "Fix: ${auth_fix_hint}" >&2
     cleanup_benchmark_preflight_files
     return 1
   fi
 
-  if ! aws s3api list-objects-v2 --bucket "$s3_bucket" --prefix "experiments/" --max-items 1 >/dev/null 2>"$s3_error_file"; then
+  if ! benchmark_aws s3api list-objects-v2 --bucket "$s3_bucket" --prefix "experiments/" --max-items 1 >/dev/null 2>"$s3_error_file"; then
     echo "ERROR: S3 access check failed for bucket '${s3_bucket}' during ${context_label}." >&2
     cat "$s3_error_file" >&2
-    echo "Fix: confirm the benchmark bucket exists and the current AWS session can read it before continuing." >&2
+    echo "Fix: confirm the benchmark bucket exists and the active benchmark credentials can read it before continuing." >&2
     cleanup_benchmark_preflight_files
     return 1
   fi
@@ -52,7 +58,7 @@ benchmark_preflight_check() {
   done
 
   if [ "$quiet" != "true" ]; then
-    echo "  aws_session  : ok"
+    echo "  aws_auth     : ok (${auth_label})"
     echo "  s3_access    : ok"
     echo "  contexts     : ${contexts}"
     echo ""

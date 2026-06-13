@@ -149,8 +149,10 @@ VULTR_NODE_READY_TIMEOUT_SECONDS=1200 make experiment-bootstrap
 
 Applied automatically by `experiment-apply`. Creates least-privilege IAM user
 scoped to `s3://<bucket>/experiments/*`. Credentials flow from Terraform state
-into `k6-runner-secret` via `create-secrets`. No AWS auth needed for the read
-step (state is local). Debug independently:
+into `k6-runner-secret` via `create-secrets`. The same Terraform output is also
+the default credential source for Vultr benchmark preflight, suite metadata
+upload, resume checks, and local artifact inspection. No AWS auth needed for
+the read step (state is local). Debug independently:
 
 ```bash
 make aws-s3-writer-plan && make aws-s3-writer-apply
@@ -421,6 +423,10 @@ Mechanism for `run-benchmark-suite` in Vultr sequential mode:
 2. Validate `SCALING_MODE`, `K6_PROFILE`, `INTER_CASE_DELAY`, and
    `ARCHITECTURE_SWITCH_DELAY`.
 3. Run suite preflight and upload suite metadata.
+   - For Vultr, these local S3 operations use the `aws-s3-writer` credentials
+     from Terraform output by default.
+   - Expired local `aws login` / SSO sessions should not block the suite unless
+     the writer credentials themselves are missing or invalid.
 4. Iterate through each architecture in `ARCHITECTURE_ORDER`.
 5. For each architecture phase:
    - deploy the architecture if there are still pending cases for it,

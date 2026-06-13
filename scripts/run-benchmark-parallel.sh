@@ -17,6 +17,7 @@ fi
 
 source scripts/lib/cloud-provider.sh
 load_cloud_provider_env
+source scripts/lib/benchmark-aws-credentials.sh
 
 if [ -n "$explicit_aws_region" ]; then
   AWS_REGION="$explicit_aws_region"
@@ -216,7 +217,7 @@ fetch_s3_artifact() {
   local s3_uri="$1"
   local artifact_name="$2"
 
-  aws s3 cp "${s3_uri%/}/${artifact_name}" - 2>/dev/null || true
+  benchmark_aws s3 cp "${s3_uri%/}/${artifact_name}" - 2>/dev/null || true
 }
 
 job_pod_state_json() {
