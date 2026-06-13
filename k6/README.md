@@ -712,7 +712,6 @@ Each k6 execution should produce:
 ```text
 summary.json
 raw.json.gz
-status-summary.json
 stdout.log
 metadata.json
 result-status.json
@@ -742,6 +741,10 @@ points by response status so analysis can separate successful `2xx` latency from
 overload or error responses such as `503`. It also includes status-family
 breakdown, successful `2xx` aggregate latency, non-`2xx` aggregate latency, and
 success achievement against the configured target RPS.
+
+For the final thesis benchmark flow, the in-cluster runner prioritizes shipping
+raw evidence quickly. That means `status-summary.json` may be generated later
+during offline report processing rather than during the benchmark job itself.
 
 `thresholds.json` is the primary source for `PASS` vs `OVERLOAD`, while
 `result-status.json` records k6 exit code, S3 upload state, and artifact

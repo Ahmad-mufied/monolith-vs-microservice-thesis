@@ -601,9 +601,11 @@ AUTO_DESTROY_CONFIRMED=true RUN_ID=rq1-fixed-vultr SCALING_MODE=fixed make run-b
 aws s3 ls "s3://$S3_BUCKET/experiments/<run_id>/" --recursive
 ```
 
-Per attempt: `summary.json`, `raw.json.gz`, `status-summary.json`,
-`stdout.log`, `metadata.json`, `k6-options.json`, `thresholds.json`,
-`result-status.json`, `datadog-time-window.json` (when Datadog enabled).
+Per attempt: `summary.json`, `raw.json.gz`, `stdout.log`, `metadata.json`,
+`k6-options.json`, `thresholds.json`, `result-status.json`,
+`datadog-time-window.json` (when Datadog enabled). `status-summary.json` is a
+derived analysis artifact and may be generated later from `raw.json.gz` during
+offline report processing.
 
 `summary.json` is the original aggregate k6 summary. Use
 `status-summary.json` when overload handling makes status-aware interpretation

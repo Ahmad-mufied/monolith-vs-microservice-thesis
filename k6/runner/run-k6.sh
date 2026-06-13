@@ -50,6 +50,7 @@ K6_STATSD_ADDR_VALUE="${K6_STATSD_ADDR:-127.0.0.1:8125}"
 K6_STATSD_NAMESPACE_VALUE="${K6_STATSD_NAMESPACE:-k6}"
 K6_STATSD_ENABLE_TAGS_VALUE="${K6_STATSD_ENABLE_TAGS:-true}"
 K6_STATSD_OUTPUT_TYPE_VALUE="${K6_STATSD_OUTPUT_TYPE:-output-statsd}"
+GENERATE_STATUS_SUMMARY_IN_RUN_VALUE="${GENERATE_STATUS_SUMMARY_IN_RUN:-false}"
 RUN_ID_VALUE="${RUN_ID:-local-run}"
 ATTEMPT_VALUE="${ATTEMPT:-attempt-01}"
 ARCHITECTURE_VALUE="${ARCHITECTURE:-unknown}"
@@ -67,6 +68,14 @@ for value_name in TARGET_RPS_VALUE PRE_ALLOCATED_VUS_VALUE MAX_VUS_VALUE; do
   fi
 done
 unset value_name value
+
+case "$GENERATE_STATUS_SUMMARY_IN_RUN_VALUE" in
+  true|false) ;;
+  *)
+    echo "ERROR: GENERATE_STATUS_SUMMARY_IN_RUN must be true or false, got: '$GENERATE_STATUS_SUMMARY_IN_RUN_VALUE'" >&2
+    exit 1
+    ;;
+esac
 
 duration_seconds() {
   local raw="$1"
@@ -296,10 +305,14 @@ fi
 
 status_summary_present=false
 if [ -f "${RAW_PATH}.gz" ]; then
-  if "$SCRIPT_DIR/build-status-summary.sh" "${RAW_PATH}.gz" "$STATUS_SUMMARY_PATH" "$CONFIGURED_DURATION_SECONDS" "$TARGET_RPS_VALUE"; then
-    status_summary_present=true
+  if [ "$GENERATE_STATUS_SUMMARY_IN_RUN_VALUE" = "true" ]; then
+    if "$SCRIPT_DIR/build-status-summary.sh" "${RAW_PATH}.gz" "$STATUS_SUMMARY_PATH" "$CONFIGURED_DURATION_SECONDS" "$TARGET_RPS_VALUE"; then
+      status_summary_present=true
+    else
+      echo "WARNING: failed to generate status-summary.json from raw k6 output" >&2
+    fi
   else
-    echo "WARNING: failed to generate status-summary.json from raw k6 output" >&2
+    echo "INFO: deferring status-summary.json generation to offline report processing" >&2
   fi
 fi
 
@@ -349,12 +362,13 @@ s3_upload_attempted=false
 
 jq -n \
   --argjson k6_exit_code "$STATUS" \
-  --argjson artifacts_generated "$( [ "$summary_present" = true ] && [ "$thresholds_present" = true ] && [ "$metadata_present" = true ] && [ "$status_summary_present" = true ] && printf 'true' || printf 'false' )" \
+  --argjson artifacts_generated "$( [ "$summary_present" = true ] && [ "$thresholds_present" = true ] && [ "$metadata_present" = true ] && printf 'true' || printf 'false' )" \
   --argjson summary_file_present "$( [ "$summary_present" = true ] && printf 'true' || printf 'false' )" \
   --argjson thresholds_file_present "$( [ "$thresholds_present" = true ] && printf 'true' || printf 'false' )" \
   --argjson metadata_file_present "$( [ "$metadata_present" = true ] && printf 'true' || printf 'false' )" \
   --argjson raw_file_present "$( [ "$raw_gzip_present" = true ] && printf 'true' || printf 'false' )" \
   --argjson status_summary_file_present "$( [ "$status_summary_present" = true ] && printf 'true' || printf 'false' )" \
+  --arg status_summary_generation "$( [ "$status_summary_present" = true ] && printf 'generated_in_run' || { [ "$raw_gzip_present" = true ] && printf 'deferred'; } || printf 'not_available' )" \
   --arg classification_hint "$classification_hint" \
   '{
     k6_exit_code: $k6_exit_code,
@@ -365,6 +379,7 @@ jq -n \
     metadata_file_present: $metadata_file_present,
     raw_file_present: $raw_file_present,
     status_summary_file_present: $status_summary_file_present,
+    status_summary_generation: $status_summary_generation,
     classification_hint: $classification_hint
   }' > "$RESULT_STATUS_PATH"
 
