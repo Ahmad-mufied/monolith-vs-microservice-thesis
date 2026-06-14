@@ -38,11 +38,14 @@ if [ "$provider" = "vultr" ]; then
     exit 1
   fi
   for expected in \
-    "$render_root/deployments/k8s/cloud/monolith/overlays/hpa/hpa.yaml" \
     "$render_root/deployments/k8s/cloud/microservices/overlays/hpa/api-gateway-hpa.yaml" \
     "$render_root/deployments/k8s/cloud/microservices/overlays/hpa/auth-service-hpa.yaml" \
     "$render_root/deployments/k8s/cloud/microservices/overlays/hpa/item-service-hpa.yaml" \
     "$render_root/deployments/k8s/cloud/microservices/overlays/hpa/transaction-service-hpa.yaml"; do
     [ -f "$expected" ] || { echo "ERROR: missing expected HPA manifest: $expected" >&2; exit 1; }
   done
+  if [ -f "$render_root/deployments/k8s/cloud/monolith/overlays/hpa/hpa.yaml" ]; then
+    echo "ERROR: rendered monolith HPA manifest should not exist in the active benchmark model" >&2
+    exit 1
+  fi
 fi

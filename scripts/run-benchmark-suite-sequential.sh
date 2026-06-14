@@ -347,6 +347,44 @@ matrix_json() {
   ' < "$MATRIX_TSV"
 }
 
+log_suite_configuration() {
+  local matrix_source
+  local scenario
+  local scenario_rps_levels
+
+  if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
+    matrix_source="SCENARIO_RPS_MATRIX"
+  else
+    matrix_source="SCENARIOS + RPS_LEVELS fallback"
+  fi
+
+  log_info "=== Sequential Benchmark Suite ==="
+  log_info "  provider      : $CLOUD_PROVIDER"
+  log_info "  context       : $SEQUENTIAL_CONTEXT"
+  log_info "  scaling_mode  : $SCALING_MODE"
+  log_info "  k6_profile    : $K6_PROFILE"
+  log_info "  duration      : $TEST_DURATION"
+  log_info "  image_tag     : $IMAGE_TAG"
+  log_info "  run_id        : $RUN_ID"
+  log_info "  attempt       : $ATTEMPT"
+  if [ -n "$EXPERIMENT_NAME" ]; then
+    log_info "  experiment    : $EXPERIMENT_NAME"
+  fi
+  log_info "  architecture  : $ARCHITECTURE_ORDER"
+  log_info "  matrix_source : $matrix_source"
+  if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
+    log_info "  raw_matrix    : $SCENARIO_RPS_MATRIX"
+  else
+    log_info "  scenarios     : $SCENARIOS"
+    log_info "  rps_levels    : $RPS_LEVELS"
+  fi
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ -z "$scenario" ] && continue
+    log_info "  effective     : ${scenario} -> ${scenario_rps_levels}"
+  done < "$MATRIX_TSV"
+  log_info "  report_s3_uri : $S3_RUN_URI"
+}
+
 case_result_cache_key() {
   printf '%s|%s|%s' "$1" "$2" "$3"
 }
@@ -702,7 +740,7 @@ scaling_mode_matches_live_architecture() {
       ! kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
       ;;
     monolith:hpa)
-      kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
+      ! kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
       ;;
     microservices:fixed)
       hpa_count="$(kubectl --context="$SEQUENTIAL_CONTEXT" get hpa -n msa -o name 2>/dev/null | wc -l | tr -d '[:space:]' || true)"
@@ -846,6 +884,7 @@ build_matrix_file
 K6_CASE_ESTIMATE_SECONDS="$(estimate_case_duration_seconds)"
 CASE_ESTIMATE_SECONDS=$((K6_CASE_ESTIMATE_SECONDS + SEQUENTIAL_CASE_OVERHEAD_SECONDS + SEQUENTIAL_RETRY_BUFFER_SECONDS))
 REUSED_CASE_ESTIMATE_SECONDS=$((K6_CASE_ESTIMATE_SECONDS + SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS + SEQUENTIAL_RETRY_BUFFER_SECONDS))
+log_suite_configuration
 
 if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
   BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_or_die "$S3_BUCKET" "sequential suite bootstrap" "false"
