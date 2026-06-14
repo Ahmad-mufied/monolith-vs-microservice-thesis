@@ -720,6 +720,10 @@ SCALING_MODE=hpa make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
 SCALING_MODE=hpa make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
 ```
 
+In the active benchmark model, `SCALING_MODE=hpa` does not enable HPA on the
+monolith deployment. It keeps the monolith on the fixed baseline while enabling
+the HPA overlays only for microservices.
+
 Alternative when you want both clusters deployed together in HPA mode:
 
 ```bash
@@ -735,6 +739,9 @@ SCALING_MODE=fixed make eks-deploy-msa
 SCALING_MODE=hpa make eks-deploy-monolith
 SCALING_MODE=hpa make eks-deploy-msa
 ```
+
+The `SCALING_MODE=hpa make eks-deploy-monolith` form is therefore a
+suite-compatible entry point, not a request to create a monolith HPA.
 
 Use the shorter implicit form only when you intentionally want the deploy
 scripts to derive `IMAGE_TAG` from the current `HEAD` at command execution

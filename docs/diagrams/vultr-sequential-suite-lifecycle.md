@@ -21,7 +21,7 @@ flowchart TB
   pendingArch{"Any pending case<br/>missing result-status.json?"}
   skipArch["Skip architecture deploy<br/>all cases already exist in S3"]
   readyArch{"Live architecture already<br/>matches IMAGE_TAG and SCALING_MODE?"}
-  deployArch["Deploy or redeploy architecture<br/>scale inactive namespace down<br/>apply fixed or HPA overlay"]
+  deployArch["Deploy or redeploy architecture<br/>scale inactive namespace down<br/>monolith: always fixed overlay<br/>microservices: fixed or HPA overlay"]
 
   scenarioLoop{"Next scenario"}
   pendingScenario{"Any pending RPS<br/>for this scenario?"}
@@ -40,7 +40,7 @@ flowchart TB
   k6["Create k6 Kubernetes job<br/>wait for completion"]
   upload["Upload attempt artifacts<br/>summary, raw, metadata,<br/>thresholds, result-status"]
   delay{"More cases in phase?"}
-  interDelay["Sleep INTER_CASE_DELAY<br/>fixed: 120s, HPA: 300s"]
+  interDelay["Sleep INTER_CASE_DELAY<br/>fixed: 120s, MSA HPA: 300s"]
   switchDelay["Sleep ARCHITECTURE_SWITCH_DELAY<br/>before next architecture"]
   summary["Upload suite summary<br/>_suite/summary.json"]
   done(["Suite complete"])

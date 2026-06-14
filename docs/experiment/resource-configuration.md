@@ -10,7 +10,7 @@ It answers four methodological questions:
 
 1. what fairness means for monolith versus microservices,
 2. why the microservices resource budget is divided equally across services,
-3. how fixed mode and HPA mode remain comparable,
+3. how fixed mode and the supplemental microservices-only HPA mode remain comparable,
 4. how the chosen split should be justified in the thesis.
 
 The total application ceiling itself is defined in
@@ -80,8 +80,8 @@ fixed:
   + equal per-service split inside microservices
 
 hpa:
-  equal total architecture budget
-  + equal per-pod baseline
+  monolith stays on the fixed baseline
+  + microservices use equal per-pod baselines
   + shared namespace headroom
 ```
 
@@ -173,13 +173,14 @@ Interpretation:
 
 ---
 
-## 5. HPA Mode
+## 5. Supplemental HPA Mode
 
 In HPA mode:
 
-- monolith uses CPU-based HPA,
-- each microservice also uses CPU-based HPA,
-- fixed and HPA must preserve the same architecture-level ceiling.
+- monolith stays on the fixed baseline,
+- each microservice uses CPU-based HPA,
+- the supplemental HPA comparison must preserve the same
+  architecture-level ceiling.
 
 The comparison rule is:
 
@@ -187,27 +188,23 @@ The comparison rule is:
 fixed mode:
   equal service ceilings are active immediately
 
-hpa mode:
-  equal per-pod baselines are active immediately
+supplemental hpa mode:
+  monolith stays fixed
+  equal microservice per-pod baselines are active immediately
   and burst capacity uses shared namespace headroom
 ```
 
-### 5.1 Monolith HPA Configuration
+### 5.1 Monolith During Supplemental HPA Runs
 
 ```text
-minReplicas            : 1
-maxReplicas            : 4
-target CPU utilization : 70%
-request / pod          : 970m CPU / 1920Mi memory
-limit / pod            : 1950m CPU / 3840Mi memory
+replicas : 1
+request  : 3900m CPU / 7680Mi memory
+limit    : 7800m CPU / 15360Mi memory
 ```
 
-This preserves:
-
-```text
-4 x 1950m   = 7800m CPU max
-4 x 3840Mi  = 15360Mi memory max
-```
+The monolith remains fixed so the supplemental HPA comparison does not change
+the monolith pod shape or admission-slot calibration relative to the primary
+baseline.
 
 ### 5.2 Microservices HPA Configuration
 
@@ -249,7 +246,7 @@ That headroom is exactly enough for four additional pods of the same size:
 4 x 1920Mi = 7680Mi memory
 ```
 
-Therefore, the active HPA model should be interpreted as:
+Therefore, the active supplemental HPA model should be interpreted as:
 
 - 4 baseline pods across the namespace,
 - plus up to 4 additional burst pods shared by all services,
@@ -315,9 +312,9 @@ The equal-split design is justified by the following argument:
    per-service profiling dataset,
 3. therefore, the least assumption-heavy internal split is equal division
    across the four services,
-4. fixed mode and HPA preserve the same total architecture-level ceiling, so
-   the comparison focuses on scaling behavior rather than manual service
-   tuning.
+4. the supplemental HPA path preserves the same total architecture-level
+   ceiling while exposing service-specific scale-out behavior in the
+   microservices deployment.
 
 Suggested thesis wording:
 
@@ -361,8 +358,8 @@ For the active Vultr benchmark path, use the following rules:
    `1 pod`, `3900m/7800m`, `7680Mi/15360Mi`
 3. microservices fixed:
    `4 services`, each `980m/1950m`, `1920Mi/3840Mi`
-4. monolith HPA:
-   `min 1 max 4`, `970m/1950m`, `1920Mi/3840Mi`
+4. supplemental HPA:
+   monolith stays fixed at the primary baseline
 5. microservices HPA:
    `min 1 max 4` for each service,
    `500m/975m`, `960Mi/1920Mi` per pod

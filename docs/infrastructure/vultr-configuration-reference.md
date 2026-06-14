@@ -185,7 +185,8 @@ Rules:
   `1950m CPU / 3840Mi memory` per service in fixed mode,
   `975m CPU / 1920Mi memory` per pod with `minReplicas=1` and
   `maxReplicas=5` (api-gateway, item-service) or `maxReplicas=2` (auth-service,
-  transaction-service) in HPA mode. Monolith HPA uses `maxReplicas=4`.
+  transaction-service) in HPA mode. The monolith stays on the fixed baseline in
+  suite-level HPA runs.
 - Set `VULTR_EXPECTED_APP_NODE_COUNT=1` when verifying the current single app
   node topology.
 

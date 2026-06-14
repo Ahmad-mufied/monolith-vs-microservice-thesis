@@ -446,6 +446,11 @@ kubectl --context=msa create secret generic auth-service-secret \
   --from-literal=LOGIN_QUEUE_TIMEOUT=2s \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
+# Note: this base secret keeps the fixed-mode auth-service default at 2.
+# The microservices HPA overlay overrides LOGIN_MAX_CONCURRENCY to 1 at the
+# Deployment level so each 975m auth-service pod keeps the intended slot-per-CPU
+# policy.
+
 # Item Service secret
 kubectl --context=msa create secret generic item-service-secret \
   --namespace msa \
@@ -797,9 +802,10 @@ the live cluster after the suite finishes.
 ### Phase 6.3 — HPA Mode Supporting Matrix
 
 HPA mode is a supporting autoscaling behavior comparison for the final thesis.
-The primary RQ1/RQ2 comparison remains fixed-replica mode. Redeploy both
-application stacks with HPA overlays before running the suite. Do not reuse a
-fixed-mode deployment by changing only `SCALING_MODE` on the runner.
+The primary RQ1/RQ2 comparison remains fixed-replica mode. In the supporting
+HPA path, the monolith stays on the fixed baseline while microservices switch
+to HPA overlays. Do not reuse a fixed-mode deployment by changing only
+`SCALING_MODE` on the runner.
 
 ```bash
 make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG
@@ -1175,8 +1181,8 @@ kubectl --context=monolith run pg-test \
 | `SCALING_MODE=fixed make eks-deploy-msa` | Deploy MSA (fixed replicas) |
 | `ARCHITECTURE=monolith SCALING_MODE=fixed make eks-deploy-sequential-architecture` | Deploy one active architecture on the sequential cluster |
 | `make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG` | Deploy both architectures in fixed mode |
-| `SCALING_MODE=hpa make eks-deploy-monolith` | Deploy monolith (HPA enabled) |
-| `make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG` | Deploy both architectures in HPA mode |
+| `SCALING_MODE=hpa make eks-deploy-monolith` | Deploy monolith with the fixed baseline while preparing the suite-level HPA mode |
+| `make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG` | Deploy monolith fixed + microservices HPA for the supporting autoscaling matrix |
 | `DATADOG_API_KEY=<key> make datadog-install-eks-monolith` | Install Datadog on monolith cluster |
 | `DATADOG_API_KEY=<key> make datadog-install-eks-msa` | Install Datadog on MSA cluster |
 | `make run-benchmark-parallel SCENARIO=login TARGET_RPS=1000 RUN_ID=... S3_BUCKET=...` | Run parallel benchmark |

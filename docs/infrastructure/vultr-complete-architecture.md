@@ -589,13 +589,14 @@ The HPA path preserves the same service-level ceiling by dividing each service
 budget across replicas:
 
 ```text
-Monolith:  minReplicas=1, maxReplicas=4
+Monolith:  fixed baseline remains active during suite-level HPA runs
+           LOGIN_MAX_CONCURRENCY=8  (975m per slot × 8 = 7800m)
 
-Microservices (per service):
-  api-gateway:         minReplicas=1, maxReplicas=5
-  auth-service:        minReplicas=1, maxReplicas=2
-  item-service:        minReplicas=1, maxReplicas=5
-  transaction-service: minReplicas=1, maxReplicas=2
+Microservices (per service, supplemental HPA):
+  api-gateway:         minReplicas=1, maxReplicas=4
+  auth-service:        minReplicas=1, maxReplicas=4, LOGIN_MAX_CONCURRENCY=1 (975m per slot)
+  item-service:        minReplicas=1, maxReplicas=4
+  transaction-service: minReplicas=1, maxReplicas=4
 ```
 
 ---

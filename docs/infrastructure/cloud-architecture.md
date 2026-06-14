@@ -486,11 +486,11 @@ ResourceQuota ceiling, not equal pod count.
 Used for RQ2 with scaling behavior analysis.
 
 ```text
-Monolith HPA           MSA HPA (one per service)
-────────────           ─────────────────────────
-minReplicas    : 1     minReplicas    : 1 per service
-maxReplicas    : 4     maxReplicas    : 2 per service
-target CPU     : 70%   target CPU     : 70%
+Monolith fixed baseline   MSA HPA (one per service)
+───────────────────────   ─────────────────────────
+HPA disabled              minReplicas    : 1 per service
+single fixed deployment   maxReplicas    : 2 per service
+                           target CPU     : 70%
 ```
 
 In the active Vultr equal-split HPA profile, each microservice uses:

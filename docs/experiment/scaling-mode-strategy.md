@@ -2,9 +2,9 @@
 
 ## 1. Purpose
 
-This document explains how fixed mode and HPA mode are used in the benchmark,
-and how both modes remain comparable under the active Vultr equal-split
-resource methodology.
+This document explains how fixed mode and the supplemental microservices-only
+HPA mode are used in the benchmark, and how both remain comparable under the
+active Vultr equal-split resource methodology.
 
 The benchmark uses two scaling modes:
 
@@ -13,7 +13,8 @@ fixed-replica : static pod count
 hpa           : CPU-based horizontal pod autoscaling
 ```
 
-Both modes must preserve the same total application ceiling per architecture.
+All benchmark variants must preserve the same total application ceiling per
+architecture.
 
 For the active Vultr benchmark path, that ceiling is:
 
@@ -72,34 +73,33 @@ Interpretation:
 
 ---
 
-## 3. HPA Mode
+## 3. Supplemental HPA Mode
 
-HPA mode keeps the same architecture ceiling, but distributes it across
-possible replicas.
+The primary benchmark comparison remains fixed mode for both architectures.
+The autoscaling extension keeps the monolith on its fixed baseline and enables
+HPA only for the microservices deployment. This isolates the architectural
+benefit of service-specific elasticity without forcing the monolith into a
+smaller per-pod shape that would no longer represent its fixed baseline.
 
 The key rule is:
 
 ```text
-fixed mode and hpa mode may differ in pod shape,
-but must preserve the same total architecture ceiling
+fixed mode remains the primary architecture baseline
+and supplemental HPA must preserve the same total architecture ceiling
 ```
 
-### 3.1 Monolith HPA
+### 3.1 Monolith During Supplemental HPA Runs
+
+During suite-level `SCALING_MODE=hpa`, the monolith remains on the fixed
+single-pod baseline:
 
 ```text
-minReplicas            : 1
-maxReplicas            : 4
-target CPU utilization : 70%
-request / pod          : 970m CPU / 1920Mi memory
-limit / pod            : 1950m CPU / 3840Mi memory
+replicas : 1
+request  : 3900m CPU / 7680Mi memory
+limit    : 7800m CPU / 15360Mi memory
 ```
 
-Maximum monolith ceiling:
-
-```text
-4 x 1950m   = 7800m CPU
-4 x 3840Mi  = 15360Mi memory
-```
+This keeps the monolith pod shape identical to the primary benchmark baseline.
 
 ### 3.2 Microservices HPA
 
@@ -134,7 +134,7 @@ That headroom is exactly equal to four more pods of the same HPA size:
 4 x 1920Mi = 7680Mi memory
 ```
 
-Therefore, the active Vultr HPA model should be read as:
+Therefore, the active Vultr supplemental HPA model should be read as:
 
 - 4 baseline pods, one for each service,
 - plus up to 4 extra pods shared across the namespace,
@@ -146,7 +146,7 @@ Therefore, the active Vultr HPA model should be read as:
 
 Equal split does not make HPA pointless.
 
-HPA still provides:
+Microservices HPA still provides:
 
 - automatic scale-out when one service experiences higher CPU load,
 - lower active footprint when services stay at `minReplicas`,
@@ -260,18 +260,24 @@ microservices:
   1920Mi request / 3840Mi limit
 ```
 
-### HPA
+### Supplemental HPA
 
 ```text
 monolith:
-  min 1 max 4
-  970m request / 1950m limit
-  1920Mi request / 3840Mi limit
+  remains fixed at the primary baseline
+  1 pod
+  3900m request / 7800m limit
+  7680Mi request / 15360Mi limit
 
 microservices:
-  min 1 max 4 for each service
+  each service starts at 1 pod
   500m request / 975m limit
-  960Mi request / 1920Mi limit
+  960Mi request / 1920Mi limit per pod
+  up to 4 replicas per service, bounded by shared namespace headroom
 ```
 
 These values are the active equal-split reference for Vultr benchmark runs.
+
+> **Note:** Monolith HPA mode is not part of the active benchmark design.
+> The monolith remains on its fixed single-pod baseline for all runs including
+> supplemental HPA suite runs. See Section 3.1 for rationale.

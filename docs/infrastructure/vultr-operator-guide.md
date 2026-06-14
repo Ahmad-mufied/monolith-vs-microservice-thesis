@@ -223,9 +223,13 @@ ITEM_VALIDATION_TIMEOUT=25s        # transaction-service only
 
 Auth Service login admission:
 LOGIN_ADMISSION_ENABLED=true
-LOGIN_MAX_CONCURRENCY=2
+LOGIN_MAX_CONCURRENCY=2          # fixed overlay
 LOGIN_QUEUE_TIMEOUT=2s
 ```
+
+When the microservices HPA overlay is applied, `auth-service` overrides
+`LOGIN_MAX_CONCURRENCY=1` at the Deployment level to keep the admission-slot
+budget proportional to the smaller `975m` HPA pod CPU limit.
 
 Expected overload behavior:
 
