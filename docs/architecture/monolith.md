@@ -883,16 +883,14 @@ Expected monolith characteristic:
 
 ## 15. Scaling Model
 
-The monolith scales as a whole application.
+The monolith scales as a whole application in a generic deployment model, but
+the active benchmark workflow keeps it on the fixed single-pod baseline.
 
 Resource configuration:
 
 ```text
 fixed mode        : 1 pod, 3900m request / 7800m limit and 7680Mi request / 15360Mi limit
-hpa mode          : 1 to 4 pods, each 970m request / 1950m limit and 1920Mi request / 3840Mi limit
-minReplicas       : 1
-maxReplicas       : 4
-HPA target CPU    : 70%
+arch-suite HPA    : unsupported for monolith in the active benchmark model
 Total CPU ceiling : 7800m
 Memory ceiling    : 15360Mi
 ```
@@ -900,20 +898,21 @@ Memory ceiling    : 15360Mi
 Scaling behavior:
 
 ```text
-If one module becomes hot,
-the entire monolith is replicated.
+Inherent monolith scaling semantics:
+if one module becomes hot,
+the entire monolith would be replicated together.
 ```
 
 Example:
 
 ```text
-High login traffic
-    |
-    v
-HPA scales monolith pods
-    |
-    v
-Auth + Item + Transaction modules are all replicated
+Active benchmark workflow:
+  run-benchmark-suite uses monolith fixed
+  run-benchmark-arch-suite also requires monolith fixed
+
+Generic monolith scaling behavior:
+  one hot module implies whole-application replication,
+  not selective module scaling
 ```
 
 This is a key architectural trade-off.

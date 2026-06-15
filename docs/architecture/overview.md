@@ -607,6 +607,8 @@ Sequential phase 2:
 
 For the complete Vultr infrastructure reference, see:
 `docs/infrastructure/vultr-complete-architecture.md`.
+For the active fixed-suite versus supplemental-HPA benchmark flow, see:
+`docs/architecture/benchmark-execution-workflows.md`.
 
 ---
 
@@ -620,9 +622,7 @@ Monolith:
 CPU ceiling      : 7800m
 Memory ceiling   : 15360Mi
 fixed            : 1 pod x (3900m request / 7800m limit, 7680Mi request / 15360Mi limit)
-hpa              : 1 to 4 pods x (970m request / 1950m limit, 1920Mi request / 3840Mi limit)
-maxReplicas      : 4
-HPA target CPU   : 70%
+single-architecture HPA suite : use microservices HPA; monolith remains fixed
 ```
 
 Microservices:

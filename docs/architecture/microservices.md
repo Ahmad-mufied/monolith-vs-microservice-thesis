@@ -1101,6 +1101,11 @@ This allows one focused service to scale up under targeted load while the
 namespace ResourceQuota still prevents the total microservices resource usage
 from exceeding the monolith resource ceiling.
 
+In the active benchmark workflow, these HPA settings are exercised through the
+single-architecture benchmark suite (`run-benchmark-arch-suite`) or the
+single-case runners rather than through the primary fixed dual-architecture
+suite.
+
 The methodology for deciding why these per-service budgets use equal split
 instead of role-aware allocation is documented in
 `docs/experiment/resource-configuration.md`.

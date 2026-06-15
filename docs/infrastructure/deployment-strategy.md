@@ -1008,7 +1008,8 @@ upload suite summary to S3
 Important:
 
 ```text
-Monolith never uses HPA overlay. Pod shape is identical in fixed and HPA suite runs.
+Monolith never uses HPA overlay. Pod shape is identical in fixed runs and in the
+single-architecture HPA extension flow.
 HPA overlay applies to microservices only when SCALING_MODE=hpa.
 DB bootstrap, migration, and seed must not run during benchmark execution.
 Do not run make vultr-destroy before verifying benchmark data exists in S3.

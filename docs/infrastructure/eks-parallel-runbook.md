@@ -137,10 +137,11 @@ Important rules:
 - changing `SCALING_MODE` in `make run-benchmark-parallel` does **not** switch
   the live application manifests
 - every `fixed <-> hpa` transition must be handled as a fresh redeploy event
-- when `SCALING_MODE=hpa`, use the non-suite HPA runners; `K6_PROFILE`
-  auto-defaults to `hpa` there and `TEST_DURATION` is **ignored** by the k6
-  executor — the actual run duration is controlled by HPA stage env vars
-  (default: 13 minutes per case). See §4.1 below.
+- when `SCALING_MODE=hpa`, use `run-benchmark-arch-suite` for a broader
+  microservices-only batch or the single-case HPA runners for one-off checks;
+  `K6_PROFILE` auto-defaults to `hpa` there and `TEST_DURATION` is **ignored**
+  by the k6 executor — the actual run duration is controlled by HPA stage env
+  vars (default: 13 minutes per case). See §4.1 below.
 
 Verify the live mode after redeploy:
 
@@ -163,7 +164,7 @@ Expected checks:
 
 ### 4.1 HPA Duration Behavior
 
-When `SCALING_MODE=hpa`, the non-suite HPA runners use `K6_PROFILE=hpa` which
+When `SCALING_MODE=hpa`, the arch-suite and single-case HPA runners use `K6_PROFILE=hpa` which
 applies a `ramping-arrival-rate` executor. This executor **ignores
 `TEST_DURATION`** entirely. The actual k6 run duration per case is:
 
@@ -185,15 +186,25 @@ To shorten HPA runs (e.g. for faster iteration or budget constraints):
 ```bash
 HPA_RAMP_UP_1=1m HPA_RAMP_UP_2=1m HPA_RAMP_UP_3=2m HPA_HOLD=3m HPA_RAMP_DOWN=30s \
   ARCHITECTURE=microservices SCENARIO=login TARGET_RPS=250 RUN_ID=eks-hpa-rq2 ATTEMPT=attempt-01 \
-  make run-benchmark-sequential SCALING_MODE=hpa K6_PROFILE=hpa ...
+  make run-benchmark-case SCALING_MODE=hpa K6_PROFILE=hpa ...
 # Total: 7.5 minutes per case
 ```
 
 For the full HPA stage configuration reference, see
 `docs/experiment/scaling-mode-strategy.md` §6.3.
 
-Repeat the non-suite HPA runner for each scenario/RPS pair you want to include
-in the supplemental autoscaling analysis.
+For a broader microservices-only HPA batch, prefer:
+
+```bash
+ARCHITECTURE=microservices \
+SCALING_MODE=hpa \
+EXPERIMENT_NAME=eks-parallel-hpa-batch \
+INTER_CASE_DELAY=300 \
+SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-transactions:100,250,500;concurrent-mixed-workload:100,250,500" \
+make run-benchmark-arch-suite
+```
+
+Use the single-case runner when you only need one scenario/RPS pair.
 
 ---
 
@@ -456,7 +467,7 @@ ATTEMPT=attempt-02 \
 SCALING_MODE=hpa \
 K6_PROFILE=hpa \
 TEST_DURATION=5m \
-make run-benchmark-sequential
+make run-benchmark-case
 ```
 level, the inter-case delay is skipped because there is no next case to
 stabilize. It is intentionally outside the k6 script because k6's

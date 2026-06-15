@@ -229,6 +229,21 @@ dispatch_run_benchmark_suite() {
   esac
 }
 
+dispatch_run_benchmark_arch_suite() {
+  : "${ARCHITECTURE:?ARCHITECTURE is required}"
+  : "${SCALING_MODE:?SCALING_MODE is required}"
+
+  case "$EXECUTION_MODE" in
+    sequential)
+      CLOUD_PROVIDER="$CLOUD_PROVIDER" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" EXECUTION_MODE="$EXECUTION_MODE" bash scripts/run-benchmark-arch-suite.sh
+      ;;
+    parallel)
+      echo "ERROR: run-benchmark-arch-suite currently supports EXECUTION_MODE=sequential only" >&2
+      exit 1
+      ;;
+  esac
+}
+
 dispatch_verify_live_mode() {
   : "${SCALING_MODE:?SCALING_MODE is required}"
   EXECUTION_MODE="$EXECUTION_MODE" ARCHITECTURE="${ARCHITECTURE:-}" bash scripts/verify-live-mode.sh
@@ -285,6 +300,9 @@ case "$action" in
     ;;
   run-benchmark-suite)
     dispatch_run_benchmark_suite
+    ;;
+  run-benchmark-arch-suite)
+    dispatch_run_benchmark_arch_suite
     ;;
   *)
     echo "ERROR: unsupported operator action '$action'" >&2

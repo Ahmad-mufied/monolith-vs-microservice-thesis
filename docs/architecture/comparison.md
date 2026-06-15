@@ -702,7 +702,7 @@ LOGIN_MAX_CONCURRENCY         : 8  (975m CPU per bcrypt slot × 8 = 7800m)
 ```
 
 The monolith operates on a fixed single-pod baseline for all benchmark runs,
-including supplemental HPA suite runs. Horizontal scaling of the monolith is
+including supplemental HPA runs. Horizontal scaling of the monolith is
 not part of the active benchmark design for the following reasons:
 
 - Real-world monolith horizontal scaling requires each replica to receive the
@@ -784,7 +784,7 @@ Other services may remain at lower replica count
 
 | Aspect | Monolith | Microservices |
 |---|---|---|
-| Benchmark scaling mode | Fixed baseline only | Fixed + supplemental HPA |
+| Benchmark scaling mode | Fixed baseline only | Fixed + arch-suite HPA extension |
 | Scaling granularity | coarse (all modules together) | fine (per service) |
 | Simplicity | simpler | more complex |
 | Resource isolation | lower | higher |

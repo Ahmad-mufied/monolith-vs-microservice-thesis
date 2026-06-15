@@ -91,8 +91,9 @@ networking and budget resources.
 |---|---|
 | `make run-benchmark-parallel-vultr` | Run one parallel benchmark case. |
 | `make run-benchmark-sequential-vultr` | Run one sequential benchmark case. |
-| `make run-benchmark-suite-vultr` | Run a full parallel matrix suite. |
-| `make run-benchmark-suite-sequential-vultr` | Run a full sequential matrix suite. |
+| `make run-benchmark-arch-suite-vultr` | Run a one-architecture suite on the sequential benchmark cluster. |
+| `make run-benchmark-suite-vultr` | Run a fixed-only full parallel matrix suite. |
+| `make run-benchmark-suite-sequential-vultr` | Run a fixed-only full sequential matrix suite. |
 
 ### Destroy
 

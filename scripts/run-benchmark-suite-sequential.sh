@@ -70,7 +70,7 @@ trap cleanup EXIT
 declare -A CASE_RESULT_STATUS_CACHE=()
 
 if [ "$SCALING_MODE" != "fixed" ]; then
-  printf '[%s] ERROR: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-case or run-benchmark-sequential for supplementary HPA benchmarks." >&2
+  printf '[%s] ERROR: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite ARCHITECTURE=microservices for a supplemental HPA suite, or run-benchmark-case for one-off HPA cases." >&2
   exit 1
 fi
 
@@ -852,7 +852,7 @@ case "$SCALING_MODE:$K6_PROFILE" in
     exit 1
     ;;
   hpa:steady|hpa:ramp|hpa:smoke|hpa:hpa)
-    log_error "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-case or run-benchmark-sequential for supplementary HPA benchmarks."
+    log_error "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite ARCHITECTURE=microservices for a supplemental HPA suite, or run-benchmark-case for one-off HPA cases."
     exit 1
     ;;
 esac

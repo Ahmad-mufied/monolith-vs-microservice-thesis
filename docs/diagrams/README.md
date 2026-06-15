@@ -13,9 +13,9 @@ thesis writing.
 | [`cloud-architecture.md`](cloud-architecture.md) | Historical AWS-oriented infrastructure topology retained for engineering reference |
 | [`sequential-parallel-topology.md`](sequential-parallel-topology.md) | Historical AWS-oriented parallel vs sequential topology retained for engineering reference |
 | [`vultr-vke-topology.md`](vultr-vke-topology.md) | Active Vultr VKE parallel, sequential, and end-to-end execution topology |
-| [`vultr-sequential-suite-lifecycle.md`](vultr-sequential-suite-lifecycle.md) | Vultr sequential suite lifecycle, data setup decision, and inter-case gap breakdown for thesis methodology |
+| [`vultr-sequential-suite-lifecycle.md`](vultr-sequential-suite-lifecycle.md) | Vultr fixed-only sequential suite lifecycle plus single-architecture HPA suite flow for thesis methodology |
 | [`architecture-comparison.md`](architecture-comparison.md) | Side-by-side monolith and microservices runtime comparison |
-| [`benchmark-lifecycle.md`](benchmark-lifecycle.md) | End-to-end benchmark execution lifecycle |
+| [`benchmark-lifecycle.md`](benchmark-lifecycle.md) | End-to-end benchmark lifecycle with fixed dual-architecture suite, single-architecture suite, and single-case branches |
 | [`login-sequence.md`](login-sequence.md) | Benchmark 1 login request flow |
 | [`create-transaction-sequence.md`](create-transaction-sequence.md) | Benchmark 2 create transaction request flow |
 | [`enriched-transactions-sequence.md`](enriched-transactions-sequence.md) | Benchmark 3 enriched transaction read flow |

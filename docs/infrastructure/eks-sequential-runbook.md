@@ -259,19 +259,19 @@ Per-architecture `timing_source` values (under `architectures.<name>`):
 - `attempt_metadata_partial`: start from metadata `timestamp_utc`, end from
   orchestrator wall-clock
 
-The sequential suite is fixed-only. If you need supplemental HPA measurements,
-run them outside the suite, for example:
+The sequential dual-architecture suite is fixed-only. If you need a broader
+supplemental HPA batch on one architecture, use `run-benchmark-arch-suite`:
 
 ```bash
 ARCHITECTURE=microservices \
-SCENARIO=login \
-TARGET_RPS=250 \
-RUN_ID=eks-sequential-hpa-rq2 \
-ATTEMPT=attempt-01 \
 SCALING_MODE=hpa \
-K6_PROFILE=hpa \
-make run-benchmark-sequential
+EXPERIMENT_NAME=eks-sequential-hpa-rq2 \
+INTER_CASE_DELAY=300 \
+SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-transactions:100,250,500;concurrent-mixed-workload:100,250,500" \
+make run-benchmark-arch-suite
 ```
+
+For one-off retries or smoke-style checks, keep using the single-case runners.
 - `orchestrator`: both timestamps came from orchestrator wall-clock
 
 Case-level `timing_source` values:

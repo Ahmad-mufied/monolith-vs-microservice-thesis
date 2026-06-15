@@ -185,7 +185,7 @@ validate_matrix_inputs() {
   esac
 
   if [ "$SCALING_MODE" != "fixed" ]; then
-    echo "ERROR: run-benchmark-suite only supports SCALING_MODE=fixed. Use run-benchmark-case, run-benchmark-sequential, or run-benchmark-parallel for supplementary HPA benchmarks." >&2
+    echo "ERROR: run-benchmark-suite only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite for a supplemental single-architecture HPA suite, or run-benchmark-case for one-off HPA cases." >&2
     return 1
   fi
 
@@ -299,7 +299,7 @@ validate_scaling_profile_pairing() {
       return 1
       ;;
     hpa:steady|hpa:ramp|hpa:smoke|hpa:hpa)
-      echo "ERROR: run-benchmark-suite only supports SCALING_MODE=fixed. Use run-benchmark-case, run-benchmark-sequential, or run-benchmark-parallel for supplementary HPA benchmarks." >&2
+      echo "ERROR: run-benchmark-suite only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite for a supplemental single-architecture HPA suite, or run-benchmark-case for one-off HPA cases." >&2
       return 1
       ;;
     *)

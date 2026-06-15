@@ -138,9 +138,10 @@ IMAGE_TAG=670736c make run-benchmark-suite
 
 For sequential Vultr suites, `make run-benchmark-suite` deploys each
 architecture phase internally with the fixed suite baseline and the selected
-`IMAGE_TAG`. Supplemental HPA measurements are executed outside the suite via
-`make run-benchmark-case`, `make run-benchmark-sequential`, or
-`make run-benchmark-parallel`.
+`IMAGE_TAG`. Supplemental HPA measurements use `make run-benchmark-arch-suite`
+for multi-case one-architecture runs, or `make run-benchmark-case`,
+`make run-benchmark-sequential`, and `make run-benchmark-parallel` for direct
+single-case control.
 
 When a suite run omits `RUN_ID` but sets `EXPERIMENT_NAME`, the current
 benchmark runners include the active `IMAGE_TAG` in the default generated

@@ -228,16 +228,18 @@ make run-benchmark-suite SCALING_MODE=fixed ...
 make run-benchmark-suite-sequential SCALING_MODE=fixed ...
 ```
 
-Use the non-suite runners for supplemental HPA measurements:
+Use the single-architecture suite or single-case runners for supplemental HPA measurements:
 
 ```bash
+make run-benchmark-arch-suite ARCHITECTURE=microservices SCALING_MODE=hpa K6_PROFILE=hpa ...
 make run-benchmark-case SCALING_MODE=hpa K6_PROFILE=hpa ...
 make run-benchmark-sequential SCALING_MODE=hpa K6_PROFILE=hpa ...
 make run-benchmark-parallel SCALING_MODE=hpa K6_PROFILE=hpa ...
 ```
 
 This keeps the primary fixed comparison separate from the supporting autoscaling
-analysis and avoids rerunning the monolith fixed baseline inside an HPA suite.
+analysis and avoids rerunning the monolith fixed baseline inside the
+single-architecture HPA extension.
 
 ## 7. Inter-Case Delay
 
@@ -305,4 +307,4 @@ These values are the active equal-split reference for Vultr benchmark runs.
 
 > **Note:** Monolith HPA mode is not part of the active benchmark design.
 > The monolith remains on its fixed single-pod baseline for all runs including
-> supplemental HPA suite runs. See Section 3.1 for rationale.
+> single-architecture HPA extension runs. See Section 3.1 for rationale.
