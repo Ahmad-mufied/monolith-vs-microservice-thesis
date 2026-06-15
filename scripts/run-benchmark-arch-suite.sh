@@ -628,6 +628,10 @@ case "$SCALING_MODE:$K6_PROFILE" in
     log_error "SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment."
     exit 1
     ;;
+  *)
+    log_error "unsupported SCALING_MODE/K6_PROFILE combination '${SCALING_MODE}:${K6_PROFILE}' (supported: fixed with steady|ramp|smoke, hpa with hpa)"
+    exit 1
+    ;;
 esac
 
 if [ -n "$EXPERIMENT_NAME" ]; then
