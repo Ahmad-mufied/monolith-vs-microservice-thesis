@@ -241,6 +241,10 @@ dispatch_run_benchmark_arch_suite() {
       echo "ERROR: run-benchmark-arch-suite currently supports EXECUTION_MODE=sequential only" >&2
       exit 1
       ;;
+    *)
+      echo "ERROR: unsupported EXECUTION_MODE '$EXECUTION_MODE' for run-benchmark-arch-suite (expected: sequential)" >&2
+      exit 1
+      ;;
   esac
 }
 
