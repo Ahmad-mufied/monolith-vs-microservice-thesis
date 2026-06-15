@@ -10,8 +10,8 @@ from bcrypt password comparison during login.
 The admission limiter is a cross-cutting infrastructure concern. It is defined
 once in the shared `pkg/` layer and consumed by both runtime variants. This
 keeps the behavioral contract identical and ensures benchmark fairness: both
-architectures apply the same concurrency ceiling and the same rejection
-semantics.
+architectures apply the same limiter semantics and rejection behavior, while
+the calibrated concurrency ceiling varies by deployment.
 
 ---
 
