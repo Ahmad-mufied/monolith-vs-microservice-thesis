@@ -56,7 +56,7 @@ In both parallel and sequential execution modes, the suite:
 
 - builds the scenario x RPS matrix,
 - uploads `_suite/manifest.json`,
-- deploys or reuses the required fixed baseline,
+- deploys or reuses the fixed baseline,
 - runs measured k6 cases,
 - uploads per-attempt artifacts,
 - uploads `_suite/summary.json`.
@@ -100,8 +100,8 @@ make run-benchmark-suite-sequential
 The architecture suite is used when you want suite behavior for only one
 architecture:
 
-- multi scenario,
-- multi target RPS,
+- multi-scenario,
+- multi-target RPS,
 - one deployment state per run,
 - one architecture selected explicitly.
 
