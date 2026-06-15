@@ -323,7 +323,7 @@ log_arch_suite_configuration() {
   log_info "  architecture  : $ARCHITECTURE"
   log_info "  scaling_mode  : $SCALING_MODE"
   log_info "  k6_profile    : $K6_PROFILE"
-  log_info "  duration      : $TEST_DURATION"
+  log_info "  duration      : $(benchmark_duration_log_value "$K6_PROFILE" "$TEST_DURATION")"
   log_info "  image_tag     : $IMAGE_TAG"
   log_info "  run_id        : $RUN_ID"
   log_info "  attempt       : $ATTEMPT"

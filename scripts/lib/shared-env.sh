@@ -82,6 +82,120 @@ parse_seconds_duration() {
   return 1
 }
 
+parse_benchmark_duration_seconds() {
+  local value="$1"
+  local number unit
+
+  if [[ "$value" =~ ^([0-9]+)(ms|s|m|h)$ ]]; then
+    number="${BASH_REMATCH[1]}"
+    unit="${BASH_REMATCH[2]}"
+    case "$unit" in
+      ms)
+        printf '0\n'
+        ;;
+      s)
+        printf '%s\n' "$number"
+        ;;
+      m)
+        printf '%s\n' "$((number * 60))"
+        ;;
+      h)
+        printf '%s\n' "$((number * 3600))"
+        ;;
+    esac
+    return 0
+  fi
+
+  return 1
+}
+
+format_benchmark_duration_seconds() {
+  local total_seconds="$1"
+  local hours minutes seconds result=""
+
+  if ! [[ "$total_seconds" =~ ^[0-9]+$ ]]; then
+    return 1
+  fi
+
+  hours=$((total_seconds / 3600))
+  minutes=$(((total_seconds % 3600) / 60))
+  seconds=$((total_seconds % 60))
+
+  if [ "$hours" -gt 0 ]; then
+    result="${hours}h"
+  fi
+  if [ "$minutes" -gt 0 ]; then
+    result="${result}${minutes}m"
+  fi
+  if [ "$seconds" -gt 0 ] || [ -z "$result" ]; then
+    result="${result}${seconds}s"
+  fi
+
+  printf '%s\n' "$result"
+}
+
+benchmark_effective_duration_seconds() {
+  local profile="$1"
+  local test_duration="$2"
+  local total_seconds=0
+  local component
+
+  case "$profile" in
+    smoke|steady)
+      parse_benchmark_duration_seconds "$test_duration"
+      ;;
+    ramp)
+      for component in "${RAMP_UP_DURATION:-1m}" "$test_duration" "${RAMP_DOWN_DURATION:-30s}"; do
+        total_seconds=$((total_seconds + $(parse_benchmark_duration_seconds "$component")))
+      done
+      printf '%s\n' "$total_seconds"
+      ;;
+    hpa)
+      for component in "${HPA_RAMP_UP_1:-2m}" "${HPA_RAMP_UP_2:-2m}" "${HPA_RAMP_UP_3:-3m}" "${HPA_HOLD:-5m}" "${HPA_RAMP_DOWN:-1m}"; do
+        total_seconds=$((total_seconds + $(parse_benchmark_duration_seconds "$component")))
+      done
+      printf '%s\n' "$total_seconds"
+      ;;
+    *)
+      parse_benchmark_duration_seconds "$test_duration"
+      ;;
+  esac
+}
+
+benchmark_duration_log_value() {
+  local profile="$1"
+  local test_duration="$2"
+  local effective_seconds effective_duration
+
+  case "$profile" in
+    hpa)
+      effective_seconds="$(benchmark_effective_duration_seconds "$profile" "$test_duration")" || {
+        printf '%s\n' "$test_duration"
+        return 0
+      }
+      effective_duration="$(format_benchmark_duration_seconds "$effective_seconds")" || {
+        printf '%s\n' "$test_duration"
+        return 0
+      }
+      printf '%s (HPA hold stage; effective total ~%s including ramp up/down)\n' "$test_duration" "$effective_duration"
+      ;;
+    ramp)
+      effective_seconds="$(benchmark_effective_duration_seconds "$profile" "$test_duration")" || {
+        printf '%s\n' "$test_duration"
+        return 0
+      }
+      effective_duration="$(format_benchmark_duration_seconds "$effective_seconds")" || {
+        printf '%s\n' "$test_duration"
+        return 0
+      }
+      printf '%s (steady hold stage; effective total ~%s including ramp up/down)\n' "$test_duration" "$effective_duration"
+      ;;
+    *)
+      printf '%s\n' "$test_duration"
+      ;;
+  esac
+}
+
 read_secret_value_from_cluster() {
   local context="$1"
   local namespace="$2"
