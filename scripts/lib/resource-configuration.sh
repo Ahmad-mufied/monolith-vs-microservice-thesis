@@ -129,7 +129,7 @@ resources_configuration_json() {
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
-            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
           "auth-service": {
@@ -139,7 +139,7 @@ resources_configuration_json() {
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
-            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
           "item-service": {
@@ -149,7 +149,7 @@ resources_configuration_json() {
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
-            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
           "transaction-service": {
@@ -159,7 +159,7 @@ resources_configuration_json() {
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
-            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 70 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           }
         }
@@ -178,7 +178,7 @@ resources_configuration_json() {
   fi
 
   if [ "$scaling_mode" = "hpa" ]; then
-    printf '%s' '{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"services":{"api-gateway":{"cpu_request":"200m","cpu_limit":"500m","memory_request":"432Mi","memory_limit":"864Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":70},"auth-service":{"cpu_request":"2000m","cpu_limit":"3500m","memory_request":"3456Mi","memory_limit":"5184Mi","min_replicas":1,"max_replicas":2,"target_cpu_utilization":70},"item-service":{"cpu_request":"200m","cpu_limit":"460m","memory_request":"432Mi","memory_limit":"864Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":70},"transaction-service":{"cpu_request":"800m","cpu_limit":"2000m","memory_request":"3024Mi","memory_limit":"5184Mi","min_replicas":1,"max_replicas":2,"target_cpu_utilization":70}}}'
+    printf '%s' '{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"services":{"api-gateway":{"cpu_request":"200m","cpu_limit":"500m","memory_request":"432Mi","memory_limit":"864Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":50},"auth-service":{"cpu_request":"2000m","cpu_limit":"3500m","memory_request":"3456Mi","memory_limit":"5184Mi","min_replicas":1,"max_replicas":2,"target_cpu_utilization":50},"item-service":{"cpu_request":"200m","cpu_limit":"460m","memory_request":"432Mi","memory_limit":"864Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":50},"transaction-service":{"cpu_request":"800m","cpu_limit":"2000m","memory_request":"3024Mi","memory_limit":"5184Mi","min_replicas":1,"max_replicas":2,"target_cpu_utilization":50}}}'
     return 0
   fi
 

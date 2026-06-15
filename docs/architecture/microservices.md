@@ -1087,7 +1087,7 @@ hpa mode:
   transaction-service: request 500m / limit 975m / 960Mi / 1920Mi
 minReplicas       : 1
 maxReplicas       : 4
-HPA target CPU    : 70%
+HPA target CPU    : 50%
 ```
 
 Namespace resource ceiling:
