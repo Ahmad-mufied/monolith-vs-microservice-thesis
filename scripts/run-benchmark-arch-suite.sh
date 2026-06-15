@@ -883,6 +883,10 @@ jq -s \
 benchmark_aws s3 cp "$summary_path" "${S3_RUN_URI}/_arch_suite/summary.json" >/dev/null
 log_info "Architecture suite summary uploaded to ${S3_RUN_URI}/_arch_suite/summary.json"
 
+if [ "$AUTO_DESTROY_CONFIRMED" = "true" ]; then
+  make "$(provider_sequential_destroy_target)"
+fi
+
 if [ "$suite_failed" -ne 0 ]; then
   log_warn "Architecture suite finished with non-pass cases."
   exit 1
