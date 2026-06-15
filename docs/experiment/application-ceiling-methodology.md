@@ -127,7 +127,7 @@ It also constrains:
 - monolith fixed pod limits,
 - microservices fixed per-service limits,
 - microservices HPA per-service total ceilings,
-- the fixed monolith baseline that remains active during suite-level HPA runs,
+- the fixed monolith baseline that remains active during supplemental HPA runs,
 - benchmark metadata that records resource settings.
 
 ---

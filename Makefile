@@ -88,7 +88,7 @@ help:
 	@echo "  make deploy-workloads SCALING_MODE=<fixed|hpa> [ARCHITECTURE=monolith|microservices]"
 	@echo "  make verify-live-mode SCALING_MODE=<fixed|hpa> [ARCHITECTURE=monolith|microservices]"
 	@echo "  make run-benchmark-case SCENARIO=<name> TARGET_RPS=<rps> RUN_ID=<id> SCALING_MODE=<fixed|hpa> [ARCHITECTURE=monolith|microservices]"
-	@echo "  make run-benchmark-suite SCALING_MODE=<fixed|hpa> EXPERIMENT_NAME=<name>"
+	@echo "  make run-benchmark-suite SCALING_MODE=fixed EXPERIMENT_NAME=<name>"
 	@echo "  make experiment-destroy-confirmed"
 	@echo "  make shared-destroy-confirmed"
 	@echo ""
@@ -1273,6 +1273,10 @@ run-benchmark-case:
 .PHONY: run-benchmark-suite
 run-benchmark-suite:
 	@printf '%s\n' '=== make run-benchmark-suite ==='; \
+	if [ "$(SCALING_MODE)" != "fixed" ]; then \
+	  printf '%s\n' "ERROR: run-benchmark-suite only supports SCALING_MODE=fixed. Use make run-benchmark-case, make run-benchmark-sequential, or make run-benchmark-parallel for supplementary HPA benchmarks." >&2; \
+	  exit 1; \
+	fi; \
 	printf '  scaling_mode             : %s\n' "$(SCALING_MODE)"; \
 	printf '  k6_profile               : %s\n' "$(if $(filter command line environment,$(origin K6_PROFILE)),$(K6_PROFILE),)"; \
 	printf '  test_duration            : %s\n' "$(TEST_DURATION)"; \
@@ -1371,6 +1375,10 @@ run-benchmark-sequential-vultr:
 .PHONY: run-benchmark-suite-vultr
 run-benchmark-suite-vultr:
 	@printf '%s\n' '=== make run-benchmark-suite-vultr ==='; \
+	if [ "$(SCALING_MODE)" != "fixed" ]; then \
+	  printf '%s\n' "ERROR: run-benchmark-suite-vultr only supports SCALING_MODE=fixed. Use make run-benchmark-case, make run-benchmark-sequential-vultr, or make run-benchmark-parallel-vultr for supplementary HPA benchmarks." >&2; \
+	  exit 1; \
+	fi; \
 	if [ -n "$(strip $(SCENARIO_RPS_MATRIX))" ]; then \
 	  printf '  scenario_rps_matrix      : %s\n' "$(SCENARIO_RPS_MATRIX)"; \
 	  printf '%s\n' '  rps_levels               : <ignored because SCENARIO_RPS_MATRIX is set>'; \
@@ -1407,6 +1415,10 @@ run-benchmark-suite-vultr:
 .PHONY: run-benchmark-suite-sequential-vultr
 run-benchmark-suite-sequential-vultr:
 	@printf '%s\n' '=== make run-benchmark-suite-sequential-vultr ==='; \
+	if [ "$(SCALING_MODE)" != "fixed" ]; then \
+	  printf '%s\n' "ERROR: run-benchmark-suite-sequential-vultr only supports SCALING_MODE=fixed. Use make run-benchmark-case or make run-benchmark-sequential-vultr for supplementary HPA benchmarks." >&2; \
+	  exit 1; \
+	fi; \
 	if [ -n "$(strip $(SCENARIO_RPS_MATRIX))" ]; then \
 	  printf '  scenario_rps_matrix      : %s\n' "$(SCENARIO_RPS_MATRIX)"; \
 	  printf '%s\n' '  rps_levels               : <ignored because SCENARIO_RPS_MATRIX is set>'; \
@@ -1445,6 +1457,10 @@ run-benchmark-suite-sequential-vultr:
 .PHONY: run-benchmark-suite-sequential
 run-benchmark-suite-sequential:
 	@printf '%s\n' '=== make run-benchmark-suite-sequential ==='; \
+	if [ "$(SCALING_MODE)" != "fixed" ]; then \
+	  printf '%s\n' "ERROR: run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use make run-benchmark-case or make run-benchmark-sequential for supplementary HPA benchmarks." >&2; \
+	  exit 1; \
+	fi; \
 	printf '  scaling_mode             : %s\n' "$(SCALING_MODE)"; \
 	printf '  k6_profile               : %s\n' "$(if $(filter command line environment,$(origin K6_PROFILE)),$(K6_PROFILE),)"; \
 	printf '  test_duration            : %s\n' "$(TEST_DURATION)"; \

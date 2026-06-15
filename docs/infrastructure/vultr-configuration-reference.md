@@ -187,7 +187,7 @@ Rules:
   `maxReplicas=4` for each microservice in supplemental HPA mode. This HPA
   profile uses an equal per-pod baseline plus shared namespace headroom rather
   than preserving the fixed-mode service ceiling per service. The monolith
-  stays on the fixed baseline in suite-level HPA runs.
+  stays on the fixed baseline in supplemental HPA runs.
 - Set `VULTR_EXPECTED_APP_NODE_COUNT=1` when verifying the current single app
   node topology.
 

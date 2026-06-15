@@ -590,7 +590,7 @@ the fixed-mode service ceiling per service. Instead, it uses an equal per-pod
 baseline plus shared namespace headroom:
 
 ```text
-Monolith:  fixed baseline remains active during suite-level HPA runs
+Monolith:  fixed baseline remains active during supplemental HPA runs
            LOGIN_MAX_CONCURRENCY=8  (975m per slot × 8 = 7800m)
 
 Microservices (per service, supplemental HPA):

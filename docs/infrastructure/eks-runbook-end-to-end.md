@@ -810,47 +810,53 @@ to HPA overlays. Do not reuse a fixed-mode deployment by changing only
 ```bash
 make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG
 
-make run-benchmark-suite \
-  SCALING_MODE=hpa \
-  EXPERIMENT_NAME=rq2-hpa-final \
+ARCHITECTURE=microservices \
+SCENARIO=concurrent-mixed-workload \
+TARGET_RPS=100 \
+RUN_ID=eks-hpa-rq2-hpa-final-670736c \
+ATTEMPT=attempt-01 \
+SCALING_MODE=hpa \
+K6_PROFILE=hpa \
   TEST_DURATION=5m \
-  INTER_CASE_DELAY=300 \
-  SCENARIOS="concurrent-mixed-workload login create-transaction enriched-transactions" \
-  RPS_LEVELS="100 250 500" \
-  S3_BUCKET=skripsi-benchmark-results
+  S3_BUCKET=skripsi-benchmark-results \
+  make run-benchmark-sequential
 ```
 
+For a broader supplemental HPA matrix, repeat the non-suite runner across the
+target scenarios and RPS levels you want to analyze. The suite runners remain
+reserved for the primary fixed matrix.
+
 **Note on `TEST_DURATION` for HPA mode:** When `SCALING_MODE=hpa`, the
-suite uses `K6_PROFILE=hpa` which applies a `ramping-arrival-rate` executor.
-This executor ignores `TEST_DURATION` entirely. The actual k6 run duration
-per case is controlled by HPA stage environment variables and defaults to
-**13 minutes** (2m + 2m + 3m + 5m + 1m). `TEST_DURATION=5m` in the command
-above is recorded in `metadata.json` but does not affect the k6 run.
+non-suite HPA runners use `K6_PROFILE=hpa` which applies a
+`ramping-arrival-rate` executor. This executor ignores `TEST_DURATION`
+entirely. The actual k6 run duration per case is controlled by HPA stage
+environment variables and defaults to **13 minutes** (2m + 2m + 3m + 5m + 1m).
+`TEST_DURATION=5m` in the command above is recorded in `metadata.json` but does
+not affect the k6 run.
 
 To shorten HPA runs for faster iteration, override the stage durations:
 
 ```bash
 HPA_RAMP_UP_1=1m HPA_RAMP_UP_2=1m HPA_RAMP_UP_3=2m HPA_HOLD=3m HPA_RAMP_DOWN=30s \
-  make run-benchmark-suite SCALING_MODE=hpa EXPERIMENT_NAME=rq2-hpa-final ...
+  ARCHITECTURE=microservices SCENARIO=login TARGET_RPS=250 RUN_ID=eks-hpa-rq2-hpa-final-670736c ATTEMPT=attempt-01 \
+  make run-benchmark-sequential SCALING_MODE=hpa K6_PROFILE=hpa ...
 # Total: 7.5 minutes per case instead of 13 minutes
 ```
 
 See `docs/experiment/scaling-mode-strategy.md` §6.3 for the full HPA stage
 configuration reference.
 
-Expected suite shape:
+Expected supplemental HPA case shape:
 
 ```text
-experiment   : rq2-hpa-final
 run_id       : eks-hpa-rq2-hpa-final-670736c
-attempt      : attempt-01, then attempt-02/03 when the same run_id is reused
+architecture : microservices
+scenario     : one selected scenario per run
+target_rps   : one selected RPS per run
+attempt      : attempt-01, then attempt-02/03 when the same run_id/case path is reused
 scaling_mode : hpa
 k6_profile   : hpa
-scenarios    : concurrent-mixed-workload login create-transaction enriched-transactions
-rps_levels   : 100 250 500
-case count   : 12
 k6 duration  : ~13 minutes per case (HPA stages, not TEST_DURATION)
-suite time   : ~3.5 hours (12 cases × 13m + inter-case delays)
 ```
 
 ### Phase 6.4 — Calibration Matrix
@@ -1181,13 +1187,13 @@ kubectl --context=monolith run pg-test \
 | `SCALING_MODE=fixed make eks-deploy-msa` | Deploy MSA (fixed replicas) |
 | `ARCHITECTURE=monolith SCALING_MODE=fixed make eks-deploy-sequential-architecture` | Deploy one active architecture on the sequential cluster |
 | `make eks-deploy-all-fixed IMAGE_TAG=$IMAGE_TAG` | Deploy both architectures in fixed mode |
-| `SCALING_MODE=hpa make eks-deploy-monolith` | Deploy monolith with the fixed baseline while preparing the suite-level HPA mode |
+| `SCALING_MODE=hpa make eks-deploy-monolith` | Deploy monolith with the fixed baseline while preparing the supplemental HPA workflow |
 | `make eks-deploy-all-hpa IMAGE_TAG=$IMAGE_TAG` | Deploy monolith fixed + microservices HPA for the supporting autoscaling matrix |
 | `DATADOG_API_KEY=<key> make datadog-install-eks-monolith` | Install Datadog on monolith cluster |
 | `DATADOG_API_KEY=<key> make datadog-install-eks-msa` | Install Datadog on MSA cluster |
 | `make run-benchmark-parallel SCENARIO=login TARGET_RPS=1000 RUN_ID=... S3_BUCKET=...` | Run parallel benchmark |
 | `make run-benchmark-suite SCALING_MODE=fixed SCENARIOS="login create-transaction enriched-transactions" RPS_LEVELS="1000 2500 5000 7500 10000"` | Run primary fixed-mode matrix |
-| `make run-benchmark-suite SCALING_MODE=hpa SCENARIOS="login create-transaction enriched-transactions" RPS_LEVELS="1000 2500 5000 7500 10000"` | Run supporting HPA-mode matrix |
+| `ARCHITECTURE=microservices SCENARIO=login TARGET_RPS=250 RUN_ID=... ATTEMPT=attempt-01 SCALING_MODE=hpa K6_PROFILE=hpa make run-benchmark-sequential` | Run one supplemental HPA benchmark case on the sequential cluster |
 | `make run-benchmark-suite-sequential SCALING_MODE=fixed ARCHITECTURE_ORDER="monolith microservices" ARCHITECTURE_SWITCH_DELAY=300` | Run one architecture at a time on the sequential cluster with a consistent Datadog separation gap |
 | `make eks-destroy-confirmed` | Destroy experiment clusters and RDS after confirming benchmark artifacts are safe in S3 |
 | `make eks-sequential-destroy-confirmed` | Destroy sequential cluster and RDS after confirming benchmark artifacts are safe in S3 |

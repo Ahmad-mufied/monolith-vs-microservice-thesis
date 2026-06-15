@@ -137,9 +137,10 @@ IMAGE_TAG=670736c make run-benchmark-suite
 ```
 
 For sequential Vultr suites, `make run-benchmark-suite` deploys each
-architecture phase internally with the suite-level `SCALING_MODE` and
-`IMAGE_TAG`. Run a new suite with `SCALING_MODE=hpa` when switching from fixed
-to HPA.
+architecture phase internally with the fixed suite baseline and the selected
+`IMAGE_TAG`. Supplemental HPA measurements are executed outside the suite via
+`make run-benchmark-case`, `make run-benchmark-sequential`, or
+`make run-benchmark-parallel`.
 
 When a suite run omits `RUN_ID` but sets `EXPERIMENT_NAME`, the current
 benchmark runners include the active `IMAGE_TAG` in the default generated
@@ -156,6 +157,6 @@ to the exact deployable image revision that was measured.
 - Verify the selected tag with `make dockerhub-list-images IMAGE_TAG=<tag>`
   before deploy.
 - Pin the selected tag for operator safety.
-- Let deploy and benchmark suite commands use the pinned tag unless you are
+- Let deploy and fixed benchmark suite commands use the pinned tag unless you are
   intentionally overriding it with a non-empty `IMAGE_TAG=<tag>`.
 - Verify benchmark metadata includes the expected `image_tag`.

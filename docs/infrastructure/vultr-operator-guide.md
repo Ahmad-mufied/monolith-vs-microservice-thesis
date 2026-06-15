@@ -309,7 +309,7 @@ full suite:   run-benchmark-suite auto-deploys each architecture phase
 ```
 
 For the full suite, do **not** run `deploy-workloads` first. The suite deploys
-each phase internally using the suite-level `SCALING_MODE` and `IMAGE_TAG`.
+each phase internally using the fixed suite baseline and `IMAGE_TAG`.
 For a single case, `run-benchmark-case` checks the requested architecture and
 mode first: if the target is already live and ready, it skips deploy; otherwise
 it deploys the target architecture before running the case.
@@ -594,7 +594,7 @@ AUTO_DESTROY_CONFIRMED=true RUN_ID=rq1-fixed-vultr SCALING_MODE=fixed make run-b
 | Smoke check one arch | `deploy-workloads` → `verify-live-mode` | Yes |
 | Single smoke case | `run-benchmark-case` | Recommended |
 | Fixed full matrix | `SCALING_MODE=fixed make run-benchmark-suite` | No |
-| HPA full matrix | `SCALING_MODE=hpa make run-benchmark-suite` | No |
+| HPA full matrix | `SCALING_MODE=hpa` with `make run-benchmark-case`, `make run-benchmark-sequential`, or `make run-benchmark-parallel` | No |
 | MSA first | add `ARCHITECTURE_ORDER="microservices monolith"` | No |
 
 ---

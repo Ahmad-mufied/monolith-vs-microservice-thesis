@@ -596,7 +596,7 @@ the per-pod concurrency level.
 ### 13.2 System-Level Fairness with Supplemental HPA
 
 The primary benchmark keeps the monolith on its fixed single-pod baseline even
-when suite-level `SCALING_MODE=hpa` is selected. Supplemental HPA therefore
+when supplemental `SCALING_MODE=hpa` is selected. Supplemental HPA therefore
 applies only to the microservices deployment.
 
 ```

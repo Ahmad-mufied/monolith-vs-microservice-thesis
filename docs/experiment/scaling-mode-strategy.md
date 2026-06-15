@@ -90,7 +90,7 @@ and supplemental HPA must preserve the same total architecture ceiling
 
 ### 3.1 Monolith During Supplemental HPA Runs
 
-During suite-level `SCALING_MODE=hpa`, the monolith remains on the fixed
+During supplemental HPA benchmark runs, the monolith remains on the fixed
 single-pod baseline:
 
 ```text
@@ -214,7 +214,32 @@ That trade-off should be stated explicitly in the thesis.
 
 ---
 
-## 6. Inter-Case Delay
+## 6. Running Fixed and Supplemental HPA Benchmarks
+
+The benchmark workflow now distinguishes clearly between:
+
+- fixed-mode suite runs for the primary architecture matrix, and
+- supplemental HPA runs executed through the non-suite benchmark runners.
+
+Use the suite runners only for the fixed matrix:
+
+```bash
+make run-benchmark-suite SCALING_MODE=fixed ...
+make run-benchmark-suite-sequential SCALING_MODE=fixed ...
+```
+
+Use the non-suite runners for supplemental HPA measurements:
+
+```bash
+make run-benchmark-case SCALING_MODE=hpa K6_PROFILE=hpa ...
+make run-benchmark-sequential SCALING_MODE=hpa K6_PROFILE=hpa ...
+make run-benchmark-parallel SCALING_MODE=hpa K6_PROFILE=hpa ...
+```
+
+This keeps the primary fixed comparison separate from the supporting autoscaling
+analysis and avoids rerunning the monolith fixed baseline inside an HPA suite.
+
+## 7. Inter-Case Delay
 
 Fixed and HPA runs are still executed as independent k6 jobs per scenario and
 RPS combination. The inter-case delay remains part of the benchmark method.
@@ -242,7 +267,7 @@ For smoke tests and quick calibration, `INTER_CASE_DELAY=0` remains acceptable.
 
 ---
 
-## 7. Practical Summary
+## 8. Practical Summary
 
 Use these rules for the active Vultr benchmark path:
 

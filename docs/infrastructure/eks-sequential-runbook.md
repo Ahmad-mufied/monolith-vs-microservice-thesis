@@ -258,6 +258,20 @@ Per-architecture `timing_source` values (under `architectures.<name>`):
 - `datadog_artifact`: both timestamps came from secondary datadog-time-window.json
 - `attempt_metadata_partial`: start from metadata `timestamp_utc`, end from
   orchestrator wall-clock
+
+The sequential suite is fixed-only. If you need supplemental HPA measurements,
+run them outside the suite, for example:
+
+```bash
+ARCHITECTURE=microservices \
+SCENARIO=login \
+TARGET_RPS=250 \
+RUN_ID=eks-sequential-hpa-rq2 \
+ATTEMPT=attempt-01 \
+SCALING_MODE=hpa \
+K6_PROFILE=hpa \
+make run-benchmark-sequential
+```
 - `orchestrator`: both timestamps came from orchestrator wall-clock
 
 Case-level `timing_source` values:

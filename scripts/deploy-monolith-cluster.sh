@@ -132,7 +132,7 @@ $K8S apply -k "$RENDERED_MONOLITH_OVERLAY_DIR"
 # Resource management
 $K8S delete hpa monolith -n mono --ignore-not-found
 if [ "$SCALING_MODE" = "hpa" ]; then
-  echo "Monolith stays in fixed mode while suite-level SCALING_MODE=hpa is used for microservices autoscaling."
+  echo "Monolith stays in fixed mode while supplemental SCALING_MODE=hpa is used for microservices autoscaling."
 else
   echo "Fixed replica mode applied"
 fi

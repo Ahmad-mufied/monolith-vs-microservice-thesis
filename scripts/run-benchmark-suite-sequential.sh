@@ -69,6 +69,11 @@ trap cleanup EXIT
 : > "$PHASES_JSONL"
 declare -A CASE_RESULT_STATUS_CACHE=()
 
+if [ "$SCALING_MODE" != "fixed" ]; then
+  printf '[%s] ERROR: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-case or run-benchmark-sequential for supplementary HPA benchmarks." >&2
+  exit 1
+fi
+
 log_timestamp() {
   date '+%Y-%m-%d %H:%M:%S %Z'
 }
@@ -837,21 +842,17 @@ sequential_case_timing_json() {
 }
 
 if [ -z "$K6_PROFILE" ]; then
-  if [ "$SCALING_MODE" = "hpa" ]; then
-    K6_PROFILE="hpa"
-  else
-    K6_PROFILE="steady"
-  fi
+  K6_PROFILE="steady"
 fi
 
 case "$SCALING_MODE:$K6_PROFILE" in
-  fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa) ;;
+  fixed:steady|fixed:ramp|fixed:smoke) ;;
   fixed:hpa)
     log_error "K6_PROFILE=hpa must not be used with SCALING_MODE=fixed."
     exit 1
     ;;
-  hpa:steady|hpa:ramp|hpa:smoke)
-    log_error "SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment."
+  hpa:steady|hpa:ramp|hpa:smoke|hpa:hpa)
+    log_error "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-case or run-benchmark-sequential for supplementary HPA benchmarks."
     exit 1
     ;;
 esac

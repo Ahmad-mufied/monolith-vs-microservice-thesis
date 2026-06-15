@@ -184,6 +184,11 @@ validate_matrix_inputs() {
       ;;
   esac
 
+  if [ "$SCALING_MODE" != "fixed" ]; then
+    echo "ERROR: run-benchmark-suite only supports SCALING_MODE=fixed. Use run-benchmark-case, run-benchmark-sequential, or run-benchmark-parallel for supplementary HPA benchmarks." >&2
+    return 1
+  fi
+
   if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
     while IFS= read -r matrix_entry; do
       matrix_entry="$(trim_whitespace "$matrix_entry")"
@@ -277,11 +282,7 @@ if [ -n "$EXPERIMENT_NAME" ]; then
 fi
 
 if [ -z "$K6_PROFILE" ]; then
-  if [ "$SCALING_MODE" = "hpa" ]; then
-    K6_PROFILE="hpa"
-  else
-    K6_PROFILE="steady"
-  fi
+  K6_PROFILE="steady"
 fi
 
 validate_scaling_profile_pairing() {
@@ -290,15 +291,15 @@ validate_scaling_profile_pairing() {
   fi
 
   case "$SCALING_MODE:$K6_PROFILE" in
-    fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa)
+    fixed:steady|fixed:ramp|fixed:smoke)
       return 0
       ;;
     fixed:hpa)
       echo "ERROR: K6_PROFILE=hpa must not be used with SCALING_MODE=fixed. Use SCALING_MODE=hpa with HPA overlays, or set ALLOW_NONSTANDARD_SCALING_PROFILE=true only if you are intentionally running a nonstandard experiment." >&2
       return 1
       ;;
-    hpa:steady|hpa:ramp|hpa:smoke)
-      echo "ERROR: SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only if you intentionally want a nonstandard pairing." >&2
+    hpa:steady|hpa:ramp|hpa:smoke|hpa:hpa)
+      echo "ERROR: run-benchmark-suite only supports SCALING_MODE=fixed. Use run-benchmark-case, run-benchmark-sequential, or run-benchmark-parallel for supplementary HPA benchmarks." >&2
       return 1
       ;;
     *)
@@ -786,7 +787,7 @@ verify_live_scaling_mode_state() {
   msa_hpa_count="${msa_hpa_count:-0}"
 
   if [ "$mono_hpa_present" -ne 0 ]; then
-    echo "ERROR: found monolith HPA in namespace mono, but the benchmark model requires monolith to stay fixed in both fixed and suite-level hpa runs." >&2
+    echo "ERROR: found monolith HPA in namespace mono, but the benchmark model requires monolith to stay fixed in both fixed and supplemental hpa runs." >&2
     return 1
   fi
 

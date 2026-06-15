@@ -28,7 +28,7 @@ check_context_architecture() {
       mono_hpa_present=1
     fi
     if [ "$mono_hpa_present" -ne 0 ]; then
-      echo "ERROR: found stale monolith HPA in context '$context'. Monolith must stay fixed in both fixed and suite-level hpa runs." >&2
+      echo "ERROR: found stale monolith HPA in context '$context'. Monolith must stay fixed in both fixed and supplemental hpa runs." >&2
       exit 1
     fi
     if [ "$MONOLITH_EFFECTIVE_SCALING_MODE" = "fixed" ]; then

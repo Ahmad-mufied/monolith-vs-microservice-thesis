@@ -65,7 +65,7 @@ resources_configuration_json() {
             measured_app_node_count: ($app_node_count | tonumber),
             measured_app_allocatable: {cpu: $allocatable_cpu, memory: $allocatable_memory},
             resource_profile: "vultr-equal-split",
-            allocation_method: "fixed monolith baseline retained while suite-level hpa applies only to microservices",
+            allocation_method: "fixed monolith baseline retained while supplemental hpa applies only to microservices",
             cpu_request: "3900m",
             cpu_limit: "7800m",
             memory_request: "7680Mi",
@@ -169,7 +169,7 @@ resources_configuration_json() {
 
   if [ "$architecture" = "monolith" ]; then
     if [ "$scaling_mode" = "hpa" ]; then
-      printf '%s' '{"autoscaling_mode":"hpa","effective_scaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"allocation_method":"fixed monolith baseline retained while suite-level hpa applies only to microservices","cpu_request":"7900m","cpu_limit":"15800m","memory_request":"13824Mi","memory_limit":"27648Mi","replica_count":1}'
+      printf '%s' '{"autoscaling_mode":"hpa","effective_scaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"15800m","memory":"27648Mi"},"allocation_method":"fixed monolith baseline retained while supplemental hpa applies only to microservices","cpu_request":"7900m","cpu_limit":"15800m","memory_request":"13824Mi","memory_limit":"27648Mi","replica_count":1}'
       return 0
     fi
 
