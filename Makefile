@@ -1475,7 +1475,7 @@ run-benchmark-arch-suite-vultr:
 	EXECUTION_MODE=sequential \
 	ARCHITECTURE=$(ARCHITECTURE) \
 	SCALING_MODE=$(SCALING_MODE) \
-	K6_PROFILE=$(K6_PROFILE) \
+	K6_PROFILE="$(if $(filter command line environment,$(origin K6_PROFILE)),$(K6_PROFILE),)" \
 	TEST_DURATION=$(TEST_DURATION) \
 	SCENARIOS="$(SCENARIOS)" \
 	RPS_LEVELS="$(RPS_LEVELS)" \
