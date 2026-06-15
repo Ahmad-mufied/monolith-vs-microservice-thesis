@@ -619,10 +619,12 @@ while true; do
 done
 
 echo ""
-if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ] && ! benchmark_preflight_check "$S3_BUCKET" "parallel benchmark result inspection" "true"; then
-  echo "ERROR: benchmark jobs finished but local AWS or EKS auth expired before result inspection." >&2
-  echo "Fix: refresh auth, verify S3 artifacts for this attempt, then rerun the inspection workflow or the benchmark case if needed." >&2
-  exit 1
+if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
+  if ! benchmark_preflight_check "$S3_BUCKET" "parallel benchmark result inspection" "true"; then
+    echo "ERROR: benchmark jobs finished but local AWS or EKS auth expired before result inspection." >&2
+    echo "Fix: refresh auth, verify S3 artifacts for this attempt, then rerun the inspection workflow or the benchmark case if needed." >&2
+    exit 1
+  fi
 fi
 
 mono_result_file="$INSPECTION_ROOT/monolith-result.json"

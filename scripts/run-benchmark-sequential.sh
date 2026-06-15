@@ -330,9 +330,11 @@ while true; do
   sleep 5
 done
 
-if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ] && ! BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_check "$S3_BUCKET" "sequential benchmark result inspection" "true"; then
-  echo "ERROR: benchmark job finished but local AWS or EKS auth expired before result inspection." >&2
-  exit 1
+if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
+  if ! BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_check "$S3_BUCKET" "sequential benchmark result inspection" "true"; then
+    echo "ERROR: benchmark job finished but local AWS or EKS auth expired before result inspection." >&2
+    exit 1
+  fi
 fi
 
 fetch_s3_artifact() {
