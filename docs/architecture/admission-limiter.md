@@ -32,8 +32,9 @@ the following failure modes emerge:
    are running.
 
 2. **Cascading latency** — the slower bcrypt makes the request context more
-   likely to expire before the comparison finishes, producing timeouts
-   (503 deadline exceeded) that are harder to attribute to the real cause.
+   likely to expire before the comparison finishes, producing timeout errors
+   that are surfaced as `503 SERVICE_UNAVAILABLE` (or `499` on client cancel)
+   and are harder to attribute to the real cause.
 
 3. **Tail latency spikes** — p99 and p999 latency blow up because of CPU
    contention, even if median latency remains low.
