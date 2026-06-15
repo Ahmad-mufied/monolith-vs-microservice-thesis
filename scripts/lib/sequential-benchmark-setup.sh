@@ -121,9 +121,9 @@ restore_active() {
   local svc
   local overlay_scaling_mode="$SCALING_MODE"
 
-  log_setup_info "Restoring active ${architecture} workloads with ${SCALING_MODE} overlay..."
   if [ "$architecture" = "monolith" ]; then
     overlay_scaling_mode="fixed"
+    log_setup_info "Restoring active ${architecture} workloads with requested=${SCALING_MODE}, effective=${overlay_scaling_mode} overlay..."
     kubectl --context="$SEQUENTIAL_CONTEXT" delete hpa monolith -n mono --ignore-not-found
     kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/cloud/monolith/overlays/$overlay_scaling_mode"
     log_setup_info "Waiting for deployment mono/monolith rollout..."
@@ -131,6 +131,7 @@ restore_active() {
     log_setup_info "Active ${architecture} workloads restored."
     return
   fi
+  log_setup_info "Restoring active ${architecture} workloads with ${overlay_scaling_mode} overlay..."
   kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/cloud/microservices/overlays/$overlay_scaling_mode"
   for svc in auth-service item-service transaction-service api-gateway; do
     log_setup_info "Waiting for deployment msa/${svc} rollout..."
