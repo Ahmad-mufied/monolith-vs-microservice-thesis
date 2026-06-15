@@ -39,6 +39,13 @@ K8S="kubectl --context=$CONTEXT"
 SCALING_MODE="${SCALING_MODE:-fixed}"
 MONOLITH_EFFECTIVE_SCALING_MODE="fixed"
 MICROSERVICES_EFFECTIVE_SCALING_MODE="$SCALING_MODE"
+case "$SCALING_MODE" in
+  fixed|hpa) ;;
+  *)
+    echo "ERROR: unsupported SCALING_MODE '$SCALING_MODE' (expected: fixed|hpa)" >&2
+    exit 1
+    ;;
+esac
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
