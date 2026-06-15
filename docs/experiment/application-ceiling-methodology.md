@@ -125,9 +125,9 @@ This means the ceiling is not just a ResourceQuota value.
 It also constrains:
 
 - monolith fixed pod limits,
-- monolith HPA per-pod limits,
 - microservices fixed per-service limits,
 - microservices HPA per-service total ceilings,
+- the fixed monolith baseline that remains active during supplemental HPA runs,
 - benchmark metadata that records resource settings.
 
 ---

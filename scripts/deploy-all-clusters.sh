@@ -34,6 +34,11 @@ done
 
 echo "=== Deploying both benchmark architectures ==="
 echo "  scaling_mode : $SCALING_MODE"
+if [ "$SCALING_MODE" = "hpa" ]; then
+  echo "  effective    : monolith=fixed, microservices=hpa"
+else
+  echo "  effective    : monolith=fixed, microservices=fixed"
+fi
 echo "  image_tag    : $IMAGE_TAG"
 echo "  provider     : $CLOUD_PROVIDER"
 echo ""
@@ -57,4 +62,8 @@ CLOUD_PROVIDER="$CLOUD_PROVIDER" \
 bash scripts/deploy-msa-cluster.sh
 
 echo ""
-echo "Both benchmark architectures deployed with SCALING_MODE=$SCALING_MODE"
+if [ "$SCALING_MODE" = "hpa" ]; then
+  echo "Both benchmark architectures deployed: monolith fixed baseline + microservices HPA"
+else
+  echo "Both benchmark architectures deployed in fixed mode"
+fi

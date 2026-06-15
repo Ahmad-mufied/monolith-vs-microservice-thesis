@@ -69,6 +69,11 @@ trap cleanup EXIT
 : > "$PHASES_JSONL"
 declare -A CASE_RESULT_STATUS_CACHE=()
 
+if [ "$SCALING_MODE" != "fixed" ]; then
+  printf '[%s] ERROR: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite ARCHITECTURE=microservices for a supplemental HPA suite, or run-benchmark-case for one-off HPA cases." >&2
+  exit 1
+fi
+
 log_timestamp() {
   date '+%Y-%m-%d %H:%M:%S %Z'
 }
@@ -345,6 +350,44 @@ matrix_json() {
     | map(select(length > 0))
     | map(split("\t") as $parts | {scenario:$parts[0], rps_levels:(($parts[1] // "") | split(" ") | map(select(length > 0) | tonumber))})
   ' < "$MATRIX_TSV"
+}
+
+log_suite_configuration() {
+  local matrix_source
+  local scenario
+  local scenario_rps_levels
+
+  if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
+    matrix_source="SCENARIO_RPS_MATRIX"
+  else
+    matrix_source="SCENARIOS + RPS_LEVELS fallback"
+  fi
+
+  log_info "=== Sequential Benchmark Suite ==="
+  log_info "  provider      : $CLOUD_PROVIDER"
+  log_info "  context       : $SEQUENTIAL_CONTEXT"
+  log_info "  scaling_mode  : $SCALING_MODE"
+  log_info "  k6_profile    : $K6_PROFILE"
+  log_info "  duration      : $TEST_DURATION"
+  log_info "  image_tag     : $IMAGE_TAG"
+  log_info "  run_id        : $RUN_ID"
+  log_info "  attempt       : $ATTEMPT"
+  if [ -n "$EXPERIMENT_NAME" ]; then
+    log_info "  experiment    : $EXPERIMENT_NAME"
+  fi
+  log_info "  architecture  : $ARCHITECTURE_ORDER"
+  log_info "  matrix_source : $matrix_source"
+  if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
+    log_info "  raw_matrix    : $SCENARIO_RPS_MATRIX"
+  else
+    log_info "  scenarios     : $SCENARIOS"
+    log_info "  rps_levels    : $RPS_LEVELS"
+  fi
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ -z "$scenario" ] && continue
+    log_info "  effective     : ${scenario} -> ${scenario_rps_levels}"
+  done < "$MATRIX_TSV"
+  log_info "  report_s3_uri : $S3_RUN_URI"
 }
 
 case_result_cache_key() {
@@ -702,7 +745,7 @@ scaling_mode_matches_live_architecture() {
       ! kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
       ;;
     monolith:hpa)
-      kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
+      ! kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
       ;;
     microservices:fixed)
       hpa_count="$(kubectl --context="$SEQUENTIAL_CONTEXT" get hpa -n msa -o name 2>/dev/null | wc -l | tr -d '[:space:]' || true)"
@@ -799,21 +842,17 @@ sequential_case_timing_json() {
 }
 
 if [ -z "$K6_PROFILE" ]; then
-  if [ "$SCALING_MODE" = "hpa" ]; then
-    K6_PROFILE="hpa"
-  else
-    K6_PROFILE="steady"
-  fi
+  K6_PROFILE="steady"
 fi
 
 case "$SCALING_MODE:$K6_PROFILE" in
-  fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa) ;;
+  fixed:steady|fixed:ramp|fixed:smoke) ;;
   fixed:hpa)
     log_error "K6_PROFILE=hpa must not be used with SCALING_MODE=fixed."
     exit 1
     ;;
-  hpa:steady|hpa:ramp|hpa:smoke)
-    log_error "SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment."
+  hpa:steady|hpa:ramp|hpa:smoke|hpa:hpa)
+    log_error "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite ARCHITECTURE=microservices for a supplemental HPA suite, or run-benchmark-case for one-off HPA cases."
     exit 1
     ;;
 esac
@@ -846,6 +885,7 @@ build_matrix_file
 K6_CASE_ESTIMATE_SECONDS="$(estimate_case_duration_seconds)"
 CASE_ESTIMATE_SECONDS=$((K6_CASE_ESTIMATE_SECONDS + SEQUENTIAL_CASE_OVERHEAD_SECONDS + SEQUENTIAL_RETRY_BUFFER_SECONDS))
 REUSED_CASE_ESTIMATE_SECONDS=$((K6_CASE_ESTIMATE_SECONDS + SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS + SEQUENTIAL_RETRY_BUFFER_SECONDS))
+log_suite_configuration
 
 if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
   BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_or_die "$S3_BUCKET" "sequential suite bootstrap" "false"

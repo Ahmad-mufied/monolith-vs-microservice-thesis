@@ -35,6 +35,7 @@ fi
 CONTEXT="monolith"
 K8S="kubectl --context=$CONTEXT"
 SCALING_MODE="${SCALING_MODE:-fixed}"
+MONOLITH_EFFECTIVE_SCALING_MODE="fixed"
 APP_JOB_DIR="deployments/k8s/cloud/monolith"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
@@ -76,7 +77,7 @@ echo "=== Deploying monolith cluster (context: $CONTEXT) ==="
 echo "Rendering cloud manifests with IMAGE_TAG=$IMAGE_TAG"
 render_provider_manifests "$RENDER_ROOT"
 RENDERED_APP_JOB_DIR="$RENDER_ROOT/$APP_JOB_DIR"
-RENDERED_MONOLITH_OVERLAY_DIR="$RENDERED_APP_JOB_DIR/overlays/$SCALING_MODE"
+RENDERED_MONOLITH_OVERLAY_DIR="$RENDERED_APP_JOB_DIR/overlays/$MONOLITH_EFFECTIVE_SCALING_MODE"
 bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 
 # Namespaces
@@ -129,11 +130,10 @@ echo "Seed complete"
 $K8S apply -k "$RENDERED_MONOLITH_OVERLAY_DIR"
 
 # Resource management
+$K8S delete hpa monolith -n mono --ignore-not-found
 if [ "$SCALING_MODE" = "hpa" ]; then
-  bash scripts/install-metrics-server.sh "$CONTEXT"
-  echo "HPA mode applied"
+  echo "Monolith stays in fixed mode while supplemental SCALING_MODE=hpa is used for microservices autoscaling."
 else
-  $K8S delete hpa monolith -n mono --ignore-not-found
   echo "Fixed replica mode applied"
 fi
 

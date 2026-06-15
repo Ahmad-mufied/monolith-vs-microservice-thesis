@@ -4,6 +4,8 @@ set -euo pipefail
 SCALING_MODE="${SCALING_MODE:?SCALING_MODE is required (fixed|hpa)}"
 EXECUTION_MODE="${EXECUTION_MODE:-parallel}"
 ARCHITECTURE="${ARCHITECTURE:-}"
+MONOLITH_EFFECTIVE_SCALING_MODE="fixed"
+MICROSERVICES_EFFECTIVE_SCALING_MODE="$SCALING_MODE"
 
 case "$SCALING_MODE" in
   fixed|hpa) ;;
@@ -25,34 +27,28 @@ check_context_architecture() {
     if kubectl --context="$context" get hpa monolith -n mono >/dev/null 2>&1; then
       mono_hpa_present=1
     fi
-    if [ "$SCALING_MODE" = "hpa" ] && [ "$mono_hpa_present" -ne 1 ]; then
-      echo "ERROR: expected monolith HPA in context '$context'" >&2
+    if [ "$mono_hpa_present" -ne 0 ]; then
+      echo "ERROR: found stale monolith HPA in context '$context'. Monolith must stay fixed in both fixed and supplemental hpa runs." >&2
       exit 1
     fi
-    if [ "$SCALING_MODE" = "fixed" ] && [ "$mono_hpa_present" -ne 0 ]; then
-      echo "ERROR: found stale monolith HPA in fixed mode in context '$context'" >&2
-      exit 1
-    fi
-    if [ "$SCALING_MODE" = "fixed" ]; then
+    if [ "$MONOLITH_EFFECTIVE_SCALING_MODE" = "fixed" ]; then
       check_deployment_replicas "$context" mono monolith 1
-    else
-      check_hpa_replicas "$context" mono monolith 1 4
     fi
     kubectl --context="$context" rollout status deployment/monolith -n mono --timeout=30s
     app_pods="$(kubectl --context="$context" get pods -n mono -l app=monolith -o json)"
   else
     msa_hpa_count="$(kubectl --context="$context" get hpa -n msa --no-headers 2>/dev/null | wc -l | tr -d '[:space:]')"
     msa_hpa_count="${msa_hpa_count:-0}"
-    if [ "$SCALING_MODE" = "hpa" ] && [ "$msa_hpa_count" -lt 4 ]; then
+    if [ "$MICROSERVICES_EFFECTIVE_SCALING_MODE" = "hpa" ] && [ "$msa_hpa_count" -lt 4 ]; then
       echo "ERROR: expected at least 4 MSA HPAs in context '$context', found $msa_hpa_count" >&2
       exit 1
     fi
-    if [ "$SCALING_MODE" = "fixed" ] && [ "$msa_hpa_count" -ne 0 ]; then
+    if [ "$MICROSERVICES_EFFECTIVE_SCALING_MODE" = "fixed" ] && [ "$msa_hpa_count" -ne 0 ]; then
       echo "ERROR: found stale MSA HPAs in fixed mode in context '$context'" >&2
       exit 1
     fi
     for svc in auth-service item-service transaction-service api-gateway; do
-      if [ "$SCALING_MODE" = "fixed" ]; then
+      if [ "$MICROSERVICES_EFFECTIVE_SCALING_MODE" = "fixed" ]; then
         check_deployment_replicas "$context" msa "$svc" 1
       fi
       kubectl --context="$context" rollout status "deployment/${svc}" -n msa --timeout=30s

@@ -129,7 +129,7 @@ sequenceDiagram
   Op->>VKE: render and deploy fixed or HPA manifests
   VKE->>DH: Pull app and k6 images
   Op->>VKE: verify live fixed/HPA mode
-  Op->>K6: run benchmark case or suite
+  Op->>K6: run fixed suite, arch suite, or single case
   K6->>VKE: Send HTTP load to active architecture
   VKE->>PG: Application database traffic over private VPC
   VKE->>DD: Datadog Agent emits telemetry

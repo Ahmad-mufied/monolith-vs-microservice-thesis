@@ -11,7 +11,7 @@ with `ARCHITECTURE_SWITCH_DELAY`.
 
 ```mermaid
 flowchart TB
-  start(["Operator starts suite<br/>make run-benchmark-suite"])
+  start(["Operator starts fixed suite<br/>make run-benchmark-suite-sequential<br/>SCALING_MODE=fixed"])
   dispatch["operator-dispatch.sh<br/>select Vultr sequential runner"]
   matrix["Build benchmark matrix<br/>SCENARIO_RPS_MATRIX or<br/>SCENARIOS + RPS_LEVELS"]
   preflight["Suite preflight<br/>validate env, S3 access,<br/>Kubernetes context, image tag"]
@@ -20,8 +20,8 @@ flowchart TB
   archLoop{"Next architecture phase<br/>monolith or microservices"}
   pendingArch{"Any pending case<br/>missing result-status.json?"}
   skipArch["Skip architecture deploy<br/>all cases already exist in S3"]
-  readyArch{"Live architecture already<br/>matches IMAGE_TAG and SCALING_MODE?"}
-  deployArch["Deploy or redeploy architecture<br/>scale inactive namespace down<br/>apply fixed or HPA overlay"]
+  readyArch{"Live architecture already<br/>matches IMAGE_TAG and fixed suite baseline?"}
+  deployArch["Deploy or redeploy architecture<br/>scale inactive namespace down<br/>monolith: fixed overlay<br/>microservices: fixed overlay"]
 
   scenarioLoop{"Next scenario"}
   pendingScenario{"Any pending RPS<br/>for this scenario?"}
@@ -40,7 +40,7 @@ flowchart TB
   k6["Create k6 Kubernetes job<br/>wait for completion"]
   upload["Upload attempt artifacts<br/>summary, raw, metadata,<br/>thresholds, result-status"]
   delay{"More cases in phase?"}
-  interDelay["Sleep INTER_CASE_DELAY<br/>fixed: 120s, HPA: 300s"]
+  interDelay["Sleep INTER_CASE_DELAY<br/>fixed suite: typically 120s"]
   switchDelay["Sleep ARCHITECTURE_SWITCH_DELAY<br/>before next architecture"]
   summary["Upload suite summary<br/>_suite/summary.json"]
   done(["Suite complete"])
@@ -84,8 +84,8 @@ flowchart TB
   enrichmentRead["Data-stable enriched read scenario<br/>enriched-transactions"]
   mutating["Mutating scenario<br/>create-transaction, sync-items,<br/>concurrent-mixed-workload, mixed-workload"]
   entrypoint{"Execution entrypoint"}
-  suiteRunner["Suite runner<br/>run-benchmark-suite"]
-  singleRunner["Single-case runner<br/>run-benchmark-case"]
+  suiteRunner["Fixed suite runner<br/>run-benchmark-suite-sequential"]
+  singleRunner["Single-case runner<br/>run-benchmark-sequential"]
   once["Reset + seed once<br/>before first pending RPS<br/>reuse for later pending RPS levels"]
   onceEnrich["Reset + seed + prepare enrichment once<br/>before first pending RPS<br/>reuse for later pending RPS levels"]
   everyCase["Reset + seed per RPS level<br/>prepare enrichment per RPS when required"]
@@ -123,5 +123,38 @@ only one part of that gap.
 | `ARCHITECTURE_SWITCH_DELAY` | Between monolith and microservices phases | Separate Datadog windows and reduce cross-phase noise. |
 
 For the final fixed-mode suite, the recommended `INTER_CASE_DELAY` is `120`
-seconds. HPA runs use a longer delay, usually `300` seconds, because autoscaler
-metrics and replica state need more time to settle.
+seconds.
+
+## Supplemental HPA Architecture Suite
+
+The sequential dual-architecture suite is fixed-only. Supplemental HPA
+measurements that need many scenario/RPS combinations use the single-architecture
+suite so the primary fixed matrix stays separate from the autoscaling analysis
+and the monolith fixed baseline is not rerun.
+
+```mermaid
+flowchart TB
+  startHpa(["Operator starts supplemental HPA arch suite<br/>make run-benchmark-arch-suite<br/>ARCHITECTURE=microservices<br/>SCALING_MODE=hpa K6_PROFILE=hpa"])
+  matrixHpa["Build one-architecture matrix<br/>SCENARIO_RPS_MATRIX or<br/>SCENARIOS + RPS_LEVELS"]
+  deploy["Deploy sequential architecture once<br/>microservices HPA overlay"]
+  verify["Verify active mode<br/>microservices HPAs present<br/>monolith HPA absent"]
+  setup["Scenario or case data setup<br/>depending on workload class"]
+  k6["Run repeated HPA k6 cases<br/>through sequential single-case runner"]
+  upload["Upload attempt artifacts per case<br/>plus _arch_suite manifest/summary"]
+  repeat{"More pending cases?"}
+
+  startHpa --> matrixHpa --> deploy --> verify --> setup --> k6 --> upload --> repeat
+  repeat -- "yes" --> setup
+```
+
+Recommended sequential supplemental HPA arch-suite example:
+
+```bash
+ARCHITECTURE=microservices \
+SCALING_MODE=hpa \
+EXPERIMENT_NAME=vultr-sequential-hpa-rq2 \
+TEST_DURATION=5m \
+INTER_CASE_DELAY=300 \
+SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-transactions:100,250,500;concurrent-mixed-workload:100,250,500" \
+make run-benchmark-arch-suite
+```

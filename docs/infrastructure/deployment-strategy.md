@@ -848,7 +848,10 @@ Do not store static AWS access keys in Kubernetes Secrets.
 
 ## 18. Final EKS Deployment Flow
 
-Final experiment flow:
+> **Note:** EKS is a supported provider but Vultr is the active benchmark path.
+> See Section 18b for the active Vultr sequential deployment flow.
+
+Final experiment flow for EKS:
 
 ```text
 terraform apply
@@ -902,6 +905,118 @@ Application pods should not run schema migration automatically.
 
 ---
 
+## 18b. Final Vultr Sequential Deployment Flow
+
+This is the active benchmark path. Sequential mode runs one architecture phase
+at a time on a single VKE cluster. The monolith always uses its fixed
+single-pod baseline. HPA applies only to the microservices deployment.
+
+### Fixed Mode Flow
+
+```text
+make vultr-apply
+    |
+    v
+configure kubectl (VKE kubeconfig)
+    |
+    v
+create Kubernetes namespaces (mono, msa)
+    |
+    v
+create/update Kubernetes Secrets
+    |
+    v
+render Vultr manifests (scripts/render-vultr-manifests.sh)
+measures live node capacity and writes ResourceQuota values
+    |
+    v
+run migration Jobs (per architecture db)
+    |
+    v
+MONOLITH PHASE
+    |
+    +-- scale MSA namespace down (0 replicas)
+    |
+    +-- deploy monolith: fixed overlay
+    |   1 pod / 3900m request / 7800m limit
+    |   LOGIN_MAX_CONCURRENCY=8 (975m per bcrypt slot)
+    |
+    +-- run seed Job (reset + seed)
+    |
+    +-- validate readiness
+    |
+    +-- for each scenario x RPS level:
+    |     run k6 benchmark Job
+    |     upload results to S3
+    |     sleep INTER_CASE_DELAY (120s)
+    |
+    +-- sleep ARCHITECTURE_SWITCH_DELAY
+    |
+    v
+MICROSERVICES PHASE
+    |
+    +-- scale monolith namespace down (0 replicas)
+    |
+    +-- deploy microservices: fixed overlay
+    |   4 services x 1 pod / 980m request / 1950m limit
+    |   auth-service LOGIN_MAX_CONCURRENCY=2 (975m per bcrypt slot)
+    |
+    +-- run seed Job (reset + seed)
+    |
+    +-- validate readiness
+    |
+    +-- for each scenario x RPS level:
+    |     run k6 benchmark Job
+    |     upload results to S3
+    |     sleep INTER_CASE_DELAY (120s)
+    |
+    v
+upload suite summary to S3
+    |
+    v
+make vultr-destroy (only after verifying S3 results exist)
+```
+
+### Supplemental HPA Mode Flow (MSA only)
+
+The monolith phase is identical to fixed mode above. Only the microservices
+phase differs:
+
+```text
+MICROSERVICES PHASE (supplemental HPA)
+    |
+    +-- scale monolith namespace down (0 replicas)
+    |
+    +-- deploy microservices: HPA overlay
+    |   4 services x min 1 / max 4 pods / 500m request / 975m limit
+    |   auth-service LOGIN_MAX_CONCURRENCY=1 (975m per bcrypt slot)
+    |   HPA target CPU: 70%, scaleDown stabilization: 60s
+    |
+    +-- run seed Job (reset + seed)
+    |
+    +-- validate readiness
+    |
+    +-- for each scenario x RPS level:
+    |     run k6 benchmark Job (ramping arrival-rate, ~13 min per case)
+    |     upload results to S3
+    |     sleep INTER_CASE_DELAY (300s)
+    |
+    v
+upload suite summary to S3
+```
+
+Important:
+
+```text
+Monolith never uses HPA overlay. Pod shape is identical in fixed runs and in the
+single-architecture HPA extension flow.
+HPA overlay applies to microservices only when SCALING_MODE=hpa.
+DB bootstrap, migration, and seed must not run during benchmark execution.
+Do not run make vultr-destroy before verifying benchmark data exists in S3.
+```
+
+---
+
 ## 19. Monolith Deployment Flow
 
 ```text
@@ -926,7 +1041,7 @@ Deploy monolith
 Apply ResourceQuota
     |
     v
-Apply monolith HPA
+Keep monolith on fixed baseline
     |
     v
 Validate readiness

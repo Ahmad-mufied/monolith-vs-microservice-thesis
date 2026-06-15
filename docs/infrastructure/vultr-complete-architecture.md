@@ -585,18 +585,25 @@ budgets. Each service therefore carries a ceiling of:
 1950m CPU / 3840Mi memory
 ```
 
-The HPA path preserves the same service-level ceiling by dividing each service
-budget across replicas:
+The HPA path keeps the same architecture-level ceiling, but it does not preserve
+the fixed-mode service ceiling per service. Instead, it uses an equal per-pod
+baseline plus shared namespace headroom:
 
 ```text
-Monolith:  minReplicas=1, maxReplicas=4
+Monolith:  fixed baseline remains active during supplemental HPA runs
+           LOGIN_MAX_CONCURRENCY=8  (975m per slot × 8 = 7800m)
 
-Microservices (per service):
-  api-gateway:         minReplicas=1, maxReplicas=5
-  auth-service:        minReplicas=1, maxReplicas=2
-  item-service:        minReplicas=1, maxReplicas=5
-  transaction-service: minReplicas=1, maxReplicas=2
+Microservices (per service, supplemental HPA):
+  api-gateway:         minReplicas=1, maxReplicas=4
+  auth-service:        minReplicas=1, maxReplicas=4, LOGIN_MAX_CONCURRENCY=1 (975m per slot)
+  item-service:        minReplicas=1, maxReplicas=4
+  transaction-service: minReplicas=1, maxReplicas=4
 ```
+
+With `975m CPU / 1920Mi memory` per HPA pod, the baseline state is four pods
+and the practical burst budget is up to four additional pods shared across the
+namespace before `ResourceQuota` and node schedulability become the final
+limiters.
 
 ---
 

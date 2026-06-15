@@ -36,6 +36,8 @@ source scripts/lib/benchmark-preflight.sh
 source scripts/lib/benchmark-timing.sh
 
 SCALING_MODE="${SCALING_MODE:-fixed}"
+MONOLITH_EFFECTIVE_SCALING_MODE="fixed"
+MICROSERVICES_EFFECTIVE_SCALING_MODE="$SCALING_MODE"
 TEST_DURATION="${TEST_DURATION:-5m}"
 S3_BUCKET="${S3_BUCKET:?S3_BUCKET is required}"
 SCENARIOS="${SCENARIOS:-login create-transaction enriched-transactions}"
@@ -63,8 +65,8 @@ SUITE_MATRIX_TSV="$SUITE_WORKDIR/scenario-rps-matrix.tsv"
 RENDER_ROOT="$SUITE_WORKDIR/rendered"
 RENDERED_APP_MONOLITH_DIR="$RENDER_ROOT/deployments/k8s/cloud/monolith"
 RENDERED_APP_MICROSERVICES_DIR="$RENDER_ROOT/deployments/k8s/cloud/microservices"
-RENDERED_MONOLITH_OVERLAY_DIR="$RENDERED_APP_MONOLITH_DIR/overlays/$SCALING_MODE"
-RENDERED_MICROSERVICES_OVERLAY_DIR="$RENDERED_APP_MICROSERVICES_DIR/overlays/$SCALING_MODE"
+RENDERED_MONOLITH_OVERLAY_DIR="$RENDERED_APP_MONOLITH_DIR/overlays/$MONOLITH_EFFECTIVE_SCALING_MODE"
+RENDERED_MICROSERVICES_OVERLAY_DIR="$RENDERED_APP_MICROSERVICES_DIR/overlays/$MICROSERVICES_EFFECTIVE_SCALING_MODE"
 
 cleanup() {
   rm -rf "$SUITE_WORKDIR"
@@ -182,6 +184,11 @@ validate_matrix_inputs() {
       ;;
   esac
 
+  if [ "$SCALING_MODE" != "fixed" ]; then
+    echo "ERROR: run-benchmark-suite only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite for a supplemental single-architecture HPA suite, or run-benchmark-case for one-off HPA cases." >&2
+    return 1
+  fi
+
   if [ -n "${SCENARIO_RPS_MATRIX//[[:space:]]/}" ]; then
     while IFS= read -r matrix_entry; do
       matrix_entry="$(trim_whitespace "$matrix_entry")"
@@ -275,11 +282,7 @@ if [ -n "$EXPERIMENT_NAME" ]; then
 fi
 
 if [ -z "$K6_PROFILE" ]; then
-  if [ "$SCALING_MODE" = "hpa" ]; then
-    K6_PROFILE="hpa"
-  else
-    K6_PROFILE="steady"
-  fi
+  K6_PROFILE="steady"
 fi
 
 validate_scaling_profile_pairing() {
@@ -288,15 +291,15 @@ validate_scaling_profile_pairing() {
   fi
 
   case "$SCALING_MODE:$K6_PROFILE" in
-    fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa)
+    fixed:steady|fixed:ramp|fixed:smoke)
       return 0
       ;;
     fixed:hpa)
       echo "ERROR: K6_PROFILE=hpa must not be used with SCALING_MODE=fixed. Use SCALING_MODE=hpa with HPA overlays, or set ALLOW_NONSTANDARD_SCALING_PROFILE=true only if you are intentionally running a nonstandard experiment." >&2
       return 1
       ;;
-    hpa:steady|hpa:ramp|hpa:smoke)
-      echo "ERROR: SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only if you intentionally want a nonstandard pairing." >&2
+    hpa:steady|hpa:ramp|hpa:smoke|hpa:hpa)
+      echo "ERROR: run-benchmark-suite only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite for a supplemental single-architecture HPA suite, or run-benchmark-case for one-off HPA cases." >&2
       return 1
       ;;
     *)
@@ -783,20 +786,17 @@ verify_live_scaling_mode_state() {
   )"
   msa_hpa_count="${msa_hpa_count:-0}"
 
-  if [ "$SCALING_MODE" = "hpa" ]; then
-    if [ "$mono_hpa_present" -ne 1 ]; then
-      echo "ERROR: expected monolith HPA to exist for SCALING_MODE=hpa, but none was found in namespace mono" >&2
-      return 1
-    fi
+  if [ "$mono_hpa_present" -ne 0 ]; then
+    echo "ERROR: found monolith HPA in namespace mono, but the benchmark model requires monolith to stay fixed in both fixed and supplemental hpa runs." >&2
+    return 1
+  fi
+
+  if [ "$MICROSERVICES_EFFECTIVE_SCALING_MODE" = "hpa" ]; then
     if [ "$msa_hpa_count" -lt 4 ]; then
       echo "ERROR: expected microservices HPAs to exist for SCALING_MODE=hpa, but found only ${msa_hpa_count} HPA object(s) in namespace msa" >&2
       return 1
     fi
   else
-    if [ "$mono_hpa_present" -ne 0 ]; then
-      echo "ERROR: found monolith HPA while SCALING_MODE=fixed. Redeploy fixed overlays before running the fixed benchmark suite." >&2
-      return 1
-    fi
     if [ "$msa_hpa_count" -ne 0 ]; then
       echo "ERROR: found ${msa_hpa_count} microservices HPA object(s) while SCALING_MODE=fixed. Redeploy fixed overlays before running the fixed benchmark suite." >&2
       return 1

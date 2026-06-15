@@ -114,6 +114,14 @@ SCALING_MODE=hpa make eks-deploy-monolith IMAGE_TAG=$IMAGE_TAG
 SCALING_MODE=hpa make eks-deploy-msa IMAGE_TAG=$IMAGE_TAG
 ```
 
+In the active benchmark model, `SCALING_MODE=hpa` is a supplemental benchmark switch:
+
+- monolith is still deployed with the fixed baseline and must not have an HPA
+- microservices switch to the HPA overlays
+- the monolith deploy command still accepts `SCALING_MODE=hpa` so the suite can
+  stay on one consistent interface, but its effective scaling mode remains
+  fixed
+
 Alternative when you want both clusters deployed together in HPA mode:
 
 ```bash
@@ -129,10 +137,11 @@ Important rules:
 - changing `SCALING_MODE` in `make run-benchmark-parallel` does **not** switch
   the live application manifests
 - every `fixed <-> hpa` transition must be handled as a fresh redeploy event
-- when `SCALING_MODE=hpa`, `K6_PROFILE` auto-defaults to `hpa` and
-  `TEST_DURATION` is **ignored** by the k6 executor — the actual run duration
-  is controlled by HPA stage env vars (default: 13 minutes per case). See
-  §4.1 below.
+- when `SCALING_MODE=hpa`, use `run-benchmark-arch-suite` for a broader
+  microservices-only batch or the single-case HPA runners for one-off checks;
+  `K6_PROFILE` auto-defaults to `hpa` there and `TEST_DURATION` is **ignored**
+  by the k6 executor — the actual run duration is controlled by HPA stage env
+  vars (default: 13 minutes per case). See §4.1 below.
 
 Verify the live mode after redeploy:
 
@@ -155,9 +164,9 @@ Expected checks:
 
 ### 4.1 HPA Duration Behavior
 
-When `SCALING_MODE=hpa`, the suite uses `K6_PROFILE=hpa` which applies a
-`ramping-arrival-rate` executor. This executor **ignores `TEST_DURATION`**
-entirely. The actual k6 run duration per case is:
+When `SCALING_MODE=hpa`, the arch-suite and single-case HPA runners use `K6_PROFILE=hpa` which
+applies a `ramping-arrival-rate` executor. This executor **ignores
+`TEST_DURATION`** entirely. The actual k6 run duration per case is:
 
 ```text
 HPA_RAMP_UP_1  = 2m   (ramp to 25% TARGET_RPS)
@@ -169,25 +178,33 @@ HPA_RAMP_DOWN  = 1m   (ramp to 0)
 Total          = 13 minutes per case
 ```
 
-This means `TEST_DURATION=5m` in the suite command is recorded in
+This means `TEST_DURATION=5m` in the benchmark command is recorded in
 `metadata.json` but has **no effect** on the k6 run.
 
 To shorten HPA runs (e.g. for faster iteration or budget constraints):
 
 ```bash
 HPA_RAMP_UP_1=1m HPA_RAMP_UP_2=1m HPA_RAMP_UP_3=2m HPA_HOLD=3m HPA_RAMP_DOWN=30s \
-  make run-benchmark-suite SCALING_MODE=hpa EXPERIMENT_NAME=rq2-hpa ...
+  ARCHITECTURE=microservices SCENARIO=login TARGET_RPS=250 RUN_ID=eks-hpa-rq2 ATTEMPT=attempt-01 \
+  make run-benchmark-case SCALING_MODE=hpa K6_PROFILE=hpa ...
 # Total: 7.5 minutes per case
 ```
 
 For the full HPA stage configuration reference, see
 `docs/experiment/scaling-mode-strategy.md` §6.3.
 
-Estimated suite time with default HPA stages:
+For a broader microservices-only HPA batch, prefer:
 
-```text
-15 cases × 13m k6 + 5m INTER_CASE_DELAY = ~4.5 hours
+```bash
+ARCHITECTURE=microservices \
+SCALING_MODE=hpa \
+EXPERIMENT_NAME=eks-parallel-hpa-batch \
+INTER_CASE_DELAY=300 \
+SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-transactions:100,250,500;concurrent-mixed-workload:100,250,500" \
+make run-benchmark-arch-suite
 ```
+
+Use the single-case runner when you only need one scenario/RPS pair.
 
 ---
 
@@ -442,24 +459,16 @@ either `EXPERIMENT_NAME` or `RUN_ID`.
 Manual overrides remain supported:
 
 ```bash
-make run-benchmark-suite \
-  SCALING_MODE=hpa \
-  TEST_DURATION=5m \
-  INTER_CASE_DELAY=300 \
-  RPS_LEVELS="1000 2500 5000" \
-  RUN_ID=eks-hpa-final-rq2 \
-  ATTEMPT=attempt-02
+ARCHITECTURE=microservices \
+SCENARIO=login \
+TARGET_RPS=250 \
+RUN_ID=eks-hpa-final-rq2 \
+ATTEMPT=attempt-02 \
+SCALING_MODE=hpa \
+K6_PROFILE=hpa \
+TEST_DURATION=5m \
+make run-benchmark-case
 ```
-
-The suite runner still executes one `run-benchmark-parallel` case at a time.
-Monolith and microservices run in parallel for each case, while scenarios and
-RPS levels run serially.
-
-`INTER_CASE_DELAY` adds an operator-controlled stabilization gap between suite
-cases. It accepts a non-negative integer value in seconds, normalizes leading
-zeroes, and rejects values above `86400` seconds to avoid accidental multi-day
-pauses. Duration suffixes such as `5m` are not supported; use `300` for five
-minutes. If the suite has only one case, for example one scenario with one RPS
 level, the inter-case delay is skipped because there is no next case to
 stabilize. It is intentionally outside the k6 script because k6's
 `gracefulStop` controls in-flight iteration shutdown inside one run, not the

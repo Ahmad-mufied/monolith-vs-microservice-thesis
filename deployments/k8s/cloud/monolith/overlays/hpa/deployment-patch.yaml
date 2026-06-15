@@ -4,15 +4,20 @@ metadata:
   name: monolith
   namespace: mono
 spec:
+  strategy:
+    type: Recreate
   replicas: 1
   template:
     spec:
       containers:
         - name: monolith
+          env:
+            - name: LOGIN_MAX_CONCURRENCY
+              value: "8"
           resources:
             requests:
-              cpu: 1975m
-              memory: 3456Mi
+              cpu: 3900m
+              memory: 7680Mi
             limits:
-              cpu: 3950m
-              memory: 6912Mi
+              cpu: 7800m
+              memory: 15360Mi

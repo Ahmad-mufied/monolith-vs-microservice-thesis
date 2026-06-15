@@ -11,6 +11,9 @@ spec:
     spec:
       containers:
         - name: monolith
+          env:
+            - name: LOGIN_MAX_CONCURRENCY
+              value: "8"
           resources:
             requests:
               cpu: 3900m

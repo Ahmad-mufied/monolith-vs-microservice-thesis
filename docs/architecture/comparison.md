@@ -697,16 +697,26 @@ The microservices version better preserves ownership boundaries but pays communi
 Monolith resource configuration:
 
 ```text
-fixed mode        : 1 pod, 3900m request / 7800m limit and 7680Mi request / 15360Mi limit
-hpa mode          : 1 to 4 pods, each 970m request / 1950m limit and 1920Mi request / 3840Mi limit
-minReplicas       : 1
-maxReplicas       : 4
-HPA target CPU    : 70%
-Total CPU ceiling : 7800m
-Memory ceiling    : 15360Mi
+fixed mode (primary baseline) : 1 pod, 3900m request / 7800m limit and 7680Mi request / 15360Mi limit
+LOGIN_MAX_CONCURRENCY         : 8  (975m CPU per bcrypt slot × 8 = 7800m)
 ```
 
-Scaling behavior:
+The monolith operates on a fixed single-pod baseline for all benchmark runs,
+including supplemental HPA runs. Horizontal scaling of the monolith is
+not part of the active benchmark design for the following reasons:
+
+- Real-world monolith horizontal scaling requires each replica to receive the
+  same resource allocation as the original single instance; constraining
+  replicas to a fraction of the original budget is operationally atypical.
+- All modules (auth, item, transaction) are replicated together when the
+  monolith scales, regardless of which module is the actual bottleneck.
+- Splitting the fixed CPU ceiling across multiple smaller pods also
+  miscalibrates the per-pod `LOGIN_MAX_CONCURRENCY`, since the value was
+  chosen for the full-size pod.
+- There is no idle-module headroom to exploit for targeted capacity growth,
+  unlike microservices where idle services yield unallocated budget.
+
+Scaling behavior (inherent, not benchmarked):
 
 ```text
 Hot module
@@ -715,7 +725,8 @@ Hot module
 Scale entire monolith
     |
     v
-Auth + Item + Transaction all replicated
+Auth + Item + Transaction all replicated together
+(only the hot module needed to scale, but all modules grow)
 ```
 
 ---
@@ -773,17 +784,20 @@ Other services may remain at lower replica count
 
 | Aspect | Monolith | Microservices |
 |---|---|---|
-| Scaling granularity | coarse | fine |
+| Benchmark scaling mode | Fixed baseline only | Fixed + arch-suite HPA extension |
+| Scaling granularity | coarse (all modules together) | fine (per service) |
 | Simplicity | simpler | more complex |
 | Resource isolation | lower | higher |
-| HPA target | one deployment | multiple deployments |
-| Quota contention | simpler | possible between services |
-| Idle module replication | possible | less likely |
-| Pod node spreading | not needed (replicas are identical) | pod anti-affinity across app nodes |
+| HPA target | not used in benchmark | per-service deployment |
+| Quota contention | n/a (fixed) | possible when multiple services scale |
+| Idle module replication | not applicable | idle services yield headroom to hot services |
+| LOGIN_MAX_CONCURRENCY | `8` (fixed, 975m/slot) | `2` fixed / `1` HPA (975m/slot both) |
+| bcrypt blast radius | affects all modules on shared CPU | isolated to auth-service pod |
 
-Microservices may be more efficient under focused load because only the hot service needs to scale.
-
-However, ResourceQuota may create scheduling contention when several services need to scale at the same time.
+Microservices are more efficient under focused load because only the hot
+service needs to scale, and idle services yield unallocated headroom. The
+monolith is simpler to operate but cannot contain blast radius or scale
+individual modules independently.
 
 ---
 

@@ -37,6 +37,15 @@ CONTEXT="${SEQUENTIAL_CONTEXT:-benchmark}"
 SEQUENTIAL_CONTEXT="$CONTEXT"
 K8S="kubectl --context=$CONTEXT"
 SCALING_MODE="${SCALING_MODE:-fixed}"
+MONOLITH_EFFECTIVE_SCALING_MODE="fixed"
+MICROSERVICES_EFFECTIVE_SCALING_MODE="$SCALING_MODE"
+case "$SCALING_MODE" in
+  fixed|hpa) ;;
+  *)
+    echo "ERROR: unsupported SCALING_MODE '$SCALING_MODE' (expected: fixed|hpa)" >&2
+    exit 1
+    ;;
+esac
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
@@ -121,7 +130,7 @@ $K8S apply -f deployments/k8s/benchmark/k6-runner-rbac.yaml
 case "$ARCHITECTURE" in
   monolith)
     rendered_job_dir="$RENDER_ROOT/deployments/k8s/cloud/monolith"
-    rendered_overlay_dir="$rendered_job_dir/overlays/$SCALING_MODE"
+    rendered_overlay_dir="$rendered_job_dir/overlays/$MONOLITH_EFFECTIVE_SCALING_MODE"
 
     require_secret benchmark db-bootstrap-env "BOOTSTRAP_DATABASE_URL"
     require_secret mono monolith-env "DATABASE_URL, JWT_SECRET, and application config"
@@ -141,16 +150,12 @@ case "$ARCHITECTURE" in
     recreate_job mono seed-monolith-benchmark-data-job "$rendered_job_dir/seed-monolith-benchmark-data-job.yaml" 300s
 
     $K8S apply -k "$rendered_overlay_dir"
-    if [ "$SCALING_MODE" = "hpa" ]; then
-      bash scripts/install-metrics-server.sh "$CONTEXT"
-    else
-      $K8S delete hpa monolith -n mono --ignore-not-found
-    fi
+    $K8S delete hpa monolith -n mono --ignore-not-found
     $K8S rollout status deployment/monolith -n mono --timeout=300s
     ;;
   microservices)
     rendered_job_dir="$RENDER_ROOT/deployments/k8s/cloud/microservices"
-    rendered_overlay_dir="$rendered_job_dir/overlays/$SCALING_MODE"
+    rendered_overlay_dir="$rendered_job_dir/overlays/$MICROSERVICES_EFFECTIVE_SCALING_MODE"
 
     require_secret benchmark db-bootstrap-env "BOOTSTRAP_DATABASE_URL"
     require_secret msa api-gateway-secret "JWT_SECRET and service addresses"
@@ -175,7 +180,7 @@ case "$ARCHITECTURE" in
     recreate_job msa seed-microservices-benchmark-data-job "$rendered_job_dir/seed-microservices-benchmark-data-job.yaml" 300s
 
     $K8S apply -k "$rendered_overlay_dir"
-    if [ "$SCALING_MODE" = "hpa" ]; then
+    if [ "$MICROSERVICES_EFFECTIVE_SCALING_MODE" = "hpa" ]; then
       bash scripts/install-metrics-server.sh "$CONTEXT"
     else
       for svc in api-gateway auth-service item-service transaction-service; do

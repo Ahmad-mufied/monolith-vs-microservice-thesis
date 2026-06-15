@@ -223,9 +223,13 @@ ITEM_VALIDATION_TIMEOUT=25s        # transaction-service only
 
 Auth Service login admission:
 LOGIN_ADMISSION_ENABLED=true
-LOGIN_MAX_CONCURRENCY=2
+LOGIN_MAX_CONCURRENCY=2          # fixed overlay
 LOGIN_QUEUE_TIMEOUT=2s
 ```
+
+When the microservices HPA overlay is applied, `auth-service` overrides
+`LOGIN_MAX_CONCURRENCY=1` at the Deployment level to keep the admission-slot
+budget proportional to the smaller `975m` HPA pod CPU limit.
 
 Expected overload behavior:
 
@@ -305,7 +309,7 @@ full suite:   run-benchmark-suite auto-deploys each architecture phase
 ```
 
 For the full suite, do **not** run `deploy-workloads` first. The suite deploys
-each phase internally using the suite-level `SCALING_MODE` and `IMAGE_TAG`.
+each phase internally using the fixed suite baseline and `IMAGE_TAG`.
 For a single case, `run-benchmark-case` checks the requested architecture and
 mode first: if the target is already live and ready, it skips deploy; otherwise
 it deploys the target architecture before running the case.
@@ -394,14 +398,15 @@ Example generated `RUN_ID` for the fixed suite above:
 vultr-sequential-fixed-final-stable-v1-670736c
 ```
 
-### HPA suite
+### HPA architecture suite
 
 ```bash
+ARCHITECTURE=microservices \
 SCALING_MODE=hpa K6_PROFILE=hpa \
-  EXPERIMENT_NAME=final-hpa-v1 ATTEMPT=attempt-01 \
-  INTER_CASE_DELAY=300 ARCHITECTURE_SWITCH_DELAY=300 \
-  SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000" \
-  make run-benchmark-suite
+EXPERIMENT_NAME=final-hpa-v1 ATTEMPT=attempt-01 \
+INTER_CASE_DELAY=300 \
+SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-transactions:100,250,500;concurrent-mixed-workload:100,250,500" \
+make run-benchmark-arch-suite
 ```
 
 `K6_PROFILE=hpa` uses ramping-arrival-rate stages (~13 min/case).
@@ -443,6 +448,22 @@ Mechanism for `run-benchmark-suite` in Vultr sequential mode:
 8. Sleep `ARCHITECTURE_SWITCH_DELAY` before switching to the next architecture.
 9. Upload suite summary to S3 after all phases finish.
 
+Mechanism for `run-benchmark-arch-suite` in Vultr sequential mode:
+
+1. Parse the matrix from `SCENARIO_RPS_MATRIX` or from `SCENARIOS` plus
+   `RPS_LEVELS`.
+2. Validate `ARCHITECTURE`, `SCALING_MODE`, `K6_PROFILE`, and
+   `INTER_CASE_DELAY`.
+3. Reject `ARCHITECTURE=monolith SCALING_MODE=hpa` explicitly in the active
+   benchmark model.
+4. Run suite preflight and upload `_arch_suite/manifest.json`.
+5. Deploy or reuse the selected architecture once for the whole run.
+6. For each `scenario + RPS` pair, call the sequential single-case runner.
+7. Reuse per-scenario setup for data-stable workloads and keep per-case setup
+   for mutating workloads.
+8. Sleep `INTER_CASE_DELAY` between cases.
+9. Upload `_arch_suite/summary.json` after all cases finish.
+
 For the thesis-methodology version of this flow, including Mermaid diagrams for
 the sequential suite lifecycle, data setup decision, and inter-case gap
 components, see
@@ -474,15 +495,15 @@ ARCHITECTURE_SWITCH_DELAY=300 \
 SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000" \
 make run-benchmark-suite
 
-# Standard HPA suite. Note that TEST_DURATION is ignored for K6_PROFILE=hpa.
+# Standard HPA single-architecture suite. TEST_DURATION is ignored for K6_PROFILE=hpa.
+ARCHITECTURE=microservices \
 SCALING_MODE=hpa \
 K6_PROFILE=hpa \
 EXPERIMENT_NAME=final-hpa-v1 \
 ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=300 \
-ARCHITECTURE_SWITCH_DELAY=300 \
-SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000" \
-make run-benchmark-suite
+SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-transactions:100,250,500;concurrent-mixed-workload:100,250,500" \
+make run-benchmark-arch-suite
 ```
 
 Important distinction:
@@ -491,6 +512,8 @@ Important distinction:
   architecture when needed.
 - In **Vultr sequential**, `run-benchmark-suite` manages deploys internally per
   architecture phase.
+- In **Vultr sequential**, `run-benchmark-arch-suite` manages one architecture
+  only and reuses the sequential single-case runner across its case matrix.
 - In **parallel mode**, the benchmark runners assume both architectures are
   already deployed; use `deploy-workloads` and `verify-live-mode` first.
 
@@ -590,7 +613,7 @@ AUTO_DESTROY_CONFIRMED=true RUN_ID=rq1-fixed-vultr SCALING_MODE=fixed make run-b
 | Smoke check one arch | `deploy-workloads` → `verify-live-mode` | Yes |
 | Single smoke case | `run-benchmark-case` | Recommended |
 | Fixed full matrix | `SCALING_MODE=fixed make run-benchmark-suite` | No |
-| HPA full matrix | `SCALING_MODE=hpa make run-benchmark-suite` | No |
+| HPA full matrix on one architecture | `ARCHITECTURE=microservices SCALING_MODE=hpa make run-benchmark-arch-suite` | No |
 | MSA first | add `ARCHITECTURE_ORDER="microservices monolith"` | No |
 
 ---

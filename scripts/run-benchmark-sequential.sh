@@ -202,7 +202,7 @@ check_scaling_mode_matches() {
       ! kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
       ;;
     monolith:hpa)
-      kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
+      ! kubectl --context="$SEQUENTIAL_CONTEXT" get hpa monolith -n mono >/dev/null 2>&1
       ;;
     microservices:fixed)
       hpa_count="$(kubectl --context="$SEQUENTIAL_CONTEXT" get hpa -n msa -o name 2>/dev/null | wc -l | tr -d '[:space:]' || true)"

@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
   - ../../base
   - resourcequota.yaml
-  - hpa.yaml
 patches:
   - path: deployment-patch.yaml
 images:

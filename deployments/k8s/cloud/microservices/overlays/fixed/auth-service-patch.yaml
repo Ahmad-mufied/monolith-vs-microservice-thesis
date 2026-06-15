@@ -9,6 +9,9 @@ spec:
     spec:
       containers:
         - name: auth-service
+          env:
+            - name: LOGIN_MAX_CONCURRENCY
+              value: "2"
           resources:
             requests:
               cpu: 980m
