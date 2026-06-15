@@ -746,17 +746,17 @@ hpa auth-service          : request 500m / limit 975m / 960Mi / 1920Mi
 hpa item-service          : request 500m / limit 975m / 960Mi / 1920Mi
 hpa transaction-service   : request 500m / limit 975m / 960Mi / 1920Mi
 minReplicas         : 1
-HPA target CPU      : 70%
+HPA target CPU      : 50%
 scaleDown window    : 60s
 ```
 
 Per-service maxReplicas:
 
 ```text
-api-gateway         : 4
-auth-service        : 4
-item-service        : 4
-transaction-service : 4
+api-gateway         : 5
+auth-service        : 5
+item-service        : 5
+transaction-service : 5
 ```
 
 Namespace ceiling:

@@ -128,7 +128,7 @@ resources_configuration_json() {
             memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
-            max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
@@ -138,7 +138,7 @@ resources_configuration_json() {
             memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
-            max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
@@ -148,7 +148,7 @@ resources_configuration_json() {
             memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
-            max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
@@ -158,7 +158,7 @@ resources_configuration_json() {
             memory_request: (if $autoscaling_mode == "hpa" then "960Mi" else "1920Mi" end),
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
-            max_replicas: (if $autoscaling_mode == "hpa" then 4 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           }

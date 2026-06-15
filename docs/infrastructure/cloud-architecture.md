@@ -490,14 +490,14 @@ This table describes the active Vultr supplemental HPA profile.
 Monolith fixed baseline   MSA HPA (one per service)
 ───────────────────────   ─────────────────────────
 HPA disabled              minReplicas    : 1 per service
-single fixed deployment   maxReplicas    : 4 per service
-                           target CPU     : 70%
+single fixed deployment   maxReplicas    : 5 per service
+                           target CPU     : 50%
 ```
 
 In the active Vultr equal-split HPA profile, each microservice uses:
 
-- request `500m`, limit `975m`, minReplicas `1`, maxReplicas `4`
-- request `960Mi`, limit `1920Mi`, minReplicas `1`, maxReplicas `4`
+- request `500m`, limit `975m`, minReplicas `1`, maxReplicas `5`
+- request `960Mi`, limit `1920Mi`, minReplicas `1`, maxReplicas `5`
 
 This keeps fairness at the same `7800m CPU / 15360Mi memory` shared ceiling
 without relying on manual role-aware service tuning.

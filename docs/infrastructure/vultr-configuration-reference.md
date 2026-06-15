@@ -185,7 +185,7 @@ Rules:
   microservices:
   `1950m CPU / 3840Mi memory` per service in fixed mode,
   `975m CPU / 1920Mi memory` per pod with `minReplicas=1` and
-  `maxReplicas=4` for each microservice in supplemental HPA mode. This HPA
+  `maxReplicas=5` for each microservice in supplemental HPA mode. This HPA
   profile uses an equal per-pod baseline plus shared namespace headroom rather
   than preserving the fixed-mode service ceiling per service. The monolith
   stays on the fixed baseline in supplemental HPA runs.

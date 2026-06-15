@@ -212,18 +212,18 @@ Each service uses the same equal per-pod baseline:
 
 ```text
 minReplicas            : 1
-maxReplicas            : 4
-target CPU utilization : 70%
+maxReplicas            : 5
+target CPU utilization : 50%
 ```
 
 Per-pod resources:
 
 | Service | Min | Max | CPU Request / Pod | CPU Limit / Pod | Memory Request / Pod | Memory Limit / Pod |
 |---|---:|---:|---:|---:|---:|---:|
-| `api-gateway` | `1` | `4` | `500m` | `975m` | `960Mi` | `1920Mi` |
-| `auth-service` | `1` | `4` | `500m` | `975m` | `960Mi` | `1920Mi` |
-| `item-service` | `1` | `4` | `500m` | `975m` | `960Mi` | `1920Mi` |
-| `transaction-service` | `1` | `4` | `500m` | `975m` | `960Mi` | `1920Mi` |
+| `api-gateway` | `1` | `5` | `500m` | `975m` | `960Mi` | `1920Mi` |
+| `auth-service` | `1` | `5` | `500m` | `975m` | `960Mi` | `1920Mi` |
+| `item-service` | `1` | `5` | `500m` | `975m` | `960Mi` | `1920Mi` |
+| `transaction-service` | `1` | `5` | `500m` | `975m` | `960Mi` | `1920Mi` |
 
 The namespace minimum state is:
 

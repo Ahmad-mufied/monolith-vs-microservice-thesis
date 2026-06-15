@@ -1086,7 +1086,7 @@ hpa mode:
   item-service       : request 500m / limit 975m / 960Mi / 1920Mi
   transaction-service: request 500m / limit 975m / 960Mi / 1920Mi
 minReplicas       : 1
-maxReplicas       : 4
+maxReplicas       : 5
 HPA target CPU    : 50%
 ```
 

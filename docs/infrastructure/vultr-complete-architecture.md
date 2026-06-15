@@ -594,10 +594,10 @@ Monolith:  fixed baseline remains active during supplemental HPA runs
            LOGIN_MAX_CONCURRENCY=8  (975m per slot × 8 = 7800m)
 
 Microservices (per service, supplemental HPA):
-  api-gateway:         minReplicas=1, maxReplicas=4
-  auth-service:        minReplicas=1, maxReplicas=4, LOGIN_MAX_CONCURRENCY=1 (975m per slot)
-  item-service:        minReplicas=1, maxReplicas=4
-  transaction-service: minReplicas=1, maxReplicas=4
+  api-gateway:         minReplicas=1, maxReplicas=5
+  auth-service:        minReplicas=1, maxReplicas=5, LOGIN_MAX_CONCURRENCY=1 (975m per slot)
+  item-service:        minReplicas=1, maxReplicas=5
+  transaction-service: minReplicas=1, maxReplicas=5
 ```
 
 With `975m CPU / 1920Mi memory` per HPA pod, the baseline state is four pods
