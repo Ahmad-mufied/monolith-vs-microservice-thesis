@@ -2,9 +2,11 @@ package grpcserver
 
 import (
 	"context"
+	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/domain"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/usecase"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
 	authv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/auth/v1"
 )
@@ -30,9 +32,12 @@ func (s *AuthServer) Register(ctx context.Context, req *authv1.RegisterRequest) 
 }
 
 func (s *AuthServer) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.LoginResponse, error) {
+	startedAt := time.Now()
 	token, user, err := s.uc.Login(ctx, req.GetEmail(), req.GetPassword())
 	if err != nil {
-		return nil, pkgerrors.ToGRPCStatus(err)
+		grpcErr := pkgerrors.ToGRPCStatus(err)
+		debuglog.GRPC(context.Background(), "auth-service login grpc failed", "auth_login_grpc_failure", "/auth.v1.AuthService/Login", startedAt, grpcErr)
+		return nil, grpcErr
 	}
 
 	return &authv1.LoginResponse{

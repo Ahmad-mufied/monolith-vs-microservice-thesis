@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"errors"
+	"log/slog"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -59,12 +61,21 @@ WHERE lower(email) = lower($1)`
 		if err == pgx.ErrNoRows {
 			return User{}, apperror.Unauthorized("invalid email or password")
 		}
+		level := slog.LevelError
+		if apperror.IsContext(err) {
+			level = slog.LevelWarn
+		}
+
+		debuglog.Error(ctx, level, "monolith auth repository failure", "monolith_auth_user_repository_failure", err,
+			"repository", "auth_repository",
+			"operation", "find_user_by_email",
+		)
 		return User{}, apperror.InternalFromContext("finding user by email", err)
 	}
 	return user, nil
 }
 
 func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+	pgErr, ok := errors.AsType[*pgconn.PgError](err)
+	return ok && pgErr.Code == "23505"
 }

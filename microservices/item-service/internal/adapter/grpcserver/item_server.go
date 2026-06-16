@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/domain"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/usecase"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/numconv"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
@@ -110,6 +111,7 @@ func (s *ItemServer) GetItemSummariesByIds(ctx context.Context, req *itemv1.GetI
 }
 
 func (s *ItemServer) ValidateTransactionItems(ctx context.Context, req *itemv1.ValidateTransactionItemsRequest) (*itemv1.ValidateTransactionItemsResponse, error) {
+	startedAt := time.Now()
 	items := make([]domain.TransactionItemValidationInput, 0, len(req.GetItems()))
 	for _, item := range req.GetItems() {
 		items = append(items, domain.TransactionItemValidationInput{
@@ -119,7 +121,11 @@ func (s *ItemServer) ValidateTransactionItems(ctx context.Context, req *itemv1.V
 	}
 
 	if err := s.uc.ValidateTransactionItems(ctx, items); err != nil {
-		return nil, pkgerrors.ToGRPCStatus(err)
+		grpcErr := pkgerrors.ToGRPCStatus(err)
+		// The server logs the final gRPC status at the boundary so downstream
+		// callers can be correlated with the item-service decision point.
+		debuglog.GRPC(context.Background(), "item-service grpc failure", "item_validate_transaction_items_grpc_failure", "/item.v1.ItemService/ValidateTransactionItems", startedAt, grpcErr)
+		return nil, grpcErr
 	}
 
 	return &itemv1.ValidateTransactionItemsResponse{}, nil

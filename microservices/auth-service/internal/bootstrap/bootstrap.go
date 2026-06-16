@@ -3,8 +3,9 @@ package bootstrap
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/usecase"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/grpcutil"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/logger"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/observability"
 	pkgpostgres "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/postgres"
 	authv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/auth/v1"
@@ -25,6 +27,8 @@ import (
 const shutdownTimeout = 10 * time.Second
 
 func Run() error {
+	slog.SetDefault(logger.New(os.Getenv("LOG_LEVEL")).With("service", "auth-service"))
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -68,7 +72,12 @@ func Run() error {
 		serverErr <- grpcServer.Serve(listener)
 	}()
 
-	log.Printf("auth-service gRPC listening on :%s (grpc_request_timeout=%s login_admission=%v max_concurrency=%d)", cfg.GRPCPort, cfg.GRPCRequestTimeout, cfg.LoginAdmission.Enabled, cfg.LoginAdmission.MaxConcurrency)
+	slog.Info("auth-service gRPC listening",
+		"grpc_port", cfg.GRPCPort,
+		"grpc_request_timeout", cfg.GRPCRequestTimeout.String(),
+		"login_admission_enabled", cfg.LoginAdmission.Enabled,
+		"login_max_concurrency", cfg.LoginAdmission.MaxConcurrency,
+	)
 
 	select {
 	case <-ctx.Done():
@@ -81,7 +90,7 @@ func Run() error {
 		select {
 		case <-stopped:
 		case <-time.After(shutdownTimeout):
-			log.Printf("auth-service graceful shutdown timed out after %s; forcing stop", shutdownTimeout)
+			slog.Warn("auth-service graceful shutdown timed out; forcing stop", "shutdown_timeout", shutdownTimeout.String())
 			grpcServer.Stop()
 		}
 

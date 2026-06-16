@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/transaction-service/internal/domain"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/numconv"
 	transactionv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/transaction/v1"
@@ -27,6 +28,7 @@ func NewTransactionServer(uc transactionUsecase) *TransactionServer {
 }
 
 func (s *TransactionServer) CreateTransaction(ctx context.Context, req *transactionv1.CreateTransactionRequest) (*transactionv1.CreateTransactionResponse, error) {
+	startedAt := time.Now()
 	items := make([]domain.TransactionItem, 0, len(req.GetItems()))
 	for _, item := range req.GetItems() {
 		items = append(items, domain.TransactionItem{
@@ -37,7 +39,11 @@ func (s *TransactionServer) CreateTransaction(ctx context.Context, req *transact
 
 	transactionID, err := s.uc.CreateTransaction(ctx, req.GetUserId(), items)
 	if err != nil {
-		return nil, pkgerrors.ToGRPCStatus(err)
+		grpcErr := pkgerrors.ToGRPCStatus(err)
+		// This captures the final status that leaves transaction-service, which
+		// is the most reliable point for cross-service RCA in Datadog traces/logs.
+		debuglog.GRPC(context.Background(), "transaction-service grpc failure", "transaction_create_transaction_grpc_failure", "/transaction.v1.TransactionService/CreateTransaction", startedAt, grpcErr)
+		return nil, grpcErr
 	}
 
 	return &transactionv1.CreateTransactionResponse{TransactionId: transactionID}, nil

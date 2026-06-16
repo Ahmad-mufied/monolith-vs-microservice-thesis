@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -82,7 +83,7 @@ func TestContextTimeoutErrorHandler(t *testing.T) {
 
 			// For non-context errors, check if it's an echo.HTTPError
 			if tt.wantCode == "" {
-				httpErr, ok := err.(*echo.HTTPError)
+				httpErr, ok := errors.AsType[*echo.HTTPError](err)
 				if !ok {
 					t.Fatalf("expected *echo.HTTPError, got %T", err)
 				}
@@ -93,7 +94,7 @@ func TestContextTimeoutErrorHandler(t *testing.T) {
 			}
 
 			// For context errors, check AppError
-			appErr, ok := err.(*httputil.AppError)
+			appErr, ok := errors.AsType[*httputil.AppError](err)
 			if !ok {
 				t.Fatalf("expected *httputil.AppError, got %T", err)
 			}
@@ -171,7 +172,7 @@ func TestContextTimeoutErrorHandler_Integration(t *testing.T) {
 				t.Fatal("expected error from deadline exceeded, got nil")
 			}
 
-			appErr, ok := err.(*httputil.AppError)
+			appErr, ok := errors.AsType[*httputil.AppError](err)
 			if !ok {
 				t.Fatalf("expected *httputil.AppError, got %T", err)
 			}

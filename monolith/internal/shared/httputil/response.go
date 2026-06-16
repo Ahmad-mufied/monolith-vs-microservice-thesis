@@ -84,8 +84,7 @@ func Error(c echo.Context, err error) error {
 }
 
 func toAppError(err error) *apperror.Error {
-	var appErr *apperror.Error
-	if errors.As(err, &appErr) {
+	if appErr, ok := errors.AsType[*apperror.Error](err); ok {
 		return appErr
 	}
 	return apperror.Internal("internal server error", err)

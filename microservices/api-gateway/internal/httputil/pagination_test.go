@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"errors"
 	"math"
 	"net/http/httptest"
 	"strconv"
@@ -107,7 +108,7 @@ func TestParsePage(t *testing.T) {
 				if err == nil {
 					t.Fatalf("ParsePage() error = nil, want error with code %q", tt.wantErrCode)
 				}
-				appErr, ok := err.(*AppError)
+				appErr, ok := errors.AsType[*AppError](err)
 				if !ok {
 					t.Fatalf("error type = %T, want *AppError", err)
 				}

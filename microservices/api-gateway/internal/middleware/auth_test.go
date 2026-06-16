@@ -68,8 +68,7 @@ func TestUserIDFromBearer(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
 				}
-				var ae *httputil.AppError
-				ok := errors.As(err, &ae)
+				ae, ok := errors.AsType[*httputil.AppError](err)
 				if !ok {
 					t.Fatalf("error type = %T, want *httputil.AppError", err)
 				}
@@ -133,8 +132,7 @@ func TestUserIDFromContext(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
 				}
-				var ae *httputil.AppError
-				ok := errors.As(err, &ae)
+				ae, ok := errors.AsType[*httputil.AppError](err)
 				if !ok {
 					t.Fatalf("error type = %T, want *httputil.AppError", err)
 				}

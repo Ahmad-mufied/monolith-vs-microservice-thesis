@@ -2,17 +2,47 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"math"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/item-service/internal/domain"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+type itemLogRecord struct {
+	level slog.Level
+	attrs map[string]any
+}
+
+type itemCaptureHandler struct {
+	mu      sync.Mutex
+	records []itemLogRecord
+}
+
+func (h *itemCaptureHandler) Enabled(context.Context, slog.Level) bool { return true }
+func (h *itemCaptureHandler) WithAttrs([]slog.Attr) slog.Handler       { return h }
+func (h *itemCaptureHandler) WithGroup(string) slog.Handler            { return h }
+func (h *itemCaptureHandler) Handle(_ context.Context, record slog.Record) error {
+	attrs := map[string]any{}
+	record.Attrs(func(attr slog.Attr) bool {
+		attrs[attr.Key] = attr.Value.Any()
+		return true
+	})
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.records = append(h.records, itemLogRecord{level: record.Level, attrs: attrs})
+	return nil
+}
 
 // --- fake usecase ---
 
@@ -194,6 +224,73 @@ func TestListItems(t *testing.T) {
 			}
 			if tt.wantCreatedAt != "" && resp.GetItems()[0].GetCreatedAt() != tt.wantCreatedAt {
 				t.Fatalf("CreatedAt = %q, want %q", resp.GetItems()[0].GetCreatedAt(), tt.wantCreatedAt)
+			}
+		})
+	}
+}
+
+func TestValidateTransactionItemsDiagnosticLogging(t *testing.T) {
+	tests := []struct {
+		name           string
+		ucErr          error
+		wantStatusCode string
+		wantLevel      slog.Level
+	}{
+		{
+			name:           "resource exhausted logs warn",
+			ucErr:          pkgerrors.ResourceExhausted("item service overloaded"),
+			wantStatusCode: "ResourceExhausted",
+			wantLevel:      slog.LevelWarn,
+		},
+		{
+			name:           "internal logs error",
+			ucErr:          pkgerrors.Internal("internal server error", errors.New("boom")),
+			wantStatusCode: "Internal",
+			wantLevel:      slog.LevelError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DIAGNOSTIC_LOGGING_ENABLED", "true")
+			debuglog.ResetForTesting()
+
+			handler := &itemCaptureHandler{}
+			previous := slog.Default()
+			slog.SetDefault(slog.New(handler))
+			t.Cleanup(func() {
+				slog.SetDefault(previous)
+				debuglog.ResetForTesting()
+			})
+
+			srv := &ItemServer{
+				uc: &fakeItemUsecase{
+					validateTransactionItemsFn: func(context.Context, []domain.TransactionItemValidationInput) error {
+						return tt.ucErr
+					},
+				},
+			}
+
+			_, err := srv.ValidateTransactionItems(context.Background(), &itemv1.ValidateTransactionItemsRequest{
+				Items: []*itemv1.TransactionItemValidationInput{{ItemId: "item-1", Amount: 1}},
+			})
+			if status.Code(err) == codes.OK {
+				t.Fatal("expected error, got nil")
+			}
+
+			if len(handler.records) != 1 {
+				t.Fatalf("record count = %d, want 1", len(handler.records))
+			}
+
+			record := handler.records[0]
+			if record.level != tt.wantLevel {
+				t.Fatalf("level = %v, want %v", record.level, tt.wantLevel)
+			}
+			if record.attrs["event"] != "item_validate_transaction_items_grpc_failure" {
+				t.Fatalf("event = %v, want item_validate_transaction_items_grpc_failure", record.attrs["event"])
+			}
+			if record.attrs["grpc_status_code"] != tt.wantStatusCode {
+				t.Fatalf("grpc_status_code = %v, want %v", record.attrs["grpc_status_code"], tt.wantStatusCode)
 			}
 		})
 	}

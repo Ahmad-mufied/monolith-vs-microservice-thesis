@@ -2,8 +2,10 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/httputil"
 	"github.com/labstack/echo/v4"
@@ -47,6 +49,11 @@ func (h *Handler) Login(c echo.Context) error {
 	}
 	resp, err := h.service.Login(c.Request().Context(), req)
 	if err != nil {
+		if appErr, ok := errors.AsType[*apperror.Error](err); ok {
+			// Monolith logs the final HTTP-facing error here so its RCA surface is
+			// comparable to the gateway HTTP boundary in the microservice flow.
+			debuglog.HTTP(c.Request().Context(), "monolith auth login http failed", "monolith_auth_login_http_failure", appErr.Status, string(appErr.Code), appErr.Message)
+		}
 		return httputil.Error(c, err)
 	}
 	return c.JSON(http.StatusOK, resp)

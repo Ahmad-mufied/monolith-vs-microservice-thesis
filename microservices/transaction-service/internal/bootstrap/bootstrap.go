@@ -3,8 +3,9 @@ package bootstrap
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/transaction-service/internal/config"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/transaction-service/internal/usecase"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/grpcutil"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/logger"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/observability"
 	pkgpostgres "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/postgres"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
@@ -32,6 +34,8 @@ const grpcRoundRobinServiceConfig = `{"loadBalancingConfig":[{"round_robin":{}}]
 const grpcShutdownTimeout = 10 * time.Second
 
 func Run() error {
+	slog.SetDefault(logger.New(os.Getenv("LOG_LEVEL")).With("service", "transaction-service"))
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -64,7 +68,7 @@ func Run() error {
 	}
 	defer func() {
 		if err := itemConn.Close(); err != nil {
-			log.Printf("close item service client: %v", err)
+			slog.Warn("close item service client", "error", err.Error())
 		}
 	}()
 
@@ -86,11 +90,10 @@ func Run() error {
 		serverErr <- grpcServer.Serve(listener)
 	}()
 
-	log.Printf(
-		"transaction-service gRPC listening on :%s (grpc_request_timeout=%s item_validation_timeout=%s)",
-		cfg.GRPCPort,
-		cfg.GRPCRequestTimeout,
-		cfg.ItemValidationTimeout,
+	slog.Info("transaction-service gRPC listening",
+		"grpc_port", cfg.GRPCPort,
+		"grpc_request_timeout", cfg.GRPCRequestTimeout.String(),
+		"item_validation_timeout", cfg.ItemValidationTimeout.String(),
 	)
 
 	select {
@@ -104,7 +107,7 @@ func Run() error {
 		select {
 		case <-stopped:
 		case <-time.After(grpcShutdownTimeout):
-			log.Printf("transaction-service graceful shutdown timed out after %s; forcing stop", grpcShutdownTimeout)
+			slog.Warn("transaction-service graceful shutdown timed out; forcing stop", "shutdown_timeout", grpcShutdownTimeout.String())
 			grpcServer.Stop()
 		}
 

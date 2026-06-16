@@ -182,6 +182,31 @@ docs/infrastructure/deployment-strategy.md
 docs/development/k6-workload-scenarios.md
 ```
 
+## 3.1 Diagnostic Logging Flag
+
+The repository also supports an optional runtime debug flag:
+
+```text
+DIAGNOSTIC_LOGGING_ENABLED=false
+```
+
+This flag enables extra structured failure-only logs for RCA without changing
+the primary application logger behavior.
+
+Design rules:
+
+- default remains `false`
+- normal success-path traffic must not depend on it
+- the additional logs are intended for short-lived debugging or benchmark RCA
+- the helper is shared through `pkg/debuglog` and remains a no-op when the flag
+  is disabled
+
+This flag is especially useful when traces alone are not enough to distinguish:
+
+- timeout vs overload vs internal error mapping
+- repository/database failure vs usecase failure
+- upstream gRPC failure vs final public HTTP failure
+
 ## 4. Runtime Topology
 
 ### 4.1 Monolith
@@ -256,6 +281,49 @@ HTTP request
 -> api-gateway
 -> transaction-service
 -> item-service
+```
+
+## 4.3 Diagnostic Event Naming
+
+When `DIAGNOSTIC_LOGGING_ENABLED=true`, diagnostic events follow a consistent
+pattern:
+
+```text
+<service>_<operation>_<boundary>_failure
+```
+
+Examples in the current codebase:
+
+- `auth_login_usecase_failure`
+- `auth_login_grpc_failure`
+- `auth_user_repository_failure`
+- `gateway_auth_login_rpc_failure`
+- `gateway_auth_login_http_failure`
+- `item_validate_transaction_items_grpc_failure`
+- `transaction_create_transaction_grpc_failure`
+- `transaction_item_validate_rpc_failure`
+- `monolith_auth_login_service_failure`
+- `monolith_auth_user_repository_failure`
+- `monolith_auth_login_http_failure`
+
+Interpretation guideline:
+
+- `*_usecase_failure` or `*_service_failure` means business logic path
+- `*_repository_failure` means database/repository path
+- `*_rpc_failure` or `*_grpc_failure` means internal service boundary failure
+- `*_http_failure` means final public HTTP response path
+
+This naming is intentionally explicit so Datadog queries stay understandable
+without requiring per-service custom knowledge.
+
+Representative Datadog log queries:
+
+```text
+service:auth-service @event:auth_login_grpc_failure
+service:auth-service @event:auth_user_repository_failure
+service:api-gateway @event:gateway_auth_login_rpc_failure
+service:transaction-service @event:transaction_item_validate_rpc_failure
+service:monolith @event:monolith_auth_login_service_failure
 ```
 
 Expected Enriched Transactions trace shape:

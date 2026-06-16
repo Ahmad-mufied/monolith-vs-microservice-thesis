@@ -68,8 +68,7 @@ func List(c echo.Context, httpStatus int, data any, limit, offset, totalReturned
 
 // Error writes an error response. Accepts *AppError or any error.
 func Error(c echo.Context, err error) error {
-	var appErr *AppError
-	if errors.As(err, &appErr) {
+	if appErr, ok := errors.AsType[*AppError](err); ok {
 		return c.JSON(appErr.Status, errorResponse{
 			Error: errorPayload{Code: appErr.Code, Message: appErr.Message, Details: appErr.Details},
 		})
@@ -80,8 +79,7 @@ func Error(c echo.Context, err error) error {
 }
 
 func BindError(err error) error {
-	var httpErr *echo.HTTPError
-	if errors.As(err, &httpErr) && httpErr.Code == http.StatusUnsupportedMediaType {
+	if httpErr, ok := errors.AsType[*echo.HTTPError](err); ok && httpErr.Code == http.StatusUnsupportedMediaType {
 		return &AppError{
 			Status:  http.StatusUnsupportedMediaType,
 			Code:    "UNSUPPORTED_MEDIA_TYPE",
@@ -107,14 +105,13 @@ func HTTPErrorHandler(err error, c echo.Context) {
 		return
 	}
 
-	var appErr *AppError
-	if errors.As(err, &appErr) {
+	if appErr, ok := errors.AsType[*AppError](err); ok {
 		_ = Error(c, appErr)
 		return
 	}
 
-	var httpErr *echo.HTTPError
-	if !errors.As(err, &httpErr) {
+	httpErr, ok := errors.AsType[*echo.HTTPError](err)
+	if !ok {
 		_ = Error(c, &AppError{
 			Status:  http.StatusInternalServerError,
 			Code:    "INTERNAL_SERVER_ERROR",

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
+	pkglogger "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/logger"
 	echotrace "github.com/DataDog/dd-trace-go/contrib/labstack/echo.v4/v2"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/auth"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/health"
@@ -28,7 +29,7 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := pkglogger.New("").With("service", "monolith")
 
 	cfg, err := config.Load()
 	if err != nil {
