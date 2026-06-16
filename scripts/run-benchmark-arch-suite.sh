@@ -41,6 +41,9 @@ INTER_CASE_DELAY="${INTER_CASE_DELAY:-0}"
 AUTO_DESTROY_CONFIRMED="${AUTO_DESTROY_CONFIRMED:-false}"
 SKIP_BENCHMARK_PREFLIGHT="${SKIP_BENCHMARK_PREFLIGHT:-false}"
 ARCH_SUITE_RESUME_SKIP_READY_DEPLOY="${ARCH_SUITE_RESUME_SKIP_READY_DEPLOY:-true}"
+SEQUENTIAL_CASE_OVERHEAD_SECONDS="${SEQUENTIAL_CASE_OVERHEAD_SECONDS:-180}"
+SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS="${SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS:-120}"
+SEQUENTIAL_RETRY_BUFFER_SECONDS="${SEQUENTIAL_RETRY_BUFFER_SECONDS:-0}"
 DATADOG_ENABLED="${DATADOG_ENABLED:-true}"
 DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 K6_PROFILE="${K6_PROFILE:-}"
@@ -85,6 +88,278 @@ log_error() {
 
 trim_whitespace() {
   sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' <<<"$1"
+}
+
+validate_seconds_value() {
+  local name="$1"
+  local value="$2"
+  if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+    log_error "${name} must be an integer number of seconds, got '$value'"
+    exit 1
+  fi
+}
+
+duration_to_seconds() {
+  local value="$1"
+  local remainder="$value"
+  local total=0
+  local number unit
+
+  if [ -z "$value" ]; then
+    log_error "duration must not be empty"
+    return 1
+  fi
+
+  while [[ "$remainder" =~ ^([0-9]+)(ms|s|m|h)(.*)$ ]]; do
+    number="${BASH_REMATCH[1]}"
+    unit="${BASH_REMATCH[2]}"
+    remainder="${BASH_REMATCH[3]}"
+    case "$unit" in
+      ms)
+        if [ "$number" -gt 0 ]; then
+          total=$((total + 1))
+        fi
+        ;;
+      s) total=$((total + number)) ;;
+      m) total=$((total + (number * 60))) ;;
+      h) total=$((total + (number * 3600))) ;;
+    esac
+  done
+
+  if [ -n "$remainder" ]; then
+    log_error "unsupported duration '$value' (expected k6-style values like 30s, 5m, 1h, or 1m30s)"
+    return 1
+  fi
+
+  printf '%s\n' "$total"
+}
+
+format_duration() {
+  local seconds="$1"
+  local hours minutes remaining
+
+  hours=$((seconds / 3600))
+  minutes=$(((seconds % 3600) / 60))
+  remaining=$((seconds % 60))
+
+  if [ "$hours" -gt 0 ]; then
+    printf '%dh%02dm%02ds' "$hours" "$minutes" "$remaining"
+  elif [ "$minutes" -gt 0 ]; then
+    printf '%dm%02ds' "$minutes" "$remaining"
+  else
+    printf '%ds' "$remaining"
+  fi
+}
+
+format_eta_epoch() {
+  local epoch="$1"
+  date -d "@$epoch" '+%Y-%m-%d %H:%M:%S %Z'
+}
+
+custom_ramp_stages_seconds() {
+  local total=0
+  local duration seconds
+
+  while IFS= read -r duration; do
+    [ -z "$duration" ] && continue
+    seconds="$(duration_to_seconds "$duration")"
+    total=$((total + seconds))
+  done < <(jq -r '.[].duration // empty' <<<"$RAMP_STAGES_JSON")
+
+  printf '%s\n' "$total"
+}
+
+estimate_case_duration_seconds() {
+  local seconds
+
+  if [ -n "${RAMP_STAGES_JSON:-}" ]; then
+    custom_ramp_stages_seconds
+    return
+  fi
+
+  case "$K6_PROFILE" in
+    hpa)
+      seconds=0
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_1:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_2:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_3:-3m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_HOLD:-5m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_DOWN:-1m}")))
+      printf '%s\n' "$seconds"
+      ;;
+    ramp)
+      seconds=0
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_UP_DURATION:-1m}")))
+      seconds=$((seconds + $(duration_to_seconds "$TEST_DURATION")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_DOWN_DURATION:-30s}")))
+      printf '%s\n' "$seconds"
+      ;;
+    smoke|steady)
+      duration_to_seconds "$TEST_DURATION"
+      ;;
+    *)
+      log_error "unsupported K6_PROFILE '$K6_PROFILE' for ETA calculation"
+      return 1
+      ;;
+  esac
+}
+
+scenario_pending_case_seconds() {
+  local scope="$1"
+  local pending_case_count="$2"
+  local setup_already_done="$3"
+
+  if [ "$pending_case_count" -le 0 ]; then
+    printf '0\n'
+    return
+  fi
+
+  if [ "$scope" = "per_scenario" ]; then
+    if [ "$setup_already_done" = "true" ]; then
+      printf '%s\n' $((pending_case_count * REUSED_CASE_ESTIMATE_SECONDS))
+      return
+    fi
+    printf '%s\n' $((CASE_ESTIMATE_SECONDS + ((pending_case_count - 1) * REUSED_CASE_ESTIMATE_SECONDS)))
+    return
+  fi
+
+  printf '%s\n' $((pending_case_count * CASE_ESTIMATE_SECONDS))
+}
+
+count_pending_scenario_cases_from() {
+  local current_scenario="$1"
+  local current_target_rps="$2"
+  local scenario scenario_rps_levels target_rps
+  local count=0
+  local seen_current=false
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ "$scenario" = "$current_scenario" ] || continue
+    for target_rps in $scenario_rps_levels; do
+      if [ "$target_rps" = "$current_target_rps" ]; then
+        seen_current=true
+      fi
+      [ "$seen_current" = "true" ] || continue
+      if case_missing_in_s3 "$scenario" "$target_rps"; then
+        count=$((count + 1))
+      fi
+    done
+  done < "$MATRIX_TSV"
+
+  printf '%s\n' "$count"
+}
+
+count_pending_suite_cases_from() {
+  local current_scenario="$1"
+  local current_target_rps="$2"
+  local scenario scenario_rps_levels target_rps
+  local count=0
+  local seen_current=false
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ -z "$scenario" ] && continue
+    for target_rps in $scenario_rps_levels; do
+      if [ "$scenario" = "$current_scenario" ] && [ "$target_rps" = "$current_target_rps" ]; then
+        seen_current=true
+      fi
+      [ "$seen_current" = "true" ] || continue
+      if case_missing_in_s3 "$scenario" "$target_rps"; then
+        count=$((count + 1))
+      fi
+    done
+  done < "$MATRIX_TSV"
+
+  printf '%s\n' "$count"
+}
+
+count_pending_suite_case_seconds_from() {
+  local current_scenario="$1"
+  local current_target_rps="$2"
+  local scenario scenario_rps_levels target_rps
+  local seen_current=false
+  local total_seconds=0
+  local scope pending_case_count
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ -z "$scenario" ] && continue
+    for target_rps in $scenario_rps_levels; do
+      if [ "$scenario" = "$current_scenario" ] && [ "$target_rps" = "$current_target_rps" ]; then
+        seen_current=true
+        pending_case_count="$(count_pending_scenario_cases_from "$current_scenario" "$current_target_rps")"
+        scope="$(scenario_setup_reuse_scope "$current_scenario")"
+        total_seconds=$((total_seconds + $(scenario_pending_case_seconds "$scope" "$pending_case_count" "true")))
+        break
+      fi
+    done
+
+    if [ "$seen_current" = "true" ] && [ "$scenario" != "$current_scenario" ]; then
+      pending_case_count="$(count_pending_scenario_cases "$scenario")"
+      if [ "$pending_case_count" -gt 0 ]; then
+        scope="$(scenario_setup_reuse_scope "$scenario")"
+        total_seconds=$((total_seconds + $(scenario_pending_case_seconds "$scope" "$pending_case_count" "false")))
+      fi
+    fi
+  done < "$MATRIX_TSV"
+
+  printf '%s\n' "$total_seconds"
+}
+
+count_pending_scenario_cases() {
+  local scenario_to_count="$1"
+  local scenario scenario_rps_levels target_rps
+  local count=0
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ "$scenario" = "$scenario_to_count" ] || continue
+    for target_rps in $scenario_rps_levels; do
+      if case_missing_in_s3 "$scenario" "$target_rps"; then
+        count=$((count + 1))
+      fi
+    done
+  done < "$MATRIX_TSV"
+
+  printf '%s\n' "$count"
+}
+
+print_case_eta() {
+  local scenario="$2"
+  local target_rps="$3"
+  local suite_case_number="$4"
+  local suite_total_cases="$5"
+  local scenario_case_number="$6"
+  local scenario_total_cases="$7"
+  local case_seconds="$8"
+  local k6_case_seconds="$9"
+  local eta_mode="${10}"
+  local pending_scenario_cases="${11}"
+  local pending_suite_cases="${12}"
+  local scenario_remaining_case_seconds="${13}"
+  local suite_remaining_case_seconds="${14}"
+  local now_epoch case_eta_epoch scenario_eta_epoch suite_eta_epoch
+  local suite_remaining_delay_seconds=0
+
+  now_epoch="$(date +%s)"
+  case_eta_epoch=$((now_epoch + case_seconds))
+
+  scenario_eta_epoch=$((now_epoch + scenario_remaining_case_seconds))
+  if [ "$pending_scenario_cases" -gt 1 ]; then
+    scenario_eta_epoch=$((scenario_eta_epoch + ((pending_scenario_cases - 1) * INTER_CASE_DELAY)))
+  fi
+
+  if [ "$pending_suite_cases" -gt 1 ]; then
+    suite_remaining_delay_seconds=$((suite_remaining_delay_seconds + ((pending_suite_cases - 1) * INTER_CASE_DELAY)))
+  fi
+  suite_eta_epoch=$((now_epoch + suite_remaining_case_seconds + suite_remaining_delay_seconds))
+
+  log_info "=== Architecture Suite ETA ==="
+  log_info "  case          : ${suite_case_number}/${suite_total_cases} ${ARCHITECTURE}/${scenario}/${target_rps}rps"
+  log_info "  scenario      : ${scenario_case_number}/${scenario_total_cases} (${scenario})"
+  log_info "  est_case      : $(format_duration "$case_seconds") -> $(format_eta_epoch "$case_eta_epoch")"
+  log_info "  est_scenario  : $(format_eta_epoch "$scenario_eta_epoch")"
+  log_info "  est_suite     : $(format_eta_epoch "$suite_eta_epoch")"
+  log_info "  pending       : scenario=${pending_scenario_cases}, suite=${pending_suite_cases}"
+  log_info "  eta_basis     : k6=$(format_duration "$k6_case_seconds") + full_overhead=$(format_duration "$SEQUENTIAL_CASE_OVERHEAD_SECONDS") or reused_overhead=$(format_duration "$SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS") + retry_buffer=$(format_duration "$SEQUENTIAL_RETRY_BUFFER_SECONDS") + configured delays"
+  log_info "  eta_mode      : $eta_mode"
 }
 
 sanitize_run_id_component() {
@@ -264,6 +539,10 @@ validate_arch_suite_inputs() {
       exit 1
       ;;
   esac
+
+  validate_seconds_value "SEQUENTIAL_CASE_OVERHEAD_SECONDS" "$SEQUENTIAL_CASE_OVERHEAD_SECONDS"
+  validate_seconds_value "SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS" "$SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS"
+  validate_seconds_value "SEQUENTIAL_RETRY_BUFFER_SECONDS" "$SEQUENTIAL_RETRY_BUFFER_SECONDS"
 }
 
 build_matrix_file() {
@@ -654,6 +933,9 @@ ARCH_SUITE_STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 build_matrix_file
 log_arch_suite_configuration
+K6_CASE_ESTIMATE_SECONDS="$(estimate_case_duration_seconds)"
+CASE_ESTIMATE_SECONDS=$((K6_CASE_ESTIMATE_SECONDS + SEQUENTIAL_CASE_OVERHEAD_SECONDS + SEQUENTIAL_RETRY_BUFFER_SECONDS))
+REUSED_CASE_ESTIMATE_SECONDS=$((K6_CASE_ESTIMATE_SECONDS + SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS + SEQUENTIAL_RETRY_BUFFER_SECONDS))
 
 if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
   BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_or_die "$S3_BUCKET" "architecture suite bootstrap" "false"
@@ -794,6 +1076,34 @@ while IFS=$'\t' read -r scenario scenario_rps_levels; do
       log_warn "existing result-status.json for ${ARCHITECTURE}/${scenario}/${target_rps}rps is unreadable; rerunning case."
       set_case_result_status_cache "$scenario" "$target_rps" "missing"
     fi
+
+    current_case_estimate_seconds="$CASE_ESTIMATE_SECONDS"
+    current_eta_mode="per_case_setup"
+    if [ "$scenario_skip_case_setup" = "true" ]; then
+      current_case_estimate_seconds="$REUSED_CASE_ESTIMATE_SECONDS"
+      current_eta_mode="per_scenario_reuse"
+    fi
+
+    pending_scenario_cases="$(count_pending_scenario_cases_from "$scenario" "$target_rps")"
+    pending_suite_cases="$(count_pending_suite_cases_from "$scenario" "$target_rps")"
+    pending_suite_case_seconds="$(count_pending_suite_case_seconds_from "$scenario" "$target_rps")"
+    scenario_remaining_case_seconds="$(scenario_pending_case_seconds "$(scenario_setup_reuse_scope "$scenario")" "$pending_scenario_cases" "$scenario_skip_case_setup")"
+
+    print_case_eta \
+      "$ARCHITECTURE" \
+      "$scenario" \
+      "$target_rps" \
+      "$((completed_cases + 1))" \
+      "$total_cases" \
+      "$scenario_case_index" \
+      "$scenario_case_count" \
+      "$current_case_estimate_seconds" \
+      "$K6_CASE_ESTIMATE_SECONDS" \
+      "$current_eta_mode" \
+      "$pending_scenario_cases" \
+      "$pending_suite_cases" \
+      "$scenario_remaining_case_seconds" \
+      "$pending_suite_case_seconds"
 
     case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     log_info "Launching single-case runner for ${ARCHITECTURE}/${scenario}/${target_rps}rps..."

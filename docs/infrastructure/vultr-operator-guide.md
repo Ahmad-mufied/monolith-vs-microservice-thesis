@@ -595,13 +595,14 @@ SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,250
 make run-benchmark-suite
 ```
 
-ETA: `est_case`, `est_scenario`, `est_suite`.
+ETA: `est_case`, `est_scenario`, `est_suite`. Both the sequential suite (`run-benchmark-suite`) and the single-architecture suite (`run-benchmark-arch-suite`) compute and log ETA information using these parameters.
 
 - `SEQUENTIAL_CASE_OVERHEAD_SECONDS=180` is the full-case overhead buffer used
   when a case still performs its own reset/seed/setup.
-- `SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS=60` is the lighter overhead buffer
+- `SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS=120` is the lighter overhead buffer
   used when the sequential suite is reusing one prepared dataset across pending
   RPS levels for a data-stable scenario.
+- `SEQUENTIAL_RETRY_BUFFER_SECONDS=0` is the additional buffer allocated for retries/errors.
 
 ### SCENARIO_RPS_MATRIX
 
