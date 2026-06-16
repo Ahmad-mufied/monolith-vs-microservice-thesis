@@ -240,6 +240,13 @@ flag in the relevant `*.app.env` file, rerun `make create-secrets` (or the
 Vultr-specific secret target you use), then redeploy the workload so the pod
 reads the updated Secret.
 
+Benchmark deploy flows now refresh those Secrets before they decide whether a
+cluster is already reusable, and the rendered Deployment manifests include a
+pod-template config checksum derived from each runtime Secret. In practice this
+means a change such as `LOGIN_ADMISSION_ENABLED=false` can no longer be hidden
+behind a matching `IMAGE_TAG` and `SCALING_MODE`; the next benchmark deploy or
+resume check will force a rollout when the Secret payload changed.
+
 `LOGIN_MAX_CONCURRENCY` is now config-driven through the same flow as well.
 For microservices, keep `LOGIN_MAX_CONCURRENCY=2` as the fixed baseline and
 `LOGIN_MAX_CONCURRENCY_HPA=1` as the HPA baseline unless you are intentionally

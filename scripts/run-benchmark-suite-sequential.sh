@@ -715,6 +715,9 @@ deployment_ready_with_image_tag() {
   if [[ "$image" != *":${IMAGE_TAG}" ]]; then
     return 1
   fi
+  if ! deployment_config_checksum_matches_secret "$SEQUENTIAL_CONTEXT" "$namespace" "$deployment"; then
+    return 1
+  fi
 
   return 0
 }
@@ -891,8 +894,17 @@ if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
   BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_or_die "$S3_BUCKET" "sequential suite bootstrap" "false"
 fi
 
+sync_runtime_secrets() {
+  PLATFORM="$PLATFORM" \
+  EXECUTION_MODE=sequential \
+  SCALING_MODE="$SCALING_MODE" \
+  CLOUD_PROVIDER="$CLOUD_PROVIDER" \
+  bash scripts/operator-dispatch.sh create-secrets >/dev/null
+}
+
 render_provider_manifests "$RENDER_ROOT"
 bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
+sync_runtime_secrets
 
 manifest_path="$SUITE_WORKDIR/manifest.json"
 jq -n \

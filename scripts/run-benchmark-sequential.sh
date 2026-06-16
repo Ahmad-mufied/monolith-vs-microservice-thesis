@@ -151,6 +151,15 @@ if [ "$SKIP_BENCHMARK_PREFLIGHT" != "true" ]; then
   BENCHMARK_PREFLIGHT_CONTEXTS="$SEQUENTIAL_CONTEXT" benchmark_preflight_or_die "$S3_BUCKET" "sequential benchmark bootstrap" "false"
 fi
 
+sync_runtime_secrets() {
+  PLATFORM="$PLATFORM" \
+  EXECUTION_MODE=sequential \
+  SCALING_MODE="$SCALING_MODE" \
+  CLOUD_PROVIDER="$CLOUD_PROVIDER" \
+  ARCHITECTURE="$ARCHITECTURE" \
+  bash scripts/operator-dispatch.sh create-secrets >/dev/null
+}
+
 # --- Auto-detect whether the target architecture needs deploying ---
 
 check_deployment_ready() {
@@ -173,7 +182,10 @@ check_deployment_ready() {
   if ! [[ "$desired" =~ ^[0-9]+$ ]] || ! [[ "$ready" =~ ^[0-9]+$ ]]; then
     return 1
   fi
-  [ "$desired" -ge 1 ] && [ "$ready" -ge "$desired" ] && [[ "$image" == *":${IMAGE_TAG}" ]]
+  [ "$desired" -ge 1 ] &&
+    [ "$ready" -ge "$desired" ] &&
+    [[ "$image" == *":${IMAGE_TAG}" ]] &&
+    deployment_config_checksum_matches_secret "$SEQUENTIAL_CONTEXT" "$namespace" "$deployment"
 }
 
 check_scaled_down() {
@@ -242,6 +254,7 @@ architecture_already_deployed() {
 render_provider_manifests "$RENDER_ROOT"
 MANIFEST="$RENDER_ROOT/deployments/k8s/benchmark/$MANIFEST_NAME"
 bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
+sync_runtime_secrets
 
 if architecture_already_deployed "$ARCHITECTURE"; then
   echo "Architecture ${ARCHITECTURE} is already deployed with IMAGE_TAG=${IMAGE_TAG} and SCALING_MODE=${SCALING_MODE}; skipping deploy."

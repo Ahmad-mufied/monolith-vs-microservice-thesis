@@ -298,6 +298,135 @@ append_secret_pair_if_override() {
   pairs_ref+=("$key" "$value")
 }
 
+deployment_config_checksum_annotation_key() {
+  printf 'benchmark.skripsi.dev/config-checksum\n'
+}
+
+secret_data_checksum() {
+  local context="$1"
+  local namespace="$2"
+  local secret_name="$3"
+  local secret_json
+
+  if ! secret_json="$(kubectl --context="$context" get secret "$secret_name" -n "$namespace" -o json 2>/dev/null)"; then
+    return 1
+  fi
+
+  jq -r '
+    .data // {}
+    | to_entries
+    | sort_by(.key)
+    | map("\(.key)=\(.value | @base64d)")
+    | .[]
+  ' <<<"$secret_json" | sha256sum | awk '{print $1}'
+}
+
+deployment_template_config_checksum() {
+  local context="$1"
+  local namespace="$2"
+  local deployment="$3"
+  local annotation_key
+
+  annotation_key="$(deployment_config_checksum_annotation_key)"
+  kubectl --context="$context" get deployment "$deployment" -n "$namespace" \
+    -o "jsonpath={.spec.template.metadata.annotations['${annotation_key//./\\.}']}" 2>/dev/null || true
+}
+
+deployment_runtime_secret_name() {
+  local namespace="$1"
+  local deployment="$2"
+
+  case "${namespace}/${deployment}" in
+    mono/monolith)
+      printf 'monolith-env\n'
+      ;;
+    msa/api-gateway)
+      printf 'api-gateway-secret\n'
+      ;;
+    msa/auth-service)
+      printf 'auth-service-secret\n'
+      ;;
+    msa/item-service)
+      printf 'item-service-secret\n'
+      ;;
+    msa/transaction-service)
+      printf 'transaction-service-secret\n'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+deployment_config_checksum_matches_secret() {
+  local context="$1"
+  local namespace="$2"
+  local deployment="$3"
+  local secret_name expected_checksum live_checksum
+
+  secret_name="$(deployment_runtime_secret_name "$namespace" "$deployment")" || return 1
+  expected_checksum="$(secret_data_checksum "$context" "$namespace" "$secret_name")" || return 1
+  live_checksum="$(deployment_template_config_checksum "$context" "$namespace" "$deployment")"
+
+  [[ -n "$live_checksum" && "$live_checksum" == "$expected_checksum" ]]
+}
+
+rendered_deployment_manifest_has_config_checksum() {
+  local manifest_path="$1"
+  local annotation_key
+
+  annotation_key="$(deployment_config_checksum_annotation_key)"
+  grep -Fq "${annotation_key}:" "$manifest_path"
+}
+
+set_rendered_deployment_config_checksum() {
+  local manifest_path="$1"
+  local checksum="$2"
+  local annotation_key
+
+  annotation_key="$(deployment_config_checksum_annotation_key)"
+
+  CONFIG_CHECKSUM_VALUE="$checksum" CONFIG_CHECKSUM_KEY="$annotation_key" perl -0pi -e '
+    my $value = $ENV{"CONFIG_CHECKSUM_VALUE"};
+    my $key = $ENV{"CONFIG_CHECKSUM_KEY"};
+
+    if (
+      s{(template:\n([ ]*)metadata:\n(?:\2  annotations:\n(?:\2    .*\n)*)\2    \Q$key\E: ).*\n}{$1$value\n}m
+    ) {
+      exit 0;
+    }
+
+    if (
+      s{(template:\n([ ]*)metadata:\n)(\2  annotations:\n)}{$1$3$2    $key: $value\n}m
+    ) {
+      exit 0;
+    }
+
+    if (
+      s{(template:\n([ ]*)metadata:\n)(\2  labels:\n)}{$1$2  annotations:\n$2    $key: $value\n$3}m
+    ) {
+      exit 0;
+    }
+
+    die "failed to inject config checksum annotation into $ARGV\n";
+  ' "$manifest_path"
+}
+
+annotate_rendered_deployment_manifest_with_secret_checksum() {
+  local manifest_path="$1"
+  local context="$2"
+  local namespace="$3"
+  local secret_name="$4"
+  local checksum
+
+  checksum="$(secret_data_checksum "$context" "$namespace" "$secret_name")" || {
+    echo "ERROR: failed to compute checksum for secret ${namespace}/${secret_name}" >&2
+    return 1
+  }
+
+  set_rendered_deployment_config_checksum "$manifest_path" "$checksum"
+}
+
 apply_secret_from_pairs() {
   local context="$1"
   local namespace="$2"

@@ -71,6 +71,37 @@ require_secret() {
   fi
 }
 
+sync_runtime_secrets() {
+  PLATFORM="$PLATFORM" \
+  EXECUTION_MODE=parallel \
+  SCALING_MODE="$SCALING_MODE" \
+  CLOUD_PROVIDER="$CLOUD_PROVIDER" \
+  bash scripts/operator-dispatch.sh create-secrets
+}
+
+annotate_microservices_rendered_manifests() {
+  annotate_rendered_deployment_manifest_with_secret_checksum \
+    "$RENDERED_APP_JOB_DIR/base/api-gateway.yaml" \
+    "$CONTEXT" \
+    msa \
+    api-gateway-secret
+  annotate_rendered_deployment_manifest_with_secret_checksum \
+    "$RENDERED_APP_JOB_DIR/base/auth-service.yaml" \
+    "$CONTEXT" \
+    msa \
+    auth-service-secret
+  annotate_rendered_deployment_manifest_with_secret_checksum \
+    "$RENDERED_APP_JOB_DIR/base/item-service.yaml" \
+    "$CONTEXT" \
+    msa \
+    item-service-secret
+  annotate_rendered_deployment_manifest_with_secret_checksum \
+    "$RENDERED_APP_JOB_DIR/base/transaction-service.yaml" \
+    "$CONTEXT" \
+    msa \
+    transaction-service-secret
+}
+
 echo "=== Deploying MSA cluster (context: $CONTEXT) ==="
 
 echo "Rendering cloud manifests with IMAGE_TAG=$IMAGE_TAG"
@@ -83,6 +114,7 @@ bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 $K8S apply -f deployments/k8s/namespaces/local.yaml
 $K8S apply -f deployments/k8s/benchmark/namespace.yaml
 $K8S apply -f deployments/k8s/benchmark/k6-runner-rbac.yaml
+sync_runtime_secrets
 
 echo "Verifying required secrets..."
 require_secret benchmark db-bootstrap-env "BOOTSTRAP_DATABASE_URL"
@@ -137,6 +169,7 @@ $K8S wait --for=condition=complete job/seed-microservices-benchmark-data-job -n 
 echo "Seed complete"
 
 # Deploy services
+annotate_microservices_rendered_manifests
 $K8S apply -k "$RENDERED_MSA_OVERLAY_DIR"
 
 # Resource management

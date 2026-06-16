@@ -72,6 +72,22 @@ require_secret() {
   fi
 }
 
+sync_runtime_secrets() {
+  PLATFORM="$PLATFORM" \
+  EXECUTION_MODE=parallel \
+  SCALING_MODE="$SCALING_MODE" \
+  CLOUD_PROVIDER="$CLOUD_PROVIDER" \
+  bash scripts/operator-dispatch.sh create-secrets
+}
+
+annotate_monolith_rendered_manifests() {
+  annotate_rendered_deployment_manifest_with_secret_checksum \
+    "$RENDERED_APP_JOB_DIR/base/monolith.yaml" \
+    "$CONTEXT" \
+    mono \
+    monolith-env
+}
+
 echo "=== Deploying monolith cluster (context: $CONTEXT) ==="
 
 echo "Rendering cloud manifests with IMAGE_TAG=$IMAGE_TAG"
@@ -84,6 +100,7 @@ bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 $K8S apply -f deployments/k8s/namespaces/local.yaml
 $K8S apply -f deployments/k8s/benchmark/namespace.yaml
 $K8S apply -f deployments/k8s/benchmark/k6-runner-rbac.yaml
+sync_runtime_secrets
 
 # Required secrets
 echo "Verifying required secrets..."
@@ -127,6 +144,7 @@ $K8S wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono 
 echo "Seed complete"
 
 # Deploy application
+annotate_monolith_rendered_manifests
 $K8S apply -k "$RENDERED_MONOLITH_OVERLAY_DIR"
 
 # Resource management

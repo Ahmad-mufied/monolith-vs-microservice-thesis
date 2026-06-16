@@ -79,6 +79,49 @@ require_secret() {
   fi
 }
 
+sync_runtime_secrets() {
+  PLATFORM="$PLATFORM" \
+  EXECUTION_MODE=sequential \
+  SCALING_MODE="$SCALING_MODE" \
+  CLOUD_PROVIDER="$CLOUD_PROVIDER" \
+  bash scripts/operator-dispatch.sh create-secrets
+}
+
+annotate_monolith_rendered_manifests() {
+  local rendered_job_dir="$1"
+
+  annotate_rendered_deployment_manifest_with_secret_checksum \
+    "$rendered_job_dir/base/monolith.yaml" \
+    "$CONTEXT" \
+    mono \
+    monolith-env
+}
+
+annotate_microservices_rendered_manifests() {
+  local rendered_job_dir="$1"
+
+  annotate_rendered_deployment_manifest_with_secret_checksum \
+    "$rendered_job_dir/base/api-gateway.yaml" \
+    "$CONTEXT" \
+    msa \
+    api-gateway-secret
+  annotate_rendered_deployment_manifest_with_secret_checksum \
+    "$rendered_job_dir/base/auth-service.yaml" \
+    "$CONTEXT" \
+    msa \
+    auth-service-secret
+  annotate_rendered_deployment_manifest_with_secret_checksum \
+    "$rendered_job_dir/base/item-service.yaml" \
+    "$CONTEXT" \
+    msa \
+    item-service-secret
+  annotate_rendered_deployment_manifest_with_secret_checksum \
+    "$rendered_job_dir/base/transaction-service.yaml" \
+    "$CONTEXT" \
+    msa \
+    transaction-service-secret
+}
+
 install_datadog_if_configured() {
   DATADOG_API_KEY="${DATADOG_API_KEY:-}"
   DATADOG_CHART_VERSION="${DATADOG_CHART_VERSION:-3.134.0}"
@@ -126,6 +169,7 @@ bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 $K8S apply -f deployments/k8s/namespaces/local.yaml
 $K8S apply -f deployments/k8s/benchmark/namespace.yaml
 $K8S apply -f deployments/k8s/benchmark/k6-runner-rbac.yaml
+sync_runtime_secrets
 
 case "$ARCHITECTURE" in
   monolith)
@@ -149,6 +193,7 @@ case "$ARCHITECTURE" in
 
     recreate_job mono seed-monolith-benchmark-data-job "$rendered_job_dir/seed-monolith-benchmark-data-job.yaml" 300s
 
+    annotate_monolith_rendered_manifests "$rendered_job_dir"
     $K8S apply -k "$rendered_overlay_dir"
     $K8S delete hpa monolith -n mono --ignore-not-found
     $K8S rollout status deployment/monolith -n mono --timeout=300s
@@ -179,6 +224,7 @@ case "$ARCHITECTURE" in
 
     recreate_job msa seed-microservices-benchmark-data-job "$rendered_job_dir/seed-microservices-benchmark-data-job.yaml" 300s
 
+    annotate_microservices_rendered_manifests "$rendered_job_dir"
     $K8S apply -k "$rendered_overlay_dir"
     if [ "$MICROSERVICES_EFFECTIVE_SCALING_MODE" = "hpa" ]; then
       bash scripts/install-metrics-server.sh "$CONTEXT"
