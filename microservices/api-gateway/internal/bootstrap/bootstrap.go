@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -107,7 +106,11 @@ func Run() error {
 
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Printf("api-gateway HTTP listening on %s (request_timeout=%s grpc_call_timeout=%s)", addr, cfg.RequestTimeout, cfg.GRPCCallTimeout)
+		slog.Info("api-gateway HTTP listening",
+			"addr", addr,
+			"request_timeout", cfg.RequestTimeout.String(),
+			"grpc_call_timeout", cfg.GRPCCallTimeout.String(),
+		)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
@@ -118,7 +121,7 @@ func Run() error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.HTTPServer.ShutdownTimeout)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
-			log.Printf("api-gateway graceful shutdown error: %v", err)
+			slog.Warn("api-gateway graceful shutdown error", "error", err.Error())
 		}
 		return nil
 	case err := <-serverErr:
@@ -137,6 +140,6 @@ func grpcClientOptions(serviceName string) []grpc.DialOption {
 
 func closeConn(conn *grpc.ClientConn, name string) {
 	if err := conn.Close(); err != nil {
-		log.Printf("close %s service conn: %v", name, err)
+		slog.Warn("close service conn", "service", name, "error", err.Error())
 	}
 }
