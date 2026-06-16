@@ -42,7 +42,7 @@ RETURNING id, name, email, password_hash, created_at, updated_at;
 		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "23505" {
 			return nil, pkgerrors.Conflict("email already exists")
 		}
-		return nil, pkgerrors.InternalFromContext("insert user", err)
+		return nil, pkgerrors.InternalFromContext(ctx, "insert user", err)
 	}
 	return &user, nil
 }
@@ -69,7 +69,7 @@ WHERE lower(email) = lower($1);
 	}
 	if err != nil {
 		level := slog.LevelError
-		if pkgerrors.IsContext(err) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		if pkgerrors.IsContext(err) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
 			level = slog.LevelWarn
 		}
 
@@ -79,7 +79,7 @@ WHERE lower(email) = lower($1);
 			"repository", "user_repository",
 			"operation", "find_by_email",
 		)
-		return nil, pkgerrors.InternalFromContext("find user by email", err)
+		return nil, pkgerrors.InternalFromContext(ctx, "find user by email", err)
 	}
 	return &user, nil
 }
@@ -104,7 +104,7 @@ WHERE id = $1::uuid;
 		return nil, pkgerrors.NotFound("user not found")
 	}
 	if err != nil {
-		return nil, pkgerrors.InternalFromContext("find user by id", err)
+		return nil, pkgerrors.InternalFromContext(ctx, "find user by id", err)
 	}
 	return &user, nil
 }
@@ -118,7 +118,7 @@ WHERE id = ANY($1::uuid[]);
 
 	rows, err := r.pool.Query(ctx, query, ids)
 	if err != nil {
-		return nil, pkgerrors.InternalFromContext("find users by ids", err)
+		return nil, pkgerrors.InternalFromContext(ctx, "find users by ids", err)
 	}
 	defer rows.Close()
 
@@ -133,12 +133,12 @@ WHERE id = ANY($1::uuid[]);
 			&user.CreatedAt,
 			&user.UpdatedAt,
 		); err != nil {
-			return nil, pkgerrors.InternalFromContext("scan users by ids", err)
+			return nil, pkgerrors.InternalFromContext(ctx, "scan users by ids", err)
 		}
 		users = append(users, &user)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, pkgerrors.InternalFromContext("iterate users by ids", err)
+		return nil, pkgerrors.InternalFromContext(ctx, "iterate users by ids", err)
 	}
 	return users, nil
 }

@@ -38,7 +38,7 @@ RETURNING id::text, name, email, password_hash, created_at, updated_at`
 		if isUniqueViolation(err) {
 			return User{}, apperror.Conflict("email already exists")
 		}
-		return User{}, apperror.InternalFromContext("creating user", err)
+		return User{}, apperror.InternalFromContext(ctx, "creating user", err)
 	}
 	return user, nil
 }
@@ -70,7 +70,7 @@ WHERE lower(email) = lower($1)`
 			"repository", "auth_repository",
 			"operation", "find_user_by_email",
 		)
-		return User{}, apperror.InternalFromContext("finding user by email", err)
+		return User{}, apperror.InternalFromContext(ctx, "finding user by email", err)
 	}
 	return user, nil
 }

@@ -22,7 +22,7 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 func (r *PostgresRepository) SyncItems(ctx context.Context, items []SyncItem) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return apperror.InternalFromContext("begin sync transaction", err)
+		return apperror.InternalFromContext(ctx, "begin sync transaction", err)
 	}
 	defer func() { _ = tx.Rollback(context.Background()) }()
 
@@ -34,7 +34,7 @@ func (r *PostgresRepository) SyncItems(ctx context.Context, items []SyncItem) er
 	})
 
 	if err := softDeleteOmittedItems(ctx, tx, keepIDs); err != nil {
-		return apperror.InternalFromContext("soft delete omitted items", err)
+		return apperror.InternalFromContext(ctx, "soft delete omitted items", err)
 	}
 	if len(inserts) > 0 {
 		if err := batchInsertItems(ctx, tx, inserts); err != nil {
@@ -48,7 +48,7 @@ func (r *PostgresRepository) SyncItems(ctx context.Context, items []SyncItem) er
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return apperror.InternalFromContext("commit sync transaction", err)
+		return apperror.InternalFromContext(ctx, "commit sync transaction", err)
 	}
 	return nil
 }
@@ -63,7 +63,7 @@ LIMIT $1 OFFSET $2`
 
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
-		return nil, apperror.InternalFromContext("list items", err)
+		return nil, apperror.InternalFromContext(ctx, "list items", err)
 	}
 	defer rows.Close()
 
@@ -71,12 +71,12 @@ LIMIT $1 OFFSET $2`
 	for rows.Next() {
 		item, err := scanItem(rows)
 		if err != nil {
-			return nil, apperror.InternalFromContext("scan item row", err)
+			return nil, apperror.InternalFromContext(ctx, "scan item row", err)
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, apperror.InternalFromContext("iterate items", err)
+		return nil, apperror.InternalFromContext(ctx, "iterate items", err)
 	}
 	return items, nil
 }
@@ -93,7 +93,7 @@ WHERE id = $1::uuid
 		return Item{}, apperror.NotFound("item not found")
 	}
 	if err != nil {
-		return Item{}, apperror.InternalFromContext("get item by id", err)
+		return Item{}, apperror.InternalFromContext(ctx, "get item by id", err)
 	}
 	return item, nil
 }
@@ -171,7 +171,7 @@ func batchInsertItems(ctx context.Context, tx pgx.Tx, items []SyncItem) error {
 INSERT INTO items (name, available_amount)
 SELECT unnest($1::text[]), unnest($2::int[])`
 	_, err := tx.Exec(ctx, query, names, amounts)
-	return mapConflictError(err)
+	return mapConflictError(ctx, err)
 }
 
 // batchUpsertItems upserts all items with a client-provided ID in one query,
@@ -194,7 +194,7 @@ SET name             = EXCLUDED.name,
     deleted_at       = NULL,
     updated_at       = now()`
 	_, err := tx.Exec(ctx, query, ids, names, amounts)
-	return mapConflictError(err)
+	return mapConflictError(ctx, err)
 }
 
 // scanItem scans a row into an Item. Works with both pgx.Row and pgx.Rows.
@@ -210,13 +210,18 @@ func scanItem(row interface{ Scan(...any) error }) (Item, error) {
 //   - deadlock_detected (40P01) → 409 Conflict (retryable)
 //   - query_canceled (57014) → 409 Conflict (timeout, retryable)
 //   - other errors → 500 Internal Server Error
-func mapConflictError(err error) error {
+func mapConflictError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
+	// Context completion takes precedence over SQLSTATE mapping so canceled or
+	// timed-out requests are never downgraded into a conflict response.
+	if ctxErr := apperror.ContextError(ctx); ctxErr != nil {
+		return ctxErr
+	}
 	pgErr, ok := errors.AsType[*pgconn.PgError](err)
 	if !ok {
-		return apperror.InternalFromContext("upsert item", err)
+		return apperror.InternalFromContext(ctx, "upsert item", err)
 	}
 	switch pgErr.Code {
 	case "23505":
@@ -224,6 +229,6 @@ func mapConflictError(err error) error {
 	case "40001", "40P01", "57014":
 		return apperror.Conflict("transaction conflict, please retry")
 	default:
-		return apperror.InternalFromContext("upsert item", err)
+		return apperror.InternalFromContext(ctx, "upsert item", err)
 	}
 }

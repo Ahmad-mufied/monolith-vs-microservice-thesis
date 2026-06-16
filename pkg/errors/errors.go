@@ -162,7 +162,12 @@ func Internal(message string, cause error) error {
 	return &Error{kind: ErrInternal, message: message, cause: cause}
 }
 
-func InternalFromContext(action string, err error) error {
+// InternalFromContext preserves request-scoped timeout/cancel semantics even
+// when the downstream driver error no longer wraps the original context error.
+func InternalFromContext(ctx context.Context, action string, err error) error {
+	if ctxErr := ContextError(ctx); ctxErr != nil {
+		return ctxErr
+	}
 	if ctxErr := FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
 		return ctxErr
 	}
