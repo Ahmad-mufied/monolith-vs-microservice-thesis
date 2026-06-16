@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/mail"
 	"reflect"
 	"strings"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/validation"
 )
@@ -102,8 +104,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 		return s.repo.FindUserByEmail(ctx, email)
 	})
 	if err != nil {
-		var appErr *apperror.Error
-		if errors.As(err, &appErr) {
+		if appErr, ok := errors.AsType[*apperror.Error](err); ok {
 			switch appErr.Code {
 			case apperror.CodeUnauthorized, apperror.CodeNotFound:
 				return LoginResponse{}, apperror.Unauthorized("invalid email or password")
@@ -119,9 +120,11 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 		})
 	}); err != nil {
 		if admission.IsRejected(err) {
+			debuglog.Error(context.Background(), slog.LevelWarn, "monolith auth login failed", "monolith_auth_login_service_failure", err, "category", "resource_exhausted")
 			return LoginResponse{}, apperror.ServiceUnavailable("login service is temporarily overloaded", err)
 		}
 		if apperror.IsContext(err) {
+			debuglog.Error(context.Background(), slog.LevelWarn, "monolith auth login failed", "monolith_auth_login_service_failure", err, "category", "context")
 			if ctxErr := apperror.FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
 				return LoginResponse{}, ctxErr
 			}
@@ -130,6 +133,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 		if errors.Is(err, ErrPasswordMismatch) {
 			return LoginResponse{}, apperror.Unauthorized("invalid email or password")
 		}
+		debuglog.Error(context.Background(), slog.LevelError, "monolith auth login failed", "monolith_auth_login_service_failure", err, "category", "compare_password_internal")
 		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("comparing password: %w", err))
 	}
 
@@ -138,8 +142,10 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 	})
 	if err != nil {
 		if apperror.IsContext(err) {
+			debuglog.Error(context.Background(), slog.LevelWarn, "monolith auth login failed", "monolith_auth_login_service_failure", err, "category", "jwt_context")
 			return LoginResponse{}, err
 		}
+		debuglog.Error(context.Background(), slog.LevelError, "monolith auth login failed", "monolith_auth_login_service_failure", err, "category", "jwt_internal")
 		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("signing token: %w", err))
 	}
 

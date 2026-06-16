@@ -81,6 +81,21 @@ make env-init-eks
 - `transaction-service.app.env`
 - `k6-runner.app.env`
 
+Optional runtime flag for application debugging:
+
+- `DIAGNOSTIC_LOGGING_ENABLED=false`
+
+When enabled, the deployable applications emit extra structured failure-only
+debug events that are useful for Datadog RCA. The flag is read directly from
+the runtime environment, so it can be enabled temporarily for a specific
+deployment or benchmark run without changing normal application behavior.
+
+Recommended use:
+
+- keep `DIAGNOSTIC_LOGGING_ENABLED=false` for ordinary runs
+- enable it only for focused investigations such as tracing false `500` errors
+- apply it symmetrically when you need comparable monolith vs microservices RCA
+
 `make env-init-eks` creates AWS benchmark helper env files:
 
 - `aws-benchmark.env`

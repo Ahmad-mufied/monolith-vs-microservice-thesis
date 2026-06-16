@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/mail"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/domain"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/port"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
 	pkgjwt "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/jwt"
 	pkgvalidator "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/validator"
@@ -70,6 +72,9 @@ func (u *AuthUsecase) Register(ctx context.Context, name, email, password string
 }
 
 func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token string, user *domain.User, err error) {
+	// Reuse one timer across the full login path so every debug failure in this
+	// usecase can be compared against the same end-to-end application duration.
+	startedAt := time.Now()
 	email = normalizeEmail(email)
 
 	if err := validateLoginInput(email, password); err != nil {
@@ -86,14 +91,18 @@ func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token 
 	}
 
 	if err := u.limiter.Do(ctx, func() error {
+		// The limiter only wraps the bcrypt hot path because that is the most
+		// CPU-expensive part of login and the main overload trigger we debug.
 		return pkgerrors.DoIfActive(ctx, func() error {
 			return bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 		})
 	}); err != nil {
 		if admission.IsRejected(err) {
+			debuglog.ErrorWithDuration(context.Background(), slog.LevelWarn, "auth-service login failed", "auth_login_usecase_failure", startedAt, err, "category", "resource_exhausted")
 			return "", nil, pkgerrors.ResourceExhausted("auth service is temporarily overloaded")
 		}
 		if pkgerrors.IsContext(err) {
+			debuglog.ErrorWithDuration(context.Background(), slog.LevelWarn, "auth-service login failed", "auth_login_usecase_failure", startedAt, err, "category", "context")
 			if ctxErr := pkgerrors.FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
 				return "", nil, ctxErr
 			}
@@ -102,6 +111,7 @@ func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token 
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 			return "", nil, pkgerrors.InvalidCredentials("invalid email or password")
 		}
+		debuglog.ErrorWithDuration(context.Background(), slog.LevelError, "auth-service login failed", "auth_login_usecase_failure", startedAt, err, "category", "compare_password_internal")
 		return "", nil, pkgerrors.Internal("internal server error", fmt.Errorf("compare password: %w", err))
 	}
 
@@ -110,8 +120,10 @@ func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token 
 	})
 	if err != nil {
 		if pkgerrors.IsContext(err) {
+			debuglog.ErrorWithDuration(context.Background(), slog.LevelWarn, "auth-service login failed", "auth_login_usecase_failure", startedAt, err, "category", "jwt_context")
 			return "", nil, err
 		}
+		debuglog.ErrorWithDuration(context.Background(), slog.LevelError, "auth-service login failed", "auth_login_usecase_failure", startedAt, err, "category", "jwt_internal")
 		return "", nil, pkgerrors.Internal("internal server error", fmt.Errorf("sign jwt: %w", err))
 	}
 

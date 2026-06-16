@@ -2,16 +2,50 @@ package client
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	authv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/auth/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+type authClientLogRecord struct {
+	level slog.Level
+	attrs map[string]any
+}
+
+type authClientCaptureHandler struct {
+	mu      sync.Mutex
+	records []authClientLogRecord
+}
+
+func (h *authClientCaptureHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *authClientCaptureHandler) Handle(_ context.Context, record slog.Record) error {
+	attrs := map[string]any{}
+	record.Attrs(func(attr slog.Attr) bool {
+		attrs[attr.Key] = attr.Value.Any()
+		return true
+	})
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.records = append(h.records, authClientLogRecord{
+		level: record.Level,
+		attrs: attrs,
+	})
+	return nil
+}
+
+func (h *authClientCaptureHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h *authClientCaptureHandler) WithGroup(string) slog.Handler      { return h }
 
 // fakeAuthServiceClient implements authv1.AuthServiceClient for testing.
 type fakeAuthServiceClient struct {
@@ -147,6 +181,73 @@ func TestAuthClient_Login(t *testing.T) {
 			}
 			if user == nil {
 				t.Fatalf("user is nil")
+			}
+		})
+	}
+}
+
+func TestAuthClient_LoginDiagnosticLogging(t *testing.T) {
+	tests := []struct {
+		name           string
+		grpcErr        error
+		wantEvent      string
+		wantStatusCode string
+		wantHTTPStatus int
+	}{
+		{
+			name:           "deadline exceeded maps to 503 event",
+			grpcErr:        status.Error(codes.DeadlineExceeded, "request timeout"),
+			wantEvent:      "gateway_auth_login_rpc_failure",
+			wantStatusCode: "DeadlineExceeded",
+			wantHTTPStatus: 503,
+		},
+		{
+			name:           "internal maps to 500 event",
+			grpcErr:        status.Error(codes.Internal, "boom"),
+			wantEvent:      "gateway_auth_login_rpc_failure",
+			wantStatusCode: "Internal",
+			wantHTTPStatus: 500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DIAGNOSTIC_LOGGING_ENABLED", "true")
+			debuglog.ResetForTesting()
+
+			handler := &authClientCaptureHandler{}
+			previous := slog.Default()
+			slog.SetDefault(slog.New(handler))
+			t.Cleanup(func() {
+				slog.SetDefault(previous)
+				debuglog.ResetForTesting()
+			})
+
+			fake := &fakeAuthServiceClient{
+				loginFn: func(_ context.Context, _ *authv1.LoginRequest, _ ...grpc.CallOption) (*authv1.LoginResponse, error) {
+					return nil, tt.grpcErr
+				},
+			}
+
+			client := NewAuthClient(fake, 5*time.Second)
+			_, _, err := client.Login(context.Background(), "a@b.com", "pass1234")
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+
+			if len(handler.records) != 1 {
+				t.Fatalf("record count = %d, want 1", len(handler.records))
+			}
+
+			record := handler.records[0]
+			if record.attrs["event"] != tt.wantEvent {
+				t.Fatalf("event = %v, want %v", record.attrs["event"], tt.wantEvent)
+			}
+			if record.attrs["grpc_status_code"] != tt.wantStatusCode {
+				t.Fatalf("grpc_status_code = %v, want %v", record.attrs["grpc_status_code"], tt.wantStatusCode)
+			}
+			if record.attrs["http_status"] != int64(tt.wantHTTPStatus) && record.attrs["http_status"] != tt.wantHTTPStatus {
+				t.Fatalf("http_status = %v, want %d", record.attrs["http_status"], tt.wantHTTPStatus)
 			}
 		})
 	}

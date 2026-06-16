@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/handler"
 	mware "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/middleware"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/router"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/logger"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/observability"
 	authv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/auth/v1"
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
@@ -33,6 +36,7 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	slog.SetDefault(logger.New(os.Getenv("LOG_LEVEL")).With("service", "api-gateway"))
 	serviceName := observability.ServiceName("api-gateway")
 	stopObservability, err := observability.Start(serviceName)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	authv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/auth/v1"
 )
 
@@ -35,9 +36,18 @@ func (c *AuthClient) Register(ctx context.Context, name, email, password string)
 func (c *AuthClient) Login(ctx context.Context, email, password string) (string, *dto.UserSummary, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.grpcTimeout)
 	defer cancel()
+	startedAt := time.Now()
 	resp, err := c.grpc.Login(ctx, &authv1.LoginRequest{Email: email, Password: password})
 	if err != nil {
-		return "", nil, httputil.FromGRPCError(err)
+		appErr := httputil.FromGRPCError(err)
+		// Log both sides of the mapping here so RCA can see the upstream gRPC
+		// status and the public HTTP status chosen by the gateway.
+		debuglog.GRPC(context.Background(), "api-gateway auth login rpc failed", "gateway_auth_login_rpc_failure", "/auth.v1.AuthService/Login", startedAt, err,
+			"http_status", appErr.Status,
+			"http_error_code", appErr.Code,
+			"http_error_message", appErr.Message,
+		)
+		return "", nil, appErr
 	}
 	return resp.GetToken(), protoUserSummaryToDTO(resp.GetUser()), nil
 }

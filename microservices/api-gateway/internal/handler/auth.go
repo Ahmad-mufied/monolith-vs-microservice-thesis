@@ -6,6 +6,7 @@ import (
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/dto"
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/api-gateway/internal/httputil"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	"github.com/labstack/echo/v4"
 )
 
@@ -45,6 +46,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 	token, user, err := h.client.Login(c.Request().Context(), req.Email, req.Password)
 	if err != nil {
+		if appErr, ok := err.(*httputil.AppError); ok {
+			debuglog.HTTP(context.Background(), "api-gateway auth login http failed", "gateway_auth_login_http_failure", appErr.Status, appErr.Code, appErr.Message)
+		}
 		return httputil.Error(c, err)
 	}
 	if user == nil {

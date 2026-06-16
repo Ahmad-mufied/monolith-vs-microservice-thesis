@@ -3,8 +3,11 @@ package postgres
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/microservices/auth-service/internal/domain"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	pkgerrors "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -46,6 +49,7 @@ RETURNING id, name, email, password_hash, created_at, updated_at;
 }
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
+	startedAt := time.Now()
 	const query = `
 SELECT id, name, email, password_hash, created_at, updated_at
 FROM users
@@ -65,6 +69,17 @@ WHERE lower(email) = lower($1);
 		return nil, pkgerrors.NotFound("user not found")
 	}
 	if err != nil {
+		level := slog.LevelError
+		if pkgerrors.IsContext(err) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			level = slog.LevelWarn
+		}
+
+		// Repository-level timeout details are crucial for distinguishing false
+		// 500s from true internal faults during overload investigations.
+		debuglog.ErrorWithDuration(ctx, level, "auth-service repository failure", "auth_user_repository_failure", startedAt, err,
+			"repository", "user_repository",
+			"operation", "find_by_email",
+		)
 		return nil, pkgerrors.InternalFromContext("find user by email", err)
 	}
 	return &user, nil

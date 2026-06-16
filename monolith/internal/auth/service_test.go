@@ -3,13 +3,42 @@ package auth
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/admission"
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 )
+
+type monolithLogRecord struct {
+	level slog.Level
+	attrs map[string]any
+}
+
+type monolithCaptureHandler struct {
+	mu      sync.Mutex
+	records []monolithLogRecord
+}
+
+func (h *monolithCaptureHandler) Enabled(context.Context, slog.Level) bool { return true }
+func (h *monolithCaptureHandler) WithAttrs([]slog.Attr) slog.Handler       { return h }
+func (h *monolithCaptureHandler) WithGroup(string) slog.Handler            { return h }
+func (h *monolithCaptureHandler) Handle(_ context.Context, record slog.Record) error {
+	attrs := map[string]any{}
+	record.Attrs(func(attr slog.Attr) bool {
+		attrs[attr.Key] = attr.Value.Any()
+		return true
+	})
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.records = append(h.records, monolithLogRecord{level: record.Level, attrs: attrs})
+	return nil
+}
 
 type fakeRepo struct {
 	createUser        User
@@ -256,6 +285,78 @@ func TestServiceLoginAdmissionDeadlineWhileQueued(t *testing.T) {
 
 	_, err := service.Login(ctx, LoginRequest{Email: "mufied@example.com", Password: "secret123"})
 	assertAppError(t, err, true, apperror.CodeServiceUnavailable)
+}
+
+func TestServiceLoginDiagnosticLogging(t *testing.T) {
+	tests := []struct {
+		name         string
+		repo         *fakeRepo
+		hasher       fakeHasher
+		limiter      *admission.Limiter
+		wantLevel    slog.Level
+		wantCategory string
+	}{
+		{
+			name:         "resource exhausted logs warn",
+			repo:         &fakeRepo{findUser: User{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Email: "mufied@example.com", PasswordHash: "hashed"}},
+			hasher:       fakeHasher{},
+			limiter:      nil,
+			wantLevel:    slog.LevelWarn,
+			wantCategory: "resource_exhausted",
+		},
+		{
+			name:         "hasher internal logs error",
+			repo:         &fakeRepo{findUser: User{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Email: "mufied@example.com", PasswordHash: "hashed"}},
+			hasher:       fakeHasher{compareErr: errors.New("hash parsing failed")},
+			limiter:      newDisabledLimiter(),
+			wantLevel:    slog.LevelError,
+			wantCategory: "compare_password_internal",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DIAGNOSTIC_LOGGING_ENABLED", "true")
+			debuglog.ResetForTesting()
+
+			handler := &monolithCaptureHandler{}
+			previous := slog.Default()
+			slog.SetDefault(slog.New(handler))
+			t.Cleanup(func() {
+				slog.SetDefault(previous)
+				debuglog.ResetForTesting()
+			})
+
+			limiter := tt.limiter
+			var release func()
+			if limiter == nil {
+				limiter = newEnabledLimiter(t, 1, 10*time.Millisecond)
+				release = occupyLimiterSlot(t, limiter)
+				defer release()
+			}
+
+			service := NewService(tt.repo, tt.hasher, fakeSigner{token: "token"}, limiter)
+			_, err := service.Login(context.Background(), LoginRequest{Email: "mufied@example.com", Password: "secret123"})
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+
+			if len(handler.records) != 1 {
+				t.Fatalf("record count = %d, want 1", len(handler.records))
+			}
+
+			record := handler.records[0]
+			if record.level != tt.wantLevel {
+				t.Fatalf("level = %v, want %v", record.level, tt.wantLevel)
+			}
+			if record.attrs["event"] != "monolith_auth_login_service_failure" {
+				t.Fatalf("event = %v, want monolith_auth_login_service_failure", record.attrs["event"])
+			}
+			if record.attrs["category"] != tt.wantCategory {
+				t.Fatalf("category = %v, want %v", record.attrs["category"], tt.wantCategory)
+			}
+		})
+	}
 }
 
 func TestServiceLoginContextCanceledBeforeRepository(t *testing.T) {

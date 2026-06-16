@@ -4,13 +4,42 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
+	"github.com/Ahmad-mufied/monolith-vs-microservice-thesis/pkg/debuglog"
 	"github.com/ahmadmufied/skripsi-benchmark/monolith/internal/shared/apperror"
 	"github.com/labstack/echo/v4"
 )
+
+type monolithHandlerLogRecord struct {
+	level slog.Level
+	attrs map[string]any
+}
+
+type monolithHandlerCaptureHandler struct {
+	mu      sync.Mutex
+	records []monolithHandlerLogRecord
+}
+
+func (h *monolithHandlerCaptureHandler) Enabled(context.Context, slog.Level) bool { return true }
+func (h *monolithHandlerCaptureHandler) WithAttrs([]slog.Attr) slog.Handler       { return h }
+func (h *monolithHandlerCaptureHandler) WithGroup(string) slog.Handler            { return h }
+func (h *monolithHandlerCaptureHandler) Handle(_ context.Context, record slog.Record) error {
+	attrs := map[string]any{}
+	record.Attrs(func(attr slog.Attr) bool {
+		attrs[attr.Key] = attr.Value.Any()
+		return true
+	})
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.records = append(h.records, monolithHandlerLogRecord{level: record.Level, attrs: attrs})
+	return nil
+}
 
 type fakeAuthService struct {
 	registerResp RegisterResponse
@@ -97,6 +126,63 @@ func TestHandlerLogin(t *testing.T) {
 				if got.Message != "Login successful" || got.Data.Token != "token" {
 					t.Fatalf("response = %+v", got)
 				}
+			}
+		})
+	}
+}
+
+func TestHandlerLoginDiagnosticLogging(t *testing.T) {
+	tests := []struct {
+		name           string
+		service        fakeAuthService
+		wantStatusCode int
+		wantLevel      slog.Level
+	}{
+		{
+			name:           "service unavailable logs warn",
+			service:        fakeAuthService{loginErr: apperror.ServiceUnavailable("request timeout", context.DeadlineExceeded)},
+			wantStatusCode: http.StatusServiceUnavailable,
+			wantLevel:      slog.LevelWarn,
+		},
+		{
+			name:           "internal logs error",
+			service:        fakeAuthService{loginErr: apperror.Internal("internal server error", context.DeadlineExceeded)},
+			wantStatusCode: http.StatusInternalServerError,
+			wantLevel:      slog.LevelError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DIAGNOSTIC_LOGGING_ENABLED", "true")
+			debuglog.ResetForTesting()
+
+			handler := &monolithHandlerCaptureHandler{}
+			previous := slog.Default()
+			slog.SetDefault(slog.New(handler))
+			t.Cleanup(func() {
+				slog.SetDefault(previous)
+				debuglog.ResetForTesting()
+			})
+
+			rec := executeAuthHandler(`{"email":"mufied@example.com","password":"secret123"}`, NewHandler(tt.service).Login)
+			if rec.Code != tt.wantStatusCode {
+				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatusCode)
+			}
+
+			if len(handler.records) != 1 {
+				t.Fatalf("record count = %d, want 1", len(handler.records))
+			}
+
+			record := handler.records[0]
+			if record.level != tt.wantLevel {
+				t.Fatalf("level = %v, want %v", record.level, tt.wantLevel)
+			}
+			if record.attrs["event"] != "monolith_auth_login_http_failure" {
+				t.Fatalf("event = %v, want monolith_auth_login_http_failure", record.attrs["event"])
+			}
+			if record.attrs["http_status"] != int64(tt.wantStatusCode) && record.attrs["http_status"] != tt.wantStatusCode {
+				t.Fatalf("http_status = %v, want %d", record.attrs["http_status"], tt.wantStatusCode)
 			}
 		})
 	}
