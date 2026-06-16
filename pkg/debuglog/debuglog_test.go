@@ -173,7 +173,23 @@ func TestDiagnosticLoggingHelpers(t *testing.T) {
 
 			for key, want := range tt.wantAttrs {
 				got := record.attrs[key]
-				if got != want && got != int64(503) && got != int64(500) {
+				if key == "http_status" {
+					switch value := got.(type) {
+					case int:
+						if value != want {
+							t.Fatalf("%s = %v, want %v", key, got, want)
+						}
+					case int64:
+						if int(value) != want {
+							t.Fatalf("%s = %v, want %v", key, got, want)
+						}
+					default:
+						t.Fatalf("%s = %v, want %v", key, got, want)
+					}
+					continue
+				}
+
+				if got != want {
 					t.Fatalf("%s = %v, want %v", key, got, want)
 				}
 			}
