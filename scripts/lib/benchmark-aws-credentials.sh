@@ -64,7 +64,7 @@ prepare_benchmark_aws_env() {
 benchmark_aws() {
   prepare_benchmark_aws_env || return 1
 
-  local max_attempts=3
+  local max_attempts=10
   local attempt=1
   local delay=3
   local exit_code=0

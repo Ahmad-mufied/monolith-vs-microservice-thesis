@@ -501,7 +501,7 @@ validate_transaction_timeout_chain() {
 
 # Robust kubectl wrapper with retries for transient connection/DNS issues
 kubectl() {
-  local max_attempts=3
+  local max_attempts=10
   local attempt=1
   local delay=3
   local exit_code=0
