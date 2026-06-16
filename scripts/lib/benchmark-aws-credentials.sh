@@ -63,5 +63,43 @@ prepare_benchmark_aws_env() {
 
 benchmark_aws() {
   prepare_benchmark_aws_env || return 1
-  aws "$@"
+
+  local max_attempts=3
+  local attempt=1
+  local delay=3
+  local exit_code=0
+  local stderr_tmp
+  stderr_tmp="$(mktemp)"
+
+  while [ $attempt -le $max_attempts ]; do
+    exit_code=0
+    aws "$@" 2>"$stderr_tmp" || exit_code=$?
+
+    if [ $exit_code -eq 0 ]; then
+      rm -f "$stderr_tmp"
+      return 0
+    fi
+
+    local stderr_content
+    stderr_content="$(cat "$stderr_tmp")"
+    echo "$stderr_content" >&2
+
+    # Check if the error is a transient network/connection issue
+    if [[ "$stderr_content" =~ "Could not connect to the endpoint URL" ]] || \
+       [[ "$stderr_content" =~ "lookup" ]] || \
+       [[ "$stderr_content" =~ "connection refused" ]] || \
+       [[ "$stderr_content" =~ "Connection timeout" ]] || \
+       [[ "$stderr_content" =~ "EOF" ]]; then
+      
+      if [ $attempt -lt $max_attempts ]; then
+        echo "WARNING: Transient AWS CLI failure detected (exit code: $exit_code). Retrying in ${delay}s (Attempt ${attempt}/${max_attempts})..." >&2
+        sleep "$delay"
+        attempt=$((attempt + 1))
+        continue
+      fi
+    fi
+
+    rm -f "$stderr_tmp"
+    return $exit_code
+  done
 }
