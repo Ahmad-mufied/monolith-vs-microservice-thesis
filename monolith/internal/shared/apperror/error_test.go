@@ -167,7 +167,7 @@ func TestInternalFromContext(t *testing.T) {
 			name: "deadline exceeded from context state",
 			ctx: func() context.Context {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
-				time.Sleep(2 * time.Millisecond)
+				<-ctx.Done()
 				cancel()
 				return ctx
 			},
