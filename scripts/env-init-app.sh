@@ -202,6 +202,7 @@ DIAGNOSTIC_LOGGING_ENABLED=false
 GRPC_REQUEST_TIMEOUT=30s
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=2
+LOGIN_MAX_CONCURRENCY_HPA=1
 LOGIN_QUEUE_TIMEOUT=2s"
 
 write_if_missing "env/item-service.app.env" "APP_ENV=production
@@ -248,6 +249,7 @@ update_if_missing_or_default "env/api-gateway.app.env" "HTTP_WRITE_TIMEOUT" "15s
 update_if_missing_or_default "env/auth-service.app.env" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
 write_or_update_env_value "env/auth-service.app.env" "LOGIN_ADMISSION_ENABLED" "true"
 write_or_update_env_value "env/auth-service.app.env" "LOGIN_MAX_CONCURRENCY" "2"
+write_or_update_env_value "env/auth-service.app.env" "LOGIN_MAX_CONCURRENCY_HPA" "1"
 write_or_update_env_value "env/auth-service.app.env" "LOGIN_QUEUE_TIMEOUT" "2s"
 update_if_missing_or_default "env/item-service.app.env" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
 update_if_missing_or_default "env/transaction-service.app.env" "GRPC_REQUEST_TIMEOUT" "15s" "30s"

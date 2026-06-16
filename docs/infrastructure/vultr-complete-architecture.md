@@ -595,7 +595,9 @@ Monolith:  fixed baseline remains active during supplemental HPA runs
 
 Microservices (per service, supplemental HPA):
   api-gateway:         minReplicas=1, maxReplicas=5
-  auth-service:        minReplicas=1, maxReplicas=5, LOGIN_MAX_CONCURRENCY=1 (975m per slot)
+  auth-service:        minReplicas=1, maxReplicas=5, effective LOGIN_MAX_CONCURRENCY=1
+                       selected from LOGIN_MAX_CONCURRENCY_HPA when SCALING_MODE=hpa
+                       (975m per slot)
   item-service:        minReplicas=1, maxReplicas=5
   transaction-service: minReplicas=1, maxReplicas=5
 ```

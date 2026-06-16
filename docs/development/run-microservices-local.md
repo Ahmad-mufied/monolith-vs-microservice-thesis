@@ -142,6 +142,7 @@ DIAGNOSTIC_LOGGING_ENABLED=false
 GRPC_REQUEST_TIMEOUT=30s
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=2
+LOGIN_MAX_CONCURRENCY_HPA=1
 LOGIN_QUEUE_TIMEOUT=2s
 ```
 
@@ -247,6 +248,9 @@ Meaning:
 - Auth Service login admission control bounds concurrent bcrypt comparisons.
   Requests wait up to `LOGIN_QUEUE_TIMEOUT`; when no slot is available, Auth
   Service returns gRPC `ResourceExhausted`, and API Gateway maps it to `503`.
+- `LOGIN_MAX_CONCURRENCY_HPA` provides the HPA-mode auth-service override.
+  The local Kubernetes secret generator selects that value automatically when
+  `SCALING_MODE=hpa` is used.
 - `DIAGNOSTIC_LOGGING_ENABLED=true` enables failure-only structured diagnostic
   events in API Gateway and the backend services. Keep it `false` for ordinary
   runs and enable it only for focused RCA.

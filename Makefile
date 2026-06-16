@@ -202,7 +202,7 @@ setup-contexts:
 
 .PHONY: create-secrets
 create-secrets:
-	bash scripts/operator-dispatch.sh create-secrets
+	SCALING_MODE=$(SCALING_MODE) bash scripts/operator-dispatch.sh create-secrets
 
 .PHONY: preflight-check
 preflight-check:
@@ -496,7 +496,7 @@ create-local-secrets:
 
 .PHONY: create-local-secrets-microservices
 create-local-secrets-microservices:
-	bash scripts/create-local-secrets-microservices.sh
+	SCALING_MODE=$(SCALING_MODE) bash scripts/create-local-secrets-microservices.sh
 
 # =========================
 # Minikube
@@ -722,7 +722,8 @@ minikube-deploy-microservices: minikube-load-microservices create-local-secrets-
 	kubectl rollout status deployment/api-gateway -n msa --timeout=180s
 
 .PHONY: minikube-deploy-microservices-hpa
-minikube-deploy-microservices-hpa: minikube-load-microservices create-local-secrets-microservices
+minikube-deploy-microservices-hpa: minikube-load-microservices
+	SCALING_MODE=hpa $(MAKE) create-local-secrets-microservices
 	kubectl apply -f $(K8S_DIR)/local/microservices/auth-service.yaml
 	kubectl apply -f $(K8S_DIR)/local/microservices/item-service.yaml
 	kubectl apply -f $(K8S_DIR)/local/microservices/transaction-service.yaml
@@ -1158,7 +1159,7 @@ create-eks-secrets-monolith:
 
 .PHONY: create-eks-secrets-microservices
 create-eks-secrets-microservices:
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/create-eks-secrets-microservices.sh
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) SCALING_MODE=$(SCALING_MODE) bash scripts/create-eks-secrets-microservices.sh
 
 .PHONY: eks-create-secrets
 eks-create-secrets:
@@ -1167,7 +1168,7 @@ eks-create-secrets:
 
 .PHONY: eks-create-secrets-sequential
 eks-create-secrets-sequential:
-	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) bash scripts/create-eks-secrets-sequential.sh
+	TERRAFORM_AWS_PROFILE=$(TERRAFORM_AWS_PROFILE) SCALING_MODE=$(SCALING_MODE) bash scripts/create-eks-secrets-sequential.sh
 
 .PHONY: vultr-render-tfvars
 vultr-render-tfvars:
@@ -1197,12 +1198,12 @@ vultr-setup-contexts-parallel:
 
 .PHONY: vultr-create-secrets-sequential
 vultr-create-secrets-sequential:
-	bash scripts/create-vultr-secrets-sequential.sh
+	SCALING_MODE=$(SCALING_MODE) bash scripts/create-vultr-secrets-sequential.sh
 
 .PHONY: vultr-create-secrets
 vultr-create-secrets:
-	bash scripts/create-vultr-secrets-monolith.sh
-	bash scripts/create-vultr-secrets-microservices.sh
+	SCALING_MODE=$(SCALING_MODE) bash scripts/create-vultr-secrets-monolith.sh
+	SCALING_MODE=$(SCALING_MODE) bash scripts/create-vultr-secrets-microservices.sh
 
 .PHONY: vultr-measure-resource-baseline
 vultr-measure-resource-baseline:

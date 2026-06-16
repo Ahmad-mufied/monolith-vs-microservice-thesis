@@ -258,6 +258,33 @@ append_secret_pair_if_set() {
   pairs_ref+=("$key" "$value")
 }
 
+resolve_login_max_concurrency_for_mode() {
+  local scaling_mode="${1:-fixed}"
+  local fixed_value="$2"
+  local hpa_value="$3"
+  local fixed_default="$4"
+  local hpa_default="$5"
+
+  case "$scaling_mode" in
+    hpa)
+      if [[ -n "$hpa_value" ]]; then
+        printf '%s\n' "$hpa_value"
+      elif [[ -n "$fixed_value" ]]; then
+        printf '%s\n' "$fixed_value"
+      else
+        printf '%s\n' "$hpa_default"
+      fi
+      ;;
+    *)
+      if [[ -n "$fixed_value" ]]; then
+        printf '%s\n' "$fixed_value"
+      else
+        printf '%s\n' "$fixed_default"
+      fi
+      ;;
+  esac
+}
+
 append_secret_pair_if_override() {
   local -n pairs_ref="$1"
   local key="$2"

@@ -73,6 +73,7 @@ auth_service_jwt_secret="$(resolve_preserved_secret_value "$(read_env_value "$au
 raw_auth_service_grpc_request_timeout="$(read_env_value "$auth_service_env_file" GRPC_REQUEST_TIMEOUT)"
 auth_service_login_admission_enabled="$(read_env_value "$auth_service_env_file" LOGIN_ADMISSION_ENABLED)"
 auth_service_login_max_concurrency="$(read_env_value "$auth_service_env_file" LOGIN_MAX_CONCURRENCY)"
+auth_service_login_max_concurrency_hpa="$(read_env_value "$auth_service_env_file" LOGIN_MAX_CONCURRENCY_HPA)"
 auth_service_login_queue_timeout="$(read_env_value "$auth_service_env_file" LOGIN_QUEUE_TIMEOUT)"
 
 item_service_app_env="$(read_env_value "$item_service_env_file" APP_ENV)"
@@ -94,6 +95,8 @@ raw_transaction_service_item_validation_timeout="$(read_env_value "$transaction_
 : "${admin_user_password:?ADMIN_USER_PASSWORD must be set in ${k6_runner_env_file}}"
 : "${api_gateway_jwt_secret:?JWT_SECRET must be set in ${api_gateway_env_file}}"
 : "${auth_service_jwt_secret:?JWT_SECRET must be set in ${auth_service_env_file}}"
+
+effective_auth_login_max_concurrency="$(resolve_login_max_concurrency_for_mode "${SCALING_MODE:-fixed}" "$auth_service_login_max_concurrency" "$auth_service_login_max_concurrency_hpa" "2" "1")"
 
 terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
 terraform_with_profile() {
@@ -140,7 +143,7 @@ if [[ -n "$auth_service_login_admission_enabled" ]]; then
   append_secret_pair_if_override auth_service_secret_pairs LOGIN_ADMISSION_ENABLED "$auth_service_login_admission_enabled" "true"
 fi
 if [[ "${auth_service_login_admission_enabled:-true}" == "true" ]]; then
-  append_secret_pair_if_override auth_service_secret_pairs LOGIN_MAX_CONCURRENCY "$auth_service_login_max_concurrency" "2"
+  append_secret_pair_if_override auth_service_secret_pairs LOGIN_MAX_CONCURRENCY "$effective_auth_login_max_concurrency" "2"
   append_secret_pair_if_override auth_service_secret_pairs LOGIN_QUEUE_TIMEOUT "$auth_service_login_queue_timeout" "2s"
 fi
 

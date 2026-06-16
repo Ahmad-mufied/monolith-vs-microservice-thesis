@@ -96,6 +96,16 @@ Recommended use:
 - enable it only for focused investigations such as tracing false `500` errors
 - apply it symmetrically when you need comparable monolith vs microservices RCA
 
+Optional login admission control flags:
+
+- `LOGIN_ADMISSION_ENABLED=true`
+- `LOGIN_MAX_CONCURRENCY=8` for monolith, `2` for auth-service fixed baseline
+- `LOGIN_MAX_CONCURRENCY_HPA=1` for auth-service HPA baseline
+
+`LOGIN_ADMISSION_ENABLED` is the on/off switch. When it is `false`, login
+requests bypass the concurrency limiter entirely. `LOGIN_MAX_CONCURRENCY` and
+`LOGIN_MAX_CONCURRENCY_HPA` are tuning values, not separate feature flags.
+
 `make env-init-eks` creates AWS benchmark helper env files:
 
 - `aws-benchmark.env`

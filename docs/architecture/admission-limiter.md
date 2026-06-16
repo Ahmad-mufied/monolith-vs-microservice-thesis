@@ -151,7 +151,8 @@ loaded at startup by the respective config package and used to build an
 | Environment Variable | Type | Default (Monolith) | Default (Auth-Service) | Description |
 |---|---|---|---|---|
 | `LOGIN_ADMISSION_ENABLED` | bool | `true` | `true` | Enable/disable the limiter. When `false`, all login requests bypass the semaphore |
-| `LOGIN_MAX_CONCURRENCY` | int | `8` | `2` fixed / `1` HPA overlay | Maximum number of concurrent bcrypt comparisons |
+| `LOGIN_MAX_CONCURRENCY` | int | `8` | `2` | Maximum number of concurrent bcrypt comparisons in the default fixed profile |
+| `LOGIN_MAX_CONCURRENCY_HPA` | int | n/a | `1` | Optional HPA-specific override used when `SCALING_MODE=hpa` selects the auth-service secret value |
 | `LOGIN_QUEUE_TIMEOUT` | duration | `2s` | `2s` | Maximum time a request waits for a semaphore slot before being rejected |
 
 ### 5.1 Why Different Defaults for MaxConcurrency?
@@ -163,9 +164,9 @@ for a multi-core node running the full application.
 
 The auth-service is a dedicated single-responsibility pod with a smaller
 resource allocation. In fixed mode, the auth-service pod receives `1950m` CPU
-and uses `LOGIN_MAX_CONCURRENCY=2`. In the supplemental HPA overlay, each
-auth-service pod receives `975m` CPU and the overlay reduces
-`LOGIN_MAX_CONCURRENCY` to `1` so the slot-per-CPU policy remains consistent.
+and uses `LOGIN_MAX_CONCURRENCY=2`. In HPA mode, each auth-service pod
+receives `975m` CPU and the scaling-mode-aware secret generation flow selects
+`LOGIN_MAX_CONCURRENCY_HPA=1` so the slot-per-CPU policy remains consistent.
 
 Both defaults can be overridden per deployment via environment variables
 without rebuilding the binary.
@@ -579,7 +580,7 @@ deployments:
 |---|---|---|
 | Monolith fixed baseline | `8` | Single monolith pod owns the full architecture-level login CPU budget |
 | Auth-service fixed | `2` | Fixed auth-service pod receives `1950m` CPU and uses two slots |
-| Auth-service HPA | `1` | HPA auth-service pod receives `975m` CPU and uses one slot |
+| Auth-service HPA | `1` via `LOGIN_MAX_CONCURRENCY_HPA` | HPA auth-service pod receives `975m` CPU and uses one slot |
 
 **This is not a confound. It is an intentional, calibrated CPU saturation parameter.**
 
@@ -658,9 +659,9 @@ difference has no effect on benchmark metrics.
 | `microservices/auth-service/internal/adapter/grpcserver/auth_server.go` | Calls `pkgerrors.ToGRPCStatus()` on rejection |
 | `microservices/api-gateway/internal/client/auth_client.go` | Calls `httputil.FromGRPCError()` on gRPC error |
 | `microservices/api-gateway/internal/httputil/grpcerror.go` | Maps `codes.ResourceExhausted` → HTTP 503 |
-| `deployments/k8s/cloud/monolith/overlays/fixed/deployment-patch.yaml` | Sets `LOGIN_MAX_CONCURRENCY=8` explicitly for monolith fixed baseline |
-| `deployments/k8s/cloud/microservices/overlays/fixed/auth-service-patch.yaml` | Sets `LOGIN_MAX_CONCURRENCY=2` for auth-service fixed overlay |
-| `deployments/k8s/cloud/microservices/overlays/hpa/auth-service-patch.yaml` | Sets `LOGIN_MAX_CONCURRENCY=1` for auth-service supplemental HPA overlay |
+| `scripts/create-eks-secrets-microservices.sh` | Selects the effective auth-service login concurrency from `SCALING_MODE` plus `LOGIN_MAX_CONCURRENCY` / `LOGIN_MAX_CONCURRENCY_HPA` |
+| `scripts/create-vultr-secrets-microservices.sh` | Applies the same scaling-mode-aware auth-service concurrency selection for Vultr |
+| `scripts/create-local-secrets-microservices.sh` | Applies the same scaling-mode-aware auth-service concurrency selection for local Kubernetes |
 
 ---
 

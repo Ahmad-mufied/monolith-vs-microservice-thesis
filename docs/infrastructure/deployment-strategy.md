@@ -939,7 +939,8 @@ MONOLITH PHASE
     |
     +-- deploy monolith: fixed overlay
     |   1 pod / 3900m request / 7800m limit
-    |   LOGIN_MAX_CONCURRENCY=8 (975m per bcrypt slot)
+    |   effective LOGIN_MAX_CONCURRENCY=8 from the monolith env/secret flow
+    |   (975m per bcrypt slot)
     |
     +-- run seed Job (reset + seed)
     |
@@ -959,7 +960,8 @@ MICROSERVICES PHASE
     |
     +-- deploy microservices: fixed overlay
     |   4 services x 1 pod / 980m request / 1950m limit
-    |   auth-service LOGIN_MAX_CONCURRENCY=2 (975m per bcrypt slot)
+    |   auth-service effective LOGIN_MAX_CONCURRENCY=2 from the fixed env/secret
+    |   flow (975m per bcrypt slot)
     |
     +-- run seed Job (reset + seed)
     |
@@ -989,7 +991,8 @@ MICROSERVICES PHASE (supplemental HPA)
     |
     +-- deploy microservices: HPA overlay
     |   4 services x min 1 / max 4 pods / 500m request / 975m limit
-    |   auth-service LOGIN_MAX_CONCURRENCY=1 (975m per bcrypt slot)
+    |   auth-service effective LOGIN_MAX_CONCURRENCY=1 via SCALING_MODE=hpa
+    |   secret resolution (975m per bcrypt slot)
     |   HPA target CPU: 70%, scaleDown stabilization: 60s
     |
     +-- run seed Job (reset + seed)

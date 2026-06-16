@@ -443,13 +443,13 @@ kubectl --context=msa create secret generic auth-service-secret \
   --from-literal=GRPC_REQUEST_TIMEOUT=30s \
   --from-literal=LOGIN_ADMISSION_ENABLED=true \
   --from-literal=LOGIN_MAX_CONCURRENCY=2 \
+  --from-literal=LOGIN_MAX_CONCURRENCY_HPA=1 \
   --from-literal=LOGIN_QUEUE_TIMEOUT=2s \
   --dry-run=client -o yaml | kubectl --context=msa apply -f -
 
-# Note: this base secret keeps the fixed-mode auth-service default at 2.
-# The microservices HPA overlay overrides LOGIN_MAX_CONCURRENCY to 1 at the
-# Deployment level so each 975m auth-service pod keeps the intended slot-per-CPU
-# policy.
+# Note: the repository secret helpers select LOGIN_MAX_CONCURRENCY=2 for fixed
+# and LOGIN_MAX_CONCURRENCY_HPA=1 for HPA so each 975m auth-service pod keeps
+# the intended slot-per-CPU policy without a manifest-level override.
 
 # Item Service secret
 kubectl --context=msa create secret generic item-service-secret \

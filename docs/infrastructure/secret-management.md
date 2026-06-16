@@ -287,6 +287,17 @@ LOGIN_MAX_CONCURRENCY
 LOGIN_QUEUE_TIMEOUT
 ```
 
+Notes:
+
+- `LOGIN_ADMISSION_ENABLED` is the feature flag that enables or disables login
+  admission control entirely.
+- `LOGIN_MAX_CONCURRENCY` is the default fixed-mode limit for bcrypt work.
+- In repository-managed Kubernetes flows, `auth-service` may also define
+  `LOGIN_MAX_CONCURRENCY_HPA` in its source env file. The secret helper resolves
+  the effective `LOGIN_MAX_CONCURRENCY` from `SCALING_MODE` before writing the
+  secret, so the deployed Secret stays compatible with the existing app config
+  package.
+
 For Kubernetes benchmark deployments, the gRPC dependency addresses should use
 headless Services with the gRPC DNS resolver scheme:
 

@@ -791,7 +791,7 @@ Other services may remain at lower replica count
 | HPA target | not used in benchmark | per-service deployment |
 | Quota contention | n/a (fixed) | possible when multiple services scale |
 | Idle module replication | not applicable | idle services yield headroom to hot services |
-| LOGIN_MAX_CONCURRENCY | `8` (fixed, 975m/slot) | `2` fixed / `1` HPA (975m/slot both) |
+| LOGIN_MAX_CONCURRENCY | `8` (fixed, 975m/slot) | `2` fixed / `1` HPA via `LOGIN_MAX_CONCURRENCY_HPA` (975m/slot both) |
 | bcrypt blast radius | affects all modules on shared CPU | isolated to auth-service pod |
 
 Microservices are more efficient under focused load because only the hot

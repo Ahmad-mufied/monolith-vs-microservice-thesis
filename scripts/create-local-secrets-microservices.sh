@@ -76,6 +76,7 @@ auth_login_admission_enabled="$(read_env_value env/auth-service.env LOGIN_ADMISS
 auth_login_admission_enabled="${auth_login_admission_enabled:-true}"
 auth_login_max_concurrency="$(read_env_value env/auth-service.env LOGIN_MAX_CONCURRENCY)"
 auth_login_max_concurrency="${auth_login_max_concurrency:-2}"
+auth_login_max_concurrency_hpa="$(read_env_value env/auth-service.env LOGIN_MAX_CONCURRENCY_HPA)"
 auth_login_queue_timeout="$(read_env_value env/auth-service.env LOGIN_QUEUE_TIMEOUT)"
 auth_login_queue_timeout="${auth_login_queue_timeout:-2s}"
 auth_db_pool_max_conns="$(read_env_value env/auth-service.env DB_POOL_MAX_CONNS)"
@@ -138,6 +139,8 @@ transaction_datadog_enabled="${transaction_datadog_enabled:-false}"
 transaction_diagnostic_logging_enabled="$(read_env_value env/transaction-service.env DIAGNOSTIC_LOGGING_ENABLED)"
 transaction_diagnostic_logging_enabled="${transaction_diagnostic_logging_enabled:-false}"
 
+effective_auth_login_max_concurrency="$(resolve_login_max_concurrency_for_mode "${SCALING_MODE:-fixed}" "$auth_login_max_concurrency" "$auth_login_max_concurrency_hpa" "2" "1")"
+
 tmp_api_gateway_env="$(mktemp /tmp/api-gateway-k8s-env.XXXXXX)"
 tmp_auth_service_env="$(mktemp /tmp/auth-service-k8s-env.XXXXXX)"
 tmp_item_service_env="$(mktemp /tmp/item-service-k8s-env.XXXXXX)"
@@ -168,7 +171,7 @@ DATADOG_ENABLED=${auth_datadog_enabled}
 DIAGNOSTIC_LOGGING_ENABLED=${auth_diagnostic_logging_enabled}
 GRPC_REQUEST_TIMEOUT=${auth_grpc_request_timeout}
 LOGIN_ADMISSION_ENABLED=${auth_login_admission_enabled}
-LOGIN_MAX_CONCURRENCY=${auth_login_max_concurrency}
+LOGIN_MAX_CONCURRENCY=${effective_auth_login_max_concurrency}
 LOGIN_QUEUE_TIMEOUT=${auth_login_queue_timeout}
 DB_POOL_MAX_CONNS=${auth_db_pool_max_conns}
 DB_POOL_MIN_CONNS=${auth_db_pool_min_conns}

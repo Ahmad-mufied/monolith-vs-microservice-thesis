@@ -118,6 +118,26 @@ func TestLoad(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "login max concurrency must be positive when admission is enabled",
+			env: map[string]string{
+				"DATABASE_URL":            "postgres://localhost:5432/auth_db?sslmode=disable",
+				"JWT_SECRET":              "secret",
+				"LOGIN_ADMISSION_ENABLED": "true",
+				"LOGIN_MAX_CONCURRENCY":   "0",
+			},
+			wantErr: true,
+		},
+		{
+			name: "login queue timeout must be positive when admission is enabled",
+			env: map[string]string{
+				"DATABASE_URL":            "postgres://localhost:5432/auth_db?sslmode=disable",
+				"JWT_SECRET":              "secret",
+				"LOGIN_ADMISSION_ENABLED": "true",
+				"LOGIN_QUEUE_TIMEOUT":     "0s",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

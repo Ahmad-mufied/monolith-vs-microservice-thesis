@@ -90,6 +90,7 @@ auth_bcrypt_cost="$(read_env_value "$auth_service_env_file" BCRYPT_COST)"
 raw_auth_grpc_request_timeout="$(read_env_value "$auth_service_env_file" GRPC_REQUEST_TIMEOUT)"
 auth_login_admission_enabled="$(read_env_value "$auth_service_env_file" LOGIN_ADMISSION_ENABLED)"
 auth_login_max_concurrency="$(read_env_value "$auth_service_env_file" LOGIN_MAX_CONCURRENCY)"
+auth_login_max_concurrency_hpa="$(read_env_value "$auth_service_env_file" LOGIN_MAX_CONCURRENCY_HPA)"
 auth_login_queue_timeout="$(read_env_value "$auth_service_env_file" LOGIN_QUEUE_TIMEOUT)"
 item_app_env="$(read_env_value "$item_service_env_file" APP_ENV)"
 item_grpc_port="$(read_env_value "$item_service_env_file" GRPC_PORT)"
@@ -110,6 +111,8 @@ admin_user_password="$(resolve_preserved_secret_value "$(read_env_value "$k6_run
 : "${auth_jwt_secret:?JWT_SECRET must be set in ${auth_service_env_file}}"
 : "${admin_user_email:?ADMIN_USER_EMAIL must be set in ${k6_runner_env_file}}"
 : "${admin_user_password:?ADMIN_USER_PASSWORD must be set in ${k6_runner_env_file}}"
+
+effective_auth_login_max_concurrency="$(resolve_login_max_concurrency_for_mode "${SCALING_MODE:-fixed}" "$auth_login_max_concurrency" "$auth_login_max_concurrency_hpa" "2" "1")"
 
 api_gateway_secret_pairs=()
 append_secret_pair api_gateway_secret_pairs APP_ENV "${api_app_env:-production}"
@@ -147,7 +150,7 @@ if [[ -n "$auth_login_admission_enabled" ]]; then
   append_secret_pair_if_override auth_service_secret_pairs LOGIN_ADMISSION_ENABLED "$auth_login_admission_enabled" "true"
 fi
 if [[ "${auth_login_admission_enabled:-true}" == "true" ]]; then
-  append_secret_pair_if_override auth_service_secret_pairs LOGIN_MAX_CONCURRENCY "$auth_login_max_concurrency" "2"
+  append_secret_pair_if_override auth_service_secret_pairs LOGIN_MAX_CONCURRENCY "$effective_auth_login_max_concurrency" "2"
   append_secret_pair_if_override auth_service_secret_pairs LOGIN_QUEUE_TIMEOUT "$auth_login_queue_timeout" "2s"
 fi
 

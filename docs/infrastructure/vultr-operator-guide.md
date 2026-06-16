@@ -225,19 +225,25 @@ ITEM_VALIDATION_TIMEOUT=25s        # transaction-service only
 
 Auth Service login admission:
 LOGIN_ADMISSION_ENABLED=true
-LOGIN_MAX_CONCURRENCY=2          # fixed overlay
+LOGIN_MAX_CONCURRENCY=2
+LOGIN_MAX_CONCURRENCY_HPA=1
 LOGIN_QUEUE_TIMEOUT=2s
 ```
 
-When the microservices HPA overlay is applied, `auth-service` overrides
-`LOGIN_MAX_CONCURRENCY=1` at the Deployment level to keep the admission-slot
-budget proportional to the smaller `975m` HPA pod CPU limit.
+When `SCALING_MODE=hpa`, the secret generation flow selects
+`LOGIN_MAX_CONCURRENCY_HPA=1` for `auth-service` so the admission-slot budget
+stays proportional to the smaller `975m` HPA pod CPU limit.
 
 `DIAGNOSTIC_LOGGING_ENABLED` is now config-driven through the same app env
 files and Secret creation flow. To enable it for a focused RCA run, set the
 flag in the relevant `*.app.env` file, rerun `make create-secrets` (or the
 Vultr-specific secret target you use), then redeploy the workload so the pod
 reads the updated Secret.
+
+`LOGIN_MAX_CONCURRENCY` is now config-driven through the same flow as well.
+For microservices, keep `LOGIN_MAX_CONCURRENCY=2` as the fixed baseline and
+`LOGIN_MAX_CONCURRENCY_HPA=1` as the HPA baseline unless you are intentionally
+running a supplemental tuning experiment.
 
 Expected overload behavior:
 
@@ -261,7 +267,9 @@ Validation:
 kubectl --context=<ctx> get secret -A
 kubectl --context=<ctx> get secret monolith-env -n mono -o jsonpath='{.data.APP_REQUEST_TIMEOUT}' | base64 -d && echo
 kubectl --context=<ctx> get secret monolith-env -n mono -o jsonpath='{.data.HTTP_WRITE_TIMEOUT}' | base64 -d && echo
+kubectl --context=<ctx> get secret monolith-env -n mono -o jsonpath='{.data.LOGIN_MAX_CONCURRENCY}' | base64 -d && echo
 kubectl --context=<ctx> get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_ADMISSION_ENABLED}' | base64 -d && echo
+kubectl --context=<ctx> get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_MAX_CONCURRENCY}' | base64 -d && echo
 kubectl --context=<ctx> get secret api-gateway-secret -n msa -o jsonpath='{.data.GRPC_CALL_TIMEOUT}' | base64 -d && echo
 ```
 

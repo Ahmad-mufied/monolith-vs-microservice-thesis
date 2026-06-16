@@ -124,6 +124,7 @@ DATADOG_ENABLED=false
 DIAGNOSTIC_LOGGING_ENABLED=false
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=2
+LOGIN_MAX_CONCURRENCY_HPA=1
 LOGIN_QUEUE_TIMEOUT=2s
 DB_POOL_MAX_CONNS=6
 DB_POOL_MIN_CONNS=1
@@ -179,6 +180,7 @@ DATADOG_ENABLED=false
 DIAGNOSTIC_LOGGING_ENABLED=false
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=2
+LOGIN_MAX_CONCURRENCY_HPA=1
 LOGIN_QUEUE_TIMEOUT=2s
 DB_POOL_MAX_CONNS=6
 DB_POOL_MIN_CONNS=1
@@ -230,6 +232,7 @@ for auth_env_file in env/auth-service.env env/auth-service.compose.env; do
   update_if_missing_or_default "$auth_env_file" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
   write_or_update_env_value "$auth_env_file" "LOGIN_ADMISSION_ENABLED" "true"
   write_or_update_env_value "$auth_env_file" "LOGIN_MAX_CONCURRENCY" "2"
+  write_or_update_env_value "$auth_env_file" "LOGIN_MAX_CONCURRENCY_HPA" "1"
   write_or_update_env_value "$auth_env_file" "LOGIN_QUEUE_TIMEOUT" "2s"
   write_or_update_env_value "$auth_env_file" "DB_POOL_MAX_CONNS" "6"
   write_or_update_env_value "$auth_env_file" "DB_POOL_MIN_CONNS" "1"
