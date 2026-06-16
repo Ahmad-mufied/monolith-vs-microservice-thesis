@@ -109,6 +109,7 @@ HTTP_MAX_HEADER_BYTES=1048576
 BCRYPT_COST=10
 JWT_SECRET=${jwt_secret}
 DATADOG_ENABLED=false
+DIAGNOSTIC_LOGGING_ENABLED=false
 APP_REQUEST_TIMEOUT=35s
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=8
@@ -119,6 +120,7 @@ write_or_update_env_value "env/monolith.env" "APP_REQUEST_TIMEOUT" "35s"
 write_or_update_env_value "env/monolith.env" "LOGIN_ADMISSION_ENABLED" "true"
 write_or_update_env_value "env/monolith.env" "LOGIN_MAX_CONCURRENCY" "8"
 write_or_update_env_value "env/monolith.env" "LOGIN_QUEUE_TIMEOUT" "2s"
+write_or_update_env_value "env/monolith.env" "DIAGNOSTIC_LOGGING_ENABLED" "false"
 if [[ "$(read_env_value env/monolith.env HTTP_WRITE_TIMEOUT)" == "30s" || "$(read_env_value env/monolith.env HTTP_WRITE_TIMEOUT)" == "35s" ]]; then
   write_or_update_env_value "env/monolith.env" "HTTP_WRITE_TIMEOUT" "40s"
 else

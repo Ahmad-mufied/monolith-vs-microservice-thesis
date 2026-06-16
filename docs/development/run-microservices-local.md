@@ -138,6 +138,7 @@ AUTH_DATABASE_URL=postgres://postgres:<password>@localhost:5432/auth_db?sslmode=
 JWT_SECRET=<same-local-secret-as-api-gateway>
 JWT_EXPIRY=24h
 BCRYPT_COST=10
+DIAGNOSTIC_LOGGING_ENABLED=false
 GRPC_REQUEST_TIMEOUT=30s
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=2
@@ -162,6 +163,7 @@ Expected keys:
 GRPC_PORT=50052
 DATABASE_URL=postgres://postgres:<password>@localhost:5432/item_db?sslmode=disable
 ITEM_DATABASE_URL=postgres://postgres:<password>@localhost:5432/item_db?sslmode=disable
+DIAGNOSTIC_LOGGING_ENABLED=false
 GRPC_REQUEST_TIMEOUT=30s
 ```
 
@@ -180,8 +182,31 @@ GRPC_PORT=50053
 DATABASE_URL=postgres://postgres:<password>@localhost:5432/transaction_db?sslmode=disable
 TRANSACTION_DATABASE_URL=postgres://postgres:<password>@localhost:5432/transaction_db?sslmode=disable
 ITEM_SERVICE_ADDR=localhost:50052
+DIAGNOSTIC_LOGGING_ENABLED=false
 GRPC_REQUEST_TIMEOUT=30s
 ITEM_VALIDATION_TIMEOUT=25s
+```
+
+### API Gateway
+
+File:
+
+```text
+env/api-gateway.env
+```
+
+Expected keys:
+
+```env
+HTTP_PORT=8080
+JWT_SECRET=<same-local-secret-as-auth-service>
+AUTH_SERVICE_ADDR=localhost:50051
+ITEM_SERVICE_ADDR=localhost:50052
+TRANSACTION_SERVICE_ADDR=localhost:50053
+DIAGNOSTIC_LOGGING_ENABLED=false
+GRPC_CALL_TIMEOUT=32s
+REQUEST_TIMEOUT=35s
+HTTP_WRITE_TIMEOUT=40s
 ```
 
 Transaction Service calls Item Service over gRPC for transaction item
@@ -222,6 +247,9 @@ Meaning:
 - Auth Service login admission control bounds concurrent bcrypt comparisons.
   Requests wait up to `LOGIN_QUEUE_TIMEOUT`; when no slot is available, Auth
   Service returns gRPC `ResourceExhausted`, and API Gateway maps it to `503`.
+- `DIAGNOSTIC_LOGGING_ENABLED=true` enables failure-only structured diagnostic
+  events in API Gateway and the backend services. Keep it `false` for ordinary
+  runs and enable it only for focused RCA.
 - `HTTP_WRITE_TIMEOUT` must remain larger than `REQUEST_TIMEOUT` so API Gateway
   can translate dependency deadline or overload failures into a proper `503`
   response before the transport layer closes the connection.

@@ -121,6 +121,7 @@ JWT_EXPIRY=24h
 BCRYPT_COST=10
 GRPC_REQUEST_TIMEOUT=30s
 DATADOG_ENABLED=false
+DIAGNOSTIC_LOGGING_ENABLED=false
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=2
 LOGIN_QUEUE_TIMEOUT=2s
@@ -135,6 +136,7 @@ DATABASE_URL=${item_database_url}
 ITEM_DATABASE_URL=${item_database_url}
 GRPC_REQUEST_TIMEOUT=30s
 DATADOG_ENABLED=false
+DIAGNOSTIC_LOGGING_ENABLED=false
 DB_POOL_MAX_CONNS=6
 DB_POOL_MIN_CONNS=1
 DB_POOL_MAX_CONN_LIFETIME=15m
@@ -148,6 +150,7 @@ ITEM_SERVICE_ADDR=localhost:50052
 GRPC_REQUEST_TIMEOUT=30s
 ITEM_VALIDATION_TIMEOUT=25s
 DATADOG_ENABLED=false
+DIAGNOSTIC_LOGGING_ENABLED=false
 DB_POOL_MAX_CONNS=6
 DB_POOL_MIN_CONNS=1
 DB_POOL_MAX_CONN_LIFETIME=15m
@@ -162,7 +165,8 @@ TRANSACTION_SERVICE_ADDR=localhost:50053
 GRPC_CALL_TIMEOUT=32s
 REQUEST_TIMEOUT=35s
 HTTP_WRITE_TIMEOUT=40s
-DATADOG_ENABLED=false"
+DATADOG_ENABLED=false
+DIAGNOSTIC_LOGGING_ENABLED=false"
 
 write_if_missing "env/auth-service.compose.env" "GRPC_PORT=50051
 DATABASE_URL=${compose_auth_database_url}
@@ -172,6 +176,7 @@ JWT_EXPIRY=24h
 BCRYPT_COST=10
 GRPC_REQUEST_TIMEOUT=30s
 DATADOG_ENABLED=false
+DIAGNOSTIC_LOGGING_ENABLED=false
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=2
 LOGIN_QUEUE_TIMEOUT=2s
@@ -186,6 +191,7 @@ DATABASE_URL=${compose_item_database_url}
 ITEM_DATABASE_URL=${compose_item_database_url}
 GRPC_REQUEST_TIMEOUT=30s
 DATADOG_ENABLED=false
+DIAGNOSTIC_LOGGING_ENABLED=false
 DB_POOL_MAX_CONNS=6
 DB_POOL_MIN_CONNS=1
 DB_POOL_MAX_CONN_LIFETIME=15m
@@ -199,6 +205,7 @@ ITEM_SERVICE_ADDR=item-service:50052
 GRPC_REQUEST_TIMEOUT=30s
 ITEM_VALIDATION_TIMEOUT=25s
 DATADOG_ENABLED=false
+DIAGNOSTIC_LOGGING_ENABLED=false
 DB_POOL_MAX_CONNS=6
 DB_POOL_MIN_CONNS=1
 DB_POOL_MAX_CONN_LIFETIME=15m
@@ -213,11 +220,13 @@ TRANSACTION_SERVICE_ADDR=transaction-service:50053
 GRPC_CALL_TIMEOUT=32s
 REQUEST_TIMEOUT=35s
 HTTP_WRITE_TIMEOUT=40s
-DATADOG_ENABLED=false"
+DATADOG_ENABLED=false
+DIAGNOSTIC_LOGGING_ENABLED=false"
 
 write_or_update_env_value "env/auth-service.env" "BCRYPT_COST" "10"
 write_or_update_env_value "env/auth-service.compose.env" "BCRYPT_COST" "10"
 for auth_env_file in env/auth-service.env env/auth-service.compose.env; do
+  write_or_update_env_value "$auth_env_file" "DIAGNOSTIC_LOGGING_ENABLED" "false"
   update_if_missing_or_default "$auth_env_file" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
   write_or_update_env_value "$auth_env_file" "LOGIN_ADMISSION_ENABLED" "true"
   write_or_update_env_value "$auth_env_file" "LOGIN_MAX_CONCURRENCY" "2"
@@ -229,6 +238,7 @@ for auth_env_file in env/auth-service.env env/auth-service.compose.env; do
   write_or_update_env_value "$auth_env_file" "DB_PING_TIMEOUT" "5s"
 done
 for item_env_file in env/item-service.env env/item-service.compose.env; do
+  write_or_update_env_value "$item_env_file" "DIAGNOSTIC_LOGGING_ENABLED" "false"
   update_if_missing_or_default "$item_env_file" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
   write_or_update_env_value "$item_env_file" "DB_POOL_MAX_CONNS" "6"
   write_or_update_env_value "$item_env_file" "DB_POOL_MIN_CONNS" "1"
@@ -237,6 +247,7 @@ for item_env_file in env/item-service.env env/item-service.compose.env; do
   write_or_update_env_value "$item_env_file" "DB_PING_TIMEOUT" "5s"
 done
 for tx_env_file in env/transaction-service.env env/transaction-service.compose.env; do
+  write_or_update_env_value "$tx_env_file" "DIAGNOSTIC_LOGGING_ENABLED" "false"
   update_if_missing_or_default "$tx_env_file" "GRPC_REQUEST_TIMEOUT" "15s" "30s"
   update_if_missing_or_default "$tx_env_file" "ITEM_VALIDATION_TIMEOUT" "10s" "25s"
   write_or_update_env_value "$tx_env_file" "DB_POOL_MAX_CONNS" "6"
@@ -246,6 +257,7 @@ for tx_env_file in env/transaction-service.env env/transaction-service.compose.e
   write_or_update_env_value "$tx_env_file" "DB_PING_TIMEOUT" "5s"
 done
 for gateway_env_file in env/api-gateway.env env/api-gateway.compose.env; do
+  write_or_update_env_value "$gateway_env_file" "DIAGNOSTIC_LOGGING_ENABLED" "false"
   update_if_missing_or_default "$gateway_env_file" "GRPC_CALL_TIMEOUT" "10s" "32s"
   update_if_missing_or_default "$gateway_env_file" "REQUEST_TIMEOUT" "30s" "35s"
   update_if_missing_or_default "$gateway_env_file" "HTTP_WRITE_TIMEOUT" "15s" "40s"

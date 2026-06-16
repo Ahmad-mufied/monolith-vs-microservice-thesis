@@ -154,6 +154,7 @@ HTTP_MAX_HEADER_BYTES=1048576
 BCRYPT_COST=10
 JWT_SECRET=<generated-local-secret>
 DATADOG_ENABLED=false
+DIAGNOSTIC_LOGGING_ENABLED=false
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=8
 LOGIN_QUEUE_TIMEOUT=2s
@@ -181,6 +182,10 @@ does not oversubscribe CPU. When `LOGIN_ADMISSION_ENABLED=true`, at most
 `LOGIN_MAX_CONCURRENCY` login password checks run at the same time. Requests
 wait up to `LOGIN_QUEUE_TIMEOUT`; if no slot is available, the monolith returns
 `503 SERVICE_UNAVAILABLE` through the normal error envelope.
+
+`DIAGNOSTIC_LOGGING_ENABLED` enables failure-only structured diagnostic logs.
+Keep it `false` for ordinary local runs, and enable it temporarily only when
+you need extra RCA breadcrumbs for login, repository, or HTTP failure paths.
 
 The HTTP server values control request and connection timeouts for the monolith
 process. They keep slow or idle clients from holding resources too long and

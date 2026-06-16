@@ -208,6 +208,7 @@ Runtime defaults that now live in Go unless explicitly overridden:
 Monolith:
 APP_REQUEST_TIMEOUT=35s
 HTTP_WRITE_TIMEOUT=40s
+DIAGNOSTIC_LOGGING_ENABLED=false
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=8
 LOGIN_QUEUE_TIMEOUT=2s
@@ -216,6 +217,7 @@ Microservices API Gateway:
 GRPC_CALL_TIMEOUT=32s
 REQUEST_TIMEOUT=35s
 HTTP_WRITE_TIMEOUT=40s
+DIAGNOSTIC_LOGGING_ENABLED=false
 
 Microservices services:
 GRPC_REQUEST_TIMEOUT=30s
@@ -230,6 +232,12 @@ LOGIN_QUEUE_TIMEOUT=2s
 When the microservices HPA overlay is applied, `auth-service` overrides
 `LOGIN_MAX_CONCURRENCY=1` at the Deployment level to keep the admission-slot
 budget proportional to the smaller `975m` HPA pod CPU limit.
+
+`DIAGNOSTIC_LOGGING_ENABLED` is now config-driven through the same app env
+files and Secret creation flow. To enable it for a focused RCA run, set the
+flag in the relevant `*.app.env` file, rerun `make create-secrets` (or the
+Vultr-specific secret target you use), then redeploy the workload so the pod
+reads the updated Secret.
 
 Expected overload behavior:
 

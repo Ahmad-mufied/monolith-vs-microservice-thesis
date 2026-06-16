@@ -75,6 +75,7 @@ append_secret_pair_if_override monolith_secret_pairs HTTP_IDLE_TIMEOUT "${HTTP_I
 append_secret_pair_if_override monolith_secret_pairs HTTP_SHUTDOWN_TIMEOUT "${HTTP_SHUTDOWN_TIMEOUT:-}" "10s"
 append_secret_pair_if_override monolith_secret_pairs HTTP_MAX_HEADER_BYTES "${HTTP_MAX_HEADER_BYTES:-}" "1048576"
 append_secret_pair_if_override monolith_secret_pairs BCRYPT_COST "${BCRYPT_COST:-}" "10"
+append_secret_pair monolith_secret_pairs DIAGNOSTIC_LOGGING_ENABLED "${DIAGNOSTIC_LOGGING_ENABLED:-false}"
 
 effective_http_write_timeout="40s"
 if [[ -n "${HTTP_WRITE_TIMEOUT:-}" ]]; then

@@ -175,6 +175,7 @@ HTTP_SHUTDOWN_TIMEOUT=10s
 HTTP_MAX_HEADER_BYTES=1048576
 BCRYPT_COST=10
 JWT_SECRET=${jwt_secret}
+DIAGNOSTIC_LOGGING_ENABLED=false
 APP_REQUEST_TIMEOUT=35s
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=8
@@ -184,6 +185,7 @@ write_if_missing "env/api-gateway.app.env" "APP_ENV=production
 HTTP_PORT=8080
 SERVICE_NAME=api-gateway
 JWT_SECRET=${jwt_secret}
+DIAGNOSTIC_LOGGING_ENABLED=false
 AUTH_SERVICE_ADDR=dns:///auth-service-headless.msa.svc.cluster.local:50051
 ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
 TRANSACTION_SERVICE_ADDR=dns:///transaction-service-headless.msa.svc.cluster.local:50053
@@ -196,6 +198,7 @@ GRPC_PORT=50051
 SERVICE_NAME=auth-service
 BCRYPT_COST=10
 JWT_SECRET=${jwt_secret}
+DIAGNOSTIC_LOGGING_ENABLED=false
 GRPC_REQUEST_TIMEOUT=30s
 LOGIN_ADMISSION_ENABLED=true
 LOGIN_MAX_CONCURRENCY=2
@@ -204,11 +207,13 @@ LOGIN_QUEUE_TIMEOUT=2s"
 write_if_missing "env/item-service.app.env" "APP_ENV=production
 GRPC_PORT=50052
 SERVICE_NAME=item-service
+DIAGNOSTIC_LOGGING_ENABLED=false
 GRPC_REQUEST_TIMEOUT=30s"
 
 write_if_missing "env/transaction-service.app.env" "APP_ENV=production
 GRPC_PORT=50053
 SERVICE_NAME=transaction-service
+DIAGNOSTIC_LOGGING_ENABLED=false
 ITEM_SERVICE_ADDR=dns:///item-service-headless.msa.svc.cluster.local:50052
 GRPC_REQUEST_TIMEOUT=30s
 ITEM_VALIDATION_TIMEOUT=25s"
@@ -219,6 +224,15 @@ ADMIN_USER_PASSWORD=${k6_runner_password}"
 if is_invalid_k6_benchmark_password "$k6_runner_password_current"; then
   write_or_update_env_value "env/k6-runner.app.env" "ADMIN_USER_PASSWORD" "$benchmark_k6_runner_password"
 fi
+
+for app_env_file in \
+  "env/monolith.app.env" \
+  "env/api-gateway.app.env" \
+  "env/auth-service.app.env" \
+  "env/item-service.app.env" \
+  "env/transaction-service.app.env"; do
+  write_or_update_env_value "$app_env_file" "DIAGNOSTIC_LOGGING_ENABLED" "false"
+done
 
 write_or_update_env_value "env/k6-runner.app.env" "ADMIN_USER_EMAIL" "$k6_runner_email"
 write_or_update_env_value "env/monolith.app.env" "BCRYPT_COST" "10"

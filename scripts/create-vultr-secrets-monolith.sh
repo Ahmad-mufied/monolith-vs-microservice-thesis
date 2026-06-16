@@ -78,6 +78,7 @@ http_idle_timeout="$(read_env_value "$monolith_env_file" HTTP_IDLE_TIMEOUT)"
 http_shutdown_timeout="$(read_env_value "$monolith_env_file" HTTP_SHUTDOWN_TIMEOUT)"
 http_max_header_bytes="$(read_env_value "$monolith_env_file" HTTP_MAX_HEADER_BYTES)"
 bcrypt_cost="$(read_env_value "$monolith_env_file" BCRYPT_COST)"
+diagnostic_logging_enabled="$(read_env_value "$monolith_env_file" DIAGNOSTIC_LOGGING_ENABLED)"
 raw_app_request_timeout="$(read_env_value "$monolith_env_file" APP_REQUEST_TIMEOUT)"
 login_admission_enabled="$(read_env_value "$monolith_env_file" LOGIN_ADMISSION_ENABLED)"
 login_max_concurrency="$(read_env_value "$monolith_env_file" LOGIN_MAX_CONCURRENCY)"
@@ -106,6 +107,7 @@ append_secret_pair_if_override monolith_secret_pairs HTTP_IDLE_TIMEOUT "$http_id
 append_secret_pair_if_override monolith_secret_pairs HTTP_SHUTDOWN_TIMEOUT "$http_shutdown_timeout" "10s"
 append_secret_pair_if_override monolith_secret_pairs HTTP_MAX_HEADER_BYTES "$http_max_header_bytes" "1048576"
 append_secret_pair_if_override monolith_secret_pairs BCRYPT_COST "$bcrypt_cost" "10"
+append_secret_pair monolith_secret_pairs DIAGNOSTIC_LOGGING_ENABLED "${diagnostic_logging_enabled:-false}"
 
 effective_http_write_timeout="40s"
 if [[ -n "$raw_http_write_timeout" ]]; then
