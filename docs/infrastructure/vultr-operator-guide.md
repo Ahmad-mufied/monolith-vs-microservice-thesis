@@ -245,6 +245,15 @@ For microservices, keep `LOGIN_MAX_CONCURRENCY=2` as the fixed baseline and
 `LOGIN_MAX_CONCURRENCY_HPA=1` as the HPA baseline unless you are intentionally
 running a supplemental tuning experiment.
 
+`LOGIN_ADMISSION_ENABLED` is the feature flag for the login admission limiter:
+
+- `true`: enable bounded bcrypt admission control
+- `false`: bypass the limiter entirely
+
+When the flag is `false`, `LOGIN_MAX_CONCURRENCY`, `LOGIN_MAX_CONCURRENCY_HPA`,
+and `LOGIN_QUEUE_TIMEOUT` are ignored by the application runtime until the flag
+is turned back on.
+
 Expected overload behavior:
 
 ```text
@@ -520,6 +529,68 @@ ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=300 \
 SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-transactions:100,250,500;concurrent-mixed-workload:100,250,500" \
 make run-benchmark-arch-suite
+```
+
+Login admission comparison examples:
+
+```bash
+# 1. Fixed-mode baseline with login admission enabled.
+perl -0pi -e 's/^LOGIN_ADMISSION_ENABLED=.*/LOGIN_ADMISSION_ENABLED=true/m' env/auth-service.app.env
+
+ARCHITECTURE=microservices \
+SCALING_MODE=fixed \
+K6_PROFILE=steady \
+TEST_DURATION=5m \
+EXPERIMENT_NAME=thesis-msa-fixed-login-admission-enabled \
+INTER_CASE_DELAY=0 \
+SCENARIO_RPS_MATRIX="login:100,500" \
+IMAGE_TAG="$IMAGE_TAG" \
+make run-benchmark-arch-suite
+
+# 2. Fixed-mode comparison with login admission disabled.
+perl -0pi -e 's/^LOGIN_ADMISSION_ENABLED=.*/LOGIN_ADMISSION_ENABLED=false/m' env/auth-service.app.env
+
+ARCHITECTURE=microservices \
+SCALING_MODE=fixed \
+K6_PROFILE=steady \
+TEST_DURATION=5m \
+EXPERIMENT_NAME=thesis-msa-fixed-login-admission-disabled \
+INTER_CASE_DELAY=0 \
+SCENARIO_RPS_MATRIX="login:100,500" \
+IMAGE_TAG="$IMAGE_TAG" \
+make run-benchmark-arch-suite
+
+# 3. Focused RCA run with login admission enabled and diagnostic logging on.
+perl -0pi -e 's/^LOGIN_ADMISSION_ENABLED=.*/LOGIN_ADMISSION_ENABLED=true/m' env/auth-service.app.env
+perl -0pi -e 's/^DIAGNOSTIC_LOGGING_ENABLED=.*/DIAGNOSTIC_LOGGING_ENABLED=true/m' env/auth-service.app.env
+
+ARCHITECTURE=microservices \
+SCALING_MODE=fixed \
+K6_PROFILE=steady \
+TEST_DURATION=5m \
+EXPERIMENT_NAME=rca-msa-fixed-login-admission-enabled-authlog \
+INTER_CASE_DELAY=0 \
+SCENARIO_RPS_MATRIX="login:100,500" \
+IMAGE_TAG="$IMAGE_TAG" \
+make run-benchmark-arch-suite
+```
+
+Recommended usage by case:
+
+- Use **enabled** as the benchmark baseline when you want overload to surface as
+  controlled queue saturation instead of unbounded bcrypt contention.
+- Use **disabled** only as an explicit comparison experiment to show how much
+  admission control changes error shape, latency tail, and overload behavior.
+- Use **enabled + diagnostic logging** for focused false-`500` / timeout RCA,
+  not for ordinary thesis measurement runs.
+
+Before each comparison run, verify the source env and the deployed Secret:
+
+```bash
+rg -n "LOGIN_ADMISSION_ENABLED|LOGIN_MAX_CONCURRENCY|LOGIN_MAX_CONCURRENCY_HPA|LOGIN_QUEUE_TIMEOUT|DIAGNOSTIC_LOGGING_ENABLED" env/auth-service.app.env
+kubectl --context=benchmark get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_ADMISSION_ENABLED}' | base64 -d && echo
+kubectl --context=benchmark get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_MAX_CONCURRENCY}' | base64 -d && echo
+kubectl --context=benchmark get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_QUEUE_TIMEOUT}' | base64 -d && echo
 ```
 
 Important distinction:
