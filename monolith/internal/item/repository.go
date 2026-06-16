@@ -214,6 +214,11 @@ func mapConflictError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
+	// Context completion takes precedence over SQLSTATE mapping so canceled or
+	// timed-out requests are never downgraded into a conflict response.
+	if ctxErr := apperror.ContextError(ctx); ctxErr != nil {
+		return ctxErr
+	}
 	pgErr, ok := errors.AsType[*pgconn.PgError](err)
 	if !ok {
 		return apperror.InternalFromContext(ctx, "upsert item", err)
