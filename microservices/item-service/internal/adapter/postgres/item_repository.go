@@ -23,7 +23,7 @@ func NewItemRepository(pool *pgxpool.Pool) *ItemRepository {
 func (r *ItemRepository) SyncItems(ctx context.Context, items []domain.SyncItemInput) error {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return pkgerrors.InternalFromContext("begin sync items transaction", err)
+		return pkgerrors.InternalFromContext(ctx, "begin sync items transaction", err)
 	}
 	defer func() { _ = tx.Rollback(context.Background()) }()
 
@@ -35,7 +35,7 @@ func (r *ItemRepository) SyncItems(ctx context.Context, items []domain.SyncItemI
 	})
 
 	if err := softDeleteOmittedItems(ctx, tx, keepIDs); err != nil {
-		return pkgerrors.InternalFromContext("soft delete omitted items", err)
+		return pkgerrors.InternalFromContext(ctx, "soft delete omitted items", err)
 	}
 	if len(inserts) > 0 {
 		if err := batchInsertItems(ctx, tx, inserts); err != nil {
@@ -49,7 +49,7 @@ func (r *ItemRepository) SyncItems(ctx context.Context, items []domain.SyncItemI
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return pkgerrors.InternalFromContext("commit sync items transaction", err)
+		return pkgerrors.InternalFromContext(ctx, "commit sync items transaction", err)
 	}
 	return nil
 }
@@ -64,7 +64,7 @@ LIMIT $1 OFFSET $2`
 
 	rows, err := r.pool.Query(ctx, query, limit, offset)
 	if err != nil {
-		return nil, pkgerrors.InternalFromContext("list items", err)
+		return nil, pkgerrors.InternalFromContext(ctx, "list items", err)
 	}
 	defer rows.Close()
 
@@ -72,12 +72,12 @@ LIMIT $1 OFFSET $2`
 	for rows.Next() {
 		item, err := scanItem(rows)
 		if err != nil {
-			return nil, pkgerrors.InternalFromContext("scan listed items", err)
+			return nil, pkgerrors.InternalFromContext(ctx, "scan listed items", err)
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, pkgerrors.InternalFromContext("iterate listed items", err)
+		return nil, pkgerrors.InternalFromContext(ctx, "iterate listed items", err)
 	}
 
 	return items, nil
@@ -96,7 +96,7 @@ WHERE id = $1::uuid
 		return nil, pkgerrors.NotFound("item not found")
 	}
 	if err != nil {
-		return nil, pkgerrors.InternalFromContext("get item by id", err)
+		return nil, pkgerrors.InternalFromContext(ctx, "get item by id", err)
 	}
 
 	return item, nil
@@ -114,7 +114,7 @@ WHERE id = ANY($1::uuid[])`
 
 	rows, err := r.pool.Query(ctx, query, ids)
 	if err != nil {
-		return nil, pkgerrors.InternalFromContext("get item summaries by ids", err)
+		return nil, pkgerrors.InternalFromContext(ctx, "get item summaries by ids", err)
 	}
 	defer rows.Close()
 
@@ -122,12 +122,12 @@ WHERE id = ANY($1::uuid[])`
 	for rows.Next() {
 		var item domain.ItemSummary
 		if err := rows.Scan(&item.ID, &item.Name, &item.Deleted); err != nil {
-			return nil, pkgerrors.InternalFromContext("scan item summaries", err)
+			return nil, pkgerrors.InternalFromContext(ctx, "scan item summaries", err)
 		}
 		items = append(items, &item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, pkgerrors.InternalFromContext("iterate item summaries", err)
+		return nil, pkgerrors.InternalFromContext(ctx, "iterate item summaries", err)
 	}
 
 	return items, nil
@@ -148,7 +148,7 @@ WHERE deleted_at IS NULL
 
 	rows, err := r.pool.Query(ctx, query, itemIDs)
 	if err != nil {
-		return pkgerrors.InternalFromContext("validate transaction items", err)
+		return pkgerrors.InternalFromContext(ctx, "validate transaction items", err)
 	}
 	defer rows.Close()
 
@@ -157,12 +157,12 @@ WHERE deleted_at IS NULL
 		var itemID string
 		var availableAmount int
 		if err := rows.Scan(&itemID, &availableAmount); err != nil {
-			return pkgerrors.InternalFromContext("scan validated items", err)
+			return pkgerrors.InternalFromContext(ctx, "scan validated items", err)
 		}
 		found[itemID] = availableAmount
 	}
 	if err := rows.Err(); err != nil {
-		return pkgerrors.InternalFromContext("iterate validated items", err)
+		return pkgerrors.InternalFromContext(ctx, "iterate validated items", err)
 	}
 
 	if len(found) != len(requestedAmounts) {
@@ -264,7 +264,7 @@ func batchInsertItems(ctx context.Context, tx pgx.Tx, items []domain.SyncItemInp
 INSERT INTO items (name, available_amount)
 SELECT unnest($1::text[]), unnest($2::int[])`
 	_, err := tx.Exec(ctx, query, names, amounts)
-	return mapConflictError(err)
+	return mapConflictError(ctx, err)
 }
 
 // batchUpsertItems upserts all items with a client-provided ID in one query,
@@ -287,7 +287,7 @@ SET name             = EXCLUDED.name,
     deleted_at       = NULL,
     updated_at       = now()`
 	_, err := tx.Exec(ctx, query, ids, names, amounts)
-	return mapConflictError(err)
+	return mapConflictError(ctx, err)
 }
 
 // scanItem scans a row into a domain.Item. Works with both pgx.Row and pgx.Rows.
@@ -312,13 +312,13 @@ func scanItem(row interface{ Scan(dest ...any) error }) (*domain.Item, error) {
 //   - deadlock_detected (40P01) → 409 Conflict (retryable)
 //   - query_canceled (57014) → 409 Conflict (timeout, retryable)
 //   - other errors → 500 Internal Server Error
-func mapConflictError(err error) error {
+func mapConflictError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
 	pgErr, ok := errors.AsType[*pgconn.PgError](err)
 	if !ok {
-		return pkgerrors.InternalFromContext("upsert item", err)
+		return pkgerrors.InternalFromContext(ctx, "upsert item", err)
 	}
 	switch pgErr.Code {
 	case "23505":
@@ -326,6 +326,6 @@ func mapConflictError(err error) error {
 	case "40001", "40P01", "57014":
 		return pkgerrors.Conflict("transaction conflict, please retry")
 	default:
-		return pkgerrors.InternalFromContext("upsert item", err)
+		return pkgerrors.InternalFromContext(ctx, "upsert item", err)
 	}
 }

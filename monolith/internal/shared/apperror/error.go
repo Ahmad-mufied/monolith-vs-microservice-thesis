@@ -80,7 +80,12 @@ func Internal(message string, err error) *Error {
 	return &Error{Code: CodeInternal, Message: message, Status: http.StatusInternalServerError, Err: err}
 }
 
-func InternalFromContext(action string, err error) *Error {
+// InternalFromContext preserves request-scoped timeout/cancel semantics even
+// when the downstream driver error no longer wraps the original context error.
+func InternalFromContext(ctx context.Context, action string, err error) *Error {
+	if ctxErr := ContextError(ctx); ctxErr != nil {
+		return ctxErr
+	}
 	if ctxErr := FromContext(err, "request timeout", "request canceled"); ctxErr != nil {
 		return ctxErr
 	}

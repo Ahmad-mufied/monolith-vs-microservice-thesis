@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"testing"
+	"time"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
@@ -243,23 +244,73 @@ func TestContextAwareHelpers(t *testing.T) {
 
 func TestInternalFromContext(t *testing.T) {
 	tests := []struct {
-		name string
-		err  error
-		want error
+		name      string
+		ctx       func() context.Context
+		err       error
+		want      error
+		wantCause error
 	}{
-		{name: "deadline exceeded", err: context.DeadlineExceeded, want: ErrDeadlineExceeded},
-		{name: "canceled", err: context.Canceled, want: ErrCanceled},
-		{name: "other", err: stderrors.New("driver error"), want: ErrInternal},
+		{
+			name:      "deadline exceeded from error",
+			ctx:       context.Background,
+			err:       context.DeadlineExceeded,
+			want:      ErrDeadlineExceeded,
+			wantCause: context.DeadlineExceeded,
+		},
+		{
+			name:      "canceled from error",
+			ctx:       context.Background,
+			err:       context.Canceled,
+			want:      ErrCanceled,
+			wantCause: context.Canceled,
+		},
+		{
+			name: "deadline exceeded from context state",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+				time.Sleep(2 * time.Millisecond)
+				cancel()
+				return ctx
+			},
+			err:       stderrors.New("driver timeout wrapper"),
+			want:      ErrDeadlineExceeded,
+			wantCause: context.DeadlineExceeded,
+		},
+		{
+			name: "canceled from context state",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			},
+			err:       stderrors.New("driver canceled wrapper"),
+			want:      ErrCanceled,
+			wantCause: context.Canceled,
+		},
+		{
+			name:      "other",
+			ctx:       context.Background,
+			err:       stderrors.New("driver error"),
+			want:      ErrInternal,
+			wantCause: stderrors.New("driver error"),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := InternalFromContext("query users", tt.err)
+			ctx := tt.ctx()
+			got := InternalFromContext(ctx, "query users", tt.err)
 			if !stderrors.Is(got, tt.want) {
 				t.Fatalf("InternalFromContext() = %v, want %v", got, tt.want)
 			}
-			if !stderrors.Is(got, tt.err) {
-				t.Fatalf("InternalFromContext() should preserve cause %v, got %v", tt.err, got)
+			if tt.want == ErrInternal {
+				if !stderrors.Is(got, tt.err) {
+					t.Fatalf("InternalFromContext() should preserve cause %v, got %v", tt.err, got)
+				}
+				return
+			}
+			if !stderrors.Is(got, tt.wantCause) {
+				t.Fatalf("InternalFromContext() should preserve cause %v, got %v", tt.wantCause, got)
 			}
 		})
 	}

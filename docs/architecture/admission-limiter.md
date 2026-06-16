@@ -839,6 +839,17 @@ This ordering guarantees that the admission limiter always fires before any
 outer context deadline for the login endpoint, and that the app always has time
 to write a proper error response before the transport closes the connection.
 
+### 15.7 Repository-Level Context Error Classification
+
+During database operations (e.g., query, scan, or iterate), the database driver (pgx/pgconn) may return a variety of error types when a timeout or cancellation occurs under high load. These driver-level errors (e.g., `*pgconn.errTimeout` or `*pgconn.contextAlreadyDoneError`) may not always directly wrap `context.DeadlineExceeded` or `context.Canceled` in a way that standard error helpers can identify.
+
+To prevent these timeouts from being misclassified as internal system faults (HTTP `500 Internal Server Error`), the repository layer uses the shared `InternalFromContext(ctx, action, err)` helper to perform a context-aware error classification check:
+
+1. **Check context health**: First, check if the request context itself is already canceled or timed out using `pkgerrors.ContextError(ctx)`. If the context is done, return the corresponding context error (`ErrDeadlineExceeded` or `ErrCanceled`) immediately.
+2. **Fallback to wrapping**: If the context is still healthy but the driver error wraps a context error, return it. Otherwise, treat the failure as a true system fault and wrap it as `ErrInternal` (which correctly maps to HTTP `500`).
+
+This shared helper is used symmetrically by both monolith and microservices repositories, so saturated database request queues and context timeouts during repository operations are correctly surfaced to the client as HTTP `503 Service Unavailable` or `499 Client Canceled`, rather than producing false `500`s.
+
 ---
 
 ## 16. Two Login Failure Scenarios Under Load

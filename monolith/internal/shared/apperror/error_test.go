@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 )
 
 func TestErrorConstructors(t *testing.T) {
@@ -140,26 +141,81 @@ func TestContextAwareHelpers(t *testing.T) {
 func TestInternalFromContext(t *testing.T) {
 	tests := []struct {
 		name       string
+		ctx        func() context.Context
 		err        error
 		wantCode   Code
 		wantStatus int
+		wantCause  error
 	}{
-		{name: "deadline exceeded", err: context.DeadlineExceeded, wantCode: CodeServiceUnavailable, wantStatus: http.StatusServiceUnavailable},
-		{name: "canceled", err: context.Canceled, wantCode: CodeClientCanceled, wantStatus: 499},
-		{name: "other", err: errors.New("driver error"), wantCode: CodeInternal, wantStatus: http.StatusInternalServerError},
+		{
+			name:       "deadline exceeded from error",
+			ctx:        context.Background,
+			err:        context.DeadlineExceeded,
+			wantCode:   CodeServiceUnavailable,
+			wantStatus: http.StatusServiceUnavailable,
+			wantCause:  context.DeadlineExceeded,
+		},
+		{
+			name:       "canceled from error",
+			ctx:        context.Background,
+			err:        context.Canceled,
+			wantCode:   CodeClientCanceled,
+			wantStatus: 499,
+			wantCause:  context.Canceled,
+		},
+		{
+			name: "deadline exceeded from context state",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+				time.Sleep(2 * time.Millisecond)
+				cancel()
+				return ctx
+			},
+			err:        errors.New("driver timeout wrapper"),
+			wantCode:   CodeServiceUnavailable,
+			wantStatus: http.StatusServiceUnavailable,
+			wantCause:  context.DeadlineExceeded,
+		},
+		{
+			name: "canceled from context state",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			},
+			err:        errors.New("driver canceled wrapper"),
+			wantCode:   CodeClientCanceled,
+			wantStatus: 499,
+			wantCause:  context.Canceled,
+		},
+		{
+			name:       "other",
+			ctx:        context.Background,
+			err:        errors.New("driver error"),
+			wantCode:   CodeInternal,
+			wantStatus: http.StatusInternalServerError,
+			wantCause:  errors.New("driver error"),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := InternalFromContext("query users", tt.err)
+			ctx := tt.ctx()
+			got := InternalFromContext(ctx, "query users", tt.err)
 			if got.Code != tt.wantCode {
 				t.Fatalf("code = %s, want %s", got.Code, tt.wantCode)
 			}
 			if got.Status != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", got.Status, tt.wantStatus)
 			}
-			if !errors.Is(got, tt.err) {
-				t.Fatalf("InternalFromContext() should preserve cause %v, got %v", tt.err, got)
+			if tt.wantCode == CodeInternal {
+				if !errors.Is(got, tt.err) {
+					t.Fatalf("InternalFromContext() should preserve cause %v, got %v", tt.err, got)
+				}
+				return
+			}
+			if !errors.Is(got, tt.wantCause) {
+				t.Fatalf("InternalFromContext() should preserve cause %v, got %v", tt.wantCause, got)
 			}
 		})
 	}
