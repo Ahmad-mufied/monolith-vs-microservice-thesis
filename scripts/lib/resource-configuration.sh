@@ -129,7 +129,7 @@ resources_configuration_json() {
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
-            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
           "auth-service": {
@@ -139,7 +139,7 @@ resources_configuration_json() {
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
-            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
           "item-service": {
@@ -149,7 +149,7 @@ resources_configuration_json() {
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
-            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
           "transaction-service": {
@@ -159,7 +159,7 @@ resources_configuration_json() {
             memory_limit: (if $autoscaling_mode == "hpa" then "1920Mi" else "3840Mi" end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
-            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 50 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           }
         }

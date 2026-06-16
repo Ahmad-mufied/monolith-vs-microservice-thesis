@@ -1057,7 +1057,7 @@ For thesis documents that originally referenced AWS, use this mapping:
 - Database schema — identical (PostgreSQL 18)
 - Seed data — logically equivalent
 - k6 scripts — identical
-- HPA behavior — identical (50% CPU target)
+- HPA behavior — identical (40% CPU target)
 - Datadog integration — identical
 - AWS S3 for benchmark artifacts — same bucket
 - Terraform IaC approach — same pattern, different provider
@@ -1078,7 +1078,7 @@ Benchmark storage     : AWS S3 (unchanged)
 Observability         : Datadog SaaS (unchanged)
 Resource fairness     : Measurement-derived quotas from live node capacity
 Execution modes       : Parallel (preferred) and Sequential (fallback)
-Scaling modes         : Fixed replicas and HPA (50% CPU target)
+Scaling modes         : Fixed replicas and HPA (40% CPU target)
 ```
 
 The infrastructure is designed to be:

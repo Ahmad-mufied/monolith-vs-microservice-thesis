@@ -746,7 +746,7 @@ hpa auth-service          : request 500m / limit 975m / 960Mi / 1920Mi
 hpa item-service          : request 500m / limit 975m / 960Mi / 1920Mi
 hpa transaction-service   : request 500m / limit 975m / 960Mi / 1920Mi
 minReplicas         : 1
-HPA target CPU      : 50%
+HPA target CPU      : 40%
 scaleDown window    : 60s
 ```
 

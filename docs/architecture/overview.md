@@ -635,7 +635,7 @@ hpa per service          : request 500m / limit 975m / 960Mi / 1920Mi
 minReplicas per service  : 1
 maxReplicas per service  : 5
 shared HPA headroom      : 4 additional pods across the namespace
-HPA target CPU           : 50%
+HPA target CPU           : 40%
 ```
 
 The active Vultr benchmark path uses an equal per-service split rather than

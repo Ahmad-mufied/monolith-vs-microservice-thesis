@@ -491,7 +491,7 @@ Monolith fixed baseline   MSA HPA (one per service)
 ───────────────────────   ─────────────────────────
 HPA disabled              minReplicas    : 1 per service
 single fixed deployment   maxReplicas    : 5 per service
-                           target CPU     : 50%
+                           target CPU     : 40%
 ```
 
 In the active Vultr equal-split HPA profile, each microservice uses:

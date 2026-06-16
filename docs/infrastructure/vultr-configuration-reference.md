@@ -179,7 +179,7 @@ Rules:
 - `SCALING_MODE` in benchmark commands records expected mode and chooses k6
   profile behavior; it does not mutate live Kubernetes deployment objects.
 - Every `fixed <-> hpa` transition must redeploy manifests.
-- HPA uses a 50% CPU target to make the login-focused supplemental autoscaling path more responsive under the current equal-split Vultr profile.
+- HPA uses a 40% CPU target to make the login-focused supplemental autoscaling path more responsive under the current equal-split Vultr profile.
 - ResourceQuota is equal for monolith and MSA.
 - The active Vultr documentation path uses equal split across the four
   microservices:
