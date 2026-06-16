@@ -478,8 +478,8 @@ func TestNewServiceDependencyValidation(t *testing.T) {
 
 func assertValidationDetail(t *testing.T, err error, wantField, wantMessage string) {
 	t.Helper()
-	var appErr *apperror.Error
-	if !errors.As(err, &appErr) {
+	appErr, ok := errors.AsType[*apperror.Error](err)
+	if !ok {
 		t.Fatalf("error type = %T, want *apperror.Error", err)
 	}
 
@@ -498,8 +498,8 @@ func assertAppError(t *testing.T, err error, wantError bool, wantCode apperror.C
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		var appErr *apperror.Error
-		if !errors.As(err, &appErr) {
+		appErr, ok := errors.AsType[*apperror.Error](err)
+		if !ok {
 			t.Fatalf("error type = %T, want *apperror.Error", err)
 		}
 		if appErr.Code != wantCode {

@@ -52,8 +52,8 @@ func assertValidationError(t *testing.T, err error, wantField, wantMessage strin
 		t.Fatal("expected error, got nil")
 	}
 
-	var appErr *apperror.Error
-	if !errors.As(err, &appErr) {
+	appErr, ok := errors.AsType[*apperror.Error](err)
+	if !ok {
 		t.Fatalf("error type = %T, want *apperror.Error", err)
 	}
 	if appErr.Message != "invalid request payload" {

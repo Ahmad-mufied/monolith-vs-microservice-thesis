@@ -322,8 +322,8 @@ func insertTransaction(ctx context.Context, tx pgx.Tx, userID string) (Transacti
 }
 
 func isMissingTransactionUserError(err error) bool {
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) {
+	pgErr, ok := errors.AsType[*pgconn.PgError](err)
+	if !ok {
 		return false
 	}
 	return pgErr.Code == "23503" && pgErr.TableName == "transactions" && pgErr.ConstraintName == "transactions_user_id_fkey"

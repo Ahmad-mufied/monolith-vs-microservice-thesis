@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"math"
 	"net/http"
 	"strconv"
@@ -246,7 +247,7 @@ func assertClientError(t *testing.T, err error, wantStatus int) {
 	if err == nil {
 		t.Fatalf("expected error with status %d, got nil", wantStatus)
 	}
-	ae, ok := err.(*httputil.AppError)
+	ae, ok := errors.AsType[*httputil.AppError](err)
 	if !ok {
 		t.Fatalf("error type = %T, want *httputil.AppError", err)
 	}

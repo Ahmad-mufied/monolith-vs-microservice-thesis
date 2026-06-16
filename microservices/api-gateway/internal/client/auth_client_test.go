@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -108,7 +109,7 @@ func TestAuthClient_Register(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
 				}
-				ae, ok := err.(*httputil.AppError)
+				ae, ok := errors.AsType[*httputil.AppError](err)
 				if !ok {
 					t.Fatalf("error type = %T, want *httputil.AppError", err)
 				}
@@ -164,7 +165,7 @@ func TestAuthClient_Login(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
 				}
-				ae, ok := err.(*httputil.AppError)
+				ae, ok := errors.AsType[*httputil.AppError](err)
 				if !ok {
 					t.Fatalf("error type = %T, want *httputil.AppError", err)
 				}
@@ -291,7 +292,7 @@ func TestAuthClient_GetUsersByIDs(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
 				}
-				ae, ok := err.(*httputil.AppError)
+				ae, ok := errors.AsType[*httputil.AppError](err)
 				if !ok {
 					t.Fatalf("error type = %T, want *httputil.AppError", err)
 				}

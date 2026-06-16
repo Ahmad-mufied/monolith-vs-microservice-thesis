@@ -109,8 +109,8 @@ func IsContext(err error) bool {
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return true
 	}
-	var appErr *Error
-	return errors.As(err, &appErr) && (appErr.Code == CodeServiceUnavailable || appErr.Code == CodeClientCanceled)
+	appErr, ok := errors.AsType[*Error](err)
+	return ok && (appErr.Code == CodeServiceUnavailable || appErr.Code == CodeClientCanceled)
 }
 
 func DoIfActive(ctx context.Context, fn func() error) error {

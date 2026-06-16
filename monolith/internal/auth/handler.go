@@ -49,8 +49,7 @@ func (h *Handler) Login(c echo.Context) error {
 	}
 	resp, err := h.service.Login(c.Request().Context(), req)
 	if err != nil {
-		var appErr *apperror.Error
-		if errors.As(err, &appErr) {
+		if appErr, ok := errors.AsType[*apperror.Error](err); ok {
 			// Monolith logs the final HTTP-facing error here so its RCA surface is
 			// comparable to the gateway HTTP boundary in the microservice flow.
 			debuglog.HTTP(context.Background(), "monolith auth login http failed", "monolith_auth_login_http_failure", appErr.Status, string(appErr.Code), appErr.Message)

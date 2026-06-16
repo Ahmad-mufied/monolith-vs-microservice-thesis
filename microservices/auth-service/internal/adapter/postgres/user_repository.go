@@ -39,8 +39,7 @@ RETURNING id, name, email, password_hash, created_at, updated_at;
 		&user.UpdatedAt,
 	)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "23505" {
 			return nil, pkgerrors.Conflict("email already exists")
 		}
 		return nil, pkgerrors.InternalFromContext("insert user", err)
