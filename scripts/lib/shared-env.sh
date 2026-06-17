@@ -393,22 +393,18 @@ set_rendered_deployment_config_checksum() {
     if (
       s{(template:\n([ ]*)metadata:\n(?:\2  annotations:\n(?:\2    .*\n)*)\2    \Q$key\E: ).*\n}{$1$value\n}m
     ) {
-      exit 0;
     }
-
-    if (
+    elsif (
       s{(template:\n([ ]*)metadata:\n)(\2  annotations:\n)}{$1$3$2    $key: $value\n}m
     ) {
-      exit 0;
     }
-
-    if (
+    elsif (
       s{(template:\n([ ]*)metadata:\n)(\2  labels:\n)}{$1$2  annotations:\n$2    $key: $value\n$3}m
     ) {
-      exit 0;
     }
-
-    die "failed to inject config checksum annotation into $ARGV\n";
+    else {
+      die "failed to inject config checksum annotation into $ARGV\n";
+    }
   ' "$manifest_path"
 }
 

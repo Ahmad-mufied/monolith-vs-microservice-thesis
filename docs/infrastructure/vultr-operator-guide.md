@@ -247,6 +247,9 @@ means a change such as `LOGIN_ADMISSION_ENABLED=false` can no longer be hidden
 behind a matching `IMAGE_TAG` and `SCALING_MODE`; the next benchmark deploy or
 resume check will force a rollout when the Secret payload changed.
 
+The rollout is triggered automatically by Kubernetes because the deployment generator computes a SHA-256 hash of the decoded secret payload (sorted alphabetically by key to maintain consistency) and injects it as an annotation (`benchmark.skripsi.dev/config-checksum`) under the pod template (`spec.template.metadata.annotations`). Any change in the secret data changes the checksum annotation value, which prompts Kubernetes to initiate a rolling update.
+
+
 `LOGIN_MAX_CONCURRENCY` is now config-driven through the same flow as well.
 For microservices, keep `LOGIN_MAX_CONCURRENCY=2` as the fixed baseline and
 `LOGIN_MAX_CONCURRENCY_HPA=1` as the HPA baseline unless you are intentionally
