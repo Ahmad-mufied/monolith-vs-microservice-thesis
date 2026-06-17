@@ -30,6 +30,7 @@ import (
 
 func main() {
 	logger := pkglogger.New("").With("service", "monolith")
+	slog.SetDefault(logger)
 
 	cfg, err := config.Load()
 	if err != nil {
