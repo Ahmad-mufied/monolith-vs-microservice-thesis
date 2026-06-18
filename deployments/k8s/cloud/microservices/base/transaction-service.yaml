@@ -48,6 +48,8 @@ spec:
               drop:
                 - ALL
           envFrom:
+            - configMapRef:
+                name: transaction-service-config
             - secretRef:
                 name: transaction-service-secret
           env:

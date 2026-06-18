@@ -8,38 +8,8 @@ url_encode() {
   printf '%s' "$1" | jq -sRr @uri
 }
 
-read_env_value() {
-  grep -E "^${2}=" "$1" | head -n 1 | cut -d= -f2- || true
-}
-
-terraform_output_required() {
-  local stack="$1"
-  local output_name="$2"
-  local description="$3"
-  local value err_file
-
-  err_file="$(mktemp)"
-  if ! value="$(terraform -chdir="$stack" output -raw "$output_name" 2>"$err_file")"; then
-    echo "ERROR: failed to read $description from Terraform output '$output_name'" >&2
-    sed 's/^/  terraform: /' "$err_file" >&2
-    rm -f "$err_file"
-    exit 1
-  fi
-  rm -f "$err_file"
-
-  if [ -z "$value" ]; then
-    echo "ERROR: Terraform output '$output_name' for $description is empty" >&2
-    exit 1
-  fi
-
-  printf '%s' "$value"
-}
-
-monolith_env_file="$(resolve_app_env_file monolith || true)"
-k6_runner_env_file="$(resolve_app_env_file k6-runner || true)"
-
-for file in env/vultr.env "${monolith_env_file:-env/monolith.app.env}" "${k6_runner_env_file:-env/k6-runner.app.env}"; do
-  [ -f "$file" ] || { echo "missing $file; run: make env-init-app and make env-init-vultr" >&2; exit 1; }
+for file in env/vultr.env env/values.yaml; do
+  [ -f "$file" ] || { echo "missing $file; run: make env-init" >&2; exit 1; }
 done
 
 set -a
@@ -62,33 +32,40 @@ fi
 encoded_db_password="$(url_encode "$POSTGRES_PASSWORD")"
 context="${VULTR_CONTEXT:-monolith}"
 K8S="kubectl --context=${context}"
-jwt_secret="$(resolve_preserved_secret_value "$(read_env_value "$monolith_env_file" JWT_SECRET)" "$context" mono monolith-env JWT_SECRET || true)"
-app_env="$(read_env_value "$monolith_env_file" APP_ENV)"
-app_port="$(read_env_value "$monolith_env_file" APP_PORT)"
-service_name="$(read_env_value "$monolith_env_file" SERVICE_NAME)"
-db_pool_max_conns="$(read_env_value "$monolith_env_file" DB_POOL_MAX_CONNS)"
-db_pool_min_conns="$(read_env_value "$monolith_env_file" DB_POOL_MIN_CONNS)"
-db_pool_max_conn_lifetime="$(read_env_value "$monolith_env_file" DB_POOL_MAX_CONN_LIFETIME)"
-db_pool_max_conn_idle_time="$(read_env_value "$monolith_env_file" DB_POOL_MAX_CONN_IDLE_TIME)"
-db_ping_timeout="$(read_env_value "$monolith_env_file" DB_PING_TIMEOUT)"
-http_read_header_timeout="$(read_env_value "$monolith_env_file" HTTP_READ_HEADER_TIMEOUT)"
-http_read_timeout="$(read_env_value "$monolith_env_file" HTTP_READ_TIMEOUT)"
-raw_http_write_timeout="$(read_env_value "$monolith_env_file" HTTP_WRITE_TIMEOUT)"
-http_idle_timeout="$(read_env_value "$monolith_env_file" HTTP_IDLE_TIMEOUT)"
-http_shutdown_timeout="$(read_env_value "$monolith_env_file" HTTP_SHUTDOWN_TIMEOUT)"
-http_max_header_bytes="$(read_env_value "$monolith_env_file" HTTP_MAX_HEADER_BYTES)"
-bcrypt_cost="$(read_env_value "$monolith_env_file" BCRYPT_COST)"
-diagnostic_logging_enabled="$(read_env_value "$monolith_env_file" DIAGNOSTIC_LOGGING_ENABLED)"
-raw_app_request_timeout="$(read_env_value "$monolith_env_file" APP_REQUEST_TIMEOUT)"
-login_admission_enabled="$(read_env_value "$monolith_env_file" LOGIN_ADMISSION_ENABLED)"
-login_max_concurrency="$(read_env_value "$monolith_env_file" LOGIN_MAX_CONCURRENCY)"
-login_queue_timeout="$(read_env_value "$monolith_env_file" LOGIN_QUEUE_TIMEOUT)"
-admin_user_email="$(resolve_preserved_secret_value "$(read_env_value "$k6_runner_env_file" ADMIN_USER_EMAIL)" "$context" benchmark k6-runner-secret ADMIN_USER_EMAIL || true)"
-admin_user_password="$(resolve_preserved_secret_value "$(read_env_value "$k6_runner_env_file" ADMIN_USER_PASSWORD)" "$context" benchmark k6-runner-secret ADMIN_USER_PASSWORD || true)"
 
-: "${jwt_secret:?JWT_SECRET must be set in ${monolith_env_file}}"
-: "${admin_user_email:?ADMIN_USER_EMAIL must be set in ${k6_runner_env_file}}"
-: "${admin_user_password:?ADMIN_USER_PASSWORD must be set in ${k6_runner_env_file}}"
+jwt_secret="${JWT_SECRET:-$(read_yaml_value ".cluster.monolith.JWT_SECRET")}"
+jwt_secret="$(resolve_preserved_secret_value "$jwt_secret" "$context" mono monolith-env JWT_SECRET || true)"
+
+app_env="${APP_ENV:-$(read_yaml_value ".cluster.monolith.APP_ENV")}"
+app_port="${APP_PORT:-$(read_yaml_value ".cluster.monolith.APP_PORT")}"
+service_name="${SERVICE_NAME:-$(read_yaml_value ".cluster.monolith.SERVICE_NAME")}"
+db_pool_max_conns="${DB_POOL_MAX_CONNS:-$(read_yaml_value ".cluster.monolith.DB_POOL_MAX_CONNS")}"
+db_pool_min_conns="${DB_POOL_MIN_CONNS:-$(read_yaml_value ".cluster.monolith.DB_POOL_MIN_CONNS")}"
+db_pool_max_conn_lifetime="${DB_POOL_MAX_CONN_LIFETIME:-$(read_yaml_value ".cluster.monolith.DB_POOL_MAX_CONN_LIFETIME")}"
+db_pool_max_conn_idle_time="${DB_POOL_MAX_CONN_IDLE_TIME:-$(read_yaml_value ".cluster.monolith.DB_POOL_MAX_CONN_IDLE_TIME")}"
+db_ping_timeout="${DB_PING_TIMEOUT:-$(read_yaml_value ".cluster.monolith.DB_PING_TIMEOUT")}"
+http_read_header_timeout="${HTTP_READ_HEADER_TIMEOUT:-$(read_yaml_value ".cluster.monolith.HTTP_READ_HEADER_TIMEOUT")}"
+http_read_timeout="${HTTP_READ_TIMEOUT:-$(read_yaml_value ".cluster.monolith.HTTP_READ_TIMEOUT")}"
+raw_http_write_timeout="${HTTP_WRITE_TIMEOUT:-$(read_yaml_value ".cluster.monolith.HTTP_WRITE_TIMEOUT")}"
+http_idle_timeout="${HTTP_IDLE_TIMEOUT:-$(read_yaml_value ".cluster.monolith.HTTP_IDLE_TIMEOUT")}"
+http_shutdown_timeout="${HTTP_SHUTDOWN_TIMEOUT:-$(read_yaml_value ".cluster.monolith.HTTP_SHUTDOWN_TIMEOUT")}"
+http_max_header_bytes="${HTTP_MAX_HEADER_BYTES:-$(read_yaml_value ".cluster.monolith.HTTP_MAX_HEADER_BYTES")}"
+bcrypt_cost="${BCRYPT_COST:-$(read_yaml_value ".cluster.monolith.BCRYPT_COST")}"
+diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".cluster.monolith.DIAGNOSTIC_LOGGING_ENABLED")}"
+raw_app_request_timeout="${APP_REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.monolith.APP_REQUEST_TIMEOUT")}"
+login_admission_enabled="${LOGIN_ADMISSION_ENABLED:-$(read_yaml_value ".cluster.monolith.LOGIN_ADMISSION_ENABLED")}"
+login_max_concurrency="${LOGIN_MAX_CONCURRENCY:-$(read_yaml_value ".cluster.monolith.LOGIN_MAX_CONCURRENCY")}"
+login_queue_timeout="${LOGIN_QUEUE_TIMEOUT:-$(read_yaml_value ".cluster.monolith.LOGIN_QUEUE_TIMEOUT")}"
+
+admin_user_email="${ADMIN_USER_EMAIL:-$(read_yaml_value ".shared.\"k6-runner\".ADMIN_USER_EMAIL")}"
+admin_user_email="$(resolve_preserved_secret_value "$admin_user_email" "$context" benchmark k6-runner-secret ADMIN_USER_EMAIL || true)"
+
+admin_user_password="${ADMIN_USER_PASSWORD:-$(read_yaml_value ".shared.\"k6-runner\".ADMIN_USER_PASSWORD")}"
+admin_user_password="$(resolve_preserved_secret_value "$admin_user_password" "$context" benchmark k6-runner-secret ADMIN_USER_PASSWORD || true)"
+
+: "${jwt_secret:?JWT_SECRET must be set in env/values.yaml under .cluster.monolith.JWT_SECRET}"
+: "${admin_user_email:?ADMIN_USER_EMAIL must be set in env/values.yaml under .shared.k6-runner.ADMIN_USER_EMAIL}"
+: "${admin_user_password:?ADMIN_USER_PASSWORD must be set in env/values.yaml under .shared.k6-runner.ADMIN_USER_PASSWORD}"
 
 monolith_secret_pairs=()
 append_secret_pair monolith_secret_pairs APP_ENV "${app_env:-production}"

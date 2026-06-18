@@ -220,9 +220,13 @@ Missing secrets or config:
 
 ```bash
 kubectl --context=monolith get secrets -n mono
+kubectl --context=monolith get configmaps -n mono
 kubectl --context=msa get secrets -n msa
+kubectl --context=msa get configmaps -n msa
 kubectl --context=monolith get secret monolith-env -n mono -o yaml
+kubectl --context=monolith get configmap monolith-config -n mono -o yaml
 kubectl --context=msa get secret api-gateway-secret -n msa -o yaml
+kubectl --context=msa get configmap api-gateway-config -n msa -o yaml
 ```
 
 Image or pull-policy issues:

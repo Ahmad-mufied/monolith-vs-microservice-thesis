@@ -190,14 +190,14 @@ Node roles: `node-group=app` (applications), `node-group=testing` (k6, tainted).
 Included in `experiment-bootstrap`. Manual: `make create-secrets`
 
 Creates application secrets in `mono`, `msa`, and `benchmark` from
-`env/*.app.env`, `env/vultr.env`, and Terraform outputs. The scripts reconcile
-existing secrets with the current template:
+`env/values.yaml` (specifically under the `.cluster` profile), `env/vultr.env`, and Terraform outputs. The scripts reconcile
+existing secrets with the current configurations:
 
-- Go remains the source of truth for runtime defaults; the scripts always pass
+- `env/values.yaml` remains the source of truth for runtime defaults; the scripts always pass
   only required secrets, environment-specific values, and explicit overrides
 - preserved credentials such as `JWT_SECRET`, `ADMIN_USER_EMAIL`, and
   `ADMIN_USER_PASSWORD` can fall back to the current in-cluster secret when the
-  local env file leaves them empty
+  local config leaves them empty or as placeholders
 - when an operator supplies only part of a timeout chain, the scripts derive the
   dependent timeout required to keep rollout-safe invariants
 - invalid timeout chains still fail before `kubectl apply`
@@ -234,9 +234,11 @@ When `SCALING_MODE=hpa`, the secret generation flow selects
 `LOGIN_MAX_CONCURRENCY_HPA=1` for `auth-service` so the admission-slot budget
 stays proportional to the smaller `975m` HPA pod CPU limit.
 
-`DIAGNOSTIC_LOGGING_ENABLED` is now config-driven through the same app env
-files and Secret creation flow. To enable it for a focused RCA run, set the
-flag in the relevant `*.app.env` file, rerun `make create-secrets` (or the
+`DIAGNOSTIC_LOGGING_ENABLED` is now config-driven through the centralized `env/values.yaml`
+file and Secret creation flow. To enable it for a focused RCA run, set the
+flag to `true` in the appropriate cluster section of `env/values.yaml` (e.g., using
+`yq -i '.cluster.microservices.auth-service.DIAGNOSTIC_LOGGING_ENABLED = true' env/values.yaml`),
+run `make env-init` to regenerate derived configurations, rerun `make create-secrets` (or the
 Vultr-specific secret target you use), then redeploy the workload so the pod
 reads the updated Secret.
 
@@ -284,12 +286,13 @@ Validation:
 
 ```bash
 kubectl --context=<ctx> get secret -A
-kubectl --context=<ctx> get secret monolith-env -n mono -o jsonpath='{.data.APP_REQUEST_TIMEOUT}' | base64 -d && echo
-kubectl --context=<ctx> get secret monolith-env -n mono -o jsonpath='{.data.HTTP_WRITE_TIMEOUT}' | base64 -d && echo
-kubectl --context=<ctx> get secret monolith-env -n mono -o jsonpath='{.data.LOGIN_MAX_CONCURRENCY}' | base64 -d && echo
-kubectl --context=<ctx> get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_ADMISSION_ENABLED}' | base64 -d && echo
-kubectl --context=<ctx> get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_MAX_CONCURRENCY}' | base64 -d && echo
-kubectl --context=<ctx> get secret api-gateway-secret -n msa -o jsonpath='{.data.GRPC_CALL_TIMEOUT}' | base64 -d && echo
+kubectl --context=<ctx> get configmaps -A
+kubectl --context=<ctx> get configmap monolith-config -n mono -o jsonpath='{.data.APP_REQUEST_TIMEOUT}' && echo
+kubectl --context=<ctx> get configmap monolith-config -n mono -o jsonpath='{.data.HTTP_WRITE_TIMEOUT}' && echo
+kubectl --context=<ctx> get configmap monolith-config -n mono -o jsonpath='{.data.LOGIN_MAX_CONCURRENCY}' && echo
+kubectl --context=<ctx> get configmap auth-service-config -n msa -o jsonpath='{.data.LOGIN_ADMISSION_ENABLED}' && echo
+kubectl --context=<ctx> get configmap auth-service-config -n msa -o jsonpath='{.data.LOGIN_MAX_CONCURRENCY}' && echo
+kubectl --context=<ctx> get configmap api-gateway-config -n msa -o jsonpath='{.data.GRPC_CALL_TIMEOUT}' && echo
 ```
 
 ## Phase 8 — Measure Resource Baseline
@@ -545,7 +548,8 @@ Login admission comparison examples:
 
 ```bash
 # 1. Fixed-mode baseline with login admission enabled.
-perl -0pi -e 's/^LOGIN_ADMISSION_ENABLED=.*/LOGIN_ADMISSION_ENABLED=true/m' env/auth-service.app.env
+yq -i '.cluster.microservices.auth-service.LOGIN_ADMISSION_ENABLED = true' env/values.yaml
+make env-init
 
 ARCHITECTURE=microservices \
 SCALING_MODE=fixed \
@@ -558,7 +562,8 @@ IMAGE_TAG="$IMAGE_TAG" \
 make run-benchmark-arch-suite
 
 # 2. Fixed-mode comparison with login admission disabled.
-perl -0pi -e 's/^LOGIN_ADMISSION_ENABLED=.*/LOGIN_ADMISSION_ENABLED=false/m' env/auth-service.app.env
+yq -i '.cluster.microservices.auth-service.LOGIN_ADMISSION_ENABLED = false' env/values.yaml
+make env-init
 
 ARCHITECTURE=microservices \
 SCALING_MODE=fixed \
@@ -571,8 +576,9 @@ IMAGE_TAG="$IMAGE_TAG" \
 make run-benchmark-arch-suite
 
 # 3. Focused RCA run with login admission enabled and diagnostic logging on.
-perl -0pi -e 's/^LOGIN_ADMISSION_ENABLED=.*/LOGIN_ADMISSION_ENABLED=true/m' env/auth-service.app.env
-perl -0pi -e 's/^DIAGNOSTIC_LOGGING_ENABLED=.*/DIAGNOSTIC_LOGGING_ENABLED=true/m' env/auth-service.app.env
+yq -i '.cluster.microservices.auth-service.LOGIN_ADMISSION_ENABLED = true' env/values.yaml
+yq -i '.cluster.microservices.auth-service.DIAGNOSTIC_LOGGING_ENABLED = true' env/values.yaml
+make env-init
 
 ARCHITECTURE=microservices \
 SCALING_MODE=fixed \
@@ -597,10 +603,10 @@ Recommended usage by case:
 Before each comparison run, verify the source env and the deployed Secret:
 
 ```bash
-rg -n "LOGIN_ADMISSION_ENABLED|LOGIN_MAX_CONCURRENCY|LOGIN_MAX_CONCURRENCY_HPA|LOGIN_QUEUE_TIMEOUT|DIAGNOSTIC_LOGGING_ENABLED" env/auth-service.app.env
-kubectl --context=benchmark get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_ADMISSION_ENABLED}' | base64 -d && echo
-kubectl --context=benchmark get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_MAX_CONCURRENCY}' | base64 -d && echo
-kubectl --context=benchmark get secret auth-service-secret -n msa -o jsonpath='{.data.LOGIN_QUEUE_TIMEOUT}' | base64 -d && echo
+yq '.cluster.microservices.auth-service' env/values.yaml
+kubectl --context=benchmark get configmap auth-service-config -n msa -o jsonpath='{.data.LOGIN_ADMISSION_ENABLED}' && echo
+kubectl --context=benchmark get configmap auth-service-config -n msa -o jsonpath='{.data.LOGIN_MAX_CONCURRENCY}' && echo
+kubectl --context=benchmark get configmap auth-service-config -n msa -o jsonpath='{.data.LOGIN_QUEUE_TIMEOUT}' && echo
 ```
 
 Important distinction:

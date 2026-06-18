@@ -34,6 +34,34 @@ read_env_value_from_file() {
   grep -E "^${key}=" "$file" | head -n 1 | cut -d= -f2- || true
 }
 
+read_yaml_value() {
+  local path="$1"
+  local file="${2:-env/values.yaml}"
+
+  if [[ ! -f "$file" ]]; then
+    echo "ERROR: Config file $file not found." >&2
+    return 1
+  fi
+
+  yq "${path} | select(. != null)" "$file"
+}
+
+generate_env_from_yaml() {
+  local yaml_path="$1"
+  local dest_file="$2"
+  local source_file="${3:-env/values.yaml}"
+
+  if [[ ! -f "$source_file" ]]; then
+    echo "ERROR: Config file $source_file not found." >&2
+    return 1
+  fi
+
+  # Generate the lines and write to dest_file
+  yq "${yaml_path} | to_entries | .[] | .key + \"=\" + (.value | tostring)" "$source_file" > "$dest_file"
+  chmod 600 "$dest_file"
+  echo "Generated $dest_file from $yaml_path in $source_file"
+}
+
 resolve_app_env_file() {
   local service="$1"
 
@@ -302,24 +330,95 @@ deployment_config_checksum_annotation_key() {
   printf 'benchmark.skripsi.dev/config-checksum\n'
 }
 
+is_sensitive_key() {
+  local key="$1"
+  case "$key" in
+    *SECRET*|*PASSWORD*|*DATABASE_URL*|*API_KEY*|*TOKEN*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+deployment_runtime_configmap_name() {
+  local namespace="$1"
+  local deployment="$2"
+
+  case "${namespace}/${deployment}" in
+    mono/monolith)
+      printf 'monolith-config\n'
+      ;;
+    msa/api-gateway)
+      printf 'api-gateway-config\n'
+      ;;
+    msa/auth-service)
+      printf 'auth-service-config\n'
+      ;;
+    msa/item-service)
+      printf 'item-service-config\n'
+      ;;
+    msa/transaction-service)
+      printf 'transaction-service-config\n'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 secret_data_checksum() {
   local context="$1"
   local namespace="$2"
   local secret_name="$3"
-  local secret_json
 
-  if ! secret_json="$(kubectl --context="$context" get secret "$secret_name" -n "$namespace" -o json 2>/dev/null)"; then
+  local should_split=false
+  case "$secret_name" in
+    monolith-env|api-gateway-secret|auth-service-secret|item-service-secret|transaction-service-secret)
+      should_split=true
+      ;;
+  esac
+
+  local context_args=()
+  if [[ -n "$context" ]]; then
+    context_args=(--context="$context")
+  fi
+
+  local secret_json configmap_json data_content=""
+
+  # Try to get secret data
+  if secret_json="$(kubectl "${context_args[@]}" get secret "$secret_name" -n "$namespace" -o json 2>/dev/null)"; then
+    data_content+="$(jq -r '.data // {} | to_entries | sort_by(.key) | map("\(.key)=\(.value | @base64d)") | .[]' <<<"$secret_json")"
+    data_content+=$'\n'
+  fi
+
+  if [ "$should_split" = true ]; then
+    local configmap_name
+    case "$secret_name" in
+      monolith-env) configmap_name="monolith-config" ;;
+      api-gateway-secret) configmap_name="api-gateway-config" ;;
+      auth-service-secret) configmap_name="auth-service-config" ;;
+      item-service-secret) configmap_name="item-service-config" ;;
+      transaction-service-secret) configmap_name="transaction-service-config" ;;
+    esac
+
+    # Try to get configmap data
+    if configmap_json="$(kubectl "${context_args[@]}" get configmap "$configmap_name" -n "$namespace" -o json 2>/dev/null)"; then
+      data_content+="$(jq -r '.data // {} | to_entries | sort_by(.key) | map("\(.key)=\(.value)") | .[]' <<<"$configmap_json")"
+      data_content+=$'\n'
+    fi
+  fi
+
+  local cleaned_content
+  cleaned_content="$(echo "$data_content" | grep -v '^$' | sort)"
+  if [[ -z "$cleaned_content" ]]; then
     return 1
   fi
 
-  jq -r '
-    .data // {}
-    | to_entries
-    | sort_by(.key)
-    | map("\(.key)=\(.value | @base64d)")
-    | .[]
-  ' <<<"$secret_json" | sha256sum | awk '{print $1}'
+  echo "$cleaned_content" | sha256sum | awk '{print $1}'
 }
+
 
 deployment_template_config_checksum() {
   local context="$1"
@@ -434,22 +533,116 @@ apply_secret_from_pairs() {
     return 1
   fi
 
-  local temp_env_file
-  temp_env_file="$(mktemp)"
-  chmod 600 "$temp_env_file"
+  local should_split=false
+  case "$secret_name" in
+    monolith-env|api-gateway-secret|auth-service-secret|item-service-secret|transaction-service-secret)
+      should_split=true
+      ;;
+  esac
+
+  local context_args=()
+  if [[ -n "$context" ]]; then
+    context_args=(--context="$context")
+  fi
+
+  if [ "$should_split" = false ]; then
+    local temp_env_file
+    temp_env_file="$(mktemp)"
+    chmod 600 "$temp_env_file"
+    while (( $# > 0 )); do
+      printf '%s=%s\n' "$1" "$2" >> "$temp_env_file"
+      shift 2
+    done
+    kubectl "${context_args[@]}" create secret generic "$secret_name" \
+      --namespace "$namespace" \
+      --from-env-file="$temp_env_file" \
+      --dry-run=client -o yaml | kubectl "${context_args[@]}" apply -f -
+    rm -f "$temp_env_file"
+    return 0
+  fi
+
+  local configmap_name
+  case "$secret_name" in
+    monolith-env) configmap_name="monolith-config" ;;
+    api-gateway-secret) configmap_name="api-gateway-config" ;;
+    auth-service-secret) configmap_name="auth-service-config" ;;
+    item-service-secret) configmap_name="item-service-config" ;;
+    transaction-service-secret) configmap_name="transaction-service-config" ;;
+    *) configmap_name="${secret_name}-config" ;;
+  esac
+
+  local temp_secret_file temp_config_file
+  temp_secret_file="$(mktemp)"
+  temp_config_file="$(mktemp)"
+  chmod 600 "$temp_secret_file" "$temp_config_file"
+
+  local has_secret=false
+  local has_config=false
 
   while (( $# > 0 )); do
-    printf '%s=%s\n' "$1" "$2" >> "$temp_env_file"
+    local key="$1"
+    local value="$2"
     shift 2
+
+    if is_sensitive_key "$key"; then
+      printf '%s=%s\n' "$key" "$value" >> "$temp_secret_file"
+      has_secret=true
+    else
+      printf '%s=%s\n' "$key" "$value" >> "$temp_config_file"
+      has_config=true
+    fi
   done
 
-  kubectl --context="$context" create secret generic "$secret_name" \
-    --namespace "$namespace" \
-    --from-env-file="$temp_env_file" \
-    --dry-run=client -o yaml | kubectl --context="$context" apply -f -
+  # Apply ConfigMap
+  if [ "$has_config" = true ]; then
+    kubectl "${context_args[@]}" create configmap "$configmap_name" \
+      --namespace "$namespace" \
+      --from-env-file="$temp_config_file" \
+      --dry-run=client -o yaml | kubectl "${context_args[@]}" apply -f -
+  else
+    kubectl "${context_args[@]}" create configmap "$configmap_name" \
+      --namespace "$namespace" \
+      --dry-run=client -o yaml | kubectl "${context_args[@]}" apply -f -
+  fi
 
-  rm -f "$temp_env_file"
+  # Apply Secret
+  if [ "$has_secret" = true ]; then
+    kubectl "${context_args[@]}" create secret generic "$secret_name" \
+      --namespace "$namespace" \
+      --from-env-file="$temp_secret_file" \
+      --dry-run=client -o yaml | kubectl "${context_args[@]}" apply -f -
+  else
+    kubectl "${context_args[@]}" create secret generic "$secret_name" \
+      --namespace "$namespace" \
+      --dry-run=client -o yaml | kubectl "${context_args[@]}" apply -f -
+  fi
+
+  rm -f "$temp_secret_file" "$temp_config_file"
 }
+
+apply_secret_and_config_from_env_file() {
+  local context="$1"
+  local namespace="$2"
+  local base_name="$3"
+  local env_file="$4"
+
+  if [[ ! -f "$env_file" ]]; then
+    echo "ERROR: env file $env_file not found" >&2
+    return 1
+  fi
+
+  local pairs=()
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^# ]] && continue
+    [[ -z "$line" ]] && continue
+    if [[ "$line" =~ ^([^=]+)=(.*)$ ]]; then
+      pairs+=("${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")
+    fi
+  done < "$env_file"
+
+  apply_secret_from_pairs "$context" "$namespace" "$base_name" "${pairs[@]}"
+}
+
 
 normalize_http_write_timeout() {
   local value="$1"

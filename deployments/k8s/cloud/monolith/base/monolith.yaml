@@ -36,6 +36,8 @@ spec:
               drop:
                 - ALL
           envFrom:
+            - configMapRef:
+                name: monolith-config
             - secretRef:
                 name: monolith-env
           env:

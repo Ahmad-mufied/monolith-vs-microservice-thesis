@@ -649,6 +649,17 @@ If query-level spans become required later, add them only after verifying the
 exact Datadog pgx integration package and version. Do not replace the database
 driver or change repository behavior only for observability.
 
+### 8.5 Log-Trace Correlation
+
+To enable automatic log-trace correlation in Datadog, log records must include tracing IDs. This is implemented in `pkg/logger/logger.go` using a custom `slog.Handler` wrapper (`ddHandler`).
+
+When a log is written using a context that contains an active span (e.g., within an HTTP request or gRPC call):
+- The handler extracts the span using `tracer.SpanFromContext(ctx)`.
+- It injects `dd.trace_id` (128-bit hex representation string) and `dd.span_id` (64-bit uint representation) into the log record.
+- Datadog's log-trace parser automatically reads these fields to connect logs to their corresponding APM traces.
+
+Both monolith and microservices set this up by registering the custom logger as the default slog logger using `slog.SetDefault(logger)`.
+
 ## 9. k6 and Datadog
 
 ### 9.1 Responsibility Split

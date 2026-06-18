@@ -4,132 +4,38 @@ umask 077
 
 mkdir -p env
 
-random_hex() {
-  local bytes="$1"
+source scripts/lib/shared-env.sh
 
-  if command -v openssl >/dev/null 2>&1; then
-    openssl rand -hex "$bytes"
-    return
-  fi
-
-  od -An -N "$bytes" -tx1 /dev/urandom | tr -d ' \n'
-}
-
-url_encode() {
-  local string="$1"
-  printf '%s' "$string" | jq -sRr @uri
-}
-
-read_env_value() {
-  local file="$1"
-  local key="$2"
-
-  if [[ ! -f "$file" ]]; then
-    return 0
-  fi
-
-  grep -E "^${key}=" "$file" | head -n 1 | cut -d= -f2- || true
-}
-
-write_if_missing() {
-  local file="$1"
-  local content="$2"
-
-  if [[ -f "$file" ]]; then
-    echo "skip $file (already exists)"
-    return
-  fi
-
-  printf "%s\n" "$content" >"$file"
-  echo "created $file"
-}
-
-write_or_update_env_value() {
-  local file="$1"
-  local key="$2"
-  local value="$3"
-
-  if [[ ! -f "$file" ]]; then
-    printf "%s=%s\n" "$key" "$value" >"$file"
-    echo "created $file"
-    return
-  fi
-
-  local current_value
-  current_value="$(read_env_value "$file" "$key")"
-  if [[ "$current_value" == "$value" ]]; then
-    echo "skip $file ($key already up to date)"
-    return
-  fi
-
-  if grep -q -E "^${key}=" "$file"; then
-    perl -0pi -e "s#^${key}=.*#${key}=${value}#m" "$file"
-  else
-    printf "%s=%s\n" "$key" "$value" >>"$file"
-  fi
-
-  echo "updated $file"
-}
+# 1. Make sure app env has been initialized
+if [[ ! -f env/values.yaml ]]; then
+  echo "values.yaml not found, running env-init-app first..."
+  bash scripts/env-init-app.sh
+fi
 
 if [[ ! -f env/postgres.env ]]; then
   echo "missing env/postgres.env; run: make env-init-base" >&2
   exit 1
 fi
 
-postgres_user="$(read_env_value env/postgres.env POSTGRES_USER)"
+postgres_user="$(grep -E '^POSTGRES_USER=' env/postgres.env | cut -d= -f2- || true)"
 postgres_user="${postgres_user:-postgres}"
-postgres_password="$(read_env_value env/postgres.env POSTGRES_PASSWORD)"
-if [[ -z "$postgres_password" ]]; then
-  echo "env/postgres.env exists but POSTGRES_PASSWORD is empty" >&2
-  exit 1
-fi
+postgres_password="$(grep -E '^POSTGRES_PASSWORD=' env/postgres.env | cut -d= -f2- || true)"
 
-jwt_secret="$(read_env_value env/monolith.env JWT_SECRET)"
-jwt_secret="${jwt_secret:-$(random_hex 32)}"
+url_encode() {
+  local string="$1"
+  printf '%s' "$string" | jq -sRr @uri
+}
 
 encoded_postgres_user="$(url_encode "$postgres_user")"
 encoded_postgres_password="$(url_encode "$postgres_password")"
 
-write_if_missing "env/monolith.env" "APP_ENV=local
-APP_PORT=8080
-SERVICE_NAME=monolith
-DATABASE_URL=postgres://${encoded_postgres_user}:${encoded_postgres_password}@postgres:5432/mono_db?sslmode=disable
-MONO_DATABASE_URL=postgres://${encoded_postgres_user}:${encoded_postgres_password}@localhost:5432/mono_db?sslmode=disable
-DB_POOL_MAX_CONNS=25
-DB_POOL_MIN_CONNS=2
-DB_POOL_MAX_CONN_LIFETIME=5m
-DB_POOL_MAX_CONN_IDLE_TIME=1m
-DB_PING_TIMEOUT=5s
-HTTP_READ_HEADER_TIMEOUT=5s
-HTTP_READ_TIMEOUT=15s
-HTTP_WRITE_TIMEOUT=40s
-HTTP_IDLE_TIMEOUT=60s
-HTTP_SHUTDOWN_TIMEOUT=10s
-HTTP_MAX_HEADER_BYTES=1048576
-BCRYPT_COST=10
-JWT_SECRET=${jwt_secret}
-DATADOG_ENABLED=false
-DIAGNOSTIC_LOGGING_ENABLED=false
-APP_REQUEST_TIMEOUT=35s
-LOGIN_ADMISSION_ENABLED=true
-LOGIN_MAX_CONCURRENCY=8
-LOGIN_QUEUE_TIMEOUT=2s"
+# 2. Generate local monolith.env from values.yaml
+generate_env_from_yaml ".local.monolith" "env/monolith.env"
 
-write_or_update_env_value "env/monolith.env" "BCRYPT_COST" "10"
-write_or_update_env_value "env/monolith.env" "APP_REQUEST_TIMEOUT" "35s"
-write_or_update_env_value "env/monolith.env" "LOGIN_ADMISSION_ENABLED" "true"
-write_or_update_env_value "env/monolith.env" "LOGIN_MAX_CONCURRENCY" "8"
-write_or_update_env_value "env/monolith.env" "LOGIN_QUEUE_TIMEOUT" "2s"
-write_or_update_env_value "env/monolith.env" "DIAGNOSTIC_LOGGING_ENABLED" "false"
-if [[ "$(read_env_value env/monolith.env HTTP_WRITE_TIMEOUT)" == "30s" || "$(read_env_value env/monolith.env HTTP_WRITE_TIMEOUT)" == "35s" ]]; then
-  write_or_update_env_value "env/monolith.env" "HTTP_WRITE_TIMEOUT" "40s"
-else
-  echo "skip env/monolith.env (HTTP_WRITE_TIMEOUT has custom value)"
-fi
-
-write_or_update_env_value \
-  "env/db-bootstrap.env" \
-  "BOOTSTRAP_DATABASE_URL" \
-  "postgres://${encoded_postgres_user}:${encoded_postgres_password}@postgres.local-database.svc.cluster.local:5432/bootstrap?sslmode=disable"
+# 3. Create db-bootstrap.env
+bootstrap_url="postgres://${encoded_postgres_user}:${encoded_postgres_password}@postgres.local-database.svc.cluster.local:5432/bootstrap?sslmode=disable"
+echo "BOOTSTRAP_DATABASE_URL=$bootstrap_url" > env/db-bootstrap.env
+chmod 600 env/db-bootstrap.env
+echo "Generated env/db-bootstrap.env"
 
 echo "local monolith env initialization complete"
