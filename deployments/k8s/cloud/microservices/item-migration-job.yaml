@@ -26,6 +26,8 @@ spec:
               drop:
                 - ALL
           envFrom:
+            - configMapRef:
+                name: item-service-config
             - secretRef:
                 name: item-service-secret
           resources:

@@ -1,0 +1,223 @@
+# env/values.yaml.template
+# This is a template for the unified config file env/values.yaml.
+# Local secrets (JWT_SECRET, admin password, and database password) are injected automatically on run.
+
+local:
+  monolith:
+    APP_ENV: local
+    APP_PORT: 8080
+    SERVICE_NAME: monolith
+    DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@localhost:5432/mono_db?sslmode=disable"
+    MONO_DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@localhost:5432/mono_db?sslmode=disable"
+    DB_POOL_MAX_CONNS: 25
+    DB_POOL_MIN_CONNS: 2
+    DB_POOL_MAX_CONN_LIFETIME: 5m
+    DB_POOL_MAX_CONN_IDLE_TIME: 1m
+    DB_PING_TIMEOUT: 5s
+    HTTP_READ_HEADER_TIMEOUT: 5s
+    HTTP_READ_TIMEOUT: 15s
+    HTTP_WRITE_TIMEOUT: 40s
+    HTTP_IDLE_TIMEOUT: 60s
+    HTTP_SHUTDOWN_TIMEOUT: 10s
+    HTTP_MAX_HEADER_BYTES: 1048576
+    BCRYPT_COST: 10
+    JWT_SECRET: "PLACEHOLDER_JWT_SECRET"
+    DATADOG_ENABLED: false
+    DIAGNOSTIC_LOGGING_ENABLED: true
+    APP_REQUEST_TIMEOUT: 35s
+    LOGIN_ADMISSION_ENABLED: true
+    LOGIN_MAX_CONCURRENCY: 8
+    LOGIN_QUEUE_TIMEOUT: 2s
+  microservices:
+    api-gateway:
+      HTTP_PORT: 8080
+      JWT_SECRET: "PLACEHOLDER_JWT_SECRET"
+      AUTH_SERVICE_ADDR: "localhost:50051"
+      ITEM_SERVICE_ADDR: "localhost:50052"
+      TRANSACTION_SERVICE_ADDR: "localhost:50053"
+      GRPC_CALL_TIMEOUT: 32s
+      REQUEST_TIMEOUT: 35s
+      HTTP_WRITE_TIMEOUT: 40s
+      DATADOG_ENABLED: false
+      DIAGNOSTIC_LOGGING_ENABLED: true
+    auth-service:
+      GRPC_PORT: 50051
+      DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@localhost:5432/auth_db?sslmode=disable"
+      AUTH_DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@localhost:5432/auth_db?sslmode=disable"
+      JWT_SECRET: "PLACEHOLDER_JWT_SECRET"
+      JWT_EXPIRY: 24h
+      BCRYPT_COST: 10
+      GRPC_REQUEST_TIMEOUT: 30s
+      DATADOG_ENABLED: false
+      DIAGNOSTIC_LOGGING_ENABLED: true
+      LOGIN_ADMISSION_ENABLED: true
+      LOGIN_MAX_CONCURRENCY: 2
+      LOGIN_MAX_CONCURRENCY_HPA: 1
+      LOGIN_QUEUE_TIMEOUT: 2s
+      DB_POOL_MAX_CONNS: 6
+      DB_POOL_MIN_CONNS: 1
+      DB_POOL_MAX_CONN_LIFETIME: 15m
+      DB_POOL_MAX_CONN_IDLE_TIME: 1m
+      DB_PING_TIMEOUT: 5s
+    item-service:
+      GRPC_PORT: 50052
+      DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@localhost:5432/item_db?sslmode=disable"
+      ITEM_DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@localhost:5432/item_db?sslmode=disable"
+      GRPC_REQUEST_TIMEOUT: 30s
+      DATADOG_ENABLED: false
+      DIAGNOSTIC_LOGGING_ENABLED: true
+      DB_POOL_MAX_CONNS: 6
+      DB_POOL_MIN_CONNS: 1
+      DB_POOL_MAX_CONN_LIFETIME: 15m
+      DB_POOL_MAX_CONN_IDLE_TIME: 1m
+      DB_PING_TIMEOUT: 5s
+    transaction-service:
+      GRPC_PORT: 50053
+      DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@localhost:5432/transaction_db?sslmode=disable"
+      TRANSACTION_DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@localhost:5432/transaction_db?sslmode=disable"
+      ITEM_SERVICE_ADDR: "localhost:50052"
+      GRPC_REQUEST_TIMEOUT: 30s
+      ITEM_VALIDATION_TIMEOUT: 25s
+      DATADOG_ENABLED: false
+      DIAGNOSTIC_LOGGING_ENABLED: true
+      DB_POOL_MAX_CONNS: 6
+      DB_POOL_MIN_CONNS: 1
+      DB_POOL_MAX_CONN_LIFETIME: 15m
+      DB_POOL_MAX_CONN_IDLE_TIME: 1m
+      DB_PING_TIMEOUT: 5s
+
+compose:
+  microservices:
+    api-gateway:
+      HTTP_PORT: 8080
+      JWT_SECRET: "PLACEHOLDER_JWT_SECRET"
+      AUTH_SERVICE_ADDR: "auth-service:50051"
+      ITEM_SERVICE_ADDR: "item-service:50052"
+      TRANSACTION_SERVICE_ADDR: "transaction-service:50053"
+      GRPC_CALL_TIMEOUT: 32s
+      REQUEST_TIMEOUT: 35s
+      HTTP_WRITE_TIMEOUT: 40s
+      DATADOG_ENABLED: false
+      DIAGNOSTIC_LOGGING_ENABLED: true
+    auth-service:
+      GRPC_PORT: 50051
+      DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@postgres:5432/auth_db?sslmode=disable"
+      AUTH_DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@postgres:5432/auth_db?sslmode=disable"
+      JWT_SECRET: "PLACEHOLDER_JWT_SECRET"
+      JWT_EXPIRY: 24h
+      BCRYPT_COST: 10
+      GRPC_REQUEST_TIMEOUT: 30s
+      DATADOG_ENABLED: false
+      DIAGNOSTIC_LOGGING_ENABLED: true
+      LOGIN_ADMISSION_ENABLED: true
+      LOGIN_MAX_CONCURRENCY: 2
+      LOGIN_MAX_CONCURRENCY_HPA: 1
+      LOGIN_QUEUE_TIMEOUT: 2s
+      DB_POOL_MAX_CONNS: 6
+      DB_POOL_MIN_CONNS: 1
+      DB_POOL_MAX_CONN_LIFETIME: 15m
+      DB_POOL_MAX_CONN_IDLE_TIME: 1m
+      DB_PING_TIMEOUT: 5s
+    item-service:
+      GRPC_PORT: 50052
+      DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@postgres:5432/item_db?sslmode=disable"
+      ITEM_DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@postgres:5432/item_db?sslmode=disable"
+      GRPC_REQUEST_TIMEOUT: 30s
+      DATADOG_ENABLED: false
+      DIAGNOSTIC_LOGGING_ENABLED: true
+      DB_POOL_MAX_CONNS: 6
+      DB_POOL_MIN_CONNS: 1
+      DB_POOL_MAX_CONN_LIFETIME: 15m
+      DB_POOL_MAX_CONN_IDLE_TIME: 1m
+      DB_PING_TIMEOUT: 5s
+    transaction-service:
+      GRPC_PORT: 50053
+      DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@postgres:5432/transaction_db?sslmode=disable"
+      TRANSACTION_DATABASE_URL: "postgres://postgres:PLACEHOLDER_POSTGRES_PASSWORD@postgres:5432/transaction_db?sslmode=disable"
+      ITEM_SERVICE_ADDR: "item-service:50052"
+      GRPC_REQUEST_TIMEOUT: 30s
+      ITEM_VALIDATION_TIMEOUT: 25s
+      DATADOG_ENABLED: false
+      DIAGNOSTIC_LOGGING_ENABLED: true
+      DB_POOL_MAX_CONNS: 6
+      DB_POOL_MIN_CONNS: 1
+      DB_POOL_MAX_CONN_LIFETIME: 15m
+      DB_POOL_MAX_CONN_IDLE_TIME: 1m
+      DB_PING_TIMEOUT: 5s
+
+cluster:
+  monolith:
+    APP_ENV: production
+    APP_PORT: 8080
+    SERVICE_NAME: monolith
+    DB_POOL_MAX_CONNS: 25
+    DB_POOL_MIN_CONNS: 2
+    DB_POOL_MAX_CONN_LIFETIME: 5m
+    DB_POOL_MAX_CONN_IDLE_TIME: 1m
+    DB_PING_TIMEOUT: 5s
+    HTTP_READ_HEADER_TIMEOUT: 5s
+    HTTP_READ_TIMEOUT: 15s
+    HTTP_WRITE_TIMEOUT: 40s
+    HTTP_IDLE_TIMEOUT: 1m
+    HTTP_SHUTDOWN_TIMEOUT: 10s
+    HTTP_MAX_HEADER_BYTES: 1048576
+    BCRYPT_COST: 10
+    JWT_SECRET: "PLACEHOLDER_JWT_SECRET"
+    DATADOG_ENABLED: true
+    DIAGNOSTIC_LOGGING_ENABLED: true
+    APP_REQUEST_TIMEOUT: 35s
+    LOGIN_ADMISSION_ENABLED: true
+    LOGIN_MAX_CONCURRENCY: 8
+    LOGIN_QUEUE_TIMEOUT: 2s
+  microservices:
+    api-gateway:
+      APP_ENV: production
+      HTTP_PORT: 8080
+      SERVICE_NAME: api-gateway
+      JWT_SECRET: "PLACEHOLDER_JWT_SECRET"
+      AUTH_SERVICE_ADDR: "dns:///auth-service-headless.msa.svc.cluster.local:50051"
+      ITEM_SERVICE_ADDR: "dns:///item-service-headless.msa.svc.cluster.local:50052"
+      TRANSACTION_SERVICE_ADDR: "dns:///transaction-service-headless.msa.svc.cluster.local:50053"
+      GRPC_CALL_TIMEOUT: 32s
+      REQUEST_TIMEOUT: 35s
+      HTTP_WRITE_TIMEOUT: 40s
+      DATADOG_ENABLED: true
+      DIAGNOSTIC_LOGGING_ENABLED: true
+    auth-service:
+      APP_ENV: production
+      GRPC_PORT: 50051
+      SERVICE_NAME: auth-service
+      BCRYPT_COST: 10
+      JWT_SECRET: "PLACEHOLDER_JWT_SECRET"
+      DATADOG_ENABLED: true
+      DIAGNOSTIC_LOGGING_ENABLED: true
+      GRPC_REQUEST_TIMEOUT: 30s
+      LOGIN_ADMISSION_ENABLED: true
+      LOGIN_MAX_CONCURRENCY: 2
+      LOGIN_MAX_CONCURRENCY_HPA: 1
+      LOGIN_QUEUE_TIMEOUT: 2s
+    item-service:
+      APP_ENV: production
+      GRPC_PORT: 50052
+      SERVICE_NAME: item-service
+      DATADOG_ENABLED: true
+      DIAGNOSTIC_LOGGING_ENABLED: true
+      GRPC_REQUEST_TIMEOUT: 30s
+    transaction-service:
+      APP_ENV: production
+      GRPC_PORT: 50053
+      SERVICE_NAME: transaction-service
+      DATADOG_ENABLED: true
+      DIAGNOSTIC_LOGGING_ENABLED: true
+      ITEM_SERVICE_ADDR: "dns:///item-service-headless.msa.svc.cluster.local:50052"
+      GRPC_REQUEST_TIMEOUT: 30s
+      ITEM_VALIDATION_TIMEOUT: 25s
+
+shared:
+  datadog:
+    DATADOG_API_KEY: "replace-me"
+    DATADOG_SITE: "datadoghq.com"
+  k6-runner:
+    ADMIN_USER_EMAIL: "benchmark-user-001@example.com"
+    ADMIN_USER_PASSWORD: "PLACEHOLDER_ADMIN_PASSWORD"
+    MAX_VUS: 1000

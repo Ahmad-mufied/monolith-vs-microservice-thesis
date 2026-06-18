@@ -106,12 +106,7 @@ make eks-create-secrets-sequential
 The helper reads:
 
 ```text
-env/monolith.app.env
-env/api-gateway.app.env
-env/auth-service.app.env
-env/item-service.app.env
-env/transaction-service.app.env
-env/k6-runner.app.env
+env/values.yaml (specifically under the .cluster profile)
 env/terraform.experiment.env
 ```
 

@@ -128,7 +128,35 @@ Reconciliation policy for Kubernetes secret generation:
   `GRPC_CALL_TIMEOUT < REQUEST_TIMEOUT < HTTP_WRITE_TIMEOUT`, and
   `ITEM_VALIDATION_TIMEOUT < GRPC_REQUEST_TIMEOUT`.
 
+## Kubernetes ConfigMap and Secret Partitioning
+
+At deployment time, the secret generation scripts (`create-local-secrets.sh`, `create-local-secrets-microservices.sh`, `create-eks-secrets-sequential.sh`, etc.) dynamically partition the centralized `env/values.yaml` configuration parameters using `is_sensitive_key` matching.
+
+### Partitioning Rules
+
+1. **Kubernetes Secret:**
+   - Any key matching `*SECRET*`, `*PASSWORD*`, `*DATABASE_URL*`, or `*API_KEY*` (e.g., `DATABASE_URL`, `JWT_SECRET`, `DATADOG_API_KEY`) is stored securely in a Kubernetes `Secret`.
+2. **Kubernetes ConfigMap:**
+   - All other keys (e.g., `APP_ENV`, `APP_PORT`, `GRPC_PORT`, pool sizes, timeouts, limits) are stored in a Kubernetes `ConfigMap`.
+
+### Pod Mounting
+
+In deployment manifests, the workloads source environment variables using both resource types via `envFrom`:
+
+```yaml
+          envFrom:
+            - configMapRef:
+                name: monolith-config
+            - secretRef:
+                name: monolith-env
+```
+
+### Combined Rollout Checksum
+
+To trigger rolling updates automatically, the deployment scripts compute a combined SHA256 checksum annotation (`benchmark.skripsi.dev/config-checksum`) on the pod template. This checksum is computed from the sorted union of keys and values from both the ConfigMap and the Secret. Any configuration update—regardless of whether it affects a Secret or a ConfigMap—will change this checksum and trigger a zero-downtime rolling update.
+
 ---
+
 
 ## Env File Structure
 
@@ -160,7 +188,7 @@ Current repository helper flow for EKS:
 env-init PLATFORM=eks EXECUTION_MODE=parallel|sequential
   -> reads env/operator-profile.env and dispatches the operator flow
 env-init-app
-  -> lower-level helper that creates provider-neutral app env files under env/*.app.env
+  -> lower-level helper that creates the unified env/values.yaml configuration and exports derived env files
 env-init-eks
   -> lower-level helper that creates AWS helper env files under env/
 eks-render-tfvars

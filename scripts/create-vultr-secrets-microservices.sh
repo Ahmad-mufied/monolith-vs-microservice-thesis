@@ -35,19 +35,8 @@ terraform_output_required() {
   printf '%s' "$value"
 }
 
-api_gateway_env_file="$(resolve_app_env_file api-gateway || true)"
-auth_service_env_file="$(resolve_app_env_file auth-service || true)"
-item_service_env_file="$(resolve_app_env_file item-service || true)"
-transaction_service_env_file="$(resolve_app_env_file transaction-service || true)"
-k6_runner_env_file="$(resolve_app_env_file k6-runner || true)"
-api_gateway_env_file="${api_gateway_env_file:-env/api-gateway.app.env}"
-auth_service_env_file="${auth_service_env_file:-env/auth-service.app.env}"
-item_service_env_file="${item_service_env_file:-env/item-service.app.env}"
-transaction_service_env_file="${transaction_service_env_file:-env/transaction-service.app.env}"
-k6_runner_env_file="${k6_runner_env_file:-env/k6-runner.app.env}"
-
-for file in env/vultr.env "$api_gateway_env_file" "$auth_service_env_file" "$item_service_env_file" "$transaction_service_env_file" "$k6_runner_env_file"; do
-  [ -f "$file" ] || { echo "missing $file; run: make env-init-app and make env-init-vultr" >&2; exit 1; }
+for file in env/vultr.env env/values.yaml; do
+  [ -f "$file" ] || { echo "missing $file; run: make env-init" >&2; exit 1; }
 done
 
 set -a
@@ -70,47 +59,61 @@ fi
 encoded_db_password="$(url_encode "$POSTGRES_PASSWORD")"
 context="${VULTR_CONTEXT:-msa}"
 K8S="kubectl --context=${context}"
-api_jwt_secret="$(resolve_preserved_secret_value "$(read_env_value "$api_gateway_env_file" JWT_SECRET)" "$context" msa api-gateway-secret JWT_SECRET || true)"
-api_app_env="$(read_env_value "$api_gateway_env_file" APP_ENV)"
-api_http_port="$(read_env_value "$api_gateway_env_file" HTTP_PORT)"
-api_service_name="$(read_env_value "$api_gateway_env_file" SERVICE_NAME)"
-api_diagnostic_logging_enabled="$(read_env_value "$api_gateway_env_file" DIAGNOSTIC_LOGGING_ENABLED)"
-api_auth_service_addr="$(read_env_value "$api_gateway_env_file" AUTH_SERVICE_ADDR)"
-api_item_service_addr="$(read_env_value "$api_gateway_env_file" ITEM_SERVICE_ADDR)"
-api_transaction_service_addr="$(read_env_value "$api_gateway_env_file" TRANSACTION_SERVICE_ADDR)"
-raw_api_grpc_call_timeout="$(read_env_value "$api_gateway_env_file" GRPC_CALL_TIMEOUT)"
-raw_api_request_timeout="$(read_env_value "$api_gateway_env_file" REQUEST_TIMEOUT)"
-raw_api_http_write_timeout="$(read_env_value "$api_gateway_env_file" HTTP_WRITE_TIMEOUT)"
-auth_jwt_secret="$(resolve_preserved_secret_value "$(read_env_value "$auth_service_env_file" JWT_SECRET)" "$context" msa auth-service-secret JWT_SECRET || true)"
-auth_app_env="$(read_env_value "$auth_service_env_file" APP_ENV)"
-auth_grpc_port="$(read_env_value "$auth_service_env_file" GRPC_PORT)"
-auth_service_name="$(read_env_value "$auth_service_env_file" SERVICE_NAME)"
-auth_diagnostic_logging_enabled="$(read_env_value "$auth_service_env_file" DIAGNOSTIC_LOGGING_ENABLED)"
-auth_bcrypt_cost="$(read_env_value "$auth_service_env_file" BCRYPT_COST)"
-raw_auth_grpc_request_timeout="$(read_env_value "$auth_service_env_file" GRPC_REQUEST_TIMEOUT)"
-auth_login_admission_enabled="$(read_env_value "$auth_service_env_file" LOGIN_ADMISSION_ENABLED)"
-auth_login_max_concurrency="$(read_env_value "$auth_service_env_file" LOGIN_MAX_CONCURRENCY)"
-auth_login_max_concurrency_hpa="$(read_env_value "$auth_service_env_file" LOGIN_MAX_CONCURRENCY_HPA)"
-auth_login_queue_timeout="$(read_env_value "$auth_service_env_file" LOGIN_QUEUE_TIMEOUT)"
-item_app_env="$(read_env_value "$item_service_env_file" APP_ENV)"
-item_grpc_port="$(read_env_value "$item_service_env_file" GRPC_PORT)"
-item_service_name="$(read_env_value "$item_service_env_file" SERVICE_NAME)"
-item_diagnostic_logging_enabled="$(read_env_value "$item_service_env_file" DIAGNOSTIC_LOGGING_ENABLED)"
-raw_item_grpc_request_timeout="$(read_env_value "$item_service_env_file" GRPC_REQUEST_TIMEOUT)"
-transaction_app_env="$(read_env_value "$transaction_service_env_file" APP_ENV)"
-transaction_grpc_port="$(read_env_value "$transaction_service_env_file" GRPC_PORT)"
-transaction_service_name="$(read_env_value "$transaction_service_env_file" SERVICE_NAME)"
-transaction_diagnostic_logging_enabled="$(read_env_value "$transaction_service_env_file" DIAGNOSTIC_LOGGING_ENABLED)"
-transaction_item_service_addr="$(read_env_value "$transaction_service_env_file" ITEM_SERVICE_ADDR)"
-raw_transaction_grpc_request_timeout="$(read_env_value "$transaction_service_env_file" GRPC_REQUEST_TIMEOUT)"
-raw_transaction_item_validation_timeout="$(read_env_value "$transaction_service_env_file" ITEM_VALIDATION_TIMEOUT)"
-admin_user_email="$(resolve_preserved_secret_value "$(read_env_value "$k6_runner_env_file" ADMIN_USER_EMAIL)" "$context" benchmark k6-runner-secret ADMIN_USER_EMAIL || true)"
-admin_user_password="$(resolve_preserved_secret_value "$(read_env_value "$k6_runner_env_file" ADMIN_USER_PASSWORD)" "$context" benchmark k6-runner-secret ADMIN_USER_PASSWORD || true)"
 
-: "${api_jwt_secret:?JWT_SECRET must be set in ${api_gateway_env_file}}"
-: "${auth_jwt_secret:?JWT_SECRET must be set in ${auth_service_env_file}}"
-: "${admin_user_email:?ADMIN_USER_EMAIL must be set in ${k6_runner_env_file}}"
-: "${admin_user_password:?ADMIN_USER_PASSWORD must be set in ${k6_runner_env_file}}"
+# API Gateway
+api_jwt_secret="${JWT_SECRET:-$(read_yaml_value ".cluster.microservices.api-gateway.JWT_SECRET")}"
+api_jwt_secret="$(resolve_preserved_secret_value "$api_jwt_secret" "$context" msa api-gateway-secret JWT_SECRET || true)"
+api_app_env="${APP_ENV:-$(read_yaml_value ".cluster.microservices.api-gateway.APP_ENV")}"
+api_http_port="${HTTP_PORT:-$(read_yaml_value ".cluster.microservices.api-gateway.HTTP_PORT")}"
+api_service_name="${SERVICE_NAME:-$(read_yaml_value ".cluster.microservices.api-gateway.SERVICE_NAME")}"
+api_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".cluster.microservices.api-gateway.DIAGNOSTIC_LOGGING_ENABLED")}"
+api_auth_service_addr="${AUTH_SERVICE_ADDR:-$(read_yaml_value ".cluster.microservices.api-gateway.AUTH_SERVICE_ADDR")}"
+api_item_service_addr="${ITEM_SERVICE_ADDR:-$(read_yaml_value ".cluster.microservices.api-gateway.ITEM_SERVICE_ADDR")}"
+api_transaction_service_addr="${TRANSACTION_SERVICE_ADDR:-$(read_yaml_value ".cluster.microservices.api-gateway.TRANSACTION_SERVICE_ADDR")}"
+raw_api_grpc_call_timeout="${GRPC_CALL_TIMEOUT:-$(read_yaml_value ".cluster.microservices.api-gateway.GRPC_CALL_TIMEOUT")}"
+raw_api_request_timeout="${REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.microservices.api-gateway.REQUEST_TIMEOUT")}"
+raw_api_http_write_timeout="${HTTP_WRITE_TIMEOUT:-$(read_yaml_value ".cluster.microservices.api-gateway.HTTP_WRITE_TIMEOUT")}"
+
+# Auth Service
+auth_jwt_secret="${JWT_SECRET:-$(read_yaml_value ".cluster.microservices.auth-service.JWT_SECRET")}"
+auth_jwt_secret="$(resolve_preserved_secret_value "$auth_jwt_secret" "$context" msa auth-service-secret JWT_SECRET || true)"
+auth_app_env="${APP_ENV:-$(read_yaml_value ".cluster.microservices.auth-service.APP_ENV")}"
+auth_grpc_port="${GRPC_PORT:-$(read_yaml_value ".cluster.microservices.auth-service.GRPC_PORT")}"
+auth_service_name="${SERVICE_NAME:-$(read_yaml_value ".cluster.microservices.auth-service.SERVICE_NAME")}"
+auth_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".cluster.microservices.auth-service.DIAGNOSTIC_LOGGING_ENABLED")}"
+auth_bcrypt_cost="${BCRYPT_COST:-$(read_yaml_value ".cluster.microservices.auth-service.BCRYPT_COST")}"
+raw_auth_grpc_request_timeout="${GRPC_REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.microservices.auth-service.GRPC_REQUEST_TIMEOUT")}"
+auth_login_admission_enabled="${LOGIN_ADMISSION_ENABLED:-$(read_yaml_value ".cluster.microservices.auth-service.LOGIN_ADMISSION_ENABLED")}"
+auth_login_max_concurrency="${LOGIN_MAX_CONCURRENCY:-$(read_yaml_value ".cluster.microservices.auth-service.LOGIN_MAX_CONCURRENCY")}"
+auth_login_max_concurrency_hpa="${LOGIN_MAX_CONCURRENCY_HPA:-$(read_yaml_value ".cluster.microservices.auth-service.LOGIN_MAX_CONCURRENCY_HPA")}"
+auth_login_queue_timeout="${LOGIN_QUEUE_TIMEOUT:-$(read_yaml_value ".cluster.microservices.auth-service.LOGIN_QUEUE_TIMEOUT")}"
+
+# Item Service
+item_app_env="${APP_ENV:-$(read_yaml_value ".cluster.microservices.item-service.APP_ENV")}"
+item_grpc_port="${GRPC_PORT:-$(read_yaml_value ".cluster.microservices.item-service.GRPC_PORT")}"
+item_service_name="${SERVICE_NAME:-$(read_yaml_value ".cluster.microservices.item-service.SERVICE_NAME")}"
+item_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".cluster.microservices.item-service.DIAGNOSTIC_LOGGING_ENABLED")}"
+raw_item_grpc_request_timeout="${GRPC_REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.microservices.item-service.GRPC_REQUEST_TIMEOUT")}"
+
+# Transaction Service
+transaction_app_env="${APP_ENV:-$(read_yaml_value ".cluster.microservices.transaction-service.APP_ENV")}"
+transaction_grpc_port="${GRPC_PORT:-$(read_yaml_value ".cluster.microservices.transaction-service.GRPC_PORT")}"
+transaction_service_name="${SERVICE_NAME:-$(read_yaml_value ".cluster.microservices.transaction-service.SERVICE_NAME")}"
+transaction_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".cluster.microservices.transaction-service.DIAGNOSTIC_LOGGING_ENABLED")}"
+transaction_item_service_addr="${ITEM_SERVICE_ADDR:-$(read_yaml_value ".cluster.microservices.transaction-service.ITEM_SERVICE_ADDR")}"
+raw_transaction_grpc_request_timeout="${GRPC_REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.microservices.transaction-service.GRPC_REQUEST_TIMEOUT")}"
+raw_transaction_item_validation_timeout="${ITEM_VALIDATION_TIMEOUT:-$(read_yaml_value ".cluster.microservices.transaction-service.ITEM_VALIDATION_TIMEOUT")}"
+
+# Admin Credentials
+admin_user_email="${ADMIN_USER_EMAIL:-$(read_yaml_value ".shared.k6-runner.ADMIN_USER_EMAIL")}"
+admin_user_email="$(resolve_preserved_secret_value "$admin_user_email" "$context" benchmark k6-runner-secret ADMIN_USER_EMAIL || true)"
+admin_user_password="${ADMIN_USER_PASSWORD:-$(read_yaml_value ".shared.k6-runner.ADMIN_USER_PASSWORD")}"
+admin_user_password="$(resolve_preserved_secret_value "$admin_user_password" "$context" benchmark k6-runner-secret ADMIN_USER_PASSWORD || true)"
+
+: "${api_jwt_secret:?JWT_SECRET must be set in env/values.yaml under .cluster.microservices.api-gateway.JWT_SECRET}"
+: "${auth_jwt_secret:?JWT_SECRET must be set in env/values.yaml under .cluster.microservices.auth-service.JWT_SECRET}"
+: "${admin_user_email:?ADMIN_USER_EMAIL must be set in env/values.yaml under .shared.k6-runner.ADMIN_USER_EMAIL}"
+: "${admin_user_password:?ADMIN_USER_PASSWORD must be set in env/values.yaml under .shared.k6-runner.ADMIN_USER_PASSWORD}"
 
 effective_auth_login_max_concurrency="$(resolve_login_max_concurrency_for_mode "${SCALING_MODE:-fixed}" "$auth_login_max_concurrency" "$auth_login_max_concurrency_hpa" "2" "1")"
 

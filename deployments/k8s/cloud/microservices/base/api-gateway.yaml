@@ -48,6 +48,8 @@ spec:
               drop:
                 - ALL
           envFrom:
+            - configMapRef:
+                name: api-gateway-config
             - secretRef:
                 name: api-gateway-secret
           env:

@@ -14,40 +14,53 @@ url_encode() {
   printf '%s' "$string" | jq -sRr @uri
 }
 
-monolith_env_file="$(resolve_app_env_file monolith || true)"
-k6_runner_env_file="$(resolve_app_env_file k6-runner || true)"
-monolith_env_file="${monolith_env_file:-env/monolith.app.env}"
-k6_runner_env_file="${k6_runner_env_file:-env/k6-runner.app.env}"
-
-required_files=(
-  "$monolith_env_file"
-  env/terraform.experiment.env
-  "$k6_runner_env_file"
-)
-
-for file in "${required_files[@]}"; do
+for file in env/terraform.experiment.env env/values.yaml; do
   if [[ ! -f "$file" ]]; then
-    echo "missing $file; run: make env-init-app and make env-init-eks" >&2
+    echo "missing $file; run: make env-init" >&2
     exit 1
   fi
 done
 
 set -a
-source "$monolith_env_file"
 source env/terraform.experiment.env
-source "$k6_runner_env_file"
 set +a
 
 context="monolith"
 
-JWT_SECRET="$(resolve_preserved_secret_value "${JWT_SECRET:-}" "$context" mono monolith-env JWT_SECRET || true)"
-ADMIN_USER_EMAIL="$(resolve_preserved_secret_value "${ADMIN_USER_EMAIL:-}" "$context" benchmark k6-runner-secret ADMIN_USER_EMAIL || true)"
-ADMIN_USER_PASSWORD="$(resolve_preserved_secret_value "${ADMIN_USER_PASSWORD:-}" "$context" benchmark k6-runner-secret ADMIN_USER_PASSWORD || true)"
+JWT_SECRET="${JWT_SECRET:-$(read_yaml_value ".cluster.monolith.JWT_SECRET")}"
+JWT_SECRET="$(resolve_preserved_secret_value "$JWT_SECRET" "$context" mono monolith-env JWT_SECRET || true)"
+
+ADMIN_USER_EMAIL="${ADMIN_USER_EMAIL:-$(read_yaml_value ".shared.k6-runner.ADMIN_USER_EMAIL")}"
+ADMIN_USER_EMAIL="$(resolve_preserved_secret_value "$ADMIN_USER_EMAIL" "$context" benchmark k6-runner-secret ADMIN_USER_EMAIL || true)"
+
+ADMIN_USER_PASSWORD="${ADMIN_USER_PASSWORD:-$(read_yaml_value ".shared.k6-runner.ADMIN_USER_PASSWORD")}"
+ADMIN_USER_PASSWORD="$(resolve_preserved_secret_value "$ADMIN_USER_PASSWORD" "$context" benchmark k6-runner-secret ADMIN_USER_PASSWORD || true)"
+
+APP_ENV="${APP_ENV:-$(read_yaml_value ".cluster.monolith.APP_ENV")}"
+APP_PORT="${APP_PORT:-$(read_yaml_value ".cluster.monolith.APP_PORT")}"
+SERVICE_NAME="${SERVICE_NAME:-$(read_yaml_value ".cluster.monolith.SERVICE_NAME")}"
+DB_POOL_MAX_CONNS="${DB_POOL_MAX_CONNS:-$(read_yaml_value ".cluster.monolith.DB_POOL_MAX_CONNS")}"
+DB_POOL_MIN_CONNS="${DB_POOL_MIN_CONNS:-$(read_yaml_value ".cluster.monolith.DB_POOL_MIN_CONNS")}"
+DB_POOL_MAX_CONN_LIFETIME="${DB_POOL_MAX_CONN_LIFETIME:-$(read_yaml_value ".cluster.monolith.DB_POOL_MAX_CONN_LIFETIME")}"
+DB_POOL_MAX_CONN_IDLE_TIME="${DB_POOL_MAX_CONN_IDLE_TIME:-$(read_yaml_value ".cluster.monolith.DB_POOL_MAX_CONN_IDLE_TIME")}"
+DB_PING_TIMEOUT="${DB_PING_TIMEOUT:-$(read_yaml_value ".cluster.monolith.DB_PING_TIMEOUT")}"
+HTTP_READ_HEADER_TIMEOUT="${HTTP_READ_HEADER_TIMEOUT:-$(read_yaml_value ".cluster.monolith.HTTP_READ_HEADER_TIMEOUT")}"
+HTTP_READ_TIMEOUT="${HTTP_READ_TIMEOUT:-$(read_yaml_value ".cluster.monolith.HTTP_READ_TIMEOUT")}"
+HTTP_WRITE_TIMEOUT="${HTTP_WRITE_TIMEOUT:-$(read_yaml_value ".cluster.monolith.HTTP_WRITE_TIMEOUT")}"
+HTTP_IDLE_TIMEOUT="${HTTP_IDLE_TIMEOUT:-$(read_yaml_value ".cluster.monolith.HTTP_IDLE_TIMEOUT")}"
+HTTP_SHUTDOWN_TIMEOUT="${HTTP_SHUTDOWN_TIMEOUT:-$(read_yaml_value ".cluster.monolith.HTTP_SHUTDOWN_TIMEOUT")}"
+HTTP_MAX_HEADER_BYTES="${HTTP_MAX_HEADER_BYTES:-$(read_yaml_value ".cluster.monolith.HTTP_MAX_HEADER_BYTES")}"
+BCRYPT_COST="${BCRYPT_COST:-$(read_yaml_value ".cluster.monolith.BCRYPT_COST")}"
+DIAGNOSTIC_LOGGING_ENABLED="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".cluster.monolith.DIAGNOSTIC_LOGGING_ENABLED")}"
+APP_REQUEST_TIMEOUT="${APP_REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.monolith.APP_REQUEST_TIMEOUT")}"
+LOGIN_ADMISSION_ENABLED="${LOGIN_ADMISSION_ENABLED:-$(read_yaml_value ".cluster.monolith.LOGIN_ADMISSION_ENABLED")}"
+LOGIN_MAX_CONCURRENCY="${LOGIN_MAX_CONCURRENCY:-$(read_yaml_value ".cluster.monolith.LOGIN_MAX_CONCURRENCY")}"
+LOGIN_QUEUE_TIMEOUT="${LOGIN_QUEUE_TIMEOUT:-$(read_yaml_value ".cluster.monolith.LOGIN_QUEUE_TIMEOUT")}"
 
 : "${DB_PASSWORD:?DB_PASSWORD must be set in env/terraform.experiment.env}"
-: "${JWT_SECRET:?JWT_SECRET must be set in ${monolith_env_file}}"
-: "${ADMIN_USER_EMAIL:?ADMIN_USER_EMAIL must be set in ${k6_runner_env_file}}"
-: "${ADMIN_USER_PASSWORD:?ADMIN_USER_PASSWORD must be set in ${k6_runner_env_file}}"
+: "${JWT_SECRET:?JWT_SECRET must be set in env/values.yaml under .cluster.monolith.JWT_SECRET}"
+: "${ADMIN_USER_EMAIL:?ADMIN_USER_EMAIL must be set in env/values.yaml under .shared.k6-runner.ADMIN_USER_EMAIL}"
+: "${ADMIN_USER_PASSWORD:?ADMIN_USER_PASSWORD must be set in env/values.yaml under .shared.k6-runner.ADMIN_USER_PASSWORD}"
 
 terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
 terraform_with_profile() {
