@@ -135,7 +135,7 @@ At deployment time, the secret generation scripts (`create-local-secrets.sh`, `c
 ### Partitioning Rules
 
 1. **Kubernetes Secret:**
-   - Any key matching `*SECRET*`, `*PASSWORD*`, `*DATABASE_URL*`, or `*API_KEY*` (e.g., `DATABASE_URL`, `JWT_SECRET`, `DATADOG_API_KEY`) is stored securely in a Kubernetes `Secret`.
+   - Any key matching `*SECRET*`, `*PASSWORD*`, `*DATABASE_URL*`, `*API_KEY*`, or `*TOKEN*` (e.g., `DATABASE_URL`, `JWT_SECRET`, `DATADOG_API_KEY`, `AUTH_TOKEN`) is stored securely in a Kubernetes `Secret`.
 2. **Kubernetes ConfigMap:**
    - All other keys (e.g., `APP_ENV`, `APP_PORT`, `GRPC_PORT`, pool sizes, timeouts, limits) are stored in a Kubernetes `ConfigMap`.
 

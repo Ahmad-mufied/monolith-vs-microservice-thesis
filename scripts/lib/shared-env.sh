@@ -333,7 +333,7 @@ deployment_config_checksum_annotation_key() {
 is_sensitive_key() {
   local key="$1"
   case "$key" in
-    *SECRET*|*PASSWORD*|*DATABASE_URL*|*API_KEY*)
+    *SECRET*|*PASSWORD*|*DATABASE_URL*|*API_KEY*|*TOKEN*)
       return 0
       ;;
     *)
