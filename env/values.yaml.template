@@ -196,6 +196,11 @@ cluster:
       LOGIN_MAX_CONCURRENCY: 2
       LOGIN_MAX_CONCURRENCY_HPA: 1
       LOGIN_QUEUE_TIMEOUT: 2s
+      DB_POOL_MAX_CONNS: 10
+      DB_POOL_MIN_CONNS: 1
+      DB_POOL_MAX_CONN_LIFETIME: 15m
+      DB_POOL_MAX_CONN_IDLE_TIME: 1m
+      DB_PING_TIMEOUT: 5s
     item-service:
       APP_ENV: production
       GRPC_PORT: 50052
@@ -203,6 +208,11 @@ cluster:
       DATADOG_ENABLED: true
       DIAGNOSTIC_LOGGING_ENABLED: true
       GRPC_REQUEST_TIMEOUT: 30s
+      DB_POOL_MAX_CONNS: 10
+      DB_POOL_MIN_CONNS: 1
+      DB_POOL_MAX_CONN_LIFETIME: 15m
+      DB_POOL_MAX_CONN_IDLE_TIME: 1m
+      DB_PING_TIMEOUT: 5s
     transaction-service:
       APP_ENV: production
       GRPC_PORT: 50053
@@ -212,6 +222,11 @@ cluster:
       ITEM_SERVICE_ADDR: "dns:///item-service-headless.msa.svc.cluster.local:50052"
       GRPC_REQUEST_TIMEOUT: 30s
       ITEM_VALIDATION_TIMEOUT: 25s
+      DB_POOL_MAX_CONNS: 10
+      DB_POOL_MIN_CONNS: 1
+      DB_POOL_MAX_CONN_LIFETIME: 15m
+      DB_POOL_MAX_CONN_IDLE_TIME: 1m
+      DB_PING_TIMEOUT: 5s
 
 shared:
   datadog:
