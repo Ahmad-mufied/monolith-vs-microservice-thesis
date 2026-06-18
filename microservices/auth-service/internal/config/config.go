@@ -120,7 +120,7 @@ func getEnvBool(key string, fallback bool) (bool, error) {
 }
 
 func loadDBPoolConfig() *postgres.PoolConfig {
-	maxConns := pkgconfig.GetEnvInt32("DB_POOL_MAX_CONNS", 6)
+	maxConns := pkgconfig.GetEnvInt32("DB_POOL_MAX_CONNS", 10)
 	minConns := pkgconfig.GetEnvInt32("DB_POOL_MIN_CONNS", 1)
 	maxConnLifetime := pkgconfig.GetEnvDuration("DB_POOL_MAX_CONN_LIFETIME", 15*time.Minute)
 	maxConnIdleTime := pkgconfig.GetEnvDuration("DB_POOL_MAX_CONN_IDLE_TIME", time.Minute)

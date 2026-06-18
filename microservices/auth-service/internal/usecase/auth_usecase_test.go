@@ -246,10 +246,8 @@ func TestLoginAdmissionCanceledWhileQueued(t *testing.T) {
 		t.Fatalf("setup hash failed: %v", err)
 	}
 
-	repoCalled := make(chan struct{})
 	repo := &fakeUserRepo{
 		findByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {
-			close(repoCalled)
 			return &domain.User{
 				ID:           "01968ad4-98b1-79c8-a6f0-ec21f8f434c6",
 				Email:        email,
@@ -270,7 +268,7 @@ func TestLoginAdmissionCanceledWhileQueued(t *testing.T) {
 		errCh <- loginErr
 	}()
 
-	<-repoCalled
+	time.Sleep(50 * time.Millisecond)
 	cancel()
 
 	if err := <-errCh; !errors.Is(err, pkgerrors.ErrCanceled) {

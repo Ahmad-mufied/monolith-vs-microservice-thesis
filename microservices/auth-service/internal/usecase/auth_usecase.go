@@ -80,23 +80,24 @@ func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token 
 	if err := validateLoginInput(email, password); err != nil {
 		return "", nil, err
 	}
-	user, err = pkgerrors.CallIfActive(ctx, func() (*domain.User, error) {
-		return u.repo.FindByEmail(ctx, email)
-	})
-	if err != nil {
-		if errors.Is(err, pkgerrors.ErrNotFound) {
-			return "", nil, pkgerrors.InvalidCredentials("invalid email or password")
-		}
-		return "", nil, err
-	}
 
-	if err := u.limiter.Do(ctx, func() error {
-		// The limiter only wraps the bcrypt hot path because that is the most
-		// CPU-expensive part of login and the main overload trigger we debug.
+	err = u.limiter.Do(ctx, func() error {
+		var dbErr error
+		user, dbErr = pkgerrors.CallIfActive(ctx, func() (*domain.User, error) {
+			return u.repo.FindByEmail(ctx, email)
+		})
+		if dbErr != nil {
+			return dbErr
+		}
+
 		return pkgerrors.DoIfActive(ctx, func() error {
 			return bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 		})
-	}); err != nil {
+	})
+	if err != nil {
+		if errors.Is(err, pkgerrors.ErrNotFound) || errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			return "", nil, pkgerrors.InvalidCredentials("invalid email or password")
+		}
 		if admission.IsRejected(err) {
 			debuglog.ErrorWithDuration(context.Background(), slog.LevelWarn, "auth-service login failed", "auth_login_usecase_failure", startedAt, err, "category", "resource_exhausted")
 			return "", nil, pkgerrors.ResourceExhausted("auth service is temporarily overloaded")
@@ -108,11 +109,8 @@ func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token 
 			}
 			return "", nil, err
 		}
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return "", nil, pkgerrors.InvalidCredentials("invalid email or password")
-		}
 		debuglog.ErrorWithDuration(context.Background(), slog.LevelError, "auth-service login failed", "auth_login_usecase_failure", startedAt, err, "category", "compare_password_internal")
-		return "", nil, pkgerrors.Internal("internal server error", fmt.Errorf("compare password: %w", err))
+		return "", nil, pkgerrors.Internal("internal server error", fmt.Errorf("login failed: %w", err))
 	}
 
 	token, err = pkgerrors.CallIfActive(ctx, func() (string, error) {

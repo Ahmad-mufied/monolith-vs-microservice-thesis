@@ -102,9 +102,18 @@ func Canceled(message string) error {
 	return &Error{kind: ErrCanceled, message: message}
 }
 
+type timeoutable interface {
+	Timeout() bool
+}
+
 func FromContext(err error, deadlineMessage, canceledMessage string) error {
+	if err == nil {
+		return nil
+	}
+
+	var tErr timeoutable
 	switch {
-	case stderrors.Is(err, context.DeadlineExceeded):
+	case stderrors.Is(err, context.DeadlineExceeded) || (stderrors.As(err, &tErr) && tErr.Timeout()):
 		return &Error{kind: ErrDeadlineExceeded, message: deadlineMessage, cause: err}
 	case stderrors.Is(err, context.Canceled):
 		return &Error{kind: ErrCanceled, message: canceledMessage, cause: err}

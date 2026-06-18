@@ -238,11 +238,9 @@ func TestServiceLoginAdmissionRejected(t *testing.T) {
 }
 
 func TestServiceLoginAdmissionCanceledWhileQueued(t *testing.T) {
-	repoCalled := make(chan struct{})
 	service := NewService(
 		&fakeRepo{
 			findUser: User{ID: "018f5f60-7c35-7ccf-9c3c-0a5e6f6f0001", Email: "mufied@example.com", PasswordHash: "hashed"},
-			findHook: func() { close(repoCalled) },
 		},
 		fakeHasher{},
 		fakeSigner{token: "token"},
@@ -259,7 +257,7 @@ func TestServiceLoginAdmissionCanceledWhileQueued(t *testing.T) {
 		errCh <- err
 	}()
 
-	<-repoCalled
+	time.Sleep(50 * time.Millisecond)
 	cancel()
 
 	if err := <-errCh; err == nil {

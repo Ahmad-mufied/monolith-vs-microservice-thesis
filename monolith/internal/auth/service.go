@@ -100,25 +100,30 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 	if err := validatePasswordBytes(req.Password); err != nil {
 		return LoginResponse{}, err
 	}
-	user, err := apperror.CallIfActive(ctx, func() (User, error) {
-		return s.repo.FindUserByEmail(ctx, email)
+	var user User
+	err := s.limiter.Do(ctx, func() error {
+		var dbErr error
+		user, dbErr = apperror.CallIfActive(ctx, func() (User, error) {
+			return s.repo.FindUserByEmail(ctx, email)
+		})
+		if dbErr != nil {
+			return dbErr
+		}
+
+		return apperror.DoIfActive(ctx, func() error {
+			return s.hasher.Compare(user.PasswordHash, req.Password)
+		})
 	})
 	if err != nil {
 		if appErr, ok := errors.AsType[*apperror.Error](err); ok {
 			switch appErr.Code {
 			case apperror.CodeUnauthorized, apperror.CodeNotFound:
 				return LoginResponse{}, apperror.Unauthorized("invalid email or password")
-			default:
-				return LoginResponse{}, err
 			}
 		}
-		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("finding user by email: %w", err))
-	}
-	if err := s.limiter.Do(ctx, func() error {
-		return apperror.DoIfActive(ctx, func() error {
-			return s.hasher.Compare(user.PasswordHash, req.Password)
-		})
-	}); err != nil {
+		if errors.Is(err, ErrPasswordMismatch) {
+			return LoginResponse{}, apperror.Unauthorized("invalid email or password")
+		}
 		if admission.IsRejected(err) {
 			debuglog.Error(context.Background(), slog.LevelWarn, "monolith auth login failed", "monolith_auth_login_service_failure", err, "category", "resource_exhausted")
 			return LoginResponse{}, apperror.ServiceUnavailable("login service is temporarily overloaded", err)
@@ -130,11 +135,8 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 			}
 			return LoginResponse{}, err
 		}
-		if errors.Is(err, ErrPasswordMismatch) {
-			return LoginResponse{}, apperror.Unauthorized("invalid email or password")
-		}
 		debuglog.Error(context.Background(), slog.LevelError, "monolith auth login failed", "monolith_auth_login_service_failure", err, "category", "compare_password_internal")
-		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("comparing password: %w", err))
+		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("login failed: %w", err))
 	}
 
 	token, err := apperror.CallIfActive(ctx, func() (string, error) {
