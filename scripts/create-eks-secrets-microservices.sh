@@ -163,7 +163,7 @@ if [[ "${auth_service_login_admission_enabled:-true}" == "true" ]]; then
   append_secret_pair_if_override auth_service_secret_pairs LOGIN_MAX_CONCURRENCY "$effective_auth_login_max_concurrency" "2"
   append_secret_pair_if_override auth_service_secret_pairs LOGIN_QUEUE_TIMEOUT "$auth_service_login_queue_timeout" "2s"
 fi
-append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MAX_CONNS "$auth_db_pool_max_conns" "6"
+append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MAX_CONNS "$auth_db_pool_max_conns" "10"
 append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MIN_CONNS "$auth_db_pool_min_conns" "1"
 append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MAX_CONN_LIFETIME "$auth_db_pool_max_conn_lifetime" "15m"
 append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MAX_CONN_IDLE_TIME "$auth_db_pool_max_conn_idle_time" "1m"
@@ -176,7 +176,7 @@ append_secret_pair item_service_secret_pairs SERVICE_NAME "${item_service_name:-
 append_secret_pair item_service_secret_pairs DIAGNOSTIC_LOGGING_ENABLED "${item_service_diagnostic_logging_enabled:-false}"
 append_secret_pair item_service_secret_pairs DATABASE_URL "postgres://postgres_admin:${encoded_db_password}@${MSA_RDS}:5432/item_db?sslmode=require"
 append_secret_pair_if_override item_service_secret_pairs GRPC_REQUEST_TIMEOUT "$raw_item_service_grpc_request_timeout" "30s"
-append_secret_pair_if_override item_service_secret_pairs DB_POOL_MAX_CONNS "$item_db_pool_max_conns" "6"
+append_secret_pair_if_override item_service_secret_pairs DB_POOL_MAX_CONNS "$item_db_pool_max_conns" "10"
 append_secret_pair_if_override item_service_secret_pairs DB_POOL_MIN_CONNS "$item_db_pool_min_conns" "1"
 append_secret_pair_if_override item_service_secret_pairs DB_POOL_MAX_CONN_LIFETIME "$item_db_pool_max_conn_lifetime" "15m"
 append_secret_pair_if_override item_service_secret_pairs DB_POOL_MAX_CONN_IDLE_TIME "$item_db_pool_max_conn_idle_time" "1m"
@@ -200,7 +200,7 @@ if [[ -n "$raw_transaction_service_item_validation_timeout" || -n "$raw_transact
   append_secret_pair_if_override transaction_service_secret_pairs GRPC_REQUEST_TIMEOUT "$effective_transaction_service_grpc_request_timeout" "30s"
   append_secret_pair_if_override transaction_service_secret_pairs ITEM_VALIDATION_TIMEOUT "$effective_transaction_service_item_validation_timeout" "25s"
 fi
-append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MAX_CONNS "$transaction_db_pool_max_conns" "6"
+append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MAX_CONNS "$transaction_db_pool_max_conns" "10"
 append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MIN_CONNS "$transaction_db_pool_min_conns" "1"
 append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MAX_CONN_LIFETIME "$transaction_db_pool_max_conn_lifetime" "15m"
 append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MAX_CONN_IDLE_TIME "$transaction_db_pool_max_conn_idle_time" "1m"
