@@ -1,18 +1,58 @@
 # Local Environment Files
 
-This directory stores generated local environment files.
+This directory stores environment configuration templates and generated environment files. 
 
-Run:
+Under the centralized configuration model, **`env/values.yaml`** (copied from `env/values.yaml.template` during initialization) serves as the **single source of truth** for all environment configuration parameters across all deployable workloads (monolith, api-gateway, auth-service, item-service, transaction-service) and all execution runtimes (local host `go run`, Docker Compose, and Kubernetes EKS/Vultr clusters).
 
-```bash
-make env-init-base
-```
+## Centralized Configuration (values.yaml)
 
-The generated `*.env` files are intentionally ignored by Git because they can
-contain local passwords or secrets.
+To customize configurations, you edit `env/values.yaml` instead of editing individual flat `.env` files. The repository initialization scripts parse the values from `env/values.yaml` using `yq` and dynamically generate the required flat `.env` files for tool and runtime compatibility.
 
-Generated files:
+> [!WARNING]
+> Do not modify the generated flat `*.env` files directly! Any manual changes will be overwritten on the next execution of `make env-init` or any profile-specific `make env-init-*` target. Always update `env/values.yaml` instead.
 
+### Initialization Workflow
+
+1. **Initialize Base Local DB Environment:**
+   ```bash
+   make env-init-base
+   ```
+   Generates `postgres.env` to configure the shared local PostgreSQL database.
+
+2. **Initialize App Environment (YAML to Flat Envs):**
+   ```bash
+   make env-init-app
+   ```
+   Parses `env/values.yaml` and generates the provider-neutral app env files:
+   - `datadog.shared.env` (from `.shared.datadog`)
+   - `k6-runner.app.env` (from `.shared.k6-runner`)
+   - `monolith.app.env` (from `.cluster.monolith`)
+   - `api-gateway.app.env`, `auth-service.app.env`, `item-service.app.env`, `transaction-service.app.env` (from `.cluster.microservices.*`)
+
+3. **Initialize Local Monolith Environment:**
+   ```bash
+   make env-init-monolith
+   ```
+   Generates local monolith environment files (`monolith.env` from `.local.monolith`) and bootstrap configs (`db-bootstrap.env`).
+
+4. **Initialize Local Microservices Environment:**
+   ```bash
+   make env-init-microservices
+   ```
+   Generates local host `go run` environment files (`api-gateway.env`, etc. from `.local.microservices.*`) and Docker Compose environment files (`api-gateway.compose.env`, etc. from `.compose.microservices.*`).
+
+5. **Initialize Cloud Provider Benchmark Environments:**
+   - **AWS EKS:** Run `make env-init-eks` to create AWS-specific benchmark helpers (`aws-benchmark.env`, `terraform.shared.env`, `terraform.experiment.env`).
+   - **Vultr:** Run `make env-init-vultr` to create Vultr operator configurations.
+
+6. **Unified Profile Configuration (All-in-One):**
+   ```bash
+   make env-init PLATFORM=<eks|vultr> EXECUTION_MODE=<parallel|sequential>
+   ```
+   Coordinatively runs base, app, and cloud-provider initializations, then writes the `env/operator-profile.env` profile.
+
+### Generated files (Ignored by Git):
+The following files contain local settings, passwords, or secrets and are excluded from Git:
 - `postgres.env`
 - `datadog.minikube.env`
 - `aws-benchmark.env`
@@ -25,86 +65,20 @@ Generated files:
 - `item-service.app.env`
 - `transaction-service.app.env`
 - `k6-runner.app.env`
-- `api-gateway.env`
-- `auth-service.env`
-- `item-service.env`
-- `transaction-service.env`
-- `api-gateway.compose.env`
-- `auth-service.compose.env`
-- `item-service.compose.env`
-- `transaction-service.compose.env`
+- `api-gateway.env`, `auth-service.env`, `item-service.env`, `transaction-service.env`
+- `api-gateway.compose.env`, `auth-service.compose.env`, `item-service.compose.env`, `transaction-service.compose.env`
 
-For local microservices env files, run:
+---
 
-```bash
-make env-init-microservices
-```
+## Key Configurations in values.yaml
 
-For local monolith env files, run:
+### 1. Application Debugging
+- `DIAGNOSTIC_LOGGING_ENABLED` (boolean): When set to `true` under the respective YAML profile block, deployable applications emit structured, failure-only debug events that correlate with Datadog traces.
 
-```bash
-make env-init-monolith
-```
-
-For provider-neutral benchmark app env files, run:
-
-```bash
-make env-init-app
-```
-
-For AWS EKS helper env files, run:
-
-```bash
-make env-init-eks
-```
-
-`make env-init-base` creates the shared local PostgreSQL env:
-
-- `postgres.env`
-
-`make env-init-datadog-minikube` creates the Datadog helper env for Minikube:
-
-- `datadog.minikube.env`
-
-`make env-init-monolith` creates the monolith-specific env files:
-
-- `monolith.env`
-- `db-bootstrap.env`
-
-`make env-init-app` creates the provider-neutral benchmark app env files:
-
-- `datadog.shared.env`
-- `monolith.app.env`
-- `api-gateway.app.env`
-- `auth-service.app.env`
-- `item-service.app.env`
-- `transaction-service.app.env`
-- `k6-runner.app.env`
-
-Optional runtime flag for application debugging:
-
-- `DIAGNOSTIC_LOGGING_ENABLED=false`
-
-When enabled, the deployable applications emit extra structured failure-only
-debug events that are useful for Datadog RCA. The flag is read directly from
-the runtime environment, so it can be enabled temporarily for a specific
-deployment or benchmark run without changing normal application behavior.
-
-Recommended use:
-
-- keep `DIAGNOSTIC_LOGGING_ENABLED=false` for ordinary runs
-- enable it only for focused investigations such as tracing false `500` errors
-- apply it symmetrically when you need comparable monolith vs microservices RCA
-
-Optional login admission control flags:
-
-- `LOGIN_ADMISSION_ENABLED=true`
-- `LOGIN_MAX_CONCURRENCY=8` for monolith, `2` for auth-service fixed baseline
-- `LOGIN_MAX_CONCURRENCY_HPA=1` for auth-service HPA baseline
-
-`LOGIN_ADMISSION_ENABLED` is the on/off switch. When it is `false`, login
-requests bypass the concurrency limiter entirely. `LOGIN_MAX_CONCURRENCY` and
-`LOGIN_MAX_CONCURRENCY_HPA` are tuning values, not separate feature flags.
+### 2. Login Admission Control
+- `LOGIN_ADMISSION_ENABLED` (boolean): Controls whether the login concurrency limiter is active.
+- `LOGIN_MAX_CONCURRENCY` (integer): Maximum login slots for monolith or microservices under fixed scaling.
+- `LOGIN_MAX_CONCURRENCY_HPA` (integer): Concurrency limit override when deploying under Horizontal Pod Autoscaling (HPA) mode.
 
 `make env-init-eks` creates AWS benchmark helper env files:
 
