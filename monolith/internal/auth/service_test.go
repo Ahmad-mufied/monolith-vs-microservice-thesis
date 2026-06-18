@@ -237,6 +237,19 @@ func TestServiceLoginAdmissionRejected(t *testing.T) {
 	assertAppError(t, err, true, apperror.CodeServiceUnavailable)
 }
 
+type signalContext struct {
+	context.Context
+	doneCalled chan struct{}
+	once       sync.Once
+}
+
+func (s *signalContext) Done() <-chan struct{} {
+	s.once.Do(func() {
+		close(s.doneCalled)
+	})
+	return s.Context.Done()
+}
+
 func TestServiceLoginAdmissionCanceledWhileQueued(t *testing.T) {
 	service := NewService(
 		&fakeRepo{
@@ -250,14 +263,19 @@ func TestServiceLoginAdmissionCanceledWhileQueued(t *testing.T) {
 	release := occupyLimiterSlot(t, service.limiter)
 	defer release()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	baseCtx, cancel := context.WithCancel(context.Background())
+	doneCalled := make(chan struct{})
+	ctx := &signalContext{
+		Context:    baseCtx,
+		doneCalled: doneCalled,
+	}
 	errCh := make(chan error, 1)
 	go func() {
 		_, err := service.Login(ctx, LoginRequest{Email: "mufied@example.com", Password: "secret123"})
 		errCh <- err
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	<-doneCalled
 	cancel()
 
 	if err := <-errCh; err == nil {
@@ -308,7 +326,7 @@ func TestServiceLoginDiagnosticLogging(t *testing.T) {
 			hasher:       fakeHasher{compareErr: errors.New("hash parsing failed")},
 			limiter:      newDisabledLimiter(),
 			wantLevel:    slog.LevelError,
-			wantCategory: "compare_password_internal",
+			wantCategory: "login_internal",
 		},
 	}
 

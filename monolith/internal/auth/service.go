@@ -135,7 +135,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 			}
 			return LoginResponse{}, err
 		}
-		debuglog.Error(context.Background(), slog.LevelError, "monolith auth login failed", "monolith_auth_login_service_failure", err, "category", "compare_password_internal")
+		debuglog.Error(context.Background(), slog.LevelError, "monolith auth login failed", "monolith_auth_login_service_failure", err, "category", "login_internal")
 		return LoginResponse{}, apperror.Internal("internal server error", fmt.Errorf("login failed: %w", err))
 	}
 

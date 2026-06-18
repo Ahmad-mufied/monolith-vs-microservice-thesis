@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -240,6 +241,19 @@ func TestLoginAdmissionRejected(t *testing.T) {
 	}
 }
 
+type signalContext struct {
+	context.Context
+	doneCalled chan struct{}
+	once       sync.Once
+}
+
+func (s *signalContext) Done() <-chan struct{} {
+	s.once.Do(func() {
+		close(s.doneCalled)
+	})
+	return s.Context.Done()
+}
+
 func TestLoginAdmissionCanceledWhileQueued(t *testing.T) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("Secret123!"), 10)
 	if err != nil {
@@ -261,14 +275,19 @@ func TestLoginAdmissionCanceledWhileQueued(t *testing.T) {
 
 	uc := NewAuthUsecase(repo, "secret", 24*time.Hour, 10, limiter)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	baseCtx, cancel := context.WithCancel(context.Background())
+	doneCalled := make(chan struct{})
+	ctx := &signalContext{
+		Context:    baseCtx,
+		doneCalled: doneCalled,
+	}
 	errCh := make(chan error, 1)
 	go func() {
 		_, _, loginErr := uc.Login(ctx, "ahmad@example.com", "Secret123!")
 		errCh <- loginErr
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	<-doneCalled
 	cancel()
 
 	if err := <-errCh; !errors.Is(err, pkgerrors.ErrCanceled) {

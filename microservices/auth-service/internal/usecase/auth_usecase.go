@@ -109,7 +109,7 @@ func (u *AuthUsecase) Login(ctx context.Context, email, password string) (token 
 			}
 			return "", nil, err
 		}
-		debuglog.ErrorWithDuration(context.Background(), slog.LevelError, "auth-service login failed", "auth_login_usecase_failure", startedAt, err, "category", "compare_password_internal")
+		debuglog.ErrorWithDuration(context.Background(), slog.LevelError, "auth-service login failed", "auth_login_usecase_failure", startedAt, err, "category", "login_internal")
 		return "", nil, pkgerrors.Internal("internal server error", fmt.Errorf("login failed: %w", err))
 	}
 
