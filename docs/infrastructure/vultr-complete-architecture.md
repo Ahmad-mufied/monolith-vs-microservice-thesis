@@ -291,12 +291,13 @@ infra/terraform/modules/vultr-vke-benchmark-cluster/templates/postgres-cloud-ini
 
 Cloud-init performs:
 
-1. Install PostgreSQL 18 from official apt repository
-2. Configure `postgresql.conf` for remote access
-3. Configure `pg_hba.conf` for VPC CIDR with SCRAM-SHA-256
-4. Create `postgres_admin` superuser role
-5. Open firewall ports (22, 5432)
-6. Set generated `POSTGRES_PASSWORD`
+1. Install PostgreSQL 18 from the official apt repository.
+2. Configure `postgresql.conf` for remote access (`listen_addresses = '*'`).
+3. Optimize performance parameters in `postgresql.conf` for the `voc-c-2c-4gb-50s-amd` instance (setting `max_connections = 200`, `shared_buffers = 1GB`, `effective_cache_size = 3GB`, `work_mem = 10MB`, `maintenance_work_mem = 256MB`, `random_page_cost = 1.1`, and `effective_io_concurrency = 200`).
+4. Configure `pg_hba.conf` for VPC CIDR with SCRAM-SHA-256.
+5. Create the `postgres_admin` superuser role.
+6. Open firewall ports (22, 5432).
+7. Set the generated `POSTGRES_PASSWORD`.
 
 ### 7.3 Database Layout — Parallel Mode
 

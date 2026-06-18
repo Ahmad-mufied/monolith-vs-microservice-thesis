@@ -75,6 +75,11 @@ auth_service_login_admission_enabled="${LOGIN_ADMISSION_ENABLED:-$(read_yaml_val
 auth_service_login_max_concurrency="${LOGIN_MAX_CONCURRENCY:-$(read_yaml_value ".cluster.microservices.\"auth-service\".LOGIN_MAX_CONCURRENCY")}"
 auth_service_login_max_concurrency_hpa="${LOGIN_MAX_CONCURRENCY_HPA:-$(read_yaml_value ".cluster.microservices.\"auth-service\".LOGIN_MAX_CONCURRENCY_HPA")}"
 auth_service_login_queue_timeout="${LOGIN_QUEUE_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"auth-service\".LOGIN_QUEUE_TIMEOUT")}"
+auth_db_pool_max_conns="${DB_POOL_MAX_CONNS:-$(read_yaml_value ".cluster.microservices.\"auth-service\".DB_POOL_MAX_CONNS")}"
+auth_db_pool_min_conns="${DB_POOL_MIN_CONNS:-$(read_yaml_value ".cluster.microservices.\"auth-service\".DB_POOL_MIN_CONNS")}"
+auth_db_pool_max_conn_lifetime="${DB_POOL_MAX_CONN_LIFETIME:-$(read_yaml_value ".cluster.microservices.\"auth-service\".DB_POOL_MAX_CONN_LIFETIME")}"
+auth_db_pool_max_conn_idle_time="${DB_POOL_MAX_CONN_IDLE_TIME:-$(read_yaml_value ".cluster.microservices.\"auth-service\".DB_POOL_MAX_CONN_IDLE_TIME")}"
+auth_db_ping_timeout="${DB_PING_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"auth-service\".DB_PING_TIMEOUT")}"
 
 # Item Service
 item_service_app_env="${APP_ENV:-$(read_yaml_value ".cluster.microservices.\"item-service\".APP_ENV")}"
@@ -82,6 +87,11 @@ item_service_grpc_port="${GRPC_PORT:-$(read_yaml_value ".cluster.microservices.\
 item_service_name="${SERVICE_NAME:-$(read_yaml_value ".cluster.microservices.\"item-service\".SERVICE_NAME")}"
 item_service_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".cluster.microservices.\"item-service\".DIAGNOSTIC_LOGGING_ENABLED")}"
 raw_item_service_grpc_request_timeout="${GRPC_REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"item-service\".GRPC_REQUEST_TIMEOUT")}"
+item_db_pool_max_conns="${DB_POOL_MAX_CONNS:-$(read_yaml_value ".cluster.microservices.\"item-service\".DB_POOL_MAX_CONNS")}"
+item_db_pool_min_conns="${DB_POOL_MIN_CONNS:-$(read_yaml_value ".cluster.microservices.\"item-service\".DB_POOL_MIN_CONNS")}"
+item_db_pool_max_conn_lifetime="${DB_POOL_MAX_CONN_LIFETIME:-$(read_yaml_value ".cluster.microservices.\"item-service\".DB_POOL_MAX_CONN_LIFETIME")}"
+item_db_pool_max_conn_idle_time="${DB_POOL_MAX_CONN_IDLE_TIME:-$(read_yaml_value ".cluster.microservices.\"item-service\".DB_POOL_MAX_CONN_IDLE_TIME")}"
+item_db_ping_timeout="${DB_PING_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"item-service\".DB_PING_TIMEOUT")}"
 
 # Transaction Service
 transaction_service_app_env="${APP_ENV:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".APP_ENV")}"
@@ -91,6 +101,11 @@ transaction_service_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(
 transaction_service_item_service_addr="${ITEM_SERVICE_ADDR:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".ITEM_SERVICE_ADDR")}"
 raw_transaction_service_grpc_request_timeout="${GRPC_REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".GRPC_REQUEST_TIMEOUT")}"
 raw_transaction_service_item_validation_timeout="${ITEM_VALIDATION_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".ITEM_VALIDATION_TIMEOUT")}"
+transaction_db_pool_max_conns="${DB_POOL_MAX_CONNS:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".DB_POOL_MAX_CONNS")}"
+transaction_db_pool_min_conns="${DB_POOL_MIN_CONNS:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".DB_POOL_MIN_CONNS")}"
+transaction_db_pool_max_conn_lifetime="${DB_POOL_MAX_CONN_LIFETIME:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".DB_POOL_MAX_CONN_LIFETIME")}"
+transaction_db_pool_max_conn_idle_time="${DB_POOL_MAX_CONN_IDLE_TIME:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".DB_POOL_MAX_CONN_IDLE_TIME")}"
+transaction_db_ping_timeout="${DB_PING_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".DB_PING_TIMEOUT")}"
 
 : "${db_password:?DB_PASSWORD must be set in env/terraform.experiment.env}"
 : "${admin_user_email:?ADMIN_USER_EMAIL must be set in env/values.yaml under .shared.k6-runner.ADMIN_USER_EMAIL}"
@@ -148,6 +163,11 @@ if [[ "${auth_service_login_admission_enabled:-true}" == "true" ]]; then
   append_secret_pair_if_override auth_service_secret_pairs LOGIN_MAX_CONCURRENCY "$effective_auth_login_max_concurrency" "2"
   append_secret_pair_if_override auth_service_secret_pairs LOGIN_QUEUE_TIMEOUT "$auth_service_login_queue_timeout" "2s"
 fi
+append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MAX_CONNS "$auth_db_pool_max_conns" "6"
+append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MIN_CONNS "$auth_db_pool_min_conns" "1"
+append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MAX_CONN_LIFETIME "$auth_db_pool_max_conn_lifetime" "15m"
+append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MAX_CONN_IDLE_TIME "$auth_db_pool_max_conn_idle_time" "1m"
+append_secret_pair_if_override auth_service_secret_pairs DB_PING_TIMEOUT "$auth_db_ping_timeout" "5s"
 
 item_service_secret_pairs=()
 append_secret_pair item_service_secret_pairs APP_ENV "${item_service_app_env:-production}"
@@ -156,6 +176,11 @@ append_secret_pair item_service_secret_pairs SERVICE_NAME "${item_service_name:-
 append_secret_pair item_service_secret_pairs DIAGNOSTIC_LOGGING_ENABLED "${item_service_diagnostic_logging_enabled:-false}"
 append_secret_pair item_service_secret_pairs DATABASE_URL "postgres://postgres_admin:${encoded_db_password}@${MSA_RDS}:5432/item_db?sslmode=require"
 append_secret_pair_if_override item_service_secret_pairs GRPC_REQUEST_TIMEOUT "$raw_item_service_grpc_request_timeout" "30s"
+append_secret_pair_if_override item_service_secret_pairs DB_POOL_MAX_CONNS "$item_db_pool_max_conns" "6"
+append_secret_pair_if_override item_service_secret_pairs DB_POOL_MIN_CONNS "$item_db_pool_min_conns" "1"
+append_secret_pair_if_override item_service_secret_pairs DB_POOL_MAX_CONN_LIFETIME "$item_db_pool_max_conn_lifetime" "15m"
+append_secret_pair_if_override item_service_secret_pairs DB_POOL_MAX_CONN_IDLE_TIME "$item_db_pool_max_conn_idle_time" "1m"
+append_secret_pair_if_override item_service_secret_pairs DB_PING_TIMEOUT "$item_db_ping_timeout" "5s"
 
 transaction_service_secret_pairs=()
 append_secret_pair transaction_service_secret_pairs APP_ENV "${transaction_service_app_env:-production}"
@@ -175,6 +200,11 @@ if [[ -n "$raw_transaction_service_item_validation_timeout" || -n "$raw_transact
   append_secret_pair_if_override transaction_service_secret_pairs GRPC_REQUEST_TIMEOUT "$effective_transaction_service_grpc_request_timeout" "30s"
   append_secret_pair_if_override transaction_service_secret_pairs ITEM_VALIDATION_TIMEOUT "$effective_transaction_service_item_validation_timeout" "25s"
 fi
+append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MAX_CONNS "$transaction_db_pool_max_conns" "6"
+append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MIN_CONNS "$transaction_db_pool_min_conns" "1"
+append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MAX_CONN_LIFETIME "$transaction_db_pool_max_conn_lifetime" "15m"
+append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MAX_CONN_IDLE_TIME "$transaction_db_pool_max_conn_idle_time" "1m"
+append_secret_pair_if_override transaction_service_secret_pairs DB_PING_TIMEOUT "$transaction_db_ping_timeout" "5s"
 
 $K8S create namespace benchmark --dry-run=client -o yaml | $K8S apply -f -
 $K8S create namespace msa --dry-run=client -o yaml | $K8S apply -f -

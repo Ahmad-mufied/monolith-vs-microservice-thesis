@@ -20,6 +20,18 @@ runcmd:
   - apt-get update
   - apt-get install -y postgresql-18
   - sed -i "s/^#listen_addresses =.*/listen_addresses = '*'/" /etc/postgresql/18/main/postgresql.conf
+  - echo "max_connections = 200" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "shared_buffers = 1GB" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "effective_cache_size = 3GB" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "maintenance_work_mem = 256MB" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "work_mem = 10MB" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "min_wal_size = 1GB" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "max_wal_size = 4GB" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "checkpoint_completion_target = 0.9" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "wal_buffers = 16MB" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "default_statistics_target = 100" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "random_page_cost = 1.1" >> /etc/postgresql/18/main/postgresql.conf
+  - echo "effective_io_concurrency = 200" >> /etc/postgresql/18/main/postgresql.conf
   - printf "host all postgres_admin ${vpc_cidr} scram-sha-256\nhost all postgres ${vpc_cidr} scram-sha-256\n" >> /etc/postgresql/18/main/pg_hba.conf
   - systemctl restart postgresql
   - mv /root/init-postgres.sql /var/lib/postgresql/init-postgres.sql
