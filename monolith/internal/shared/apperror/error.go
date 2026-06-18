@@ -92,9 +92,18 @@ func InternalFromContext(ctx context.Context, action string, err error) *Error {
 	return Internal("internal server error", fmt.Errorf("%s: %w", action, err))
 }
 
+type timeoutable interface {
+	Timeout() bool
+}
+
 func FromContext(err error, deadlineMessage, canceledMessage string) *Error {
+	if err == nil {
+		return nil
+	}
+
+	var tErr timeoutable
 	switch {
-	case errors.Is(err, context.DeadlineExceeded):
+	case errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &tErr) && tErr.Timeout()):
 		return DeadlineExceeded(deadlineMessage, err)
 	case errors.Is(err, context.Canceled):
 		return Canceled(canceledMessage, err)

@@ -242,7 +242,21 @@ func TestContextAwareHelpers(t *testing.T) {
 	}
 }
 
+type mockTimeoutError struct {
+	err error
+}
+
+func (e mockTimeoutError) Error() string {
+	return e.err.Error()
+}
+
+func (e mockTimeoutError) Timeout() bool {
+	return true
+}
+
 func TestInternalFromContext(t *testing.T) {
+	timeoutErr := mockTimeoutError{err: stderrors.New("driver timeout")}
+
 	tests := []struct {
 		name      string
 		ctx       func() context.Context
@@ -286,6 +300,13 @@ func TestInternalFromContext(t *testing.T) {
 			err:       stderrors.New("driver canceled wrapper"),
 			want:      ErrCanceled,
 			wantCause: context.Canceled,
+		},
+		{
+			name:      "timeoutable network/driver error",
+			ctx:       context.Background,
+			err:       timeoutErr,
+			want:      ErrDeadlineExceeded,
+			wantCause: timeoutErr,
 		},
 		{
 			name:      "other",
