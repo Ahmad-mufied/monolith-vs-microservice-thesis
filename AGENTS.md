@@ -345,6 +345,7 @@ After editing:
 - Migrations: verify Goose markers, Up/Down, schema consistency
 - Terraform: `terraform fmt`, `terraform validate`
 - k6: ensure env-driven config, scenario symmetry, S3 upload capability
+- Git: Do not commit directly to the main branch. Let the user perform commits/merges.
 
 ## Review Checklist
 
