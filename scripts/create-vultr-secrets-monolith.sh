@@ -57,10 +57,10 @@ login_admission_enabled="${LOGIN_ADMISSION_ENABLED:-$(read_yaml_value ".cluster.
 login_max_concurrency="${LOGIN_MAX_CONCURRENCY:-$(read_yaml_value ".cluster.monolith.LOGIN_MAX_CONCURRENCY")}"
 login_queue_timeout="${LOGIN_QUEUE_TIMEOUT:-$(read_yaml_value ".cluster.monolith.LOGIN_QUEUE_TIMEOUT")}"
 
-admin_user_email="${ADMIN_USER_EMAIL:-$(read_yaml_value ".shared.k6-runner.ADMIN_USER_EMAIL")}"
+admin_user_email="${ADMIN_USER_EMAIL:-$(read_yaml_value ".shared.\"k6-runner\".ADMIN_USER_EMAIL")}"
 admin_user_email="$(resolve_preserved_secret_value "$admin_user_email" "$context" benchmark k6-runner-secret ADMIN_USER_EMAIL || true)"
 
-admin_user_password="${ADMIN_USER_PASSWORD:-$(read_yaml_value ".shared.k6-runner.ADMIN_USER_PASSWORD")}"
+admin_user_password="${ADMIN_USER_PASSWORD:-$(read_yaml_value ".shared.\"k6-runner\".ADMIN_USER_PASSWORD")}"
 admin_user_password="$(resolve_preserved_secret_value "$admin_user_password" "$context" benchmark k6-runner-secret ADMIN_USER_PASSWORD || true)"
 
 : "${jwt_secret:?JWT_SECRET must be set in env/values.yaml under .cluster.monolith.JWT_SECRET}"

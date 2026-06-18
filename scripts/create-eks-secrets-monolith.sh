@@ -30,10 +30,10 @@ context="monolith"
 JWT_SECRET="${JWT_SECRET:-$(read_yaml_value ".cluster.monolith.JWT_SECRET")}"
 JWT_SECRET="$(resolve_preserved_secret_value "$JWT_SECRET" "$context" mono monolith-env JWT_SECRET || true)"
 
-ADMIN_USER_EMAIL="${ADMIN_USER_EMAIL:-$(read_yaml_value ".shared.k6-runner.ADMIN_USER_EMAIL")}"
+ADMIN_USER_EMAIL="${ADMIN_USER_EMAIL:-$(read_yaml_value ".shared.\"k6-runner\".ADMIN_USER_EMAIL")}"
 ADMIN_USER_EMAIL="$(resolve_preserved_secret_value "$ADMIN_USER_EMAIL" "$context" benchmark k6-runner-secret ADMIN_USER_EMAIL || true)"
 
-ADMIN_USER_PASSWORD="${ADMIN_USER_PASSWORD:-$(read_yaml_value ".shared.k6-runner.ADMIN_USER_PASSWORD")}"
+ADMIN_USER_PASSWORD="${ADMIN_USER_PASSWORD:-$(read_yaml_value ".shared.\"k6-runner\".ADMIN_USER_PASSWORD")}"
 ADMIN_USER_PASSWORD="$(resolve_preserved_secret_value "$ADMIN_USER_PASSWORD" "$context" benchmark k6-runner-secret ADMIN_USER_PASSWORD || true)"
 
 APP_ENV="${APP_ENV:-$(read_yaml_value ".cluster.monolith.APP_ENV")}"

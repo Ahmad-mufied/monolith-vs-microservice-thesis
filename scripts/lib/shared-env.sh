@@ -57,7 +57,7 @@ generate_env_from_yaml() {
   fi
 
   # Generate the lines and write to dest_file
-  yq "${yaml_path} | to_entries | .[] | .key + \"=\" + .value" "$source_file" > "$dest_file"
+  yq "${yaml_path} | to_entries | .[] | .key + \"=\" + (.value | tostring)" "$source_file" > "$dest_file"
   chmod 600 "$dest_file"
   echo "Generated $dest_file from $yaml_path in $source_file"
 }
