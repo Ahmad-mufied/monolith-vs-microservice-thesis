@@ -18,6 +18,7 @@ Thumbs.db
 !.env.example
 *.env
 env/values.yaml
+env/*resource-baseline.json
 *.local
 *.secret
 *.secrets
