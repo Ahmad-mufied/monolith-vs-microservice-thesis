@@ -56,21 +56,37 @@ export function safeJson(response, selector = null, fallback = null) {
   }
 }
 
+function normalizeCheckNamePart(value) {
+  const normalized = String(value ?? "unknown")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_.]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return normalized || "unknown";
+}
+
+function normalizeSelectorCheckNamePart(selector) {
+  return normalizeCheckNamePart(selector).replace(/\./g, "_");
+}
+
+function buildCheckName(label, suffix) {
+  return `${normalizeCheckNamePart(label)}.${suffix}`;
+}
+
 export function expectStatus(response, status, label, tags = undefined) {
   return check(response, {
-    [`${label}: status is ${status}`]: (r) => r.status === status,
+    [buildCheckName(label, `status_is_${status}`)]: (r) => r.status === status,
   }, tags);
 }
 
-export function expectStatusIn(response, statuses, label) {
-  return check(response, {
-    [`${label}: status is ${statuses.join(" or ")}`]: (r) => statuses.includes(r.status),
-  });
-}
 
 export function expectJsonValue(response, selector, label, tags = undefined) {
+  const selectorPart = normalizeSelectorCheckNamePart(selector);
+
   return check(response, {
-    [`${label}: ${selector} exists`]: (r) => {
+    [buildCheckName(label, `${selectorPart}_exists`)]: (r) => {
       try {
         const value = r.json(selector);
         return value !== undefined && value !== null;
