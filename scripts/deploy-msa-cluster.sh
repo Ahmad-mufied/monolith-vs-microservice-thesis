@@ -80,26 +80,7 @@ sync_runtime_secrets() {
 }
 
 annotate_microservices_rendered_manifests() {
-  annotate_rendered_deployment_manifest_with_secret_checksum \
-    "$RENDERED_APP_JOB_DIR/base/api-gateway.yaml" \
-    "$CONTEXT" \
-    msa \
-    api-gateway-secret
-  annotate_rendered_deployment_manifest_with_secret_checksum \
-    "$RENDERED_APP_JOB_DIR/base/auth-service.yaml" \
-    "$CONTEXT" \
-    msa \
-    auth-service-secret
-  annotate_rendered_deployment_manifest_with_secret_checksum \
-    "$RENDERED_APP_JOB_DIR/base/item-service.yaml" \
-    "$CONTEXT" \
-    msa \
-    item-service-secret
-  annotate_rendered_deployment_manifest_with_secret_checksum \
-    "$RENDERED_APP_JOB_DIR/base/transaction-service.yaml" \
-    "$CONTEXT" \
-    msa \
-    transaction-service-secret
+  shared_annotate_microservices_rendered_manifests "$RENDERED_APP_JOB_DIR" "$CONTEXT"
 }
 
 echo "=== Deploying MSA cluster (context: $CONTEXT) ==="

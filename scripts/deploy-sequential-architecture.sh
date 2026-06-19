@@ -89,37 +89,12 @@ sync_runtime_secrets() {
 
 annotate_monolith_rendered_manifests() {
   local rendered_job_dir="$1"
-
-  annotate_rendered_deployment_manifest_with_secret_checksum \
-    "$rendered_job_dir/base/monolith.yaml" \
-    "$CONTEXT" \
-    mono \
-    monolith-env
+  shared_annotate_monolith_rendered_manifests "$rendered_job_dir" "$CONTEXT"
 }
 
 annotate_microservices_rendered_manifests() {
   local rendered_job_dir="$1"
-
-  annotate_rendered_deployment_manifest_with_secret_checksum \
-    "$rendered_job_dir/base/api-gateway.yaml" \
-    "$CONTEXT" \
-    msa \
-    api-gateway-secret
-  annotate_rendered_deployment_manifest_with_secret_checksum \
-    "$rendered_job_dir/base/auth-service.yaml" \
-    "$CONTEXT" \
-    msa \
-    auth-service-secret
-  annotate_rendered_deployment_manifest_with_secret_checksum \
-    "$rendered_job_dir/base/item-service.yaml" \
-    "$CONTEXT" \
-    msa \
-    item-service-secret
-  annotate_rendered_deployment_manifest_with_secret_checksum \
-    "$rendered_job_dir/base/transaction-service.yaml" \
-    "$CONTEXT" \
-    msa \
-    transaction-service-secret
+  shared_annotate_microservices_rendered_manifests "$rendered_job_dir" "$CONTEXT"
 }
 
 install_datadog_if_configured() {

@@ -81,11 +81,7 @@ sync_runtime_secrets() {
 }
 
 annotate_monolith_rendered_manifests() {
-  annotate_rendered_deployment_manifest_with_secret_checksum \
-    "$RENDERED_APP_JOB_DIR/base/monolith.yaml" \
-    "$CONTEXT" \
-    mono \
-    monolith-env
+  shared_annotate_monolith_rendered_manifests "$RENDERED_APP_JOB_DIR" "$CONTEXT"
 }
 
 echo "=== Deploying monolith cluster (context: $CONTEXT) ==="

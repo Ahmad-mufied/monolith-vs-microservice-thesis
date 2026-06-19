@@ -125,6 +125,7 @@ restore_active() {
     overlay_scaling_mode="fixed"
     log_setup_info "Restoring active ${architecture} workloads with requested=${SCALING_MODE}, effective=${overlay_scaling_mode} overlay..."
     kubectl --context="$SEQUENTIAL_CONTEXT" delete hpa monolith -n mono --ignore-not-found
+    shared_annotate_monolith_rendered_manifests "$RENDER_ROOT/deployments/k8s/cloud/monolith" "$SEQUENTIAL_CONTEXT"
     kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/cloud/monolith/overlays/$overlay_scaling_mode"
     log_setup_info "Waiting for deployment mono/monolith rollout..."
     kubectl --context="$SEQUENTIAL_CONTEXT" rollout status deployment/monolith -n mono --timeout=300s
@@ -132,6 +133,7 @@ restore_active() {
     return
   fi
   log_setup_info "Restoring active ${architecture} workloads with ${overlay_scaling_mode} overlay..."
+  shared_annotate_microservices_rendered_manifests "$RENDER_ROOT/deployments/k8s/cloud/microservices" "$SEQUENTIAL_CONTEXT"
   kubectl --context="$SEQUENTIAL_CONTEXT" apply -k "$RENDER_ROOT/deployments/k8s/cloud/microservices/overlays/$overlay_scaling_mode"
   for svc in auth-service item-service transaction-service api-gateway; do
     log_setup_info "Waiting for deployment msa/${svc} rollout..."
