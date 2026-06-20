@@ -61,7 +61,7 @@ export const MAX_DROPPED_ITERATIONS = envInt("MAX_DROPPED_ITERATIONS", 1);
 // iterations — ensuring the server (not k6) is always the timeout authority.
 //
 // Timeout precedence with the current defaults:
-// GRPC_CALL_TIMEOUT (10s) < APP_REQUEST_TIMEOUT (30s) < REQUEST_TIMEOUT_MS (60s) < GRACEFUL_STOP (65s)
+// GRPC_CALL_TIMEOUT (32s) < APP_REQUEST_TIMEOUT (35s) < REQUEST_TIMEOUT_MS (60s) < GRACEFUL_STOP (65s)
 export const GRACEFUL_STOP = envString("K6_GRACEFUL_STOP", "65s");
 export const REQUEST_TIMEOUT_MS = envInt("K6_REQUEST_TIMEOUT_MS", 60000);
 
