@@ -55,8 +55,14 @@ export const MAX_DROPPED_ITERATIONS = envInt("MAX_DROPPED_ITERATIONS", 1);
 // tighter override via K6_REQUEST_TIMEOUT_MS when an experiment explicitly
 // needs it.
 //
+// GRACEFUL_STOP is the time k6 waits for in-flight iterations to finish
+// after the scenario duration ends. It must be greater than REQUEST_TIMEOUT_MS
+// so that HTTP client timeouts always fire before k6 forcefully cancels
+// iterations — ensuring the server (not k6) is always the timeout authority.
+//
 // Timeout precedence with the current defaults:
-// GRPC_CALL_TIMEOUT (10s) < APP_REQUEST_TIMEOUT (30s) < REQUEST_TIMEOUT_MS (60s)
+// GRPC_CALL_TIMEOUT (32s) < APP_REQUEST_TIMEOUT (35s) < REQUEST_TIMEOUT_MS (60s) < GRACEFUL_STOP (65s)
+export const GRACEFUL_STOP = envString("K6_GRACEFUL_STOP", "65s");
 export const REQUEST_TIMEOUT_MS = envInt("K6_REQUEST_TIMEOUT_MS", 60000);
 
 
@@ -157,6 +163,7 @@ export function benchmarkOptions(name, metricTags = null) {
           preAllocatedVUs: PRE_ALLOCATED_VUS,
           maxVUs: MAX_VUS,
           stages: parseStages(),
+          gracefulStop: GRACEFUL_STOP,
         },
       },
       thresholds: thresholdConfig(metricTags),
@@ -172,6 +179,7 @@ export function benchmarkOptions(name, metricTags = null) {
         duration: TEST_DURATION,
         preAllocatedVUs: PRE_ALLOCATED_VUS,
         maxVUs: MAX_VUS,
+        gracefulStop: GRACEFUL_STOP,
       },
     },
     thresholds: thresholdConfig(metricTags),
@@ -194,6 +202,7 @@ export function benchmarkScenarioDefinition(rate, options = {}) {
       preAllocatedVUs,
       maxVUs,
       stages: parseStagesForTarget(rate),
+      gracefulStop: GRACEFUL_STOP,
     };
   }
 
@@ -204,6 +213,7 @@ export function benchmarkScenarioDefinition(rate, options = {}) {
     duration: TEST_DURATION,
     preAllocatedVUs,
     maxVUs,
+    gracefulStop: GRACEFUL_STOP,
   };
 }
 
@@ -290,6 +300,7 @@ function validateConfig() {
   assertCondition(P90_THRESHOLD_MS > 0, `P90_THRESHOLD_MS must be > 0, got ${P90_THRESHOLD_MS}.`);
   assertCondition(P95_THRESHOLD_MS > 0, `P95_THRESHOLD_MS must be > 0, got ${P95_THRESHOLD_MS}.`);
   assertCondition(REQUEST_TIMEOUT_MS > 0, `K6_REQUEST_TIMEOUT_MS must be > 0, got ${REQUEST_TIMEOUT_MS}.`);
+  assertCondition(typeof GRACEFUL_STOP === "string" && GRACEFUL_STOP.trim() !== "", "K6_GRACEFUL_STOP must be a non-empty string.");
 
   if (K6_PROFILE === "ramp" || K6_PROFILE === "hpa") {
     parseStages().forEach((stage, index) => validateStage(stage, index, "generated stages"));

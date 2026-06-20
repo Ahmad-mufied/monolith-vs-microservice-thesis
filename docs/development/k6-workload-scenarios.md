@@ -287,9 +287,11 @@ application, not k6, is the first layer to declare a timeout.
 Current intended precedence:
 
 ```text
-application-managed timeout boundary
+application-managed timeout boundary (32s-35s)
     <
 k6 HTTP request timeout (60s)
+    <
+k6 gracefulStop (65s)
 ```
 
 Current application-managed boundaries in this branch:
