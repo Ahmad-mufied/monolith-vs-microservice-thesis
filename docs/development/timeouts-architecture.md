@@ -34,6 +34,7 @@ In the Monolith, all domain modules run in a single process. Concurrency is mana
 ```
 
 ### Timeout Configuration Parameters
+
 | Parameter | Env Variable | Default | Description |
 |---|---|---|---|
 | **App Request Timeout** | `APP_REQUEST_TIMEOUT` | `35s` | Applied as a context deadline in Echo middleware. |
@@ -80,6 +81,7 @@ Client (k6)       API Gateway (REST)         Downstream Services          Databa
 ```
 
 ### Timeout Configuration Parameters
+
 | Service | Parameter | Env Variable | Default | Description |
 |---|---|---|---|---|
 | **API Gateway** | **Request Timeout** | `REQUEST_TIMEOUT` | `35s` | Context deadline for the incoming REST request. |
