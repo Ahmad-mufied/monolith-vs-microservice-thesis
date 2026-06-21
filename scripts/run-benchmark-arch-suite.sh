@@ -911,9 +911,9 @@ fi
 
 if [ "$ALLOW_NONSTANDARD_SCALING_PROFILE" != "true" ]; then
   case "$SCALING_MODE:$K6_PROFILE" in
-    fixed:steady|fixed:ramp|fixed:smoke|hpa:ramp-up|hpa:hpa) ;;
-    fixed:ramp-up|fixed:hpa)
-      log_error "K6_PROFILE=ramp-up must not be used with SCALING_MODE=fixed. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only for a deliberate nonstandard experiment."
+    fixed:steady|fixed:ramp|fixed:smoke|fixed:ramp-up|hpa:ramp-up|hpa:hpa) ;;
+    fixed:hpa)
+      log_error "K6_PROFILE=hpa must not be used with SCALING_MODE=fixed. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only for a deliberate nonstandard experiment."
       exit 1
       ;;
     hpa:steady|hpa:ramp|hpa:smoke)
@@ -921,7 +921,7 @@ if [ "$ALLOW_NONSTANDARD_SCALING_PROFILE" != "true" ]; then
       exit 1
       ;;
     *)
-      log_error "unsupported SCALING_MODE/K6_PROFILE combination '${SCALING_MODE}:${K6_PROFILE}' (supported: fixed with steady|ramp|smoke, hpa with ramp-up)"
+      log_error "unsupported SCALING_MODE/K6_PROFILE combination '${SCALING_MODE}:${K6_PROFILE}' (supported: fixed with steady|ramp|smoke|ramp-up, hpa with ramp-up)"
       exit 1
       ;;
   esac

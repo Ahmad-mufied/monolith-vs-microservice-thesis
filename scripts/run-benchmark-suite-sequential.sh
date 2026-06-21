@@ -55,6 +55,7 @@ CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
 DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 SEQUENTIAL_CONTEXT="${SEQUENTIAL_CONTEXT:-benchmark}"
+ALLOW_NONSTANDARD_SCALING_PROFILE="${ALLOW_NONSTANDARD_SCALING_PROFILE:-false}"
 SUITE_WORKDIR="$(mktemp -d)"
 MATRIX_TSV="$SUITE_WORKDIR/scenario-rps-matrix.tsv"
 CASES_JSONL="$SUITE_WORKDIR/cases.jsonl"
@@ -68,6 +69,14 @@ trap cleanup EXIT
 : > "$CASES_JSONL"
 : > "$PHASES_JSONL"
 declare -A CASE_RESULT_STATUS_CACHE=()
+
+case "$ALLOW_NONSTANDARD_SCALING_PROFILE" in
+  true|false) ;;
+  *)
+    printf '[%s] ERROR: invalid ALLOW_NONSTANDARD_SCALING_PROFILE value "%s" (expected: true|false)\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "$ALLOW_NONSTANDARD_SCALING_PROFILE" >&2
+    exit 1
+    ;;
+esac
 
 if [ "$SCALING_MODE" != "fixed" ]; then
   printf '[%s] ERROR: %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite ARCHITECTURE=microservices for a supplemental HPA suite, or run-benchmark-case for one-off HPA cases." >&2
@@ -228,7 +237,7 @@ estimate_case_duration_seconds() {
   fi
 
   case "$K6_PROFILE" in
-    hpa)
+    ramp-up|hpa)
       seconds=0
       seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_1:-2m}")))
       seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_2:-2m}")))
@@ -848,17 +857,19 @@ if [ -z "$K6_PROFILE" ]; then
   K6_PROFILE="steady"
 fi
 
-case "$SCALING_MODE:$K6_PROFILE" in
-  fixed:steady|fixed:ramp|fixed:smoke) ;;
-  fixed:ramp-up|fixed:hpa)
-    log_error "K6_PROFILE=ramp-up must not be used with SCALING_MODE=fixed."
-    exit 1
-    ;;
-  hpa:steady|hpa:ramp|hpa:smoke|hpa:ramp-up|hpa:hpa)
-    log_error "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite ARCHITECTURE=microservices for a supplemental HPA suite, or run-benchmark-case for one-off HPA cases."
-    exit 1
-    ;;
-esac
+if [ "$ALLOW_NONSTANDARD_SCALING_PROFILE" != "true" ]; then
+  case "$SCALING_MODE:$K6_PROFILE" in
+    fixed:steady|fixed:ramp|fixed:smoke|fixed:ramp-up) ;;
+    fixed:hpa)
+      log_error "K6_PROFILE=hpa must not be used with SCALING_MODE=fixed. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only for a deliberate nonstandard experiment."
+      exit 1
+      ;;
+    hpa:steady|hpa:ramp|hpa:smoke|hpa:ramp-up|hpa:hpa)
+      log_error "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite ARCHITECTURE=microservices for a supplemental HPA suite, or run-benchmark-case for one-off HPA cases."
+      exit 1
+      ;;
+  esac
+fi
 
 if [ -n "$EXPERIMENT_NAME" ]; then
   EXPERIMENT_NAME="$(sanitize_run_id_component "EXPERIMENT_NAME" "$EXPERIMENT_NAME")"
@@ -1113,6 +1124,7 @@ for architecture in $ARCHITECTURE_ORDER; do
       DOCKERHUB_NAMESPACE="$DOCKERHUB_NAMESPACE" \
       SKIP_SCENARIO_DATA_SETUP="$scenario_skip_case_setup" \
       IMAGE_TAG="$IMAGE_TAG" \
+      ALLOW_NONSTANDARD_SCALING_PROFILE="$ALLOW_NONSTANDARD_SCALING_PROFILE" \
       bash scripts/run-benchmark-sequential.sh
       case_exit_code=$?
       set -e

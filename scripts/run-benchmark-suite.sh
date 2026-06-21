@@ -291,11 +291,11 @@ validate_scaling_profile_pairing() {
   fi
 
   case "$SCALING_MODE:$K6_PROFILE" in
-    fixed:steady|fixed:ramp|fixed:smoke)
+    fixed:steady|fixed:ramp|fixed:smoke|fixed:ramp-up)
       return 0
       ;;
-    fixed:ramp-up|fixed:hpa)
-      echo "ERROR: K6_PROFILE=ramp-up must not be used with SCALING_MODE=fixed. Use SCALING_MODE=hpa with HPA overlays, or set ALLOW_NONSTANDARD_SCALING_PROFILE=true only if you are intentionally running a nonstandard experiment." >&2
+    fixed:hpa)
+      echo "ERROR: K6_PROFILE=hpa must not be used with SCALING_MODE=fixed. Use SCALING_MODE=hpa with HPA overlays, or set ALLOW_NONSTANDARD_SCALING_PROFILE=true only if you are intentionally running a nonstandard experiment." >&2
       return 1
       ;;
     hpa:steady|hpa:ramp|hpa:smoke|hpa:ramp-up|hpa:hpa)
