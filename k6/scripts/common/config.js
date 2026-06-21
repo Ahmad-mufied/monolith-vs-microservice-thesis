@@ -102,7 +102,7 @@ export const DATASET_VERSION = envString("DATASET_VERSION", "v1");
 export const IMAGE_TAG = envString("IMAGE_TAG", "");
 export const GIT_COMMIT = envString("GIT_COMMIT", "");
 
-const SUPPORTED_K6_PROFILES = new Set(["smoke", "steady", "ramp", "hpa"]);
+const SUPPORTED_K6_PROFILES = new Set(["smoke", "steady", "ramp", "ramp-up", "hpa"]);
 
 function assertCondition(condition, message) {
   if (!condition) {
@@ -153,7 +153,7 @@ export function benchmarkOptions(name, metricTags = null) {
     return smokeOptions(metricTags);
   }
 
-  if (K6_PROFILE === "ramp" || K6_PROFILE === "hpa") {
+  if (K6_PROFILE === "ramp" || K6_PROFILE === "ramp-up" || K6_PROFILE === "hpa") {
     return {
       scenarios: {
         [name]: {
@@ -194,7 +194,7 @@ export function benchmarkScenarioDefinition(rate, options = {}) {
     options.scaleVusByTargetRps ? scaleCapacity(MAX_VUS, rate) : MAX_VUS
   );
 
-  if (K6_PROFILE === "ramp" || K6_PROFILE === "hpa") {
+  if (K6_PROFILE === "ramp" || K6_PROFILE === "ramp-up" || K6_PROFILE === "hpa") {
     return {
       executor: "ramping-arrival-rate",
       startRate: Math.max(1, Math.floor(rate / 10)),
@@ -241,7 +241,7 @@ function parseStagesForTarget(targetRps) {
     }
   }
 
-  if (K6_PROFILE === "hpa") {
+  if (K6_PROFILE === "ramp-up" || K6_PROFILE === "hpa") {
     return [
       { target: Math.max(1, Math.floor(targetRps * 0.25)), duration: envString("HPA_RAMP_UP_1", "2m") },
       { target: Math.max(1, Math.floor(targetRps * 0.50)), duration: envString("HPA_RAMP_UP_2", "2m") },
@@ -284,7 +284,7 @@ function scaleCustomStages(stages, targetRps) {
 }
 
 function validateConfig() {
-  assertCondition(SUPPORTED_K6_PROFILES.has(K6_PROFILE), `Unsupported K6_PROFILE '${K6_PROFILE}'. Expected one of: smoke, steady, ramp, hpa.`);
+  assertCondition(SUPPORTED_K6_PROFILES.has(K6_PROFILE), `Unsupported K6_PROFILE '${K6_PROFILE}'. Expected one of: smoke, steady, ramp, ramp-up.`);
   assertCondition(TARGET_RPS > 0, `TARGET_RPS must be > 0, got ${TARGET_RPS}.`);
   assertCondition(PRE_ALLOCATED_VUS > 0, `PRE_ALLOCATED_VUS must be > 0, got ${PRE_ALLOCATED_VUS}.`);
   assertCondition(MAX_VUS >= PRE_ALLOCATED_VUS, `MAX_VUS must be >= PRE_ALLOCATED_VUS (got MAX_VUS=${MAX_VUS}, PRE_ALLOCATED_VUS=${PRE_ALLOCATED_VUS}).`);
@@ -302,7 +302,7 @@ function validateConfig() {
   assertCondition(REQUEST_TIMEOUT_MS > 0, `K6_REQUEST_TIMEOUT_MS must be > 0, got ${REQUEST_TIMEOUT_MS}.`);
   assertCondition(typeof GRACEFUL_STOP === "string" && GRACEFUL_STOP.trim() !== "", "K6_GRACEFUL_STOP must be a non-empty string.");
 
-  if (K6_PROFILE === "ramp" || K6_PROFILE === "hpa") {
+  if (K6_PROFILE === "ramp" || K6_PROFILE === "ramp-up" || K6_PROFILE === "hpa") {
     parseStages().forEach((stage, index) => validateStage(stage, index, "generated stages"));
   }
 }

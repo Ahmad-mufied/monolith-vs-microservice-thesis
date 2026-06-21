@@ -164,7 +164,7 @@ Expected checks:
 
 ### 4.1 HPA Duration Behavior
 
-When `SCALING_MODE=hpa`, the arch-suite and single-case HPA runners use `K6_PROFILE=hpa` which
+When `SCALING_MODE=hpa`, the arch-suite and single-case HPA runners use `K6_PROFILE=ramp-up` which
 applies a `ramping-arrival-rate` executor. This executor **ignores
 `TEST_DURATION`** entirely. The actual k6 run duration per case is:
 
@@ -186,7 +186,7 @@ To shorten HPA runs (e.g. for faster iteration or budget constraints):
 ```bash
 HPA_RAMP_UP_1=1m HPA_RAMP_UP_2=1m HPA_RAMP_UP_3=2m HPA_HOLD=3m HPA_RAMP_DOWN=30s \
   ARCHITECTURE=microservices SCENARIO=login TARGET_RPS=250 RUN_ID=eks-hpa-rq2 ATTEMPT=attempt-01 \
-  make run-benchmark-case SCALING_MODE=hpa K6_PROFILE=hpa ...
+  make run-benchmark-case SCALING_MODE=hpa K6_PROFILE=ramp-up ...
 # Total: 7.5 minutes per case
 ```
 
@@ -465,7 +465,7 @@ TARGET_RPS=250 \
 RUN_ID=eks-hpa-final-rq2 \
 ATTEMPT=attempt-02 \
 SCALING_MODE=hpa \
-K6_PROFILE=hpa \
+K6_PROFILE=ramp-up \
 TEST_DURATION=5m \
 make run-benchmark-case
 ```

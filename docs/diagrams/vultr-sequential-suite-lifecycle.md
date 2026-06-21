@@ -134,7 +134,7 @@ and the monolith fixed baseline is not rerun.
 
 ```mermaid
 flowchart TB
-  startHpa(["Operator starts supplemental HPA arch suite<br/>make run-benchmark-arch-suite<br/>ARCHITECTURE=microservices<br/>SCALING_MODE=hpa K6_PROFILE=hpa"])
+  startHpa(["Operator starts supplemental HPA arch suite<br/>make run-benchmark-arch-suite<br/>ARCHITECTURE=microservices<br/>SCALING_MODE=hpa K6_PROFILE=ramp-up"])
   matrixHpa["Build one-architecture matrix<br/>SCENARIO_RPS_MATRIX or<br/>SCENARIOS + RPS_LEVELS"]
   deploy["Deploy sequential architecture once<br/>microservices HPA overlay"]
   verify["Verify active mode<br/>microservices HPAs present<br/>monolith HPA absent"]

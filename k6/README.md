@@ -307,9 +307,9 @@ is **not** used by all profiles.
 | `smoke` | `TEST_DURATION` | Yes |
 | `steady` | `TEST_DURATION` | Yes |
 | `ramp` | `RAMP_UP_DURATION` + `TEST_DURATION` + `RAMP_DOWN_DURATION` | Yes (hold stage) |
-| `hpa` | `HPA_RAMP_UP_1/2/3` + `HPA_HOLD` + `HPA_RAMP_DOWN` | **No** |
+| `ramp-up` | `HPA_RAMP_UP_1/2/3` + `HPA_HOLD` + `HPA_RAMP_DOWN` | **No** |
 
-**Important:** When `K6_PROFILE=hpa`, the `TEST_DURATION` variable is
+**Important:** When `K6_PROFILE=ramp-up` (formerly `hpa`), the `TEST_DURATION` variable is
 **ignored** by the k6 executor. The actual run duration is determined entirely
 by the HPA stage environment variables (default: 2+2+3+5+1 = 13 minutes).
 `TEST_DURATION` is still recorded in `metadata.json` for reference, but it
@@ -370,7 +370,7 @@ RPS
     1m    TEST_DURATION    30s
 ```
 
-#### `hpa` — Staged Load for HPA Observation
+#### `ramp-up` — Staged Load for HPA Observation (formerly `hpa`)
 
 ```text
 Executor: ramping-arrival-rate
@@ -446,8 +446,8 @@ The benchmark enforces strict pairing between `SCALING_MODE` and `K6_PROFILE`:
 | `fixed` | `steady` | Yes | Primary RQ1 comparison |
 | `fixed` | `ramp` | Yes | Calibration / exploratory |
 | `fixed` | `smoke` | Yes | Smoke test |
-| `fixed` | `hpa` | **No** | Error: HPA overlay missing |
-| `hpa` | `hpa` | Yes | Primary RQ2 comparison |
+| `fixed` | `ramp-up` | **No** | Error: HPA overlay missing |
+| `hpa` | `ramp-up` | Yes | Primary RQ2 comparison |
 | `hpa` | `steady` | **No** | Error: no ramp for HPA observation |
 | `hpa` | `ramp` | **No** | Error: no ramp for HPA observation |
 | `hpa` | `smoke` | **No** | Error: no ramp for HPA observation |

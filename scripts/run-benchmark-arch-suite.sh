@@ -56,6 +56,7 @@ CLOUD_PROVIDER="${CLOUD_PROVIDER:-aws}"
 DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 SEQUENTIAL_CONTEXT="${SEQUENTIAL_CONTEXT:-benchmark}"
+ALLOW_NONSTANDARD_SCALING_PROFILE="${ALLOW_NONSTANDARD_SCALING_PROFILE:-false}"
 ARCH_SUITE_WORKDIR="$(mktemp -d)"
 MATRIX_TSV="$ARCH_SUITE_WORKDIR/scenario-rps-matrix.tsv"
 CASES_JSONL="$ARCH_SUITE_WORKDIR/cases.jsonl"
@@ -540,6 +541,14 @@ validate_arch_suite_inputs() {
       ;;
   esac
 
+  case "$ALLOW_NONSTANDARD_SCALING_PROFILE" in
+    true|false) ;;
+    *)
+      log_error "invalid ALLOW_NONSTANDARD_SCALING_PROFILE value '$ALLOW_NONSTANDARD_SCALING_PROFILE' (expected: true|false)"
+      exit 1
+      ;;
+  esac
+
   validate_seconds_value "SEQUENTIAL_CASE_OVERHEAD_SECONDS" "$SEQUENTIAL_CASE_OVERHEAD_SECONDS"
   validate_seconds_value "SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS" "$SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS"
   validate_seconds_value "SEQUENTIAL_RETRY_BUFFER_SECONDS" "$SEQUENTIAL_RETRY_BUFFER_SECONDS"
@@ -894,27 +903,29 @@ INTER_CASE_DELAY="$(normalize_nonnegative_integer "$INTER_CASE_DELAY")"
 
 if [ -z "$K6_PROFILE" ]; then
   if [ "$SCALING_MODE" = "hpa" ]; then
-    K6_PROFILE="hpa"
+    K6_PROFILE="ramp-up"
   else
     K6_PROFILE="steady"
   fi
 fi
 
-case "$SCALING_MODE:$K6_PROFILE" in
-  fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa) ;;
-  fixed:hpa)
-    log_error "K6_PROFILE=hpa must not be used with SCALING_MODE=fixed."
-    exit 1
-    ;;
-  hpa:steady|hpa:ramp|hpa:smoke)
-    log_error "SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment."
-    exit 1
-    ;;
-  *)
-    log_error "unsupported SCALING_MODE/K6_PROFILE combination '${SCALING_MODE}:${K6_PROFILE}' (supported: fixed with steady|ramp|smoke, hpa with hpa)"
-    exit 1
-    ;;
-esac
+if [ "$ALLOW_NONSTANDARD_SCALING_PROFILE" != "true" ]; then
+  case "$SCALING_MODE:$K6_PROFILE" in
+    fixed:steady|fixed:ramp|fixed:smoke|hpa:ramp-up|hpa:hpa) ;;
+    fixed:ramp-up|fixed:hpa)
+      log_error "K6_PROFILE=ramp-up must not be used with SCALING_MODE=fixed. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only for a deliberate nonstandard experiment."
+      exit 1
+      ;;
+    hpa:steady|hpa:ramp|hpa:smoke)
+      log_error "SCALING_MODE=hpa requires K6_PROFILE=ramp-up for the standard autoscaling experiment. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only for a deliberate nonstandard experiment."
+      exit 1
+      ;;
+    *)
+      log_error "unsupported SCALING_MODE/K6_PROFILE combination '${SCALING_MODE}:${K6_PROFILE}' (supported: fixed with steady|ramp|smoke, hpa with ramp-up)"
+      exit 1
+      ;;
+  esac
+fi
 
 if [ -n "$EXPERIMENT_NAME" ]; then
   EXPERIMENT_NAME="$(sanitize_run_id_component "EXPERIMENT_NAME" "$EXPERIMENT_NAME")"

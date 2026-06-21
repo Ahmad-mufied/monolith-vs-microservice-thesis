@@ -142,7 +142,7 @@ configured_duration_seconds() {
         $(duration_seconds "${RAMP_DOWN_DURATION:-30s}") \
       ))
       ;;
-    hpa)
+    ramp-up|hpa)
       echo $(( \
         $(duration_seconds "${HPA_RAMP_UP_1:-2m}") + \
         $(duration_seconds "${HPA_RAMP_UP_2:-2m}") + \

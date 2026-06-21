@@ -294,11 +294,11 @@ validate_scaling_profile_pairing() {
     fixed:steady|fixed:ramp|fixed:smoke)
       return 0
       ;;
-    fixed:hpa)
-      echo "ERROR: K6_PROFILE=hpa must not be used with SCALING_MODE=fixed. Use SCALING_MODE=hpa with HPA overlays, or set ALLOW_NONSTANDARD_SCALING_PROFILE=true only if you are intentionally running a nonstandard experiment." >&2
+    fixed:ramp-up|fixed:hpa)
+      echo "ERROR: K6_PROFILE=ramp-up must not be used with SCALING_MODE=fixed. Use SCALING_MODE=hpa with HPA overlays, or set ALLOW_NONSTANDARD_SCALING_PROFILE=true only if you are intentionally running a nonstandard experiment." >&2
       return 1
       ;;
-    hpa:steady|hpa:ramp|hpa:smoke|hpa:hpa)
+    hpa:steady|hpa:ramp|hpa:smoke|hpa:ramp-up|hpa:hpa)
       echo "ERROR: run-benchmark-suite only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite for a supplemental single-architecture HPA suite, or run-benchmark-case for one-off HPA cases." >&2
       return 1
       ;;

@@ -229,7 +229,7 @@ Generic targets dispatch through `scripts/operator-dispatch.sh`.
 ### Scaling Modes
 
 - **fixed**: fixed replica count, `K6_PROFILE=steady`
-- **hpa**: Horizontal Pod Autoscaler, `K6_PROFILE=hpa`
+- **hpa**: Horizontal Pod Autoscaler, `K6_PROFILE=ramp-up`
 
 Switching fixed/HPA is a redeploy action, not a runner-only change.
 

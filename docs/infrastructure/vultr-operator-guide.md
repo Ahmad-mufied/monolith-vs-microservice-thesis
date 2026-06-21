@@ -416,7 +416,7 @@ TARGET_RPS=2500 \
 RUN_ID=vultr-hpa-login-smoke \
 ATTEMPT=attempt-01 \
 SCALING_MODE=hpa \
-K6_PROFILE=hpa \
+K6_PROFILE=ramp-up \
 make run-benchmark-case
 ```
 
@@ -440,14 +440,14 @@ vultr-sequential-fixed-final-stable-v1-670736c
 
 ```bash
 ARCHITECTURE=microservices \
-SCALING_MODE=hpa K6_PROFILE=hpa \
+SCALING_MODE=hpa K6_PROFILE=ramp-up \
 EXPERIMENT_NAME=final-hpa-v1 ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=300 \
 SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500;enriched-transactions:100,250,500;concurrent-mixed-workload:100,250,500" \
 make run-benchmark-arch-suite
 ```
 
-`K6_PROFILE=hpa` uses ramping-arrival-rate stages (~13 min/case).
+`K6_PROFILE=ramp-up` uses ramping-arrival-rate stages (~13 min/case).
 `TEST_DURATION` is ignored for HPA.
 
 ### SCALING_MODE / K6_PROFILE pairing
@@ -455,7 +455,7 @@ make run-benchmark-arch-suite
 | SCALING_MODE | K6_PROFILE | Notes |
 |---|---|---|
 | `fixed` | `steady` | Default if omitted. |
-| `hpa` | `hpa` | Required. Rejects `steady`, `ramp`, `smoke`. |
+| `hpa` | `ramp-up` | Required. Rejects `steady`, `ramp`, `smoke`. |
 
 ### Suite behavior
 
@@ -533,10 +533,10 @@ ARCHITECTURE_SWITCH_DELAY=300 \
 SCENARIO_RPS_MATRIX="login:1000,2500,5000,7500,10000;create-transaction:1000,2500,5000,7500,10000;enriched-transactions:1000,2500,5000,7500,10000" \
 make run-benchmark-suite
 
-# Standard HPA single-architecture suite. TEST_DURATION is ignored for K6_PROFILE=hpa.
+# Standard HPA single-architecture suite. TEST_DURATION is ignored for K6_PROFILE=ramp-up.
 ARCHITECTURE=microservices \
 SCALING_MODE=hpa \
-K6_PROFILE=hpa \
+K6_PROFILE=ramp-up \
 EXPERIMENT_NAME=final-hpa-v1 \
 ATTEMPT=attempt-01 \
 INTER_CASE_DELAY=300 \

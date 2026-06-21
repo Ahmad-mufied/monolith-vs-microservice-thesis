@@ -850,11 +850,11 @@ fi
 
 case "$SCALING_MODE:$K6_PROFILE" in
   fixed:steady|fixed:ramp|fixed:smoke) ;;
-  fixed:hpa)
-    log_error "K6_PROFILE=hpa must not be used with SCALING_MODE=fixed."
+  fixed:ramp-up|fixed:hpa)
+    log_error "K6_PROFILE=ramp-up must not be used with SCALING_MODE=fixed."
     exit 1
     ;;
-  hpa:steady|hpa:ramp|hpa:smoke|hpa:hpa)
+  hpa:steady|hpa:ramp|hpa:smoke|hpa:ramp-up|hpa:hpa)
     log_error "run-benchmark-suite-sequential only supports SCALING_MODE=fixed. Use run-benchmark-arch-suite ARCHITECTURE=microservices for a supplemental HPA suite, or run-benchmark-case for one-off HPA cases."
     exit 1
     ;;

@@ -117,13 +117,13 @@ esac
 
 if [ "$ALLOW_NONSTANDARD_SCALING_PROFILE" != "true" ]; then
   case "$SCALING_MODE:$K6_PROFILE" in
-    fixed:steady|fixed:ramp|fixed:smoke|hpa:hpa) ;;
-    fixed:hpa)
-      echo "ERROR: K6_PROFILE=hpa must not be used with SCALING_MODE=fixed." >&2
+    fixed:steady|fixed:ramp|fixed:smoke|hpa:ramp-up|hpa:hpa) ;;
+    fixed:ramp-up|fixed:hpa)
+      echo "ERROR: K6_PROFILE=ramp-up must not be used with SCALING_MODE=fixed." >&2
       exit 1
       ;;
     hpa:steady|hpa:ramp|hpa:smoke)
-      echo "ERROR: SCALING_MODE=hpa requires K6_PROFILE=hpa for the standard autoscaling experiment." >&2
+      echo "ERROR: SCALING_MODE=hpa requires K6_PROFILE=ramp-up for the standard autoscaling experiment." >&2
       exit 1
       ;;
   esac

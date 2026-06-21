@@ -798,7 +798,7 @@ make run-benchmark-parallel \
   RUN_ID=eks-run-001 \
   ATTEMPT=attempt-01 \
   SCALING_MODE=hpa \
-  K6_PROFILE=hpa \
+  K6_PROFILE=ramp-up \
   S3_BUCKET=<bucket_name>
 ```
 

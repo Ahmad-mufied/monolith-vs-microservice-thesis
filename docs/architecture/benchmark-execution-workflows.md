@@ -250,7 +250,7 @@ TARGET_RPS=250 \
 RUN_ID=rq2-hpa-single-case \
 ATTEMPT=attempt-01 \
 SCALING_MODE=hpa \
-K6_PROFILE=hpa \
+K6_PROFILE=ramp-up \
 TEST_DURATION=5m \
 make run-benchmark-case
 ```
@@ -263,7 +263,7 @@ TARGET_RPS=100 \
 RUN_ID=rq2-hpa-parallel-single-case \
 ATTEMPT=attempt-01 \
 SCALING_MODE=hpa \
-K6_PROFILE=hpa \
+K6_PROFILE=ramp-up \
 TEST_DURATION=5m \
 make run-benchmark-case
 ```

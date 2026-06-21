@@ -816,7 +816,7 @@ TARGET_RPS=100 \
 RUN_ID=eks-hpa-rq2-hpa-final-670736c \
 ATTEMPT=attempt-01 \
 SCALING_MODE=hpa \
-K6_PROFILE=hpa \
+K6_PROFILE=ramp-up \
   TEST_DURATION=5m \
   S3_BUCKET=skripsi-benchmark-results \
   make run-benchmark-sequential
@@ -838,7 +838,7 @@ The dual-architecture suite runners remain reserved for the primary fixed
 matrix.
 
 **Note on `TEST_DURATION` for HPA mode:** When `SCALING_MODE=hpa`, the
-single-architecture suite and the single-case HPA runners use `K6_PROFILE=hpa` which applies a
+single-architecture suite and the single-case HPA runners use `K6_PROFILE=ramp-up` which applies a
 `ramping-arrival-rate` executor. This executor ignores `TEST_DURATION`
 entirely. The actual k6 run duration per case is controlled by HPA stage
 environment variables and defaults to **13 minutes** (2m + 2m + 3m + 5m + 1m).
@@ -1207,7 +1207,7 @@ kubectl --context=monolith run pg-test \
 | `make run-benchmark-parallel SCENARIO=login TARGET_RPS=1000 RUN_ID=... S3_BUCKET=...` | Run parallel benchmark |
 | `make run-benchmark-suite SCALING_MODE=fixed SCENARIOS="login create-transaction enriched-transactions" RPS_LEVELS="1000 2500 5000 7500 10000"` | Run primary fixed-mode matrix |
 | `ARCHITECTURE=microservices SCALING_MODE=hpa EXPERIMENT_NAME=... SCENARIO_RPS_MATRIX="login:100,250,500;create-transaction:100,250,500" make run-benchmark-arch-suite` | Run a supplemental one-architecture HPA suite on the sequential cluster |
-| `ARCHITECTURE=microservices SCENARIO=login TARGET_RPS=250 RUN_ID=... ATTEMPT=attempt-01 SCALING_MODE=hpa K6_PROFILE=hpa make run-benchmark-case` | Run one supplemental HPA benchmark case on the sequential cluster |
+| `ARCHITECTURE=microservices SCENARIO=login TARGET_RPS=250 RUN_ID=... ATTEMPT=attempt-01 SCALING_MODE=hpa K6_PROFILE=ramp-up make run-benchmark-case` | Run one supplemental HPA benchmark case on the sequential cluster |
 | `make run-benchmark-suite-sequential SCALING_MODE=fixed ARCHITECTURE_ORDER="monolith microservices" ARCHITECTURE_SWITCH_DELAY=300` | Run one architecture at a time on the sequential cluster with a consistent Datadog separation gap |
 | `make eks-destroy-confirmed` | Destroy experiment clusters and RDS after confirming benchmark artifacts are safe in S3 |
 | `make eks-sequential-destroy-confirmed` | Destroy sequential cluster and RDS after confirming benchmark artifacts are safe in S3 |
@@ -1220,11 +1220,11 @@ kubectl --context=monolith run pg-test \
 | Goal | `SCALING_MODE` | `K6_PROFILE` | Manifest applied |
 |---|---|---|---|
 | Primary RQ1/RQ2 comparison | `fixed` | `steady` | `overlays/fixed` |
-| Supporting HPA behavior analysis | `hpa` | `hpa` | `overlays/hpa` |
+| Supporting HPA behavior analysis | `hpa` | `ramp-up` | `overlays/hpa` |
 
 The benchmark runners now fail fast when this pairing is violated or when the
 live cluster state does not match the expected fixed/HPA mode. This prevents
-silent misconfiguration such as `K6_PROFILE=hpa` against fixed overlays or an
+silent misconfiguration such as `K6_PROFILE=ramp-up` against fixed overlays or an
 HPA run against a cluster where HPA objects are missing.
 
 See `docs/experiment/scaling-mode-strategy.md` for full details.
