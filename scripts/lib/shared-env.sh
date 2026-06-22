@@ -178,7 +178,7 @@ benchmark_effective_duration_seconds() {
       done
       printf '%s\n' "$total_seconds"
       ;;
-    hpa)
+    ramp-up|hpa)
       for component in "${HPA_RAMP_UP_1:-2m}" "${HPA_RAMP_UP_2:-2m}" "${HPA_RAMP_UP_3:-3m}" "${HPA_HOLD:-5m}" "${HPA_RAMP_DOWN:-1m}"; do
         total_seconds=$((total_seconds + $(parse_benchmark_duration_seconds "$component")))
       done
@@ -196,7 +196,7 @@ benchmark_duration_log_value() {
   local effective_seconds effective_duration
 
   case "$profile" in
-    hpa)
+    ramp-up|hpa)
       effective_seconds="$(benchmark_effective_duration_seconds "$profile" "$test_duration")" || {
         printf '%s\n' "$test_duration"
         return 0

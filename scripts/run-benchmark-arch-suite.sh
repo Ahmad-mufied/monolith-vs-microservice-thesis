@@ -179,7 +179,7 @@ estimate_case_duration_seconds() {
   fi
 
   case "$K6_PROFILE" in
-    hpa)
+    ramp-up|hpa)
       seconds=0
       seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_1:-2m}")))
       seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_2:-2m}")))
