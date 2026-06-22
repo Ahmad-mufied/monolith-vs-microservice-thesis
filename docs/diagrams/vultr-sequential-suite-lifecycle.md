@@ -235,31 +235,38 @@ The data setup policy balances reproducibility and execution speed across both r
 flowchart TB
   scenario["Scenario selected"]
   classify{"Scenario class"}
-  readonly["Data-stable scenario<br/>login"]
-  enrichmentRead["Enrichment read scenario<br/>enriched-transactions"]
-  mutating["Mutating & mixed scenarios<br/>create-transaction, sync-items,<br/>concurrent-mixed-workload, mixed-workload"]
-  entrypoint{"Execution entrypoint"}
-  suiteRunner["Suite runners"]
-  singleRunner["Direct sequential runner"]
-  once["Reset + seed once<br/>before first pending RPS"]
-  onceEnrich["Reset + seed + prepare enrichment once<br/>before first pending RPS"]
-  everyCase["Reset + seed per RPS level<br/>prepare enrichment per RPS when required"]
-  conservative["Conservative setup per direct case<br/>safe for isolated reruns"]
-  k6Case["Run k6 case"]
+  
+  readonly["Data-Stable (Read-Only)<br/>login"]
+  enrichmentRead["Enrichment Read<br/>enriched-transactions"]
+  mutating["Mutating & Mixed Workloads<br/>create-transaction, sync-items,<br/>concurrent-mixed-workload, mixed-workload"]
+  
+  entrypoint{"Execution entrypoint?"}
+  
+  suiteRunner["Suite Runners<br/>(make run-benchmark-*suite)"]
+  singleRunner["Direct Single-Case Runner<br/>(make run-benchmark-case)"]
+  
+  once["Reset + seed once<br/>(SKIP_SCENARIO_DATA_SETUP=true for subsequent)"]
+  onceEnrich["Reset + seed + enrich once<br/>(SKIP_SCENARIO_DATA_SETUP=true for subsequent)"]
+  
+  everyCase["Reset + seed per RPS level<br/>(Always runs setup)"]
+  conservative["Conservative setup<br/>(Clean isolated run)"]
+  
+  k6Case["Run k6 case job"]
 
   scenario --> classify
+  
   classify -- "login" --> readonly --> entrypoint
   classify -- "enriched-transactions" --> enrichmentRead --> entrypoint
   classify -- "mutating or mixed" --> mutating --> everyCase
-  entrypoint -- "suite" --> suiteRunner
-  entrypoint -- "single case" --> singleRunner
-  suiteRunner -- "login" --> once
-  suiteRunner -- "enriched-transactions" --> onceEnrich
-  singleRunner --> conservative
-  once --> k6Case
-  onceEnrich --> k6Case
+  
+  entrypoint -- "Suite run" --> suiteRunner
+  entrypoint -- "Isolated single case" --> singleRunner
+  
+  suiteRunner -- "login" --> once --> k6Case
+  suiteRunner -- "enriched-transactions" --> onceEnrich --> k6Case
+  
+  singleRunner --> conservative --> k6Case
   everyCase --> k6Case
-  conservative --> k6Case
 ```
 
 ### 3.1 Setup Class & Scope Classifications
@@ -277,9 +284,12 @@ The setup behaviors are dictated by two classifications defined in [sequential-b
 ### 3.2 Runner Behaviors
 
 * **Suite Runners (`make run-benchmark-suite` & `make run-benchmark-arch-suite`)**:
-  - Automatically enforce the reuse scope. Data-stable scenarios run setup once and pass `SKIP_SCENARIO_DATA_SETUP=true` to subsequent cases. Mutating/mixed scenarios skip scenario-level setup and delegate it to the single-case runner to execute per case.
-* **Direct Sequential Runner (`make run-benchmark-case` / `run-benchmark-sequential.sh`)**:
-  - Always executes in a "conservative" mode. Since it is run in isolation, it always performs a full scenario-appropriate setup (reset+seed, plus enrichment when required) before the k6 workload starts, ensuring a clean and reproducible database state.
+  - Automatically enforce the reuse scope to optimize benchmark duration.
+  - For data-stable scenarios (`login` and `enriched-transactions`), the suite runner executes the setup/enrichment scripts only once before the first pending RPS case. It then passes `SKIP_SCENARIO_DATA_SETUP=true` as an environment variable to the single-case runner for all subsequent levels of that scenario.
+  - For mutating/mixed scenarios, the suite runner passes `SKIP_SCENARIO_DATA_SETUP=false` (or does not set skip) to delegate the setup execution to the case level, ensuring it runs before each individual target RPS.
+* **Direct Single-Case Runner (`make run-benchmark-case` / `run-benchmark-sequential.sh`)**:
+  - Since it is invoked in isolation for a single scenario/RPS level, it always runs in a "conservative" mode (ignoring any suite-level skip variables).
+  - It always performs a full scenario-appropriate setup (reset+seed, plus enrichment when required) before starting the k6 workload, ensuring a clean and reproducible database state for the isolated test.
 
 ---
 
