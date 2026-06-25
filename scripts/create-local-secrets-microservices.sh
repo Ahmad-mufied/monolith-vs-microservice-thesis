@@ -75,6 +75,7 @@ auth_datadog_enabled="${DATADOG_ENABLED:-$(read_yaml_value ".local.microservices
 auth_datadog_enabled="${auth_datadog_enabled:-false}"
 auth_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".local.microservices.\"auth-service\".DIAGNOSTIC_LOGGING_ENABLED")}"
 auth_diagnostic_logging_enabled="${auth_diagnostic_logging_enabled:-false}"
+auth_grpc_max_conn_age_hpa="${GRPC_MAX_CONNECTION_AGE_HPA:-$(read_yaml_value ".local.microservices.\"auth-service\".GRPC_MAX_CONNECTION_AGE_HPA")}"
 
 # Item Service variables
 item_grpc_port="${GRPC_PORT:-$(read_yaml_value ".local.microservices.\"item-service\".GRPC_PORT")}"
@@ -95,6 +96,7 @@ item_datadog_enabled="${DATADOG_ENABLED:-$(read_yaml_value ".local.microservices
 item_datadog_enabled="${item_datadog_enabled:-false}"
 item_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".local.microservices.\"item-service\".DIAGNOSTIC_LOGGING_ENABLED")}"
 item_diagnostic_logging_enabled="${item_diagnostic_logging_enabled:-false}"
+item_grpc_max_conn_age_hpa="${GRPC_MAX_CONNECTION_AGE_HPA:-$(read_yaml_value ".local.microservices.\"item-service\".GRPC_MAX_CONNECTION_AGE_HPA")}"
 
 # Transaction Service variables
 tx_grpc_port="${GRPC_PORT:-$(read_yaml_value ".local.microservices.\"transaction-service\".GRPC_PORT")}"
@@ -117,6 +119,7 @@ transaction_datadog_enabled="${DATADOG_ENABLED:-$(read_yaml_value ".local.micros
 transaction_datadog_enabled="${transaction_datadog_enabled:-false}"
 transaction_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".local.microservices.\"transaction-service\".DIAGNOSTIC_LOGGING_ENABLED")}"
 transaction_diagnostic_logging_enabled="${transaction_diagnostic_logging_enabled:-false}"
+tx_grpc_max_conn_age_hpa="${GRPC_MAX_CONNECTION_AGE_HPA:-$(read_yaml_value ".local.microservices.\"transaction-service\".GRPC_MAX_CONNECTION_AGE_HPA")}"
 
 if [[ -z "${api_gateway_jwt_secret:-}" ]]; then
   echo "JWT_SECRET must be non-empty in env/values.yaml under .local.microservices.api-gateway.JWT_SECRET" >&2
@@ -129,6 +132,21 @@ if [[ -z "${auth_jwt_secret:-}" ]]; then
 fi
 
 effective_auth_login_max_concurrency="$(resolve_login_max_concurrency_for_mode "${SCALING_MODE:-fixed}" "$auth_login_max_concurrency" "$auth_login_max_concurrency_hpa" "2" "1")"
+
+auth_grpc_max_conn_age=""
+if [[ "${SCALING_MODE:-fixed}" == "hpa" ]]; then
+  auth_grpc_max_conn_age="${auth_grpc_max_conn_age_hpa:-30s}"
+fi
+
+item_grpc_max_conn_age=""
+if [[ "${SCALING_MODE:-fixed}" == "hpa" ]]; then
+  item_grpc_max_conn_age="${item_grpc_max_conn_age_hpa:-30s}"
+fi
+
+transaction_grpc_max_conn_age=""
+if [[ "${SCALING_MODE:-fixed}" == "hpa" ]]; then
+  transaction_grpc_max_conn_age="${tx_grpc_max_conn_age_hpa:-30s}"
+fi
 
 tmp_api_gateway_env="$(mktemp /tmp/api-gateway-k8s-env.XXXXXX)"
 tmp_auth_service_env="$(mktemp /tmp/auth-service-k8s-env.XXXXXX)"
@@ -168,6 +186,9 @@ DB_POOL_MAX_CONN_LIFETIME=${auth_db_pool_max_conn_lifetime}
 DB_POOL_MAX_CONN_IDLE_TIME=${auth_db_pool_max_conn_idle_time}
 DB_PING_TIMEOUT=${auth_db_ping_timeout}
 EOFAUTH
+if [[ -n "$auth_grpc_max_conn_age" ]]; then
+  echo "GRPC_MAX_CONNECTION_AGE=${auth_grpc_max_conn_age}" >> "$tmp_auth_service_env"
+fi
 
 cat >"$tmp_item_service_env" <<EOFITEM
 GRPC_PORT=${item_grpc_port}
@@ -182,6 +203,9 @@ DB_POOL_MAX_CONN_LIFETIME=${item_db_pool_max_conn_lifetime}
 DB_POOL_MAX_CONN_IDLE_TIME=${item_db_pool_max_conn_idle_time}
 DB_PING_TIMEOUT=${item_db_ping_timeout}
 EOFITEM
+if [[ -n "$item_grpc_max_conn_age" ]]; then
+  echo "GRPC_MAX_CONNECTION_AGE=${item_grpc_max_conn_age}" >> "$tmp_item_service_env"
+fi
 
 cat >"$tmp_transaction_service_env" <<EOFTX
 GRPC_PORT=${tx_grpc_port}
@@ -198,6 +222,9 @@ DB_POOL_MAX_CONN_LIFETIME=${tx_db_pool_max_conn_lifetime}
 DB_POOL_MAX_CONN_IDLE_TIME=${tx_db_pool_max_conn_idle_time}
 DB_PING_TIMEOUT=${tx_db_ping_timeout}
 EOFTX
+if [[ -n "$transaction_grpc_max_conn_age" ]]; then
+  echo "GRPC_MAX_CONNECTION_AGE=${transaction_grpc_max_conn_age}" >> "$tmp_transaction_service_env"
+fi
 
 apply_secret_and_config_from_env_file "" msa api-gateway-secret "$tmp_api_gateway_env"
 apply_secret_and_config_from_env_file "" msa auth-service-secret "$tmp_auth_service_env"

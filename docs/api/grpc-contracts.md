@@ -84,6 +84,24 @@ This does not change the gRPC message contract, REST behavior, database
 ownership, benchmark semantics, retry behavior, or consistency model. It only
 changes how gRPC clients choose backend pods.
 
+### 4.2 Connection Pinning and MaxConnectionAge 
+
+While headless services and client-side round-robin load balancing distribute traffic under a static replica set, Kubernetes HPA scale-out triggers a "connection pinning" issue due to gRPC's long-lived HTTP/2 connections.
+
+Go's gRPC client DNS resolver does not re-resolve DNS unless connection errors occur. As a result, the client (e.g., `api-gateway` or `transaction-service`) maintains a single persistent TCP connection to the first established pod. When the HPA spins up new replica pods, 100% of the traffic continues to be routed to the first pod, rendering the autoscaling ineffective.
+
+To mitigate this while maintaining benchmark fairness, a dynamic **Server-Side Max Connection Age** policy is implemented:
+- **HPA Mode (`SCALING_MODE=hpa`)**: All internal microservices (`auth-service`, `item-service`, and `transaction-service`) parse `GRPC_MAX_CONNECTION_AGE_HPA` from [values.yaml](file:///mnt/Cons/Amikom/semester/Semester%207/Skrips/experimen/april/code/monolith-vs-microservice-thesis/env/values.yaml) (defaulting to `30s`), which is injected as the `GRPC_MAX_CONNECTION_AGE` environment variable. This forces the server to send a graceful `GoAway` frame to the client every 30 seconds, forcing the client to reconnect, re-resolve DNS (getting all the newly scaled pod IPs), and round-robin the load correctly.
+
+  **Why 30 seconds?**
+  * **Autoscaling Responsiveness**: The Kubernetes HPA evaluates metrics every 15 seconds by default, and a new pod takes approximately 10 to 30 seconds to boot up and pass readiness probes. A 30s connection age ensures that newly scaled pods receive traffic quickly (within one connection refresh cycle of pod readiness).
+  * **Connection Overhead Trade-off**: Re-establishing TCP and gRPC/HTTP/2 connections introduces a small CPU and latency handshake overhead. A value shorter than 30s (e.g., 5s or 10s) would cause excessive reconnection churn under high RPS, while a longer value (e.g., 2m or 5m) would leave newly scaled pods idle for too long, delaying the autoscaling benefit.
+  * **Graceful Transition**: gRPC's server-side MaxConnectionAge triggers a graceful `GoAway` sequence, meaning active requests are allowed to finish over a graceful termination period (controlled by `MaxConnectionAgeGrace`), avoiding request drops.
+
+- **Fixed Mode (`SCALING_MODE=fixed`)**: `GRPC_MAX_CONNECTION_AGE` is left unset (infinite connection age). This prevents connection reconnect overhead and handshake latency during fixed-replica runs, preserving the baseline evaluation integrity.
+
+This mechanism is dynamically injected during the secret/config deployment stage via `scripts/create-*-secrets-*.sh`.
+
 ## 5. UUID and Timestamp Rules
 
 UUID values are represented as strings in gRPC messages. PostgreSQL stores UUIDs as native UUID values and generates new IDs using UUIDv7.

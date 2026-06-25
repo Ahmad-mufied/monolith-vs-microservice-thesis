@@ -21,6 +21,7 @@ import (
 	itemv1 "github.com/Ahmad-mufied/monolith-vs-microservice-thesis/proto/gen/item/v1"
 	grpctrace "github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -92,11 +93,22 @@ func Run() error {
 }
 
 func grpcServerOptions(serviceName string, requestTimeout time.Duration) []grpc.ServerOption {
-	return []grpc.ServerOption{
+	opts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
 			grpcutil.UnaryServerTimeout(requestTimeout),
 			grpctrace.UnaryServerInterceptor(grpctrace.WithService(serviceName)),
 		),
 		grpc.ChainStreamInterceptor(grpctrace.StreamServerInterceptor(grpctrace.WithService(serviceName))),
 	}
+
+	if maxAgeStr := os.Getenv("GRPC_MAX_CONNECTION_AGE"); maxAgeStr != "" {
+		if d, err := time.ParseDuration(maxAgeStr); err == nil && d > 0 {
+			opts = append(opts, grpc.KeepaliveParams(keepalive.ServerParameters{
+				MaxConnectionAge:      d,
+				MaxConnectionAgeGrace: 5 * time.Second,
+			}))
+		}
+	}
+
+	return opts
 }

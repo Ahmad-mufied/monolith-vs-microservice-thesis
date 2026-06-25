@@ -140,6 +140,16 @@ Therefore, the active Vultr supplemental HPA model should be read as:
 - plus up to 4 extra pods shared across the namespace,
 - with ResourceQuota and node schedulability acting as the final limiters.
 
+### 3.3 gRPC Load Balancing and Connection Pinning under HPA
+
+During HPA scale-out, HTTP/2 multiplexing in gRPC can cause a "connection pinning" issue where clients continue sending requests to pre-existing pods instead of distributing them to newly scaled pods.
+
+To mitigate this, a dynamic **Server-Side Max Connection Age** policy is implemented:
+- **HPA Mode (`SCALING_MODE=hpa`)**: Server connection age is limited to `30s` (via `GRPC_MAX_CONNECTION_AGE_HPA` from [values.yaml](file:///mnt/Cons/Amikom/semester/Semester%207/Skrips/experimen/april/code/monolith-vs-microservice-thesis/env/values.yaml)), forcing clients to re-resolve DNS and load balance round-robin.
+- **Fixed Mode (`SCALING_MODE=fixed`)**: Unset (infinite connection age) to preserve baseline performance.
+
+For a detailed technical explanation of the pinning mechanism and implementation details, see [docs/api/grpc-contracts.md#4.2 Connection Pinning and MaxConnectionAge](file:///mnt/Cons/Amikom/semester/Semester%207/Skrips/experimen/april/code/monolith-vs-microservice-thesis/docs/api/grpc-contracts.md#42-connection-pinning-and-maxconnectionage).
+
 ---
 
 ## 4. Why HPA Still Helps Under Equal Split

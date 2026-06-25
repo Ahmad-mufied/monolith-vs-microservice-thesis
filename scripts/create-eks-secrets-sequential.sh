@@ -84,6 +84,7 @@ auth_service_jwt_secret="$(resolve_preserved_secret_value "$auth_service_jwt_sec
 auth_service_bcrypt_cost="${BCRYPT_COST:-$(read_yaml_value ".cluster.microservices.\"auth-service\".BCRYPT_COST")}"
 auth_service_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".cluster.microservices.\"auth-service\".DIAGNOSTIC_LOGGING_ENABLED")}"
 raw_auth_service_grpc_request_timeout="${GRPC_REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"auth-service\".GRPC_REQUEST_TIMEOUT")}"
+auth_service_grpc_max_conn_age_hpa="${GRPC_MAX_CONNECTION_AGE_HPA:-$(read_yaml_value ".cluster.microservices.\"auth-service\".GRPC_MAX_CONNECTION_AGE_HPA")}"
 auth_service_login_admission_enabled="${LOGIN_ADMISSION_ENABLED:-$(read_yaml_value ".cluster.microservices.\"auth-service\".LOGIN_ADMISSION_ENABLED")}"
 auth_service_login_max_concurrency="${LOGIN_MAX_CONCURRENCY:-$(read_yaml_value ".cluster.microservices.\"auth-service\".LOGIN_MAX_CONCURRENCY")}"
 auth_service_login_max_concurrency_hpa="${LOGIN_MAX_CONCURRENCY_HPA:-$(read_yaml_value ".cluster.microservices.\"auth-service\".LOGIN_MAX_CONCURRENCY_HPA")}"
@@ -100,6 +101,7 @@ item_service_grpc_port="${GRPC_PORT:-$(read_yaml_value ".cluster.microservices.\
 item_service_name="${SERVICE_NAME:-$(read_yaml_value ".cluster.microservices.\"item-service\".SERVICE_NAME")}"
 item_service_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".cluster.microservices.\"item-service\".DIAGNOSTIC_LOGGING_ENABLED")}"
 raw_item_service_grpc_request_timeout="${GRPC_REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"item-service\".GRPC_REQUEST_TIMEOUT")}"
+item_service_grpc_max_conn_age_hpa="${GRPC_MAX_CONNECTION_AGE_HPA:-$(read_yaml_value ".cluster.microservices.\"item-service\".GRPC_MAX_CONNECTION_AGE_HPA")}"
 item_db_pool_max_conns="${DB_POOL_MAX_CONNS:-$(read_yaml_value ".cluster.microservices.\"item-service\".DB_POOL_MAX_CONNS")}"
 item_db_pool_min_conns="${DB_POOL_MIN_CONNS:-$(read_yaml_value ".cluster.microservices.\"item-service\".DB_POOL_MIN_CONNS")}"
 item_db_pool_max_conn_lifetime="${DB_POOL_MAX_CONN_LIFETIME:-$(read_yaml_value ".cluster.microservices.\"item-service\".DB_POOL_MAX_CONN_LIFETIME")}"
@@ -113,6 +115,7 @@ transaction_service_name="${SERVICE_NAME:-$(read_yaml_value ".cluster.microservi
 transaction_service_diagnostic_logging_enabled="${DIAGNOSTIC_LOGGING_ENABLED:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".DIAGNOSTIC_LOGGING_ENABLED")}"
 transaction_service_item_service_addr="${ITEM_SERVICE_ADDR:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".ITEM_SERVICE_ADDR")}"
 raw_transaction_service_grpc_request_timeout="${GRPC_REQUEST_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".GRPC_REQUEST_TIMEOUT")}"
+transaction_service_grpc_max_conn_age_hpa="${GRPC_MAX_CONNECTION_AGE_HPA:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".GRPC_MAX_CONNECTION_AGE_HPA")}"
 raw_transaction_service_item_validation_timeout="${ITEM_VALIDATION_TIMEOUT:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".ITEM_VALIDATION_TIMEOUT")}"
 transaction_db_pool_max_conns="${DB_POOL_MAX_CONNS:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".DB_POOL_MAX_CONNS")}"
 transaction_db_pool_min_conns="${DB_POOL_MIN_CONNS:-$(read_yaml_value ".cluster.microservices.\"transaction-service\".DB_POOL_MIN_CONNS")}"
@@ -128,6 +131,21 @@ transaction_db_ping_timeout="${DB_PING_TIMEOUT:-$(read_yaml_value ".cluster.micr
 : "${auth_service_jwt_secret:?auth_service_jwt_secret must be set in env/values.yaml under .cluster.microservices.auth-service.JWT_SECRET}"
 
 effective_auth_login_max_concurrency="$(resolve_login_max_concurrency_for_mode "${SCALING_MODE:-fixed}" "$auth_service_login_max_concurrency" "$auth_service_login_max_concurrency_hpa" "2" "1")"
+
+auth_grpc_max_conn_age=""
+if [[ "${SCALING_MODE:-fixed}" == "hpa" ]]; then
+  auth_grpc_max_conn_age="${auth_service_grpc_max_conn_age_hpa:-30s}"
+fi
+
+item_grpc_max_conn_age=""
+if [[ "${SCALING_MODE:-fixed}" == "hpa" ]]; then
+  item_grpc_max_conn_age="${item_service_grpc_max_conn_age_hpa:-30s}"
+fi
+
+transaction_grpc_max_conn_age=""
+if [[ "${SCALING_MODE:-fixed}" == "hpa" ]]; then
+  transaction_grpc_max_conn_age="${transaction_service_grpc_max_conn_age_hpa:-30s}"
+fi
 
 terraform_aws_profile="${TERRAFORM_AWS_PROFILE:-terraform-process}"
 terraform_with_profile() {
@@ -243,6 +261,7 @@ append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MIN_CONNS "$aut
 append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MAX_CONN_LIFETIME "$auth_db_pool_max_conn_lifetime" "15m"
 append_secret_pair_if_override auth_service_secret_pairs DB_POOL_MAX_CONN_IDLE_TIME "$auth_db_pool_max_conn_idle_time" "1m"
 append_secret_pair_if_override auth_service_secret_pairs DB_PING_TIMEOUT "$auth_db_ping_timeout" "5s"
+append_secret_pair_if_set auth_service_secret_pairs GRPC_MAX_CONNECTION_AGE "$auth_grpc_max_conn_age"
 create_secret_from_pairs msa auth-service-secret "${auth_service_secret_pairs[@]}"
 
 item_service_secret_pairs=()
@@ -257,6 +276,7 @@ append_secret_pair_if_override item_service_secret_pairs DB_POOL_MIN_CONNS "$ite
 append_secret_pair_if_override item_service_secret_pairs DB_POOL_MAX_CONN_LIFETIME "$item_db_pool_max_conn_lifetime" "15m"
 append_secret_pair_if_override item_service_secret_pairs DB_POOL_MAX_CONN_IDLE_TIME "$item_db_pool_max_conn_idle_time" "1m"
 append_secret_pair_if_override item_service_secret_pairs DB_PING_TIMEOUT "$item_db_ping_timeout" "5s"
+append_secret_pair_if_set item_service_secret_pairs GRPC_MAX_CONNECTION_AGE "$item_grpc_max_conn_age"
 create_secret_from_pairs msa item-service-secret "${item_service_secret_pairs[@]}"
 
 transaction_service_secret_pairs=()
@@ -281,6 +301,7 @@ append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MIN_CONN
 append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MAX_CONN_LIFETIME "$transaction_db_pool_max_conn_lifetime" "15m"
 append_secret_pair_if_override transaction_service_secret_pairs DB_POOL_MAX_CONN_IDLE_TIME "$transaction_db_pool_max_conn_idle_time" "1m"
 append_secret_pair_if_override transaction_service_secret_pairs DB_PING_TIMEOUT "$transaction_db_ping_timeout" "5s"
+append_secret_pair_if_set transaction_service_secret_pairs GRPC_MAX_CONNECTION_AGE "$transaction_grpc_max_conn_age"
 create_secret_from_pairs msa transaction-service-secret "${transaction_service_secret_pairs[@]}"
 
 create_secret_from_pairs benchmark k6-runner-secret \
