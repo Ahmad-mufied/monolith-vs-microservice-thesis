@@ -48,22 +48,9 @@ API Gateway        → exposes REST API, validates JWT, maps REST to gRPC, perfo
 
 The API Gateway must not access service databases directly. Business services must not access another service's database directly.
 
-## 4.1 Runtime Service Discovery
+## 4.1 Runtime Service Discovery & Load Balancing
 
-Kubernetes deployments should expose internal gRPC backends through a normal
-ClusterIP Service and a matching headless Service:
-
-```text
-auth-service                    -> compatibility/debug ClusterIP
-auth-service-headless           -> gRPC client-side load balancing target
-item-service                    -> compatibility/debug ClusterIP
-item-service-headless           -> gRPC client-side load balancing target
-transaction-service             -> compatibility/debug ClusterIP
-transaction-service-headless    -> gRPC client-side load balancing target
-```
-
-gRPC clients that talk to scalable Kubernetes services should use the DNS
-resolver scheme and the `round_robin` client-side load balancing policy:
+Kubernetes deployments expose internal gRPC backends through a normal ClusterIP Service and a matching headless Service. Clients use the `dns:///` resolver scheme and the `round_robin` client-side load balancing policy:
 
 ```text
 dns:///auth-service-headless.msa.svc.cluster.local:50051
@@ -71,36 +58,7 @@ dns:///item-service-headless.msa.svc.cluster.local:50052
 dns:///transaction-service-headless.msa.svc.cluster.local:50053
 ```
 
-Reason:
-
-```text
-gRPC uses long-lived HTTP/2 connections. When a client targets a normal
-ClusterIP Service, many RPCs can stay on one connection selected by kube-proxy.
-The headless Service returns pod IPs through DNS, and round_robin distributes
-RPCs across the resolved ready endpoints.
-```
-
-This does not change the gRPC message contract, REST behavior, database
-ownership, benchmark semantics, retry behavior, or consistency model. It only
-changes how gRPC clients choose backend pods.
-
-### 4.2 Connection Pinning and MaxConnectionAge 
-
-While headless services and client-side round-robin load balancing distribute traffic under a static replica set, Kubernetes HPA scale-out triggers a "connection pinning" issue due to gRPC's long-lived HTTP/2 connections.
-
-Go's gRPC client DNS resolver does not re-resolve DNS unless connection errors occur. As a result, the client (e.g., `api-gateway` or `transaction-service`) maintains a single persistent TCP connection to the first established pod. When the HPA spins up new replica pods, 100% of the traffic continues to be routed to the first pod, rendering the autoscaling ineffective.
-
-To mitigate this while maintaining benchmark fairness, a dynamic **Server-Side Max Connection Age** policy is implemented:
-- **HPA Mode (`SCALING_MODE=hpa`)**: All internal microservices (`auth-service`, `item-service`, and `transaction-service`) parse `GRPC_MAX_CONNECTION_AGE_HPA` from [values.yaml](file:///mnt/Cons/Amikom/semester/Semester%207/Skrips/experimen/april/code/monolith-vs-microservice-thesis/env/values.yaml) (defaulting to `30s`), which is injected as the `GRPC_MAX_CONNECTION_AGE` environment variable. This forces the server to send a graceful `GoAway` frame to the client every 30 seconds, forcing the client to reconnect, re-resolve DNS (getting all the newly scaled pod IPs), and round-robin the load correctly.
-
-  **Why 30 seconds?**
-  * **Autoscaling Responsiveness**: The Kubernetes HPA evaluates metrics every 15 seconds by default, and a new pod takes approximately 10 to 30 seconds to boot up and pass readiness probes. A 30s connection age ensures that newly scaled pods receive traffic quickly (within one connection refresh cycle of pod readiness).
-  * **Connection Overhead Trade-off**: Re-establishing TCP and gRPC/HTTP/2 connections introduces a small CPU and latency handshake overhead. A value shorter than 30s (e.g., 5s or 10s) would cause excessive reconnection churn under high RPS, while a longer value (e.g., 2m or 5m) would leave newly scaled pods idle for too long, delaying the autoscaling benefit.
-  * **Graceful Transition**: gRPC's server-side MaxConnectionAge triggers a graceful `GoAway` sequence, meaning active requests are allowed to finish over a graceful termination period (controlled by `MaxConnectionAgeGrace`), avoiding request drops.
-
-- **Fixed Mode (`SCALING_MODE=fixed`)**: `GRPC_MAX_CONNECTION_AGE` is left unset (infinite connection age). This prevents connection reconnect overhead and handshake latency during fixed-replica runs, preserving the baseline evaluation integrity.
-
-This mechanism is dynamically injected during the secret/config deployment stage via `scripts/create-*-secrets-*.sh`.
+For a comprehensive explanation of client-side load balancing, the connection pinning issue under HPA, and the dynamic `MaxConnectionAge` mitigation, see [docs/architecture/grpc-load-balancing-pinning.md](file:///mnt/Cons/Amikom/semester/Semester%207/Skrips/experimen/april/code/monolith-vs-microservice-thesis/docs/architecture/grpc-load-balancing-pinning.md).
 
 ## 5. UUID and Timestamp Rules
 
