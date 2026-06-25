@@ -38,6 +38,7 @@ In traditional REST architectures, load balancing is handled by a middle proxy (
 %%{init: {
   'theme': 'base',
   'themeVariables': {
+    'background': '#0f172a',
     'actorBkg': '#eff6ff',
     'actorBorder': '#2563eb',
     'actorTextColor': '#1e3a8a',
@@ -45,10 +46,10 @@ In traditional REST architectures, load balancing is handled by a middle proxy (
     'noteBorderColor': '#d97706',
     'noteTextColor': '#7c2d12',
     'signalColor': '#94a3b8',
-    'signalTextColor': '#0f172a',
-    'labelBoxBkgColor': '#f1f5f9',
-    'labelBoxBorderColor': '#cbd5e1',
-    'labelTextColor': '#0f172a'
+    'signalTextColor': '#ffffff',
+    'labelBoxBkgColor': '#1e293b',
+    'labelBoxBorderColor': '#334155',
+    'labelTextColor': '#ffffff'
   }
 }}%%
 sequenceDiagram
@@ -193,6 +194,7 @@ Rather than forcing client-side polling or deploying complex service meshes (whi
 %%{init: {
   'theme': 'base',
   'themeVariables': {
+    'background': '#0f172a',
     'actorBkg': '#eff6ff',
     'actorBorder': '#2563eb',
     'actorTextColor': '#1e3a8a',
@@ -200,10 +202,10 @@ Rather than forcing client-side polling or deploying complex service meshes (whi
     'noteBorderColor': '#d97706',
     'noteTextColor': '#7c2d12',
     'signalColor': '#94a3b8',
-    'signalTextColor': '#0f172a',
-    'labelBoxBkgColor': '#f1f5f9',
-    'labelBoxBorderColor': '#cbd5e1',
-    'labelTextColor': '#0f172a'
+    'signalTextColor': '#ffffff',
+    'labelBoxBkgColor': '#1e293b',
+    'labelBoxBorderColor': '#334155',
+    'labelTextColor': '#ffffff'
   }
 }}%%
 sequenceDiagram
