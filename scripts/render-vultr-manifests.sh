@@ -116,27 +116,43 @@ patch_benchmark_resource_json() {
 }
 
 patch_equal_split_resource_profile() {
+  local mono_cpu_limit="${VULTR_APP_CPU_QUOTA%m}"
+  local mono_mem_limit="${VULTR_APP_MEMORY_QUOTA%Mi}"
+  local mono_cpu_req=$((mono_cpu_limit / 2))
+  local mono_mem_req=$((mono_mem_limit / 2))
+
+  local msa_cpu_limit=$((mono_cpu_limit / 4))
+  local msa_mem_limit=$((mono_mem_limit / 4))
+  local msa_cpu_req=$((msa_cpu_limit / 2))
+  local msa_mem_req=$((msa_mem_limit / 2))
+
+  local msa_hpa_cpu_limit=$((msa_cpu_limit / 2))
+  local msa_hpa_mem_limit=$((msa_mem_limit / 2))
+  local msa_hpa_cpu_req=$((msa_hpa_cpu_limit / 2))
+  [ "$msa_hpa_cpu_req" -lt 500 ] && msa_hpa_cpu_req=500
+  local msa_hpa_mem_req=$((msa_hpa_mem_limit / 2))
+
   local quota_json
   local mono_fixed_json
   local msa_fixed_json
   local msa_hpa_json
 
   quota_json="{\"cpu\":\"${VULTR_APP_CPU_QUOTA}\",\"memory\":\"${VULTR_APP_MEMORY_QUOTA}\"}"
-  mono_fixed_json='{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"'"${VULTR_APP_CPU_QUOTA}"'","memory":"'"${VULTR_APP_MEMORY_QUOTA}"'"},"cpu_request":"3900m","cpu_limit":"7800m","memory_request":"7680Mi","memory_limit":"15360Mi","replica_count":1}'
-  msa_fixed_json='{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"'"${VULTR_APP_CPU_QUOTA}"'","memory":"'"${VULTR_APP_MEMORY_QUOTA}"'"},"services":{"api-gateway":{"cpu_request":"980m","cpu_limit":"1950m","memory_request":"1920Mi","memory_limit":"3840Mi","replica_count":1},"auth-service":{"cpu_request":"980m","cpu_limit":"1950m","memory_request":"1920Mi","memory_limit":"3840Mi","replica_count":1},"item-service":{"cpu_request":"980m","cpu_limit":"1950m","memory_request":"1920Mi","memory_limit":"3840Mi","replica_count":1},"transaction-service":{"cpu_request":"980m","cpu_limit":"1950m","memory_request":"1920Mi","memory_limit":"3840Mi","replica_count":1}}}'
-  msa_hpa_json='{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"'"${VULTR_APP_CPU_QUOTA}"'","memory":"'"${VULTR_APP_MEMORY_QUOTA}"'"},"allocation_method":"equal per-pod baseline with shared namespace headroom","services":{"api-gateway":{"cpu_request":"500m","cpu_limit":"975m","memory_request":"960Mi","memory_limit":"1920Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":40},"auth-service":{"cpu_request":"500m","cpu_limit":"975m","memory_request":"960Mi","memory_limit":"1920Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":40},"item-service":{"cpu_request":"500m","cpu_limit":"975m","memory_request":"960Mi","memory_limit":"1920Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":40},"transaction-service":{"cpu_request":"500m","cpu_limit":"975m","memory_request":"960Mi","memory_limit":"1920Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":40}}}'
+  mono_fixed_json='{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"'"${VULTR_APP_CPU_QUOTA}"'","memory":"'"${VULTR_APP_MEMORY_QUOTA}"'"},"cpu_request":"'"${mono_cpu_req}"'m","cpu_limit":"'"${mono_cpu_limit}"'m","memory_request":"'"${mono_mem_req}"'Mi","memory_limit":"'"${mono_mem_limit}"'Mi","replica_count":1}'
+  msa_fixed_json='{"autoscaling_mode":"fixed","hpa_enabled":false,"namespace_resource_quota":{"cpu":"'"${VULTR_APP_CPU_QUOTA}"'","memory":"'"${VULTR_APP_MEMORY_QUOTA}"'"},"services":{"api-gateway":{"cpu_request":"'"${msa_cpu_req}"'m","cpu_limit":"'"${msa_cpu_limit}"'m","memory_request":"'"${msa_mem_req}"'Mi","memory_limit":"'"${msa_mem_limit}"'Mi","replica_count":1},"auth-service":{"cpu_request":"'"${msa_cpu_req}"'m","cpu_limit":"'"${msa_cpu_limit}"'m","memory_request":"'"${msa_mem_req}"'Mi","memory_limit":"'"${msa_mem_limit}"'Mi","replica_count":1},"item-service":{"cpu_request":"'"${msa_cpu_req}"'m","cpu_limit":"'"${msa_cpu_limit}"'m","memory_request":"'"${msa_mem_req}"'Mi","memory_limit":"'"${msa_mem_limit}"'Mi","replica_count":1},"transaction-service":{"cpu_request":"'"${msa_cpu_req}"'m","cpu_limit":"'"${msa_cpu_limit}"'m","memory_request":"'"${msa_mem_req}"'Mi","memory_limit":"'"${msa_mem_limit}"'Mi","replica_count":1}}}'
+  msa_hpa_json='{"autoscaling_mode":"hpa","hpa_enabled":true,"namespace_resource_quota":{"cpu":"'"${VULTR_APP_CPU_QUOTA}"'","memory":"'"${VULTR_APP_MEMORY_QUOTA}"'"},"allocation_method":"equal per-pod baseline with shared namespace headroom","services":{"api-gateway":{"cpu_request":"'"${msa_hpa_cpu_req}"'m","cpu_limit":"'"${msa_hpa_cpu_limit}"'m","memory_request":"'"${msa_hpa_mem_req}"'Mi","memory_limit":"'"${msa_hpa_mem_limit}"'Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":40},"auth-service":{"cpu_request":"'"${msa_hpa_cpu_req}"'m","cpu_limit":"'"${msa_hpa_cpu_limit}"'m","memory_request":"'"${msa_hpa_mem_req}"'Mi","memory_limit":"'"${msa_hpa_mem_limit}"'Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":40},"item-service":{"cpu_request":"'"${msa_hpa_cpu_req}"'m","cpu_limit":"'"${msa_hpa_cpu_limit}"'m","memory_request":"'"${msa_hpa_mem_req}"'Mi","memory_limit":"'"${msa_hpa_mem_limit}"'Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":40},"transaction-service":{"cpu_request":"'"${msa_hpa_cpu_req}"'m","cpu_limit":"'"${msa_hpa_cpu_limit}"'m","memory_request":"'"${msa_hpa_mem_req}"'Mi","memory_limit":"'"${msa_hpa_mem_limit}"'Mi","min_replicas":1,"max_replicas":5,"target_cpu_utilization":40}}}'
 
   set_deployment_replicas "$manifest_root/deployments/k8s/cloud/monolith/overlays/fixed/deployment-patch.yaml" 1
-  set_container_resources "$manifest_root/deployments/k8s/cloud/monolith/overlays/fixed/deployment-patch.yaml" "3900m" "7800m" "7680Mi" "15360Mi"
+  set_container_resources "$manifest_root/deployments/k8s/cloud/monolith/overlays/fixed/deployment-patch.yaml" "${mono_cpu_req}m" "${mono_cpu_limit}m" "${mono_mem_req}Mi" "${mono_mem_limit}Mi"
 
   set_deployment_replicas "$manifest_root/deployments/k8s/cloud/monolith/overlays/hpa/deployment-patch.yaml" 1
-  set_container_resources "$manifest_root/deployments/k8s/cloud/monolith/overlays/hpa/deployment-patch.yaml" "3900m" "7800m" "7680Mi" "15360Mi"
+  set_container_resources "$manifest_root/deployments/k8s/cloud/monolith/overlays/hpa/deployment-patch.yaml" "${mono_cpu_req}m" "${mono_cpu_limit}m" "${mono_mem_req}Mi" "${mono_mem_limit}Mi"
 
   for svc in api-gateway auth-service item-service transaction-service; do
     set_deployment_replicas "$manifest_root/deployments/k8s/cloud/microservices/overlays/fixed/${svc}-patch.yaml" 1
-    set_container_resources "$manifest_root/deployments/k8s/cloud/microservices/overlays/fixed/${svc}-patch.yaml" "980m" "1950m" "1920Mi" "3840Mi"
+    set_container_resources "$manifest_root/deployments/k8s/cloud/microservices/overlays/fixed/${svc}-patch.yaml" "${msa_cpu_req}m" "${msa_cpu_limit}m" "${msa_mem_req}Mi" "${msa_mem_limit}Mi"
     set_deployment_replicas "$manifest_root/deployments/k8s/cloud/microservices/overlays/hpa/${svc}-patch.yaml" 1
-    set_container_resources "$manifest_root/deployments/k8s/cloud/microservices/overlays/hpa/${svc}-patch.yaml" "500m" "975m" "960Mi" "1920Mi"
+    set_container_resources "$manifest_root/deployments/k8s/cloud/microservices/overlays/hpa/${svc}-patch.yaml" "${msa_hpa_cpu_req}m" "${msa_hpa_cpu_limit}m" "${msa_hpa_mem_req}Mi" "${msa_hpa_mem_limit}Mi"
     set_hpa_replicas "$manifest_root/deployments/k8s/cloud/microservices/overlays/hpa/${svc}-hpa.yaml" 1 5
   done
 
