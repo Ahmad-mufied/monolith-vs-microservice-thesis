@@ -25,7 +25,7 @@ flow.
 | `VULTR_API_KEY` | `***` | Terraform and preflight | Must not remain `replace-me`. |
 | `VULTR_REGION` | `sgp` | Terraform, metadata | Keep all Vultr stacks in the same region for private networking. |
 | `VULTR_VPC_CIDR` | `10.20.0.0/16` | Shared Terraform | Legacy VPC CIDR. |
-| `VULTR_KUBERNETES_VERSION` | `v1.36.1+1` | VKE Terraform | Must be available in the selected Vultr region. |
+| `VULTR_KUBERNETES_VERSION` | `v1.36.1+2` | VKE Terraform | Must be available in the selected Vultr region. |
 | `VULTR_APP_NODE_PLAN` | `voc-c-8c-16gb-150s-amd` | VKE Terraform, baseline metadata | Single high-vCPU app node plan. |
 | `VULTR_APP_NODE_COUNT` | `1` | VKE Terraform, live verification | App node count per active architecture. |
 | `VULTR_TESTING_NODE_PLAN` | `vc2-2c-4gb` | VKE Terraform | Dedicated k6/testing node pool. |

@@ -19,7 +19,7 @@ not at the cluster level.
 ```text
 VKE Cluster: skripsi-vultr-benchmark   (kubectl context: benchmark)
 Region: mia
-Kubernetes: v1.36.1+1
+Kubernetes: v1.36.1+2
 
 Node Pools:
   app-nodes      1 x voc-c-8c-16gb-150s-amd   8 vCPU  16 GB   Dedicated CPU

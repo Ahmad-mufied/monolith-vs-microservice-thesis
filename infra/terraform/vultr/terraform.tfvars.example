@@ -1,7 +1,7 @@
 project                 = "skripsi"
 region                  = "sgp"
 execution_mode          = "sequential"
-kubernetes_version      = "v1.36.1+1"
+kubernetes_version      = "v1.36.1+2"
 operator_cidrs          = ["REPLACE_WITH_YOUR_PUBLIC_IP/32"]
 operator_ssh_public_key = "ssh-ed25519 AAAA... operator@example"
 # postgres_password goes in env/vultr.env, not here
