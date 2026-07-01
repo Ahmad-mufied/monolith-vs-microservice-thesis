@@ -141,8 +141,7 @@ def _open_gzip_text(raw_path: str, *, s3_client: Any | None):
             raise ArtifactDiscoveryError("AWS credentials are missing or expired for raw.json.gz access.") from exc
         except BotoCoreError as exc:
             raise ArtifactDiscoveryError(f"unable to fetch {raw_path}: {exc}") from exc
-        body = response["Body"].read()
-        gzip_stream = gzip.GzipFile(fileobj=io.BytesIO(body), mode="rb")
+        gzip_stream = gzip.GzipFile(fileobj=response["Body"], mode="rb")
         return io.TextIOWrapper(gzip_stream, encoding="utf-8")
 
     return gzip.open(raw_path, "rt", encoding="utf-8")

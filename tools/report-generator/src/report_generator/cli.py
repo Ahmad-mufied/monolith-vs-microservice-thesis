@@ -116,12 +116,13 @@ def consolidate_main():
         output_parent_str = config.get("output_parent", "reports")
         output_parent = Path(output_parent_str)
     except Exception:
+        config = {}
         output_parent = Path("reports")
 
     cache_dir = args.cache_dir if args.cache_dir else output_parent / "cache"
 
     try:
-        runs = load_runs_config(args.config)
+        runs = load_runs_config(config or args.config)
     except Exception as exc:
         print(f"Error loading config: {exc}")
         sys.exit(1)
@@ -145,6 +146,8 @@ def consolidate_main():
             sys.exit(0)
         print(f"Consolidated output directory: {output_dir}")
 
+    failed = False
+
     # 1. Compile k6 results
     print("Compiling k6 consolidated results...")
     try:
@@ -161,6 +164,7 @@ def consolidate_main():
             print("Warning: No k6 results compiled.")
     except Exception as exc:
         print(f"Error compiling or plotting k6 results: {exc}")
+        failed = True
 
     # 2. Compile Datadog resource summary
     print("Compiling Datadog consolidated resource summary...")
@@ -178,6 +182,7 @@ def consolidate_main():
             print("Warning: No Datadog resource summary compiled.")
     except Exception as exc:
         print(f"Error compiling or plotting Datadog results: {exc}")
+        failed = True
 
     # 3. Create or update symlink 'consolidated' pointing to 'output_dir'
     symlink_path = output_parent / "consolidated"
@@ -195,11 +200,22 @@ def consolidate_main():
                 symlink_path.unlink()
 
         # Create relative symlink
-        relative_target = output_dir.relative_to(output_parent)
+        try:
+            relative_target = output_dir.relative_to(output_parent)
+        except ValueError:
+            import os
+            try:
+                relative_target = os.path.relpath(output_dir, output_parent)
+            except ValueError:
+                relative_target = output_dir.resolve()
         print(f"Creating symlink: {symlink_path} -> {relative_target}")
         symlink_path.symlink_to(relative_target)
     except Exception as exc:
         print(f"Warning: Failed to manage symlink '{symlink_path}': {exc}")
+
+    if failed:
+        print("Error: One or more consolidation tasks failed. Exiting with non-zero status.")
+        sys.exit(1)
 
     print(f"Consolidation complete. Output charts are in: {output_dir}")
 

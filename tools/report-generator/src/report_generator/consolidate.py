@@ -38,10 +38,13 @@ REQUIRED_RUNS = {
 }
 
 
-def load_runs_config(config_path: Path) -> dict[str, str]:
+def load_runs_config(config_or_path: Path | dict) -> dict[str, str]:
     """Load and validate consolidation runs from TOML config."""
-    with open(config_path, "rb") as f:
-        config = tomllib.load(f)
+    if isinstance(config_or_path, dict):
+        config = config_or_path
+    else:
+        with open(config_or_path, "rb") as f:
+            config = tomllib.load(f)
 
     consolidation = config.get("consolidation", {})
     runs = consolidation.get("runs", {})

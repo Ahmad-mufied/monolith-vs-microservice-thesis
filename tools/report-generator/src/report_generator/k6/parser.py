@@ -124,6 +124,8 @@ def _actual_throughput(
     count = http_reqs_values.get("count")
     if isinstance(count, (int, float)):
         seconds = parse_duration_to_seconds(duration)
+        if seconds <= 0:
+            raise InvalidArtifactError(f"invalid or zero duration '{duration}' for {source_uri}")
         return float(count) / seconds
 
     raise InvalidArtifactError(f"missing http_reqs rate/count metric for {source_uri}")

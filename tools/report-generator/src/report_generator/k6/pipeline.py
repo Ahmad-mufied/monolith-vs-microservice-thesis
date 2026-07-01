@@ -61,11 +61,15 @@ def generate_report(
     if source_type == "s3" and bucket and prefix:
         try:
             import boto3
+            import sys
 
             s3_client = boto3.client("s3")
             suite_summary = load_suite_summary_from_s3(s3_client, bucket, prefix)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(
+                f"Warning: Failed to load suite summary from S3 (s3://{bucket}/{prefix}): {exc}",
+                file=sys.stderr,
+            )
     elif source_type == "local" and input_path:
         suite_summary = load_suite_summary_from_local(input_path)
 

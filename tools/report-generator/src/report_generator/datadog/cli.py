@@ -90,11 +90,10 @@ def resolve_scaling_mode(metadata: Dict[str, Any]) -> str:
     for c in candidates:
         if isinstance(c, str) and c.strip():
             val = c.strip().lower()
-            if "hpa" in val:
+            if "hpa" in val or "ramp-up" in val or "ramp_up" in val:
                 return "hpa"
-            if val in ("steady", "fixed", "smoke", "steady-state"):
+            if "steady" in val or "fixed" in val or "smoke" in val:
                 return "fixed"
-            return val
     return "fixed"
 
 
