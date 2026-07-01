@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import io
 import json
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, NoReturn
 
 import boto3
 from botocore.exceptions import BotoCoreError, NoCredentialsError, PartialCredentialsError
 
-from report_generator.k6.exceptions import ArtifactDiscoveryError, MissingArtifactError
+from report_generator.k6.exceptions import ArtifactDiscoveryError, InvalidArtifactError, MissingArtifactError
 from report_generator.k6.models import AttemptArtifacts, REQUIRED_FILES, OPTIONAL_JSON_FILES
+from report_generator.k6.sources.local import OPTIONAL_PATH_FILES
 from report_generator.k6.utils import parse_rps_dir
 
 
@@ -42,7 +42,7 @@ def load_s3_attempts(
                 found_any = True
                 key = obj["Key"]
                 file_name = PurePosixPath(key).name
-                if file_name not in REQUIRED_FILES and file_name not in OPTIONAL_JSON_FILES and file_name != "raw.json.gz":
+                if file_name not in REQUIRED_FILES and file_name not in OPTIONAL_JSON_FILES and file_name not in OPTIONAL_PATH_FILES:
                     continue
                 attempt_prefix = str(PurePosixPath(key).parent)
                 if attempt_filter:
@@ -197,7 +197,7 @@ def _create_s3_client(bucket: str, prefix: str) -> Any:
         ) from exc
 
 
-def _raise_s3_error(exc: BotoCoreError, bucket: str, prefix: str) -> None:
+def _raise_s3_error(exc: BotoCoreError, bucket: str, prefix: str) -> NoReturn:
     error_name = type(exc).__name__
     message = str(exc)
     if "expired" in message.lower() or "login" in message.lower():
@@ -209,7 +209,10 @@ def _raise_s3_error(exc: BotoCoreError, bucket: str, prefix: str) -> None:
 
 def _load_s3_json(s3: Any, bucket: str, key: str) -> dict[str, Any]:
     payload = _load_s3_bytes(s3, bucket, key)
-    return json.loads(payload.decode("utf-8"))
+    try:
+        return json.loads(payload.decode("utf-8"))
+    except json.JSONDecodeError as exc:
+        raise InvalidArtifactError(f"malformed JSON in S3 object s3://{bucket}/{key}: {exc}") from exc
 
 
 def _load_s3_text(s3: Any, bucket: str, key: str) -> str:
@@ -225,10 +228,7 @@ def _optional_json(s3: Any, bucket: str, key: str | None) -> dict[str, Any] | No
 def _load_s3_bytes(s3: Any, bucket: str, key: str) -> bytes:
     try:
         body = s3.get_object(Bucket=bucket, Key=key)["Body"]
-        data = body.read()
-        if isinstance(data, io.BytesIO):
-            return data.getvalue()
-        return data
+        return body.read()
     except (NoCredentialsError, PartialCredentialsError) as exc:
         raise ArtifactDiscoveryError(_S3_AUTH_HINT) from exc
     except BotoCoreError as exc:

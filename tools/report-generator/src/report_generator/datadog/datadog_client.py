@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Dict, List
 import requests
 
@@ -49,11 +50,31 @@ class DatadogClient:
             "query": query,
         }
 
-        # Robust API requests with error checking (no silent errors)
-        try:
-            response = requests.get(url, headers=headers, params=params, timeout=30)
-        except requests.exceptions.RequestException as exc:
-            raise RuntimeError(f"Datadog API request failed network connection: {exc}") from exc
+        # Robust API requests with retry and backoff (no silent errors)
+        max_retries = 3
+        backoff_sec = 2.0
+        response = None
+        last_exc = None
+
+        for attempt in range(max_retries + 1):
+            if attempt > 0:
+                time.sleep(backoff_sec)
+                backoff_sec *= 2.0
+
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=30)
+                if response.status_code in (429, 500, 502, 503, 504):
+                    if attempt < max_retries:
+                        continue
+                break
+            except requests.exceptions.RequestException as exc:
+                last_exc = exc
+                if attempt < max_retries:
+                    continue
+                raise RuntimeError(f"Datadog API request failed network connection after {max_retries} retries: {exc}") from exc
+
+        if response is None:
+            raise RuntimeError(f"Datadog API request failed network connection: {last_exc}")
 
         if response.status_code != 200:
             err_msg = f"Datadog API returned HTTP {response.status_code}"

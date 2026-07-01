@@ -606,6 +606,13 @@ def main() -> None:
         else:
             run_id = Path(resolved_run_dir).name
 
+    # Sanitize run_id to prevent path traversal
+    if run_id:
+        run_id = run_id.replace("/", "").replace("\\", "").replace("..", "").strip()
+        run_id = Path(run_id).name
+    if not run_id or run_id in (".", "..", ""):
+        run_id = "unknown-run"
+
     # 5. Write Report Tables (CSV)
     output_path = resolved_output_parent / run_id
     tables_path = output_path / "tables"

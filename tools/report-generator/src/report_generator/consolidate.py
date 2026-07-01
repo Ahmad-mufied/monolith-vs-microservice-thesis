@@ -12,6 +12,14 @@ from matplotlib.patches import FancyBboxPatch
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 import boto3
+from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
+
+from report_generator.styles import (
+    THEME,
+    OUTPUT_DPI,
+    smooth_series,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +27,6 @@ try:
     import tomllib
 except ImportError:
     import tomli as tomllib
-
-from report_generator.styles import (
-    THEME,
-    OUTPUT_DPI,
-    smooth_series,
-)
 
 REQUIRED_RUNS = {
     "mono_fixed_true",
@@ -95,8 +97,18 @@ def resolve_data_file(run_id: str, filename: str, cache_dir: Path, s3_bucket: st
 
     # Fallback to S3 download
     s3_key = f"experiments/{run_id}/{filename}"
-    s3_client = boto3.client("s3")
-    s3_client.download_file(s3_bucket, s3_key, str(local_file))
+    config = Config(connect_timeout=5, read_timeout=10, retries={"max_attempts": 3})
+    try:
+        s3_client = boto3.client("s3", config=config)
+        s3_client.download_file(s3_bucket, s3_key, str(local_file))
+    except (BotoCoreError, ClientError) as exc:
+        logger.error(f"Failed to download {s3_key} from S3 bucket {s3_bucket}: {exc}")
+        if local_file.exists():
+            try:
+                local_file.unlink()
+            except OSError:
+                pass
+        raise
 
     return local_file
 

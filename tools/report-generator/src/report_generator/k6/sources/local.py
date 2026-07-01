@@ -5,11 +5,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from report_generator.k6.exceptions import ArtifactDiscoveryError, MissingArtifactError
+from report_generator.k6.exceptions import ArtifactDiscoveryError, InvalidArtifactError, MissingArtifactError
 from report_generator.k6.models import AttemptArtifacts, REQUIRED_FILES, OPTIONAL_JSON_FILES
 from report_generator.k6.utils import parse_rps_dir
 
 OPTIONAL_PATH_FILES = ("raw.json.gz",)
+
+
+def _load_json_file(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise InvalidArtifactError(f"malformed JSON in file '{path}': {exc}") from exc
 
 
 def load_local_attempts(
@@ -42,15 +49,15 @@ def load_local_attempts(
                     f"missing required file '{required}' in attempt {attempt_dir}"
                 )
 
-        metadata = json.loads(files["metadata.json"].read_text(encoding="utf-8"))
-        summary = json.loads(files["summary.json"].read_text(encoding="utf-8"))
-        thresholds = json.loads(files["thresholds.json"].read_text(encoding="utf-8"))
+        metadata = _load_json_file(files["metadata.json"])
+        summary = _load_json_file(files["summary.json"])
+        thresholds = _load_json_file(files["thresholds.json"])
         stdout_text = files["stdout.log"].read_text(encoding="utf-8")
 
         optional_json = {}
         for file_name in OPTIONAL_JSON_FILES:
             if file_name in files:
-                optional_json[file_name] = json.loads(files[file_name].read_text(encoding="utf-8"))
+                optional_json[file_name] = _load_json_file(files[file_name])
 
         attempts.append(
             AttemptArtifacts(
