@@ -126,4 +126,4 @@ coverage/
 # =========================
 # Python / Report Generator
 # =========================
-tools/
+tools/report-generator/

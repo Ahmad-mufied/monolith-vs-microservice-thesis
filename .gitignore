@@ -158,7 +158,7 @@ k6/*.gz
 results/
 experiments/
 exports/
-reports/
+/reports/
 snapshots/
 cluster-snapshots/
 *.csv.gz
