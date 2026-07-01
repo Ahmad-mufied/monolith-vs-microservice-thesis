@@ -497,3 +497,31 @@ class TestBuildLimitsFromBaseline:
         fixed_cpu = limits["fixed"]["microservices"]["auth-service"]["cpu_m"]
         hpa_cpu = limits["hpa"]["microservices"]["auth-service"]["cpu_m"]
         assert hpa_cpu == fixed_cpu // 2
+
+
+class TestDatadogClientSiteValidation:
+    """Tests for site validation in DatadogClient."""
+
+    def test_valid_sites(self) -> None:
+        """Accepts all valid documented Datadog sites."""
+        from report_generator.datadog.datadog_client import ALLOWED_SITES
+        for site in ALLOWED_SITES:
+            # Should not raise ValueError
+            client = DatadogClient(api_key="dummy", app_key="dummy", site=site)
+            assert client.site == site
+            assert client.base_url == f"https://api.{site}"
+
+    def test_invalid_sites_raise_value_error(self) -> None:
+        """Raises ValueError for invalid sites, schemes, or paths."""
+        invalid_sites = [
+            "untrusted.com",
+            "https://us5.datadoghq.com",
+            "us5.datadoghq.com/api/v1",
+            "datadoghq.com.attacker.com",
+            "",
+            "   ",
+        ]
+        for site in invalid_sites:
+            with pytest.raises(ValueError) as excinfo:
+                DatadogClient(api_key="dummy", app_key="dummy", site=site)
+            assert "Invalid Datadog site" in str(excinfo.value)

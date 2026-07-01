@@ -410,3 +410,18 @@ def test_consolidate_plotting_datadog(mock_savefig, tmp_path):
     assert any("ablation-cpu-usage.png" in p for p in saved_paths), f"Missing ablation-cpu-usage, got {saved_paths}"
     assert any("ablation-memory-usage.png" in p for p in saved_paths), f"Missing ablation-memory-usage, got {saved_paths}"
 
+
+def test_compile_consolidated_dataset_all_fail(tmp_path):
+    """Verifies that compile_consolidated_dataset raises RuntimeError when all runs fail."""
+    runs = {
+        "mono_fixed_true": "run_1",
+        "msa_fixed_true": "run_1",
+    }
+    with pytest.raises(RuntimeError, match="Failed to compile any consolidation runs"):
+        compile_consolidated_dataset(
+            runs=runs,
+            filename="master-results.csv",
+            cache_dir=tmp_path,
+            s3_bucket="dummy-bucket",
+        )
+

@@ -20,6 +20,18 @@ class TimeseriesSeries(BaseModel):
     points: List[TimeseriesPoint] = Field(default_factory=list)
 
 
+ALLOWED_SITES = {
+    "datadoghq.com",
+    "datadoghq.eu",
+    "us3.datadoghq.com",
+    "us5.datadoghq.com",
+    "ap1.datadoghq.com",
+    "ap2.datadoghq.com",
+    "ddog-gov.com",
+    "us2.ddog-gov.com",
+}
+
+
 class DatadogClient:
     """Simple requests-based Datadog client for metric queries."""
 
@@ -29,9 +41,15 @@ class DatadogClient:
         if not app_key:
             raise ValueError("Datadog Application Key (DATADOG_APP_KEY / DD_APP_KEY) is required.")
         
+        clean_site = site.strip().lower()
+        if clean_site not in ALLOWED_SITES:
+            raise ValueError(
+                f"Invalid Datadog site: {site!r}. Must be one of: {', '.join(sorted(ALLOWED_SITES))}"
+            )
+        
         self.api_key = api_key
         self.app_key = app_key
-        self.site = site.strip()
+        self.site = clean_site
         self.base_url = f"https://api.{self.site}"
 
     def query_metrics(

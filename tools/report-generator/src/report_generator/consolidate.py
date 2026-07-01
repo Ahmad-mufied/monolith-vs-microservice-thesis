@@ -124,6 +124,7 @@ def compile_consolidated_dataset(
 ) -> pd.DataFrame:
     """Load and compile data across multiple Run IDs using dynamic filtering."""
     data_list = []
+    errors = []
     
     for run_label, run_id in runs.items():
         # Determine targets from label name
@@ -135,7 +136,7 @@ def compile_consolidated_dataset(
             # Load the resolved file
             path = resolve_data_file(run_id, filename, cache_dir, s3_bucket)
             if not path.exists():
-                continue
+                raise FileNotFoundError(f"Data file does not exist locally: {path}")
 
             df = pd.read_csv(path)
 
@@ -160,9 +161,14 @@ def compile_consolidated_dataset(
                 "Error processing run_label=%r (run_id=%r, file=%r): %s",
                 run_label, run_id, filename, exc,
             )
+            errors.append(f"{run_label}: {exc}")
             continue
         
     if not data_list:
+        if errors:
+            raise RuntimeError(
+                "Failed to compile any consolidation runs: " + "; ".join(errors)
+            )
         return pd.DataFrame()
         
     return pd.concat(data_list, ignore_index=True)
