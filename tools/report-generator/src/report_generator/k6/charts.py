@@ -662,11 +662,11 @@ def _build_scaling_change_frame(frame: pd.DataFrame) -> pd.DataFrame:
     comparison["throughput_change_pct"] = (
         (comparison["hpa_actual_throughput"] - comparison["fixed_actual_throughput"])
         / comparison["fixed_actual_throughput"]
-    ) * 100.0
+    ).replace([np.inf, -np.inf], np.nan) * 100.0
     comparison["latency_change_pct"] = (
         (comparison["hpa_p95_latency_ms"] - comparison["fixed_p95_latency_ms"])
         / comparison["fixed_p95_latency_ms"]
-    ) * 100.0
+    ).replace([np.inf, -np.inf], np.nan) * 100.0
     return comparison.sort_values(["target_rps", "scenario", "architecture"]).reset_index(drop=True)
 
 

@@ -154,9 +154,11 @@ def _build_limits_from_baseline(cpu_m: int, mem_mib: int) -> dict:
 def load_config(config_path: Path | None = None) -> ReporterConfig:
     """Load configuration from TOML and environment variables."""
     # Try to load env files to populate os.environ
+    package_root = Path(__file__).resolve().parents[3]
+    repo_root = Path(__file__).resolve().parents[5]
     _load_env_file(Path.cwd() / ".env", override=True)
-    _load_env_file(Path(__file__).parent.parent.parent / ".env", override=True)
-    _load_env_file(Path("/mnt/Cons/Amikom/semester/Semester 7/Skrips/experimen/april/code/monolith-vs-microservice-thesis/env/datadog.shared.env"), override=False)
+    _load_env_file(package_root / ".env", override=True)
+    _load_env_file(repo_root / "env" / "datadog.shared.env", override=False)
 
     # Find default config path
     if config_path is None:
