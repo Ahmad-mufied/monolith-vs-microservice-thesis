@@ -1590,3 +1590,23 @@ run-benchmark-suite-sequential:
 	AWS_REGION=$(AWS_REGION) \
 	IMAGE_TAG=$(IMAGE_TAG) \
 	bash scripts/run-benchmark-suite-sequential.sh
+
+.PHONY: report-setup
+report-setup:
+	@printf '%s\n' '=== make report-setup ==='
+	uv sync --project tools/report-generator
+
+.PHONY: report-k6
+report-k6:
+	@printf '%s\n' '=== make report-k6 ==='
+	uv run --project tools/report-generator k6-report-generator $(ARGS)
+
+.PHONY: report-datadog
+report-datadog:
+	@printf '%s\n' '=== make report-datadog ==='
+	uv run --project tools/report-generator datadog-reporter $(ARGS)
+
+.PHONY: report-consolidate
+report-consolidate:
+	@printf '%s\n' '=== make report-consolidate ==='
+	uv run --project tools/report-generator report-generator consolidate --config tools/report-generator/report-generator.toml $(ARGS)

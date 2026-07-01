@@ -122,3 +122,8 @@ seed/datasets/*.gz
 node_modules/
 .cache/
 coverage/
+
+# =========================
+# Python / Report Generator
+# =========================
+tools/
