@@ -1,0 +1,55 @@
+{
+  "execution_mode": "parallel",
+  "scaling_mode": "fixed",
+  "suite_status": "pass",
+  "started_at_utc": "2026-05-27T04:35:00Z",
+  "finished_at_utc": "2026-05-27T05:00:00Z",
+  "cases": [
+    {
+      "scenario": "login",
+      "target_rps": 50,
+      "status": "pass",
+      "exit_code": 0,
+      "monolith_s3_uri": "s3://skripsi-benchmark-results/experiments/sample-run/monolith/login/50rps/attempt-01",
+      "microservices_s3_uri": "s3://skripsi-benchmark-results/experiments/sample-run/microservices/login/50rps/attempt-01",
+      "started_at_utc": "2026-05-27T04:35:03Z",
+      "finished_at_utc": "2026-05-27T04:40:18Z",
+      "timing_source": "attempt_metadata",
+      "architectures": {
+        "monolith": {
+          "started_at_utc": "2026-05-27T04:35:03Z",
+          "finished_at_utc": "2026-05-27T04:40:18Z",
+          "timing_source": "attempt_metadata"
+        },
+        "microservices": {
+          "started_at_utc": "2026-05-27T04:35:05Z",
+          "finished_at_utc": "2026-05-27T04:40:16Z",
+          "timing_source": "attempt_metadata"
+        }
+      }
+    },
+    {
+      "scenario": "login",
+      "target_rps": 100,
+      "status": "pass",
+      "exit_code": 0,
+      "monolith_s3_uri": "s3://skripsi-benchmark-results/experiments/sample-run/monolith/login/100rps/attempt-01",
+      "microservices_s3_uri": "s3://skripsi-benchmark-results/experiments/sample-run/microservices/login/100rps/attempt-01",
+      "started_at_utc": "2026-05-27T04:40:25Z",
+      "finished_at_utc": "2026-05-27T04:45:30Z",
+      "timing_source": "attempt_metadata",
+      "architectures": {
+        "monolith": {
+          "started_at_utc": "2026-05-27T04:40:25Z",
+          "finished_at_utc": "2026-05-27T04:45:28Z",
+          "timing_source": "attempt_metadata"
+        },
+        "microservices": {
+          "started_at_utc": "2026-05-27T04:40:27Z",
+          "finished_at_utc": "2026-05-27T04:45:26Z",
+          "timing_source": "attempt_metadata"
+        }
+      }
+    }
+  ]
+}
