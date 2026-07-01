@@ -39,7 +39,6 @@ THEME = {
     "row_b": "#F9FAFB",
     "edge": "#E5E7EB",
     "text": "#111827",
-    "muted": "#4B5563",
 }
 
 OUTPUT_DPI = 320

@@ -27,9 +27,7 @@ def parse_duration_to_seconds(duration: str) -> int:
     multipliers = {"s": 1, "m": 60, "h": 3600}
     value = int(match.group("value"))
     unit = match.group("unit")
-    if unit in multipliers:
-        return value * multipliers[unit]
-    raise InvalidArtifactError(f"unsupported duration unit: {duration}")
+    return value * multipliers[unit]
 
 
 def require_dict(value: Any, context: str) -> dict[str, Any]:

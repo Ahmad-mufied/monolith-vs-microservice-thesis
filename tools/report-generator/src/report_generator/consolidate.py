@@ -131,29 +131,36 @@ def compile_consolidated_dataset(
         mode = "hpa" if "hpa" in run_label else "fixed"
         admission = True if run_label.endswith("_true") else False
         
-        # Load the resolved file
-        path = resolve_data_file(run_id, filename, cache_dir, s3_bucket)
-        if not path.exists():
-            continue
-            
-        df = pd.read_csv(path)
-        
-        # Filter matching rows by architecture + scaling mode
-        df_filtered = filter_composite_results(df, arch, mode)
-        if df_filtered.empty:
-            logger.warning(
-                "run_label=%r produced empty DataFrame after arch/mode filter "
-                "(arch=%r, mode=%r, file=%s) — skipping",
-                run_label, arch, mode, path,
+        try:
+            # Load the resolved file
+            path = resolve_data_file(run_id, filename, cache_dir, s3_bucket)
+            if not path.exists():
+                continue
+
+            df = pd.read_csv(path)
+
+            # Filter matching rows by architecture + scaling mode
+            df_filtered = filter_composite_results(df, arch, mode)
+            if df_filtered.empty:
+                logger.warning(
+                    "run_label=%r produced empty DataFrame after arch/mode filter "
+                    "(arch=%r, mode=%r, file=%s) — skipping",
+                    run_label, arch, mode, path,
+                )
+                continue
+
+            # Annotate with run identity
+            df_filtered = df_filtered.copy()
+            df_filtered["run_label"] = run_label
+            df_filtered["admission"] = admission
+
+            data_list.append(df_filtered)
+        except Exception as exc:
+            logger.error(
+                "Error processing run_label=%r (run_id=%r, file=%r): %s",
+                run_label, run_id, filename, exc,
             )
             continue
-
-        # Annotate with run identity
-        df_filtered = df_filtered.copy()
-        df_filtered["run_label"] = run_label
-        df_filtered["admission"] = admission
-
-        data_list.append(df_filtered)
         
     if not data_list:
         return pd.DataFrame()

@@ -139,38 +139,28 @@ def compute_metrics(
     # 4. Resolve limits config
     mode_limits = config.limits.hpa if scaling_mode.lower() == "hpa" else config.limits.fixed
     
+    # Sum CPU and Memory across all pods/services at each timestamp (architecture level total)
+    tot_cpu = df_cpu.groupby("timestamp")["cpu_cores"].sum() if not df_cpu.empty else pd.Series([0.0])
+    tot_mem = df_mem.groupby("timestamp")["mem_gib"].sum() if not df_mem.empty else pd.Series([0.0])
+
+    avg_cpu = tot_cpu.mean()
+    p95_cpu = tot_cpu.quantile(0.95)
+    avg_mem = tot_mem.mean()
+    p95_mem = tot_mem.quantile(0.95)
+
     # Compute totals and breakdowns
     service_metrics_list: List[ServiceMetrics] = []
-    
+
     if architecture == "monolith":
-        # Monolith totals
-        # Sum CPU and Memory across all monolith pods at each timestamp
-        tot_cpu = df_cpu.groupby("timestamp")["cpu_cores"].sum() if not df_cpu.empty else pd.Series([0.0])
-        tot_mem = df_mem.groupby("timestamp")["mem_gib"].sum() if not df_mem.empty else pd.Series([0.0])
-        
-        avg_cpu = tot_cpu.mean()
-        p95_cpu = tot_cpu.quantile(0.95)
-        avg_mem = tot_mem.mean()
-        p95_mem = tot_mem.quantile(0.95)
-        
         # Monolith limit limit
         cpu_limit = mode_limits.monolith.cpu_m / 1000.0  # convert m to cores
         mem_limit = mode_limits.monolith.mem_mib / 1024.0  # convert MiB to GiB
-        
+
     else:
         # Microservices totals
         # Get list of expected services
         services = list(mode_limits.microservices.keys())
-        
-        # We compute architecture-level totals by summing CPU/Memory across all services per timestamp
-        tot_cpu = df_cpu.groupby("timestamp")["cpu_cores"].sum() if not df_cpu.empty else pd.Series([0.0])
-        tot_mem = df_mem.groupby("timestamp")["mem_gib"].sum() if not df_mem.empty else pd.Series([0.0])
-        
-        avg_cpu = tot_cpu.mean()
-        p95_cpu = tot_cpu.quantile(0.95)
-        avg_mem = tot_mem.mean()
-        p95_mem = tot_mem.quantile(0.95)
-        
+
         # Use the namespace ResourceQuota as the architecture-level fairness
         # ceiling when configured; fall back to summing service limits.
         msa_ceiling = mode_limits.microservices_ceiling

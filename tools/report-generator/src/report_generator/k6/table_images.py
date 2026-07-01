@@ -287,7 +287,7 @@ def _render_table_png(
         color=THEME["muted"],
     )
 
-    from matplotlib.path import Path
+    from matplotlib.path import Path as MPath
     from matplotlib.patches import PathPatch
 
     r = 0.02
@@ -304,18 +304,18 @@ def _render_table_png(
         (0, r)
     ]
     codes = [
-        Path.MOVETO,
-        Path.LINETO,
-        Path.CURVE3, Path.CURVE3,
-        Path.LINETO,
-        Path.CURVE3, Path.CURVE3,
-        Path.LINETO,
-        Path.CURVE3, Path.CURVE3,
-        Path.LINETO,
-        Path.CURVE3, Path.CURVE3,
-        Path.CLOSEPOLY
+        MPath.MOVETO,
+        MPath.LINETO,
+        MPath.CURVE3, MPath.CURVE3,
+        MPath.LINETO,
+        MPath.CURVE3, MPath.CURVE3,
+        MPath.LINETO,
+        MPath.CURVE3, MPath.CURVE3,
+        MPath.LINETO,
+        MPath.CURVE3, MPath.CURVE3,
+        MPath.CLOSEPOLY
     ]
-    clip_path = Path(verts, codes)
+    clip_path = MPath(verts, codes)
 
     mpl_table = ax.table(
         cellText=table.astype(str).values,
