@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 import pytest
 
@@ -409,7 +410,6 @@ class TestParseResourceBaselineEnv:
 
     def test_valid_env_file(self, tmp_path: Path) -> None:
         """Parses a well-formed env file and returns (cpu_m, mem_mib)."""
-        from pathlib import Path as _Path
         env_file = tmp_path / "vultr-resource-baseline.env"
         env_file.write_text(
             "VULTR_APP_CPU_QUOTA=7800m\n"
