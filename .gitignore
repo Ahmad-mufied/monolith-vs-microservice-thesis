@@ -158,6 +158,7 @@ k6/*.gz
 results/
 experiments/
 exports/
+/reports/
 snapshots/
 cluster-snapshots/
 *.csv.gz
@@ -199,3 +200,15 @@ coverage/
 .idea/*
 .qodo/*
 .kiro/*
+
+# =========================
+# Python / Report Generator
+# =========================
+tools/report-generator/.venv/
+tools/report-generator/.pytest_cache/
+tools/report-generator/.ruff_cache/
+tools/report-generator/reports/
+tools/report-generator/report-generator.toml
+**/__pycache__/
+*.pyc
+

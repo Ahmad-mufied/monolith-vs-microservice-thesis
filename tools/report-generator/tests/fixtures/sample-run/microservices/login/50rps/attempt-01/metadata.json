@@ -1,0 +1,14 @@
+{
+  "run_id": "sample-run",
+  "attempt": "attempt-01",
+  "architecture": "microservices",
+  "scenario_name": "login",
+  "target_rps": 50,
+  "duration": "5m",
+  "git_commit": "abc1234",
+  "image_tag": "abc1234",
+  "dataset_version": "v1",
+  "resources": {
+    "autoscaling_mode": "fixed"
+  }
+}

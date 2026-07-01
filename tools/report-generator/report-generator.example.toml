@@ -1,0 +1,50 @@
+# Default configuration for unified report-generator.
+# Matches the settings used by the k6 benchmark runner and Datadog client.
+
+s3_bucket = "skripsi-benchmark-results"
+s3_experiments_prefix = "experiments"
+output_parent = "/path/to/experimen/hasil/report"
+attempt_mode = "latest"
+attempt_filter = "attempt-01"
+
+[datadog]
+site = "us5.datadoghq.com"
+
+# Allocations and limits for Fixed Mode
+[limits.fixed.monolith]
+cpu_m = 7800
+mem_mib = 15360
+
+[limits.fixed.microservices_ceiling]
+cpu_m = 7800
+mem_mib = 15360
+
+[limits.fixed.microservices]
+api-gateway = { cpu_m = 1950, mem_mib = 3840 }
+auth-service = { cpu_m = 1950, mem_mib = 3840 }
+item-service = { cpu_m = 1950, mem_mib = 3840 }
+transaction-service = { cpu_m = 1950, mem_mib = 3840 }
+
+# Allocations and limits for HPA Mode (maximum ceiling)
+[limits.hpa.monolith]
+cpu_m = 7800
+mem_mib = 15360
+
+[limits.hpa.microservices_ceiling]
+cpu_m = 7800
+mem_mib = 15360
+
+[limits.hpa.microservices]
+api-gateway = { cpu_m = 975, mem_mib = 1920 }
+auth-service = { cpu_m = 975, mem_mib = 1920 }
+item-service = { cpu_m = 975, mem_mib = 1920 }
+transaction-service = { cpu_m = 975, mem_mib = 1920 }
+
+# Run mappings for consolidated reports (placeholders)
+[consolidation.runs]
+mono_fixed_true = "vultr-sequential-fixed-all-enabled-run-id"
+msa_fixed_true = "vultr-sequential-fixed-all-enabled-run-id"
+msa_hpa_true = "vultr-sequential-microservices-hpa-enabled-run-id"
+mono_fixed_false = "vultr-sequential-fixed-disabled-run-id"
+msa_fixed_false = "vultr-sequential-fixed-disabled-run-id"
+msa_hpa_false = "vultr-sequential-microservices-hpa-disabled-run-id"

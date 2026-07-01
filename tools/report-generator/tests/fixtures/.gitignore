@@ -1,0 +1,4 @@
+# Allow committing test fixture json and log files
+!summary.json
+!metadata.json
+!stdout.log

@@ -1,0 +1,9 @@
+.venv/
+.pytest_cache/
+.ruff_cache/
+reports/
+report-generator.toml
+__pycache__/
+*.pyc
+.env
+

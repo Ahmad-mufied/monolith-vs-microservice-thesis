@@ -1,0 +1,10 @@
+{
+  "thresholds": {
+    "http_req_duration": [
+      {
+        "threshold": "p(95)<1500",
+        "ok": true
+      }
+    ]
+  }
+}

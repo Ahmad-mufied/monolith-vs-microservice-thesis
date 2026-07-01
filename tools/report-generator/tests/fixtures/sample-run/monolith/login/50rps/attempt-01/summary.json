@@ -1,0 +1,30 @@
+{
+  "metrics": {
+    "http_reqs": {
+      "values": {
+        "count": 15000,
+        "rate": 50.0
+      }
+    },
+    "http_req_duration": {
+      "values": {
+        "p(95)": 120.0
+      }
+    },
+    "http_req_failed": {
+      "values": {
+        "rate": 0.0
+      }
+    },
+    "checks": {
+      "values": {
+        "rate": 1.0
+      }
+    },
+    "dropped_iterations": {
+      "values": {
+        "count": 0
+      }
+    }
+  }
+}
