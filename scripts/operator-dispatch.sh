@@ -11,8 +11,10 @@ shift || true
 source scripts/lib/operator-profile.sh
 source scripts/lib/cloud-provider.sh
 
-load_operator_profile_env
-load_cloud_provider_env
+if [[ "$action" != report-* ]]; then
+  load_operator_profile_env
+  load_cloud_provider_env
+fi
 
 run_deprecated_target() {
   local replacement="$1"
@@ -307,6 +309,18 @@ case "$action" in
     ;;
   run-benchmark-arch-suite)
     dispatch_run_benchmark_arch_suite
+    ;;
+  report-setup)
+    uv sync --project tools/report-generator
+    ;;
+  report-k6)
+    uv run --project tools/report-generator k6-report-generator "$@"
+    ;;
+  report-datadog)
+    uv run --project tools/report-generator datadog-reporter "$@"
+    ;;
+  report-consolidate)
+    uv run --project tools/report-generator report-generator consolidate --config tools/report-generator/report-generator.toml "$@"
     ;;
   *)
     echo "ERROR: unsupported operator action '$action'" >&2
