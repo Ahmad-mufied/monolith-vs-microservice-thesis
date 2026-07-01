@@ -108,7 +108,7 @@ Each service uses:
 ```text
 minReplicas            : 1
 maxReplicas            : 5
-target CPU utilization : 50%
+target CPU utilization : 40%
 request / pod          : 500m CPU / 960Mi memory
 limit / pod            : 975m CPU / 1920Mi memory
 ```
