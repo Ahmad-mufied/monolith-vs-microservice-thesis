@@ -212,3 +212,12 @@ tools/report-generator/report-generator.toml
 **/__pycache__/
 *.pyc
 
+# =========================
+# Plan & Review Directories
+# =========================
+docs/plan/
+docs/review/
+docs/audit/
+docs/report/
+
+
