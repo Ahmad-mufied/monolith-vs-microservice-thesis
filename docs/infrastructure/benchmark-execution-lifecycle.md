@@ -405,7 +405,7 @@ Recommended fields:
     "app_resource_quota": "7800m CPU / 15360Mi memory",
     "autoscaling_mode": "hpa",
     "hpa_enabled": true,
-    "hpa_target_cpu": "50%",
+    "hpa_target_cpu": "40%",
     "min_replicas": 1,
     "max_replicas": 5
   },

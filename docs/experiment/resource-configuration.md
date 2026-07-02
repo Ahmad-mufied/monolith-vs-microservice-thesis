@@ -213,7 +213,7 @@ Each service uses the same equal per-pod baseline:
 ```text
 minReplicas            : 1
 maxReplicas            : 5
-target CPU utilization : 50%
+target CPU utilization : 40%
 ```
 
 Per-pod resources:

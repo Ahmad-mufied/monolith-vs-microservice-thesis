@@ -888,13 +888,13 @@ Microservices: api-gateway=1, auth-service=1, item-service=1, transaction-servic
 Application uses Kubernetes Horizontal Pod Autoscaler.
 
 ```text
-Monolith: 1-4 pods, HPA target CPU 50%
+Monolith: 1-4 pods, HPA target CPU 40%
 Microservices:
   api-gateway: 1-5 pods
   auth-service: 1-2 pods
   item-service: 1-5 pods
   transaction-service: 1-2 pods
-  HPA target CPU: 50%
+  HPA target CPU: 40%
 ```
 
 ### 15.3 Mode Switching
