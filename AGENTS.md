@@ -228,7 +228,7 @@ Generic targets dispatch through `scripts/operator-dispatch.sh`.
 
 ### Scaling Modes
 
-- **fixed**: fixed replica count, `K6_PROFILE=steady`
+- **fixed**: fixed replica count, `K6_PROFILE=ramp-up`
 - **hpa**: Horizontal Pod Autoscaler, `K6_PROFILE=ramp-up`
 
 Switching fixed/HPA is a redeploy action, not a runner-only change.
@@ -281,9 +281,9 @@ Scripts: `k6/scripts/`
 Scenarios: `login.js`, `create-transaction.js`, `enriched-transactions.js`,
 `concurrent-mixed-workload.js`, `mixed-workload.js`, `smoke.js`, `sync-items.js`.
 
-Use RPS-based testing with constant-arrival-rate.
+Use RPS-based testing with ramping-arrival-rate.
 
-Default RPS levels: 1000, 2500, 5000, 7500, 10000.
+Default RPS levels: 25, 50, 100, 200, 300, 400, 500.
 
 k6 scripts must read environment variables (BASE_URL, TARGET_RPS, etc.) from
 `k6/scripts/common/config.js`. Do not hardcode URLs, credentials, or tokens.
