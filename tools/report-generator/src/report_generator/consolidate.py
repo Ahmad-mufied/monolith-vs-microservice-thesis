@@ -208,32 +208,64 @@ def _plot_unified_chart(
         x_values = subset[target_col].to_numpy(dtype=float)
         y_values = subset[metric_col].to_numpy(dtype=float)
         
-        # Smooth plotting
-        smooth_x, smooth_y = smooth_series(x_values, y_values)
+        # Map x_values to their positions in x_targets to detect missing values in the sequence
+        indices = []
+        for x in x_values:
+            idx_matches = np.where(x_targets == x)[0]
+            if len(idx_matches) > 0:
+                indices.append(idx_matches[0])
+            else:
+                indices.append(-1)
+                
+        # Group indices into contiguous blocks where index differences are exactly 1
+        segments = []
+        current_segment = []
+        for idx, val in enumerate(x_values):
+            if not current_segment:
+                current_segment.append(idx)
+            else:
+                prev_target_idx = indices[current_segment[-1]]
+                curr_target_idx = indices[idx]
+                if curr_target_idx == prev_target_idx + 1:
+                    current_segment.append(idx)
+                else:
+                    segments.append(current_segment)
+                    current_segment = [idx]
+        if current_segment:
+            segments.append(current_segment)
+            
         alpha_val = style.get("alpha", 1.0)
-        
-        ax.plot(
-            smooth_x,
-            smooth_y,
-            label=style["label"],
-            color=style["color"],
-            linewidth=1.75,
-            linestyle=style.get("linestyle", "solid"),
-            solid_capstyle="round",
-            solid_joinstyle="round",
-            antialiased=True,
-            alpha=alpha_val,
-            zorder=3
-        )
-        
-        # Area fill
-        ax.fill_between(
-            smooth_x,
-            smooth_y,
-            color=style["color"],
-            alpha=0.08 * alpha_val,
-            zorder=1
-        )
+        first_segment = True
+        for seg in segments:
+            seg_x = x_values[seg]
+            seg_y = y_values[seg]
+            
+            # Smooth plotting for this segment
+            smooth_x, smooth_y = smooth_series(seg_x, seg_y)
+            
+            ax.plot(
+                smooth_x,
+                smooth_y,
+                label=style["label"] if first_segment else None,
+                color=style["color"],
+                linewidth=1.75,
+                linestyle=style.get("linestyle", "solid"),
+                solid_capstyle="round",
+                solid_joinstyle="round",
+                antialiased=True,
+                alpha=alpha_val,
+                zorder=3
+            )
+            
+            # Area fill for this segment
+            ax.fill_between(
+                smooth_x,
+                smooth_y,
+                color=style["color"],
+                alpha=0.08 * alpha_val,
+                zorder=1
+            )
+            first_segment = False
         
         # Scatter points
         ax.plot(

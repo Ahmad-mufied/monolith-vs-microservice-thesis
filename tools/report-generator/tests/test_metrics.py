@@ -525,3 +525,55 @@ class TestDatadogClientSiteValidation:
             with pytest.raises(ValueError) as excinfo:
                 DatadogClient(api_key="dummy", app_key="dummy", site=site)
             assert "Invalid Datadog site" in str(excinfo.value)
+
+
+def test_compute_metrics_query_logic(mock_config: ReporterConfig):
+    """Test that compute_metrics constructs queries with correct namespace, from_time, and to_time."""
+    client = MagicMock(spec=DatadogClient)
+    client.query_metrics.return_value = []
+    
+    from_time = 1716832500
+    to_time = 1716832800
+
+    # 1. Monolith queries
+    compute_metrics(
+        client=client,
+        config=mock_config,
+        architecture="monolith",
+        scenario="login",
+        target_rps=100,
+        attempt="attempt-01",
+        scaling_mode="fixed",
+        duration_sec=300.0,
+        achieved_rps=98.0,
+        successful_requests=29400,
+        from_time=from_time,
+        to_time=to_time
+    )
+
+    called_args = [call.args for call in client.query_metrics.call_args_list]
+    assert ("sum:kubernetes.cpu.usage.total{kube_namespace:mono} by {kube_deployment,pod}", from_time, to_time) in called_args
+    assert ("sum:kubernetes.memory.usage{kube_namespace:mono} by {kube_deployment,pod}", from_time, to_time) in called_args
+    assert ("sum:kubernetes.pods.running{kube_namespace:mono} by {kube_deployment}", from_time, to_time) in called_args
+
+    # Reset mock and check microservices
+    client.reset_mock()
+    compute_metrics(
+        client=client,
+        config=mock_config,
+        architecture="microservices",
+        scenario="login",
+        target_rps=100,
+        attempt="attempt-01",
+        scaling_mode="fixed",
+        duration_sec=300.0,
+        achieved_rps=98.0,
+        successful_requests=29400,
+        from_time=from_time,
+        to_time=to_time
+    )
+    called_args_msa = [call.args for call in client.query_metrics.call_args_list]
+    assert ("sum:kubernetes.cpu.usage.total{kube_namespace:msa} by {kube_deployment,pod}", from_time, to_time) in called_args_msa
+    assert ("sum:kubernetes.memory.usage{kube_namespace:msa} by {kube_deployment,pod}", from_time, to_time) in called_args_msa
+    assert ("sum:kubernetes.pods.running{kube_namespace:msa} by {kube_deployment}", from_time, to_time) in called_args_msa
+
