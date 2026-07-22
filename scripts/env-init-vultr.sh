@@ -128,7 +128,7 @@ if [ ! -f "$env_file" ]; then
     format_env_assignment "VULTR_SEQUENTIAL_CLUSTER_NAME" "skripsi-vultr-benchmark"
     format_env_assignment "VULTR_MONOLITH_CLUSTER_NAME" "skripsi-vultr-monolith"
     format_env_assignment "VULTR_MSA_CLUSTER_NAME" "skripsi-vultr-msa"
-    format_env_assignment "VULTR_KUBERNETES_VERSION" "v1.36.1+2"
+    format_env_assignment "VULTR_KUBERNETES_VERSION" "v1.36.1+3"
     format_env_assignment "VULTR_APP_NODE_PLAN" "voc-c-8c-16gb-150s-amd"
     format_env_assignment "VULTR_APP_NODE_COUNT" "1"
     format_env_assignment "VULTR_TESTING_NODE_PLAN" "vc2-2c-4gb"

@@ -60,7 +60,7 @@ POSTGRES_PASSWORD=...  OPERATOR_CIDRS=<your-ip>/32  OPERATOR_SSH_PUBLIC_KEY='ssh
 Recommended defaults:
 
 ```text
-VULTR_REGION=sgp  VULTR_VPC_CIDR=10.20.0.0/16  VULTR_KUBERNETES_VERSION=v1.36.1+2
+VULTR_REGION=sgp  VULTR_VPC_CIDR=10.20.0.0/16  VULTR_KUBERNETES_VERSION=v1.36.1+3
 VULTR_APP_NODE_PLAN=voc-c-8c-16gb-150s-amd  VULTR_APP_NODE_COUNT=1
 VULTR_TESTING_NODE_PLAN=vc2-2c-4gb  VULTR_POSTGRES_PLAN=voc-c-2c-4gb-50s-amd
 ```
@@ -794,6 +794,7 @@ kubectl config get-contexts && kubectl --context=<ctx> get pods -A
 | `DOCKERHUB_NAMESPACE` empty | `make preflight-check` (auto-loads env) |
 | Image push/pull fails | `make dockerhub-push-all IMAGE_TAG="$IMAGE_TAG"`, verify with manifest inspect loop |
 | Terraform fails: `VULTR_API_KEY` missing | fill `env/vultr.env`, rerun preflight + render |
+| Terraform fails: `VULTR_KUBERNETES_VERSION` missing | add it to `env/vultr.env`, rerun `make render-tfvars` |
 | Terraform fails: `OPERATOR_CIDRS` missing | set `/32` IP, rerun render |
 | Terraform fails: quota | use sequential or request Vultr limit increase |
 | Context setup fails | `terraform output` → `make setup-contexts` |

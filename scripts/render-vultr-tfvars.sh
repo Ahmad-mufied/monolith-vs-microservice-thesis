@@ -16,6 +16,7 @@ set +a
 : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in env/vultr.env}"
 : "${OPERATOR_CIDRS:?OPERATOR_CIDRS must be set in env/vultr.env}"
 : "${OPERATOR_SSH_PUBLIC_KEY:?OPERATOR_SSH_PUBLIC_KEY must be set in env/vultr.env}"
+: "${VULTR_KUBERNETES_VERSION:?VULTR_KUBERNETES_VERSION must be set in env/vultr.env}"
 
 if [ "$VULTR_API_KEY" = "replace-me" ]; then
   echo "VULTR_API_KEY is still the placeholder 'replace-me'" >&2
@@ -67,6 +68,71 @@ vpc_mask="${vpc_cidr#*/}"
 
 execution_mode="${EXECUTION_MODE:-sequential}"
 
+resolve_kubernetes_version() {
+  local config_version="$VULTR_KUBERNETES_VERSION"
+  
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "$config_version"
+    return 0
+  fi
+  
+  update_env_version() {
+    local version="$1"
+    local temp_file
+    temp_file=$(mktemp)
+    sed "s|^VULTR_KUBERNETES_VERSION=.*|VULTR_KUBERNETES_VERSION=$version|" "$env_file" > "$temp_file"
+    cat "$temp_file" > "$env_file"
+    rm -f "$temp_file"
+  }
+  
+  local api_response
+  if api_response=$(curl -s -f --max-time 10 -H "Authorization: Bearer $VULTR_API_KEY" https://api.vultr.com/v2/kubernetes/versions 2>/dev/null); then
+    local available_versions
+    available_versions=$(echo "$api_response" | jq -r '.versions[]' 2>/dev/null || true)
+    
+    if [ -n "$available_versions" ]; then
+      if echo "$available_versions" | grep -Fq "$config_version"; then
+        echo "$config_version"
+        return 0
+      fi
+      
+      local minor_prefix
+      minor_prefix=$(echo "$config_version" | grep -oE '^v1\.[0-9]+' || true)
+      
+      if [ -n "$minor_prefix" ]; then
+        local match
+        match=$(echo "$available_versions" | grep -E "^${minor_prefix}" | head -n 1 || true)
+        if [ -n "$match" ]; then
+          echo "WARN: Configured Vultr Kubernetes version '$config_version' is no longer supported by the Vultr API." >&2
+          echo "WARN: Automatically switching to the closest available version in minor release '${minor_prefix}': '$match'" >&2
+          
+          # Auto-update env/vultr.env so it stays in sync
+          update_env_version "$match"
+          echo "INFO: Updated VULTR_KUBERNETES_VERSION to $match in $env_file" >&2
+          
+          echo "$match"
+          return 0
+        fi
+      fi
+      
+      local absolute_latest
+      absolute_latest=$(echo "$available_versions" | head -n 1 || true)
+      if [ -n "$absolute_latest" ]; then
+        echo "WARN: Configured Vultr Kubernetes version '$config_version' is not supported and no matching minor release was found." >&2
+        echo "WARN: Switching to the latest available version on Vultr: '$absolute_latest'" >&2
+        
+        update_env_version "$absolute_latest"
+        echo "$absolute_latest"
+        return 0
+      fi
+    fi
+  fi
+  
+  echo "$config_version"
+}
+
+resolved_k8s_version=$(resolve_kubernetes_version)
+
 if [ "$execution_mode" = "parallel" ]; then
   cluster_names_hcl="{ monolith = \"${VULTR_MONOLITH_CLUSTER_NAME:-skripsi-vultr-monolith}\", msa = \"${VULTR_MSA_CLUSTER_NAME:-skripsi-vultr-msa}\" }"
 else
@@ -81,7 +147,7 @@ vpc_subnet              = "${vpc_subnet}"
 vpc_subnet_mask         = ${vpc_mask}
 operator_cidrs          = ${operator_cidrs_hcl}
 operator_ssh_public_key = "${OPERATOR_SSH_PUBLIC_KEY}"
-kubernetes_version      = "${VULTR_KUBERNETES_VERSION:-v1.36.1+2}"
+kubernetes_version      = "${resolved_k8s_version}"
 cluster_names           = ${cluster_names_hcl}
 app_node_plan           = "${VULTR_APP_NODE_PLAN:-voc-c-8c-16gb-150s-amd}"
 app_node_count          = ${vultr_app_node_count}

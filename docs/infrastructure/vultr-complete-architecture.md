@@ -83,7 +83,7 @@ flowchart LR
 ```text
 Provider                : Vultr
 Region                  : sgp (Singapore)
-Kubernetes              : Vultr Kubernetes Engine (VKE) v1.33.0+1
+Kubernetes              : Vultr Kubernetes Engine (VKE) v1.36.1+3
 Application nodes       : 1 x voc-c-8c-16gb-150s-amd per active architecture
 Testing nodes           : 1 x vc2-2c-4gb per active architecture
 Database                : PostgreSQL 18 on Vultr Compute VM (self-managed)
@@ -739,9 +739,11 @@ HTTP → api-gateway → transaction-service → transaction_db
 
 ---
 
-## 13. Deployment Flow
+## 13. End-to-End Operational Lifecycle
 
-### 13.1 Complete Deployment Sequence
+This section describes the complete, end-to-end operational lifecycle of a benchmark experiment session on Vultr. It covers the full lifecycle of the operator session, including local environment initialization, docker image compilation, cloud infrastructure provisioning, Kubernetes configuration, application instantiation, load execution (k6), S3 data validation, and automated resources teardown.
+
+### 13.1 Complete Operational Lifecycle Sequence
 
 ```mermaid
 flowchart TB
@@ -770,6 +772,27 @@ flowchart TB
   choice -->|"sequential (execution_mode=sequential)"| apply --> contexts
   contexts --> secrets --> baseline --> manifests --> deploy --> verify --> benchmark --> s3 --> destroy --> done
 ```
+
+#### 13.1.1 Detailed Operational Step Description
+
+The end-to-end benchmark experiment session lifecycle consists of the following 16 operational steps:
+
+1. **Initialize Session (`make env-init-vultr`)**: Generates the primary configurations file (`env/vultr.env`). It automatically queries the host platform to capture the operator's public IP address (CIDR) and locates local SSH public keys to populate defaults.
+2. **Configure Variables (`vultr.env`)**: The operator opens the generated `env/vultr.env` file and fills in the Vultr API token, Docker Hub namespace, database superuser password (`POSTGRES_PASSWORD`), and AWS S3 writer credentials.
+3. **Build Images (`make docker-build-all`)**: Compiles 7 container images locally: 5 core application images (monolith, api-gateway, auth-service, item-service, transaction-service) and 2 utility runners (seed-runner, k6-runner).
+4. **Push Images (`make dockerhub-push-all`)**: Publishes the compiled images to Docker Hub under the designated public namespace. Pushed images are tagged with a unique session identifier (the git commit short SHA) to ensure version control.
+5. **Run Preflight (`make vultr-preflight-check`)**: Connects to Docker Hub to verify the images are public and readable, and checks the AWS S3 credentials to ensure post-test uploads won't fail due to authorization issues.
+6. **Generate Inputs (`make vultr-render-tfvars`)**: Processes the variables inside `env/vultr.env` and maps them into `infra/terraform/vultr/terraform.tfvars`. It automatically queries the Vultr API to verify if the configured Kubernetes version is still supported. If not, it dynamically selects the closest active patch release in the same minor version and updates both `env/vultr.env` and `terraform.tfvars` to guarantee bootstrapping resilience.
+7. **Apply Infrastructure (`make vultr-apply`)**: Launches Terraform to provision Vultr resources: Legacy VPC network, Firewall Group, SSH key registry, VKE cluster(s) with an app node pool and a workload-tainted testing node pool, and dedicated PostgreSQL compute VM(s). It also provisions the AWS S3 writer credentials.
+8. **Configure Kubeconfig Contexts (`vultr-setup-contexts`)**: Downloads the cluster credentials from Vultr and maps them to local Kubernetes contexts (`benchmark` for sequential mode, or `monolith` and `msa` for parallel mode).
+9. **Inject Secrets (`vultr-create-secrets`)**: Generates runtime secrets inside Kubernetes namespaces (`mono`, `msa`, `benchmark`), including the private `DATABASE_URL` mapping to the Vultr PostgreSQL VM, JWT keys, and core application timeout constraints.
+10. **Measure Resource Baseline (`make vultr-measure-resource-baseline`)**: Queries the live worker nodes of the active VKE cluster to determine the exact schedulable capacity (CPU/Memory allocatable minus system overhead). Writes the baseline to `env/vultr-resource-baseline.env`.
+11. **Render Manifests (`make vultr-render-manifests`)**: Uses Kustomize and baseline values to render final Kubernetes manifests. It dynamically computes `ResourceQuota` ceilings to enforce equivalent compute ceilings on both architectures.
+12. **Deploy Applications (`make vultr-deploy-all`)**: Boots up the application deployments. It automatically scales down the inactive architecture namespace to zero, runs SQL migrations via Goose jobs, resets and seeds the baseline dataset, and initiates rolling updates for active application pods.
+13. **Verify Deployment Mode (`make vultr-verify-live-mode`)**: Inspects active pods, deployment configs, config annotations, and active HPAs to ensure the live environment corresponds perfectly to the requested configuration.
+14. **Execute Benchmark (`run-benchmark-suite-vultr`)**: Launches the orchestrator suite. It executes the ramping k6 load generator inside the cluster's tainted testing node pool, resets the database between mutating target RPS levels, and schedules stabilizing delays.
+15. **Verify S3 Results**: The operator or script verifies the S3 bucket to ensure all telemetry artifacts (including `summary.json`, `raw.json.gz`, and `result-status.json`) are successfully written to S3.
+16. **Guarded Destroy (`make vultr-destroy-confirmed`)**: Tears down all Vultr compute VM instances, VKE clusters, firewall rules, and VPC networks to stop cloud billing, safely guarded by an S3 upload validation check.
 
 ### 13.2 Key Make Targets
 
