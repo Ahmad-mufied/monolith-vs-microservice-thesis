@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the full benchmark matrix for one scaling mode.
+# Run the full benchmark matrix for one scaling mode in parallel topology.
 set -euo pipefail
 
 source scripts/lib/shared-env.sh
@@ -67,6 +67,7 @@ RENDERED_APP_MONOLITH_DIR="$RENDER_ROOT/deployments/k8s/cloud/monolith"
 RENDERED_APP_MICROSERVICES_DIR="$RENDER_ROOT/deployments/k8s/cloud/microservices"
 RENDERED_MONOLITH_OVERLAY_DIR="$RENDERED_APP_MONOLITH_DIR/overlays/$MONOLITH_EFFECTIVE_SCALING_MODE"
 RENDERED_MICROSERVICES_OVERLAY_DIR="$RENDERED_APP_MICROSERVICES_DIR/overlays/$MICROSERVICES_EFFECTIVE_SCALING_MODE"
+declare -A CASE_RESULT_STATUS_CACHE=()
 
 cleanup() {
   rm -rf "$SUITE_WORKDIR"
@@ -137,6 +138,43 @@ validate_supported_scenario() {
     login|create-transaction|enriched-transactions|concurrent-mixed-workload|mixed-workload|sync-items) ;;
     *)
       echo "ERROR: unsupported scenario '$scenario' (expected: login|create-transaction|enriched-transactions|concurrent-mixed-workload|mixed-workload|sync-items)" >&2
+      return 1
+      ;;
+  esac
+}
+
+scenario_setup_class() {
+  local scenario="$1"
+
+  case "$scenario" in
+    login)
+      printf 'readonly'
+      ;;
+    create-transaction|sync-items)
+      printf 'mutating'
+      ;;
+    enriched-transactions|concurrent-mixed-workload|mixed-workload)
+      printf 'enrichment'
+      ;;
+    *)
+      echo "ERROR: unknown scenario '$scenario'" >&2
+      return 1
+      ;;
+  esac
+}
+
+scenario_setup_reuse_scope() {
+  local scenario="$1"
+
+  case "$scenario" in
+    login|enriched-transactions)
+      printf 'per_scenario'
+      ;;
+    create-transaction|sync-items|concurrent-mixed-workload|mixed-workload)
+      printf 'per_case'
+      ;;
+    *)
+      echo "ERROR: unknown scenario '$scenario'" >&2
       return 1
       ;;
   esac
@@ -421,6 +459,296 @@ scenario_rps_matrix_json() {
   ' < "$SUITE_MATRIX_TSV"
 }
 
+case_result_cache_key() {
+  printf '%s|%s|%s' "$1" "$2" "$3"
+}
+
+set_case_result_status_cache() {
+  local key
+  key="$(case_result_cache_key "$1" "$2" "$3")"
+  CASE_RESULT_STATUS_CACHE["$key"]="$4"
+}
+
+case_result_present_in_s3_uncached() {
+  local architecture="$1"
+  local scenario="$2"
+  local target_rps="$3"
+  local case_s3_uri="${S3_RUN_URI}/${architecture}/${scenario}/${target_rps}rps/${ATTEMPT}"
+
+  if benchmark_aws s3 ls "${case_s3_uri}/result-status.json" >/dev/null 2>&1; then
+    set_case_result_status_cache "$architecture" "$scenario" "$target_rps" "present"
+    return 0
+  fi
+
+  set_case_result_status_cache "$architecture" "$scenario" "$target_rps" "missing"
+  return 1
+}
+
+prime_case_result_status_cache() {
+  local architecture scenario scenario_rps_levels target_rps
+  local result_status_listing object_key relative_key
+  local matched_architecture matched_scenario matched_rps matched_attempt
+  local s3_run_key_prefix="experiments/${RUN_ID}/"
+
+  CASE_RESULT_STATUS_CACHE=()
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ -z "$scenario" ] && continue
+    for architecture in monolith microservices; do
+      for target_rps in $scenario_rps_levels; do
+        set_case_result_status_cache "$architecture" "$scenario" "$target_rps" "missing"
+      done
+    done
+  done < "$SUITE_MATRIX_TSV"
+
+  if ! result_status_listing="$(benchmark_aws s3 ls "${S3_RUN_URI}/" --recursive 2>/dev/null)"; then
+    echo "WARNING: initial S3 result-status cache warmup failed; falling back to on-demand checks." >&2
+    CASE_RESULT_STATUS_CACHE=()
+    return 1
+  fi
+
+  while IFS= read -r object_line; do
+    [ -z "$object_line" ] && continue
+    object_key="${object_line##* }"
+    relative_key="${object_key#${s3_run_key_prefix}}"
+    if [[ "$relative_key" =~ ^([^/]+)/([^/]+)/([0-9]+)rps/([^/]+)/result-status\.json$ ]]; then
+      matched_architecture="${BASH_REMATCH[1]}"
+      matched_scenario="${BASH_REMATCH[2]}"
+      matched_rps="${BASH_REMATCH[3]}"
+      matched_attempt="${BASH_REMATCH[4]}"
+      if [ "$matched_attempt" = "$ATTEMPT" ]; then
+        set_case_result_status_cache "$matched_architecture" "$matched_scenario" "$matched_rps" "present"
+      fi
+    fi
+  done <<<"$result_status_listing"
+}
+
+case_missing_in_s3() {
+  local scenario="$1"
+  local target_rps="$2"
+  local key_mono key_msa cached_mono cached_msa
+
+  key_mono="$(case_result_cache_key "monolith" "$scenario" "$target_rps")"
+  key_msa="$(case_result_cache_key "microservices" "$scenario" "$target_rps")"
+  cached_mono="${CASE_RESULT_STATUS_CACHE[$key_mono]:-}"
+  cached_msa="${CASE_RESULT_STATUS_CACHE[$key_msa]:-}"
+
+  if [ "$cached_mono" = "present" ] && [ "$cached_msa" = "present" ]; then
+    return 1
+  fi
+
+  if [ "$cached_mono" != "present" ] && case_result_present_in_s3_uncached "monolith" "$scenario" "$target_rps"; then
+    cached_mono="present"
+  fi
+
+  if [ "$cached_msa" != "present" ] && case_result_present_in_s3_uncached "microservices" "$scenario" "$target_rps"; then
+    cached_msa="present"
+  fi
+
+  if [ "$cached_mono" = "present" ] && [ "$cached_msa" = "present" ]; then
+    return 1
+  fi
+
+  return 0
+}
+
+scenario_has_pending_cases() {
+  local current_scenario="$1"
+  local scenario scenario_rps_levels target_rps
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ "$scenario" = "$current_scenario" ] || continue
+    for target_rps in $scenario_rps_levels; do
+      if case_missing_in_s3 "$scenario" "$target_rps"; then
+        return 0
+      fi
+    done
+  done < "$SUITE_MATRIX_TSV"
+
+  return 1
+}
+
+count_pending_scenario_cases() {
+  local current_scenario="$1"
+  local scenario scenario_rps_levels target_rps
+  local count=0
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ "$scenario" = "$current_scenario" ] || continue
+    for target_rps in $scenario_rps_levels; do
+      if case_missing_in_s3 "$scenario" "$target_rps"; then
+        count=$((count + 1))
+      fi
+    done
+  done < "$SUITE_MATRIX_TSV"
+
+  printf '%s\n' "$count"
+}
+
+count_pending_suite_cases_from() {
+  local current_scenario="$1"
+  local current_target_rps="$2"
+  local scenario scenario_rps_levels target_rps
+  local count=0
+  local seen_current=false
+
+  while IFS=$'\t' read -r scenario scenario_rps_levels; do
+    [ -z "$scenario" ] && continue
+    for target_rps in $scenario_rps_levels; do
+      if [ "$scenario" = "$current_scenario" ] && [ "$target_rps" = "$current_target_rps" ]; then
+        seen_current=true
+      fi
+      [ "$seen_current" = "true" ] || continue
+      if case_missing_in_s3 "$scenario" "$target_rps"; then
+        count=$((count + 1))
+      fi
+    done
+  done < "$SUITE_MATRIX_TSV"
+
+  printf '%s\n' "$count"
+}
+
+duration_to_seconds() {
+  local value="$1"
+  local remainder="$value"
+  local total=0
+  local number unit
+
+  if [ -z "$value" ]; then
+    echo "ERROR: duration must not be empty" >&2
+    return 1
+  fi
+
+  while [[ "$remainder" =~ ^([0-9]+)(ms|s|m|h)(.*)$ ]]; do
+    number="${BASH_REMATCH[1]}"
+    unit="${BASH_REMATCH[2]}"
+    remainder="${BASH_REMATCH[3]}"
+    case "$unit" in
+      ms)
+        if [ "$number" -gt 0 ]; then
+          total=$((total + 1))
+        fi
+        ;;
+      s) total=$((total + number)) ;;
+      m) total=$((total + (number * 60))) ;;
+      h) total=$((total + (number * 3600))) ;;
+    esac
+  done
+
+  if [ -n "$remainder" ]; then
+    echo "ERROR: unsupported duration '$value' (expected k6-style values like 30s, 5m, 1h, or 1m30s)" >&2
+    return 1
+  fi
+
+  printf '%s\n' "$total"
+}
+
+format_duration() {
+  local seconds="$1"
+  local hours minutes remaining
+
+  hours=$((seconds / 3600))
+  minutes=$(((seconds % 3600) / 60))
+  remaining=$((seconds % 60))
+
+  if [ "$hours" -gt 0 ]; then
+    printf '%dh%02dm%02ds' "$hours" "$minutes" "$remaining"
+  elif [ "$minutes" -gt 0 ]; then
+    printf '%dm%02ds' "$minutes" "$remaining"
+  else
+    printf '%ds' "$remaining"
+  fi
+}
+
+format_eta_epoch() {
+  local epoch="$1"
+  date -d "@$epoch" '+%Y-%m-%d %H:%M:%S %Z'
+}
+
+custom_ramp_stages_seconds() {
+  local total=0
+  local duration seconds
+
+  while IFS= read -r duration; do
+    [ -z "$duration" ] && continue
+    seconds="$(duration_to_seconds "$duration")"
+    total=$((total + seconds))
+  done < <(jq -r '.[].duration // empty' <<<"${RAMP_STAGES_JSON:-[]}")
+
+  printf '%s\n' "$total"
+}
+
+estimate_case_duration_seconds() {
+  local seconds
+
+  if [ -n "${RAMP_STAGES_JSON:-}" ]; then
+    custom_ramp_stages_seconds
+    return
+  fi
+
+  case "$K6_PROFILE" in
+    ramp-up|hpa)
+      seconds=0
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_1:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_2:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_UP_3:-3m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_HOLD:-5m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_DOWN:-1m}")))
+      printf '%s\n' "$seconds"
+      ;;
+    ramp)
+      seconds=0
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_UP_DURATION:-1m}")))
+      seconds=$((seconds + $(duration_to_seconds "$TEST_DURATION")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_DOWN_DURATION:-30s}")))
+      printf '%s\n' "$seconds"
+      ;;
+    smoke|steady)
+      duration_to_seconds "$TEST_DURATION"
+      ;;
+    *)
+      echo "ERROR: unsupported K6_PROFILE '$K6_PROFILE' for ETA calculation" >&2
+      return 1
+      ;;
+  esac
+}
+
+print_case_eta() {
+  local scenario="$1"
+  local target_rps="$2"
+  local suite_case_number="$3"
+  local suite_total_cases="$4"
+  local scenario_case_number="$5"
+  local scenario_total_cases="$6"
+  local case_seconds="$7"
+  local k6_case_seconds="$8"
+  local pending_scenario_cases="$9"
+  local pending_suite_cases="${10}"
+  local now_epoch case_eta_epoch scenario_eta_epoch suite_eta_epoch
+  local suite_remaining_delay_seconds=0
+
+  now_epoch="$(date +%s)"
+  case_eta_epoch=$((now_epoch + case_seconds))
+
+  scenario_eta_epoch=$((now_epoch + (pending_scenario_cases * case_seconds)))
+  if [ "$pending_scenario_cases" -gt 1 ]; then
+    scenario_eta_epoch=$((scenario_eta_epoch + ((pending_scenario_cases - 1) * INTER_CASE_DELAY)))
+  fi
+
+  if [ "$pending_suite_cases" -gt 1 ]; then
+    suite_remaining_delay_seconds=$((suite_remaining_delay_seconds + ((pending_suite_cases - 1) * INTER_CASE_DELAY)))
+  fi
+  suite_eta_epoch=$((now_epoch + (pending_suite_cases * case_seconds) + suite_remaining_delay_seconds))
+
+  echo "=== Parallel Suite ETA ==="
+  echo "  case          : ${suite_case_number}/${suite_total_cases} ${scenario}/${target_rps}rps"
+  echo "  scenario      : ${scenario_case_number}/${scenario_total_cases} (${scenario})"
+  echo "  est_case      : $(format_duration "$case_seconds") -> $(format_eta_epoch "$case_eta_epoch")"
+  echo "  est_scenario  : $(format_eta_epoch "$scenario_eta_epoch")"
+  echo "  est_suite     : $(format_eta_epoch "$suite_eta_epoch")"
+  echo "  pending       : scenario=${pending_scenario_cases}, suite=${pending_suite_cases}"
+}
+
 case_timing_source_from_architecture_sources() {
   local all_attempt_metadata=true
   local all_orchestrator=true
@@ -639,9 +967,6 @@ next_attempt_from_s3_per_rps() {
     return 0
   fi
 
-  # Second pass: verify every RPS actually has max_attempt, not just any attempt.
-  # Without this, a mix of attempt-01 and attempt-02 would incorrectly return
-  # attempt-03 (new run) instead of attempt-02 (continuation).
   for rps in $rps_words; do
     rps_dir="${rps}rps"
     local rps_attempts
@@ -736,6 +1061,22 @@ reset_seed_and_prepare_enrichment_data() {
   bash scripts/prepare-enrichment-benchmark.sh
 
   restore_app_workloads_after_data_reset
+}
+
+run_scenario_appropriate_setup() {
+  local scenario="$1"
+  local setup_class
+
+  setup_class="$(scenario_setup_class "$scenario")"
+  echo "=== Running scenario data setup for ${scenario} (class: ${setup_class}) ==="
+  case "$setup_class" in
+    readonly|mutating)
+      reset_and_seed_benchmark_data
+      ;;
+    enrichment)
+      reset_seed_and_prepare_enrichment_data
+      ;;
+  esac
 }
 
 scale_down_app_workloads_for_data_reset() {
@@ -991,7 +1332,7 @@ if [ -z "$ATTEMPT" ]; then
   ATTEMPT="$(next_attempt_for_suite "$S3_RUN_URI" "$SUITE_MATRIX_TSV")"
 fi
 
-echo "=== Benchmark Suite ==="
+echo "=== Parallel Benchmark Suite ==="
 if [ -n "$EXPERIMENT_NAME" ]; then
   echo "  experiment   : $EXPERIMENT_NAME"
 fi
@@ -1022,33 +1363,98 @@ bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 verify_live_scaling_mode_state
 upload_suite_manifest
 
+echo "Warming S3 result-status cache for parallel suite resume and ETA checks..."
+prime_case_result_status_cache || true
+echo "Initial S3 result-status cache warmup finished."
+
 while IFS=$'\t' read -r scenario scenario_rps_levels; do
   [ -z "$scenario" ] && continue
   echo "=== Scenario: ${scenario} ==="
+  scenario_case_index=0
+  scenario_case_count="$(wc -w <<<"$scenario_rps_levels" | tr -d '[:space:]')"
+  setup_reuse_scope="$(scenario_setup_reuse_scope "$scenario")"
 
-  if [ "$scenario" = "login" ]; then
-    reset_and_seed_benchmark_data
-  fi
-
-  if [ "$scenario" = "enriched-transactions" ]; then
-    reset_seed_and_prepare_enrichment_data
+  if scenario_has_pending_cases "$scenario"; then
+    if [ "$setup_reuse_scope" = "per_scenario" ]; then
+      run_scenario_appropriate_setup "$scenario"
+    fi
+  else
+    echo "No pending RPS cases remain for ${scenario}; skipping scenario setup and reusing existing S3 results where available."
   fi
 
   for target_rps in $scenario_rps_levels; do
+    scenario_case_index=$((scenario_case_index + 1))
     echo ""
-    echo "=== Suite Case ==="
-    echo "  scenario   : $scenario"
-    echo "  target_rps : $target_rps"
-    echo "  attempt    : $ATTEMPT"
+    echo "--- Parallel Case Start: ${scenario}/${target_rps}rps (${scenario_case_index}/${scenario_case_count} in scenario) ---"
 
     run_suite_preflight "suite case ${scenario} ${target_rps}rps" "true"
 
-    if [ "$scenario" = "create-transaction" ] || [ "$scenario" = "sync-items" ]; then
-      reset_and_seed_benchmark_data
+    if ! case_missing_in_s3 "$scenario" "$target_rps"; then
+      echo "=== Case already completed in S3: ${scenario}/${target_rps}rps (SKIPPING RUN) ==="
+      
+      monolith_uri="${S3_RUN_URI}/monolith/${scenario}/${target_rps}rps/${ATTEMPT}"
+      microservices_uri="${S3_RUN_URI}/microservices/${scenario}/${target_rps}rps/${ATTEMPT}"
+      mono_status="$(fetch_benchmark_timing_s3_artifact "$monolith_uri" result-status.json || true)"
+      msa_status="$(fetch_benchmark_timing_s3_artifact "$microservices_uri" result-status.json || true)"
+      mono_thresh="$(fetch_benchmark_timing_s3_artifact "$monolith_uri" thresholds.json || true)"
+      msa_thresh="$(fetch_benchmark_timing_s3_artifact "$microservices_uri" thresholds.json || true)"
+
+      case_exit_code=0
+      mono_exit="$(jq -r '.k6_exit_code // "null"' <<<"$mono_status")"
+      msa_exit="$(jq -r '.k6_exit_code // "null"' <<<"$msa_status")"
+      mono_hint="$(jq -r '.classification_hint // "unknown"' <<<"$mono_status")"
+      msa_hint="$(jq -r '.classification_hint // "unknown"' <<<"$msa_status")"
+
+      if [ "$mono_hint" = "runtime_failed" ] || [ "$msa_hint" = "runtime_failed" ] || { [ "$mono_exit" != "null" ] && [ "$mono_exit" != "0" ] && [ "$mono_exit" != "99" ]; } || { [ "$msa_exit" != "null" ] && [ "$msa_exit" != "0" ] && [ "$msa_exit" != "99" ]; }; then
+        case_exit_code=1
+      elif [ -n "$mono_thresh" ] && jq -e '[.. | objects | select(has("ok")) | .ok] | any(. == false)' >/dev/null 2>&1 <<<"$mono_thresh"; then
+        case_exit_code=1
+      elif [ -n "$msa_thresh" ] && jq -e '[.. | objects | select(has("ok")) | .ok] | any(. == false)' >/dev/null 2>&1 <<<"$msa_thresh"; then
+        case_exit_code=1
+      elif [ "$mono_hint" = "threshold_failed" ] || [ "$msa_hint" = "threshold_failed" ]; then
+        case_exit_code=1
+      fi
+
+      case_timing_json="$(
+        parallel_case_timing_json \
+          "$scenario" \
+          "$target_rps" \
+          "2026-06-04T00:00:00Z" \
+          "2026-06-04T00:00:00Z"
+      )"
+
+      case_status="pass"
+      if [ "$case_exit_code" -ne 0 ]; then
+        case_status="non_pass"
+        suite_failed=1
+      fi
+
+      append_case_summary "$scenario" "$target_rps" "$case_status" "$case_exit_code" "$case_timing_json"
+      completed_cases=$((completed_cases + 1))
+      echo "--- Parallel Case End: ${scenario}/${target_rps}rps (reused existing S3 result) ---"
+      continue
     fi
-    if [ "$scenario" = "concurrent-mixed-workload" ]; then
-      reset_seed_and_prepare_enrichment_data
+
+    if [ "$setup_reuse_scope" = "per_case" ]; then
+      run_scenario_appropriate_setup "$scenario"
     fi
+
+    pending_scenario_cases="$(count_pending_scenario_cases "$scenario")"
+    pending_suite_cases="$(count_pending_suite_cases_from "$scenario" "$target_rps")"
+    k6_case_seconds="$(estimate_case_duration_seconds)"
+    case_seconds=$((k6_case_seconds + 180))
+
+    print_case_eta \
+      "$scenario" \
+      "$target_rps" \
+      "$((completed_cases + 1))" \
+      "$TOTAL_CASES" \
+      "$scenario_case_index" \
+      "$scenario_case_count" \
+      "$case_seconds" \
+      "$k6_case_seconds" \
+      "$pending_scenario_cases" \
+      "$pending_suite_cases"
 
     case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     set +e
@@ -1072,13 +1478,16 @@ while IFS=$'\t' read -r scenario scenario_rps_levels; do
       append_case_summary "$scenario" "$target_rps" "pass" "$case_exit_code" "$case_timing_json"
     fi
 
+    set_case_result_status_cache "monolith" "$scenario" "$target_rps" "present"
+    set_case_result_status_cache "microservices" "$scenario" "$target_rps" "present"
+
     completed_cases=$((completed_cases + 1))
     maybe_wait_between_cases "$completed_cases" "$TOTAL_CASES"
   done
 done < "$SUITE_MATRIX_TSV"
 
 echo ""
-echo "=== Benchmark Suite Complete ==="
+echo "=== Parallel Benchmark Suite Complete ==="
 if [ -n "$EXPERIMENT_NAME" ]; then
   echo "  experiment   : $EXPERIMENT_NAME"
 fi
