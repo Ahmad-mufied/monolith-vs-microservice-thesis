@@ -33,16 +33,20 @@ resources_configuration_json() {
     local oci_memory_quota="15000Mi"
 
     if [ "$architecture" = "monolith" ]; then
+      local effective_mode="$scaling_mode"
+      [ "$scaling_mode" = "hpa" ] && effective_mode="fixed"
       jq -cn \
         --arg provider "$provider" \
         --arg architecture "$architecture" \
         --arg autoscaling_mode "$scaling_mode" \
+        --arg effective_scaling_mode "$effective_mode" \
         --arg cpu "$oci_cpu_quota" \
         --arg memory "$oci_memory_quota" \
         '{
           provider: $provider,
           architecture: $architecture,
           autoscaling_mode: $autoscaling_mode,
+          effective_scaling_mode: $effective_scaling_mode,
           hpa_enabled: false,
           namespace_resource_quota: {cpu: $cpu, memory: $memory},
           resource_profile: "oci-equal-split",
