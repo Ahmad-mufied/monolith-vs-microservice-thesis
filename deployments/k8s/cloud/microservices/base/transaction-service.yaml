@@ -24,6 +24,7 @@ spec:
           type: RuntimeDefault
       nodeSelector:
         node-group: app
+        architecture: msa
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:

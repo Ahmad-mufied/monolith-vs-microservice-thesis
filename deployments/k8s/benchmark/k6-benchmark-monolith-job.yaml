@@ -21,10 +21,6 @@ spec:
           operator: Equal
           value: benchmark
           effect: NoSchedule
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       containers:
         - name: k6
           image: REPLACE_WITH_ECR_IMAGE

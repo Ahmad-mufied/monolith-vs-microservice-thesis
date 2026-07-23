@@ -11,8 +11,8 @@ benchmark_aws_auth_label() {
     aws)
       printf 'AWS session'
       ;;
-    vultr)
-      printf 'Vultr AWS S3 writer credentials'
+    vultr|oci)
+      printf 'OCI/Vultr AWS S3 writer credentials'
       ;;
     *)
       printf 'AWS credentials'
@@ -25,8 +25,8 @@ benchmark_aws_auth_fix_hint() {
     aws)
       printf "%s" "refresh AWS auth first, for example with 'aws login' or 'aws sso login --profile <profile>'."
       ;;
-    vultr)
-      printf "%s" "run 'make aws-s3-writer-apply' if the writer is missing, or set both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY for Vultr benchmarking before retrying."
+    vultr|oci)
+      printf "%s" "run 'make aws-s3-writer-apply' if the writer is missing, or set both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY for benchmarking before retrying."
       ;;
     *)
       printf "%s" "configure valid AWS credentials for the active benchmark provider before retrying."
@@ -47,7 +47,7 @@ prepare_benchmark_aws_env() {
       BENCHMARK_AWS_ENV_PREPARED_FOR="$provider"
       return 0
       ;;
-    vultr)
+    vultr|oci)
       source scripts/lib/vultr-s3-credentials.sh
       load_vultr_s3_credentials || return 1
       export AWS_REGION="${AWS_REGION:-ap-southeast-1}"

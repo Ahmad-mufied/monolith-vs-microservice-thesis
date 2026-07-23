@@ -347,6 +347,9 @@ Default suite behavior:
 - `EXPERIMENT_NAME`, when provided and `RUN_ID` is blank, generates a stable default `RUN_ID` as `eks-{mode}-{experiment_name}-{image_tag}`
 - `RUN_ID` falls back to `eks-{mode}-{yyyymmdd}-{HHMM}` only when both `RUN_ID` and `EXPERIMENT_NAME` are blank
 - `ATTEMPT` is auto-detected from S3 and starts at `attempt-01`
+- S3 status cache is warmed at suite startup (`prime_case_result_status_cache`); if a run is interrupted, re-running with the same `RUN_ID` and `ATTEMPT` automatically skips completed cases without re-running k6 or resetting databases
+- real-time ETA progress is calculated and logged per case (`print_case_eta`) showing projected completion timestamps for the case, scenario, and suite
+- data setup (reset/seed/prepare) is guarded to run only when pending cases exist for that scenario or RPS level
 - `K6_PROFILE` defaults to `steady` for fixed mode and `hpa` for HPA mode
 - `INTER_CASE_DELAY` defaults to `0` for backward-compatible smoke and
   calibration runs

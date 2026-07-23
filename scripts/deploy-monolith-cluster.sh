@@ -73,7 +73,7 @@ require_secret() {
 }
 
 sync_runtime_secrets() {
-  PLATFORM="$PLATFORM" \
+  PLATFORM="${PLATFORM:-${CLOUD_PROVIDER:-oci}}" \
   EXECUTION_MODE=parallel \
   SCALING_MODE="$SCALING_MODE" \
   CLOUD_PROVIDER="$CLOUD_PROVIDER" \
@@ -106,6 +106,7 @@ echo "Required secrets are present."
 
 # DB bootstrap
 $K8S delete job db-bootstrap-job -n benchmark --ignore-not-found
+$K8S wait --for=delete job/db-bootstrap-job -n benchmark --timeout=30s || true
 $K8S apply -f deployments/k8s/benchmark/monolith/db-bootstrap-job.yaml
 $K8S wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=120s
 echo "DB bootstrap complete"
@@ -125,16 +126,19 @@ prepare_existing_workload_for_redeploy
 
 # Migration
 $K8S delete job monolith-migration-job -n mono --ignore-not-found
+$K8S wait --for=delete job/monolith-migration-job -n mono --timeout=30s || true
 $K8S apply -f "$RENDERED_APP_JOB_DIR/migration-job.yaml"
 $K8S wait --for=condition=complete job/monolith-migration-job -n mono --timeout=180s
 echo "Migration complete"
 
 # Seed
 $K8S delete job reset-monolith-data-job -n mono --ignore-not-found
+$K8S wait --for=delete job/reset-monolith-data-job -n mono --timeout=30s || true
 $K8S apply -f "$RENDERED_APP_JOB_DIR/reset-monolith-data-job.yaml"
 $K8S wait --for=condition=complete job/reset-monolith-data-job -n mono --timeout=120s
 
 $K8S delete job seed-monolith-benchmark-data-job -n mono --ignore-not-found
+$K8S wait --for=delete job/seed-monolith-benchmark-data-job -n mono --timeout=30s || true
 $K8S apply -f "$RENDERED_APP_JOB_DIR/seed-monolith-benchmark-data-job.yaml"
 $K8S wait --for=condition=complete job/seed-monolith-benchmark-data-job -n mono --timeout=300s
 echo "Seed complete"

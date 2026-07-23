@@ -16,8 +16,11 @@ normalize_operator_platform() {
     vultr)
       printf 'vultr\n'
       ;;
+    oci|oracle)
+      printf 'oci\n'
+      ;;
     *)
-      echo "ERROR: unsupported PLATFORM '$platform' (expected: eks|vultr)" >&2
+      echo "ERROR: unsupported PLATFORM '$platform' (expected: eks|vultr|oci)" >&2
       return 1
       ;;
   esac
@@ -28,6 +31,7 @@ platform_to_cloud_provider() {
   case "$platform" in
     eks) printf 'aws\n' ;;
     vultr) printf 'vultr\n' ;;
+    oci) printf 'oci\n' ;;
     *)
       echo "ERROR: unsupported PLATFORM '$platform'" >&2
       return 1
@@ -39,7 +43,7 @@ platform_to_image_registry() {
   local platform="$1"
   case "$platform" in
     eks) printf 'ecr\n' ;;
-    vultr) printf 'dockerhub\n' ;;
+    vultr|oci) printf 'dockerhub\n' ;;
     *)
       echo "ERROR: unsupported PLATFORM '$platform'" >&2
       return 1
@@ -50,7 +54,7 @@ platform_to_image_registry() {
 platform_to_result_storage() {
   local platform="$1"
   case "$platform" in
-    eks|vultr) printf 'aws-s3\n' ;;
+    eks|vultr|oci) printf 'aws-s3\n' ;;
     *)
       echo "ERROR: unsupported PLATFORM '$platform'" >&2
       return 1
