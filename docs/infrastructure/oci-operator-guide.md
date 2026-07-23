@@ -49,6 +49,12 @@ Expected Output:
   SEQUENTIAL_CONTEXT    : monolith
 ```
 
+> [!WARNING]
+> **Security & Credentials Safety Rules**:
+> 1. **Never Commit Secret Files**: `env/oci.env`, `infra/terraform/oci/terraform.tfvars`, and `kubeconfig` are ignored by `.gitignore`. Never remove them from `.gitignore` or commit secret files to Git repositories.
+> 2. **Runtime Environment Injection**: In automated CI/CD pipelines or secure execution environments, supply sensitive values dynamically via environment variables (e.g., `export TF_VAR_db_password="..."`, `export POSTGRES_PASSWORD="..."`) instead of persisting plaintext credentials to disk.
+> 3. **Avoid Shell History Leakage**: When creating Kubernetes secrets via CLI, dereference active environment variables (e.g., `--from-literal=api-key="${DATADOG_API_KEY}"`) or run commands with a leading space to prevent recording passwords in shell history (`.bash_history`).
+
 ### Step 2: Configure OCI Environment Variables (`env/oci.env`)
 
 Create or update `env/oci.env` with your AWS S3 writer credentials, Datadog API parameters, and Docker Hub namespace:
@@ -83,7 +89,7 @@ DATADOG_ENV="benchmark"
 
 ### Step 3: Configure Terraform Parameters (`infra/terraform/oci/terraform.tfvars`)
 
-Copy `infra/terraform/oci/terraform.tfvars.example` to `infra/terraform/oci/terraform.tfvars` and set target values:
+Copy `infra/terraform/oci/terraform.tfvars.example` to `infra/terraform/oci/terraform.tfvars` and set target values (or pass `db_password` securely via `export TF_VAR_db_password="${POSTGRES_PASSWORD}"`):
 
 ```hcl
 region          = "ap-kulai-2"
@@ -166,7 +172,7 @@ helm repo update
 kubectl --context=monolith create namespace datadog --dry-run=client -o yaml | kubectl --context=monolith apply -f -
 kubectl --context=monolith create secret generic datadog-secret \
   --namespace datadog \
-  --from-literal=api-key="your_datadog_api_key" \
+  --from-literal=api-key="${DATADOG_API_KEY}" \
   --dry-run=client -o yaml | kubectl --context=monolith apply -f -
 
 # Deploy Datadog Agent DaemonSet (Chart version 3.134.0)
