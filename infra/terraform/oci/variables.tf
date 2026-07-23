@@ -25,6 +25,7 @@ variable "private_key_path" {
 variable "private_key_password" {
   description = "Passphrase for encrypted OCI API Private Key."
   type        = string
+  sensitive   = true
   default     = ""
 }
 
@@ -131,7 +132,7 @@ variable "db_memory_in_gbs" {
 variable "db_shape" {
   description = "OCI Compute shape for PostgreSQL DB system."
   type        = string
-  default     = "PostgreSQL.VM.Standard.E4.Flex"
+  default     = "VM.Standard.E5.Flex"
 }
 
 variable "testing_node_shape" {

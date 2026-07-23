@@ -15,7 +15,8 @@ set -a
 set +a
 set -e
 
-db_password="${POSTGRES_PASSWORD:-ChangeMe123!SecurePassword}"
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in env/oci.env}"
+db_password="$POSTGRES_PASSWORD"
 encoded_db_password="$(url_encode "$db_password")"
 
 sequential_db_ip=$(terraform -chdir=infra/terraform/oci output -json postgres_endpoints 2>/dev/null | jq -r '.sequential' 2>/dev/null)
@@ -34,9 +35,9 @@ if [ -z "$msa_db_ip" ] || [ "$msa_db_ip" = "null" ]; then
   msa_db_ip="10.0.4.206"
 fi
 
-jwt_secret="super-secret-jwt-key-change-in-production"
-admin_email="admin@example.com"
-admin_password="AdminPassword123!"
+jwt_secret="${JWT_SECRET:-super-secret-jwt-key-change-in-production}"
+admin_email="${ADMIN_USER_EMAIL:-admin@example.com}"
+admin_password="${ADMIN_USER_PASSWORD:-AdminPassword123!}"
 
 # Load AWS S3 credentials
 load_vultr_s3_credentials
