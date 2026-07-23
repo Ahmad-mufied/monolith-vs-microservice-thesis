@@ -175,7 +175,20 @@ dispatch_preflight_check() {
   case "$PLATFORM" in
     eks) bash scripts/benchmark-preflight-check.sh ;;
     vultr) bash scripts/vultr-preflight-check.sh ;;
-    oci) echo "OCI preflight check complete" ;;
+    oci)
+      echo "=== OCI Preflight Validation ==="
+      command -v terraform >/dev/null 2>&1 || { echo "ERROR: terraform CLI is required for OCI" >&2; exit 1; }
+      command -v kubectl >/dev/null 2>&1 || { echo "ERROR: kubectl CLI is required for OCI" >&2; exit 1; }
+      command -v jq >/dev/null 2>&1 || { echo "ERROR: jq CLI is required for OCI" >&2; exit 1; }
+      if [ -f env/oci.env ]; then
+        set -a; source env/oci.env; set +a
+      fi
+      if [ -z "${POSTGRES_PASSWORD:-}" ]; then
+        echo "ERROR: POSTGRES_PASSWORD must be set in env/oci.env" >&2
+        exit 1
+      fi
+      echo "OCI preflight check: OK (CLI tools and env/oci.env verified)"
+      ;;
   esac
 }
 
