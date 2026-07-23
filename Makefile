@@ -1190,15 +1190,15 @@ vultr-destroy-confirmed:
 
 .PHONY: oci-plan
 oci-plan:
-	cd infra/terraform/oci && terraform init && terraform plan -out=tfplan
+	bash scripts/render-oci-tfvars.sh && cd infra/terraform/oci && terraform init && terraform plan -out=tfplan
 
 .PHONY: oci-apply
 oci-apply:
-	cd infra/terraform/oci && terraform init && terraform apply
+	bash scripts/render-oci-tfvars.sh && cd infra/terraform/oci && terraform init && terraform apply
 
 .PHONY: oci-destroy-confirmed
 oci-destroy-confirmed:
-	cd infra/terraform/oci && terraform destroy -auto-approve
+	bash scripts/render-oci-tfvars.sh && cd infra/terraform/oci && terraform init && terraform destroy -auto-approve
 
 .PHONY: oci-render-manifests
 oci-render-manifests:
