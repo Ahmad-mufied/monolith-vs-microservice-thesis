@@ -169,8 +169,9 @@ kubectl --context=monolith create secret generic datadog-secret \
   --from-literal=api-key="your_datadog_api_key" \
   --dry-run=client -o yaml | kubectl --context=monolith apply -f -
 
-# Deploy Datadog Agent DaemonSet
+# Deploy Datadog Agent DaemonSet (Chart version 3.134.0)
 helm upgrade --install datadog datadog/datadog \
+  --version 3.134.0 \
   --namespace datadog \
   --set datadog.apiKeyExistingSecret=datadog-secret \
   --set datadog.site=us5.datadoghq.com \
