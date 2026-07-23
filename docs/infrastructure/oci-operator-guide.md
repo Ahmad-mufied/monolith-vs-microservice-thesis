@@ -16,7 +16,7 @@ Before executing benchmark operations on OCI, ensure the following local tools a
 |---|---|---|
 | `oci-cli` | `3.30.0` | Managing OCI tenancy & OKE kubeconfig credentials |
 | `terraform` | `>= 1.6.0` | Provisioning OCI VCN, OKE cluster, node pools, and PostgreSQL VM |
-| `kubectl` | `v1.28.0` | Interacting with Kubernetes clusters and inspecting pod logs |
+| `kubectl` | `v1.35.0` | Interacting with Kubernetes clusters and inspecting pod logs |
 | `helm` | `v3.12.0` | Deploying Datadog Agent DaemonSet |
 | `make` | `4.3` | Dispatching benchmark targets via `Makefile` |
 | `git` | `2.40.0` | Pinning `IMAGE_TAG` and tracking codebase revisions |
