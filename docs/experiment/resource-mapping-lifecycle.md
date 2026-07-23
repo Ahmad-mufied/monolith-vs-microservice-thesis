@@ -15,7 +15,7 @@ To understand the resource allocation model, we must distinguish between three d
 |    - Measured dynamically via Kubernetes API.              |
 +-----------------------------+------------------------------+
                               |
-                              v (Subtract Safety Margin & Round)
+                              v (Raw Allocatable directly, or optional margin & rounding if enabled)
 +-----------------------------+------------------------------+
 | 2. RESOURCE QUOTA (Namespace Hard Fence)                   |
 |    - Enforced via ResourceQuota objects in K8s.            |
@@ -31,7 +31,7 @@ To understand the resource allocation model, we must distinguish between three d
 +------------------------------------------------------------+
 ```
 
-1. **Resource Baseline:** The physical capacity of the hardware dedicated to target workloads. It is defined as the aggregate **Allocatable** resources of the node group labeled `node-group=app`, minus a stability safety margin, rounded down to clean mathematical segments.
+1. **Resource Baseline:** The physical capacity of the hardware dedicated to target workloads. It is defined as the aggregate **Allocatable** resources of the node group labeled `node-group=app` (using raw allocatable capacity directly by default, or with optional safety margin subtraction and rounding if `VULTR_RESOURCE_ROUNDING=true`).
 2. **Resource Quota:** A logical Kubernetes policy (`ResourceQuota` object) applied to the namespaces (`mono` and `msa`). It establishes a hard ceiling preventing pods inside the namespace from collectively requesting or limiting more resources than the physical baseline.
 3. **Resource Limits & Requests:** The fine-grained CPU and Memory bounds configured on the individual container/pod definitions.
 
