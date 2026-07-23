@@ -15,7 +15,7 @@ To understand the resource allocation model, we must distinguish between three d
 |    - Measured dynamically via Kubernetes API.              |
 +-----------------------------+------------------------------+
                               |
-                              v (Raw Allocatable directly, or optional margin & rounding if enabled)
+                              v (Allocatable Baseline Capacity)
 +-----------------------------+------------------------------+
 | 2. RESOURCE QUOTA (Namespace Hard Fence)                   |
 |    - Enforced via ResourceQuota objects in K8s.            |
@@ -31,7 +31,7 @@ To understand the resource allocation model, we must distinguish between three d
 +------------------------------------------------------------+
 ```
 
-1. **Resource Baseline:** The physical capacity of the hardware dedicated to target workloads. It is defined as the aggregate **Allocatable** resources of the node group labeled `node-group=app` (using raw allocatable capacity directly by default, or with optional safety margin subtraction and rounding if `VULTR_RESOURCE_ROUNDING=true`).
+1. **Resource Baseline:** The physical capacity of the hardware dedicated to target workloads. It is defined as the aggregate **Allocatable** resources of the node group labeled `node-group=app`, measured dynamically via the Kubernetes API.
 2. **Resource Quota:** A logical Kubernetes policy (`ResourceQuota` object) applied to the namespaces (`mono` and `msa`). It establishes a hard ceiling preventing pods inside the namespace from collectively requesting or limiting more resources than the physical baseline.
 3. **Resource Limits & Requests:** The fine-grained CPU and Memory bounds configured on the individual container/pod definitions.
 
@@ -51,14 +51,13 @@ sequenceDiagram
     participant QD as K8s Deployer
 
     Note over TF, K8s: Phase 1: Infrastructure Provisioning
-    TF->>K8s: Create VKE Cluster (1x app-node, 1x testing-node)
+    TF->>K8s: Create Node Pool (1x app-node, 1x testing-node)
     TF->>K8s: Taint testing-node (workload=benchmark:NoSchedule)
 
     Note over K8s, BS: Phase 2: Physical Measurement
     BS->>K8s: kubectl get nodes -l node-group=app
-    K8s-->>BS: Return Allocatable CPU & Memory (e.g. 7800m CPU / 15786Mi Memory)
-    BS->>BS: Subtract safety margins if configured
-    BS->>BS: Use exact raw allocatable baseline (or optional rounding if VULTR_RESOURCE_ROUNDING=true)
+    K8s-->>BS: Return Allocatable CPU & Memory Baseline
+    BS->>BS: Write baseline environment values
     BS->>BS: Write env/vultr-resource-baseline.env
 
     Note over BS, RS: Phase 3: Manifest Rendering
@@ -84,34 +83,27 @@ The following ASCII diagram illustrates how a single 8 vCPU / 16 GB physical nod
 ========================================================================================
 [  System Overhead (200m CPU / 426Mi Mem) - Reserved for OS, Kubelet, Daemonsets, etc. ]
 ----------------------------------------------------------------------------------------
-[                     ALLOCATABLE CAPACITY: 7800m CPU / 15786Mi Memory                 ]
-========================================================================================
-                                           │
-                                           │ (Minus 110Mi Memory Safety Margin)
-                                           ▼
-========================================================================================
-                        FINAL SHARED CEILING / RESOURCE QUOTA
-                              7800m CPU / 15360Mi Memory
+[               ALLOCATABLE CAPACITY / RESOURCE QUOTA BASELINE: 7800m CPU / 15000Mi Memory           ]
 ========================================================================================
           │                                                │
           ▼ (MONOLITH NAMESPACE)                           ▼ (MICROSERVICES NAMESPACE)
 ┌──────────────────────────────────┐             ┌──────────────────────────────────┐
 │ mono-resource-quota              │             │ msa-resource-quota               │
 │ CPU Limit: 7800m                 │             │ CPU Limit: 7800m                 │
-│ Memory Limit: 15360Mi            │             │ Memory Limit: 15360Mi            │
+│ Memory Limit: 15000Mi            │             │ Memory Limit: 15000Mi            │
 └────────────────┬─────────────────┘             └────────────────┬─────────────────┘
                  │                                                │
                  ▼                                                ├─► api-gateway pod:
-┌──────────────────────────────────┐                              │   limit: 1950m CPU / 3840Mi Mem
+┌──────────────────────────────────┐                              │   limit: 1950m CPU / 3750Mi Mem
 │ monolith pod:                    │                              │
-│ limit: 7800m CPU / 15360Mi Mem   │                              ├─► auth-service pod:
-│ req:   3900m CPU / 7680Mi Mem    │                              │   limit: 1950m CPU / 3840Mi Mem
+│ limit: 7800m CPU / 15000Mi Mem   │                              ├─► auth-service pod:
+│ req:   3900m CPU / 7500Mi Mem    │                              │   limit: 1950m CPU / 3750Mi Mem
 └──────────────────────────────────┘                              │
                                                                   ├─► item-service pod:
-                                                                  │   limit: 1950m CPU / 3840Mi Mem
+                                                                  │   limit: 1950m CPU / 3750Mi Mem
                                                                   │
                                                                   └─► transaction-service pod:
-                                                                      limit: 1950m CPU / 3840Mi Mem
+                                                                      limit: 1950m CPU / 3750Mi Mem
 ========================================================================================
 ```
 
