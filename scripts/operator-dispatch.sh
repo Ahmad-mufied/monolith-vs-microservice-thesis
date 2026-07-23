@@ -129,9 +129,9 @@ dispatch_oci_terraform() {
     set -- -out=tfplan
   fi
 
-  if [[ "$terraform_action" == "apply" ]] && [ -n "${AWS_PROFILE:-}" -o -n "${AWS_ACCESS_KEY_ID:-}" ]; then
-    TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-s3-writer.sh init || true
-    TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-s3-writer.sh apply || true
+  if [[ "$terraform_action" == "apply" ]] && [[ -n "${AWS_PROFILE:-}" || -n "${AWS_ACCESS_KEY_ID:-}" ]]; then
+    TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-s3-writer.sh init
+    TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-s3-writer.sh apply
   fi
 
   cd infra/terraform/oci
@@ -227,7 +227,11 @@ dispatch_deploy_workloads() {
           IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" AWS_REGION="${AWS_REGION:-ap-southeast-1}" ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}" make --no-print-directory ecr-check-tag
           CLOUD_PROVIDER=aws SCALING_MODE="$SCALING_MODE" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" AWS_REGION="${AWS_REGION:-ap-southeast-1}" ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}" bash scripts/deploy-all-clusters.sh
           ;;
-        vultr|oci)
+        vultr)
+          IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}" bash scripts/dockerhub-public-image-check.sh
+          CLOUD_PROVIDER="$CLOUD_PROVIDER" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" bash scripts/deploy-all-clusters.sh
+          ;;
+        oci)
           IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}" bash scripts/dockerhub-public-image-check.sh || true
           CLOUD_PROVIDER="$CLOUD_PROVIDER" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" bash scripts/deploy-all-clusters.sh
           ;;
