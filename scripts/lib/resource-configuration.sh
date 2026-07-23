@@ -6,12 +6,7 @@ resources_configuration_json() {
   local provider="${CLOUD_PROVIDER:-aws}"
   local baseline_env="${VULTR_RESOURCE_BASELINE_ENV:-env/vultr-resource-baseline.env}"
 
-  if [ "$provider" = "vultr" ]; then
-    if [ ! -f "$baseline_env" ]; then
-      echo "ERROR: missing $baseline_env; run the provider resource baseline measurement target first" >&2
-      return 1
-    fi
-
+  if [ "$provider" = "vultr" ] && [ -f "$baseline_env" ]; then
     set -a
     source "$baseline_env"
     set +a
@@ -32,6 +27,92 @@ resources_configuration_json() {
       return 1
       ;;
   esac
+
+  if [ "$provider" = "oci" ]; then
+    local oci_cpu_quota="7800m"
+    local oci_memory_quota="15000Mi"
+
+    if [ "$architecture" = "monolith" ]; then
+      jq -cn \
+        --arg provider "$provider" \
+        --arg architecture "$architecture" \
+        --arg autoscaling_mode "$scaling_mode" \
+        --arg cpu "$oci_cpu_quota" \
+        --arg memory "$oci_memory_quota" \
+        '{
+          provider: $provider,
+          architecture: $architecture,
+          autoscaling_mode: $autoscaling_mode,
+          hpa_enabled: false,
+          namespace_resource_quota: {cpu: $cpu, memory: $memory},
+          resource_profile: "oci-equal-split",
+          cpu_request: "3900m",
+          cpu_limit: "7800m",
+          memory_request: "7500Mi",
+          memory_limit: "15000Mi",
+          replica_count: 1
+        }'
+      return 0
+    fi
+
+    jq -cn \
+      --arg provider "$provider" \
+      --arg architecture "$architecture" \
+      --arg autoscaling_mode "$scaling_mode" \
+      --arg cpu "$oci_cpu_quota" \
+      --arg memory "$oci_memory_quota" \
+      '{
+        provider: $provider,
+        architecture: $architecture,
+        autoscaling_mode: $autoscaling_mode,
+        hpa_enabled: ($autoscaling_mode == "hpa"),
+        namespace_resource_quota: {cpu: $cpu, memory: $memory},
+        resource_profile: "oci-equal-split",
+        services: {
+          "api-gateway": {
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "950m" end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else "1900m" end),
+            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else "1800Mi" end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else "3600Mi" end),
+            min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
+            replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
+          },
+          "auth-service": {
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "950m" end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else "1900m" end),
+            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else "1800Mi" end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else "3600Mi" end),
+            min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
+            replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
+          },
+          "item-service": {
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "950m" end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else "1900m" end),
+            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else "1800Mi" end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else "3600Mi" end),
+            min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
+            replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
+          },
+          "transaction-service": {
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "950m" end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else "1900m" end),
+            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else "1800Mi" end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else "3600Mi" end),
+            min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
+            max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
+            target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
+            replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
+          }
+        }
+      }'
+    return 0
+  fi
 
   if [ "$provider" = "vultr" ]; then
     local cpu_quota memory_quota app_node_count allocatable_cpu allocatable_memory

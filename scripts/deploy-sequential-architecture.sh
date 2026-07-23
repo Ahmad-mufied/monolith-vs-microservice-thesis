@@ -146,6 +146,13 @@ $K8S apply -f deployments/k8s/benchmark/namespace.yaml
 $K8S apply -f deployments/k8s/benchmark/k6-runner-rbac.yaml
 sync_runtime_secrets
 
+label_arch="monolith"
+if [ "$ARCHITECTURE" = "microservices" ]; then
+  label_arch="msa"
+fi
+echo "Labeling sequential app nodes with architecture=$label_arch..."
+$K8S label nodes -l node-group=app "architecture=$label_arch" --overwrite
+
 case "$ARCHITECTURE" in
   monolith)
     rendered_job_dir="$RENDER_ROOT/deployments/k8s/cloud/monolith"

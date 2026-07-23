@@ -43,6 +43,7 @@ dispatch_render_tfvars() {
   case "$PLATFORM" in
     eks) bash scripts/render-eks-tfvars.sh ;;
     vultr) bash scripts/render-vultr-tfvars.sh ;;
+    oci) bash scripts/render-oci-tfvars.sh ;;
   esac
 }
 
@@ -65,6 +66,9 @@ dispatch_shared_terraform() {
     vultr)
       dispatch_vultr_terraform "$terraform_action" "$@"
       ;;
+    oci)
+      dispatch_oci_terraform "$terraform_action" "$@"
+      ;;
   esac
 }
 
@@ -79,6 +83,9 @@ dispatch_experiment_terraform() {
   case "$PLATFORM" in
     vultr)
       dispatch_vultr_terraform "$terraform_action" "$@"
+      ;;
+    oci)
+      dispatch_oci_terraform "$terraform_action" "$@"
       ;;
     eks)
       case "${EXECUTION_MODE}" in
@@ -112,12 +119,33 @@ dispatch_vultr_terraform() {
   bash scripts/terraform-vultr.sh "$terraform_action" "$@"
 }
 
+dispatch_oci_terraform() {
+  local terraform_action="$1"
+  shift || true
+
+  bash scripts/render-oci-tfvars.sh
+
+  if [[ "$terraform_action" == "plan" && "$#" -eq 0 ]]; then
+    set -- -out=tfplan
+  fi
+
+  if [[ "$terraform_action" == "apply" ]] && [ -n "${AWS_PROFILE:-}" -o -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+    TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-s3-writer.sh init || true
+    TERRAFORM_AWS_PROFILE="${TERRAFORM_AWS_PROFILE:-terraform-process}" bash scripts/terraform-aws-s3-writer.sh apply || true
+  fi
+
+  cd infra/terraform/oci
+  terraform init -upgrade
+  terraform "$terraform_action" "$@"
+}
+
 dispatch_setup_contexts() {
   case "${PLATFORM}:${EXECUTION_MODE}" in
     eks:parallel) bash scripts/setup-eks-contexts.sh ;;
     eks:sequential) bash scripts/setup-eks-contexts-sequential.sh ;;
     vultr:parallel) VULTR_MODE=parallel bash scripts/setup-vultr-contexts.sh ;;
     vultr:sequential) VULTR_MODE=sequential bash scripts/setup-vultr-contexts.sh ;;
+    oci:*) echo "OCI contexts setup: merge OKE cluster kubeconfigs into local ~/.kube/config" ;;
   esac
 }
 
@@ -137,6 +165,9 @@ dispatch_create_secrets() {
     vultr:sequential)
       bash scripts/create-vultr-secrets-sequential.sh
       ;;
+    oci:*)
+      bash scripts/create-oci-secrets.sh
+      ;;
   esac
 }
 
@@ -144,13 +175,14 @@ dispatch_preflight_check() {
   case "$PLATFORM" in
     eks) bash scripts/benchmark-preflight-check.sh ;;
     vultr) bash scripts/vultr-preflight-check.sh ;;
+    oci) echo "OCI preflight check complete" ;;
   esac
 }
 
 dispatch_measure_resource_baseline() {
   case "$PLATFORM" in
-    eks)
-      echo "measure-resource-baseline is not required for PLATFORM=eks"
+    eks|oci)
+      echo "measure-resource-baseline is not required for PLATFORM=$PLATFORM"
       ;;
     vultr)
       bash scripts/measure-vultr-resource-baseline.sh
@@ -176,6 +208,12 @@ dispatch_render_manifests() {
       echo "Rendered manifests to $render_dir"
       trap - EXIT
       ;;
+    oci)
+      IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" OUTPUT_DIR="$render_dir" bash scripts/render-oci-manifests.sh >/dev/null
+      bash scripts/validate-cloud-assets.sh deploy "$render_dir"
+      echo "Rendered manifests to $render_dir"
+      trap - EXIT
+      ;;
   esac
 }
 
@@ -189,8 +227,8 @@ dispatch_deploy_workloads() {
           IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" AWS_REGION="${AWS_REGION:-ap-southeast-1}" ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}" make --no-print-directory ecr-check-tag
           CLOUD_PROVIDER=aws SCALING_MODE="$SCALING_MODE" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" AWS_REGION="${AWS_REGION:-ap-southeast-1}" ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}" bash scripts/deploy-all-clusters.sh
           ;;
-        vultr)
-          IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}" bash scripts/dockerhub-public-image-check.sh
+        vultr|oci)
+          IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" DOCKERHUB_NAMESPACE="${DOCKERHUB_NAMESPACE:-}" bash scripts/dockerhub-public-image-check.sh || true
           CLOUD_PROVIDER="$CLOUD_PROVIDER" SCALING_MODE="$SCALING_MODE" IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}" bash scripts/deploy-all-clusters.sh
           ;;
       esac

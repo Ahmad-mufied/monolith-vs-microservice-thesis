@@ -1188,6 +1188,36 @@ vultr-apply: aws-s3-writer-apply
 vultr-destroy-confirmed:
 	S3_BENCHMARK_DATA_VERIFIED=true bash scripts/terraform-vultr.sh destroy
 
+.PHONY: oci-plan
+oci-plan:
+	cd infra/terraform/oci && terraform init && terraform plan -out=tfplan
+
+.PHONY: oci-apply
+oci-apply:
+	cd infra/terraform/oci && terraform init && terraform apply
+
+.PHONY: oci-destroy-confirmed
+oci-destroy-confirmed:
+	cd infra/terraform/oci && terraform destroy -auto-approve
+
+.PHONY: oci-render-manifests
+oci-render-manifests:
+	@set -euo pipefail; \
+	RENDER_DIR="$$(mktemp -d)"; \
+	trap 'rm -rf "$$RENDER_DIR"' EXIT; \
+	echo "Rendering OCI manifests to $$RENDER_DIR"; \
+	IMAGE_TAG=$(IMAGE_TAG) OUTPUT_DIR="$$RENDER_DIR" bash scripts/render-oci-manifests.sh >/dev/null; \
+	bash scripts/validate-cloud-assets.sh deploy "$$RENDER_DIR"; \
+	echo "OCI manifests rendered and validated successfully"
+
+.PHONY: oci-deploy-all
+oci-deploy-all:
+	CLOUD_PROVIDER=oci SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/deploy-all-clusters.sh
+
+.PHONY: oci-run-benchmark-suite
+oci-run-benchmark-suite:
+	CLOUD_PROVIDER=oci SCALING_MODE=$(SCALING_MODE) IMAGE_TAG=$(IMAGE_TAG) bash scripts/run-benchmark-suite.sh
+
 .PHONY: vultr-setup-context-sequential
 vultr-setup-context-sequential:
 	VULTR_MODE=sequential bash scripts/setup-vultr-contexts.sh

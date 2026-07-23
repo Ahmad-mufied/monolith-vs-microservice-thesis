@@ -72,7 +72,7 @@ require_secret() {
 }
 
 sync_runtime_secrets() {
-  PLATFORM="$PLATFORM" \
+  PLATFORM="${PLATFORM:-${CLOUD_PROVIDER:-oci}}" \
   EXECUTION_MODE=parallel \
   SCALING_MODE="$SCALING_MODE" \
   CLOUD_PROVIDER="$CLOUD_PROVIDER" \
@@ -107,6 +107,7 @@ echo "Required secrets are present."
 
 # DB bootstrap
 $K8S delete job db-bootstrap-job -n benchmark --ignore-not-found
+$K8S wait --for=delete job/db-bootstrap-job -n benchmark --timeout=30s || true
 $K8S apply -f deployments/k8s/benchmark/microservices/db-bootstrap-job.yaml
 $K8S wait --for=condition=complete job/db-bootstrap-job -n benchmark --timeout=120s
 echo "DB bootstrap complete"
@@ -132,6 +133,7 @@ prepare_existing_workloads_for_redeploy
 # Migrations (parallel)
 for svc in auth item transaction; do
   $K8S delete job "${svc}-migration-job" -n msa --ignore-not-found
+  $K8S wait --for=delete job/"${svc}-migration-job" -n msa --timeout=30s || true
   $K8S apply -f "${RENDERED_APP_JOB_DIR}/${svc}-migration-job.yaml"
 done
 for svc in auth item transaction; do
@@ -141,10 +143,12 @@ echo "Migrations complete"
 
 # Seed
 $K8S delete job reset-microservices-data-job -n msa --ignore-not-found
+$K8S wait --for=delete job/reset-microservices-data-job -n msa --timeout=30s || true
 $K8S apply -f "$RENDERED_APP_JOB_DIR/reset-microservices-data-job.yaml"
 $K8S wait --for=condition=complete job/reset-microservices-data-job -n msa --timeout=120s
 
 $K8S delete job seed-microservices-benchmark-data-job -n msa --ignore-not-found
+$K8S wait --for=delete job/seed-microservices-benchmark-data-job -n msa --timeout=30s || true
 $K8S apply -f "$RENDERED_APP_JOB_DIR/seed-microservices-benchmark-data-job.yaml"
 $K8S wait --for=condition=complete job/seed-microservices-benchmark-data-job -n msa --timeout=300s
 echo "Seed complete"

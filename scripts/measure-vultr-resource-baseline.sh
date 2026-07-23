@@ -48,8 +48,11 @@ done < <(jq -r '.items[] | [.status.allocatable.cpu, .status.allocatable.memory]
 
 app_cpu_quota_m=$((total_cpu_m - safety_cpu_m))
 app_memory_quota_mi=$((total_memory_mi - safety_memory_mi))
-app_cpu_quota_m=$((app_cpu_quota_m / 100 * 100))
-app_memory_quota_mi=$((app_memory_quota_mi / 1024 * 1024))
+
+if [ "${VULTR_RESOURCE_ROUNDING:-false}" = "true" ]; then
+  app_cpu_quota_m=$((app_cpu_quota_m / 100 * 100))
+  app_memory_quota_mi=$((app_memory_quota_mi / 1024 * 1024))
+fi
 
 if [ "$app_cpu_quota_m" -le 0 ] || [ "$app_memory_quota_mi" -le 0 ]; then
   echo "ERROR: derived invalid resource quota cpu=${app_cpu_quota_m}m memory=${app_memory_quota_mi}Mi" >&2

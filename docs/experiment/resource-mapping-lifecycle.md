@@ -56,9 +56,9 @@ sequenceDiagram
 
     Note over K8s, BS: Phase 2: Physical Measurement
     BS->>K8s: kubectl get nodes -l node-group=app
-    K8s-->>BS: Return Allocatable CPU (7800m) & Memory (15786Mi)
-    BS->>BS: Subtract safety margins (0m CPU / 110Mi Memory)
-    BS->>BS: Round memory down to nearest 1Gi (15360Mi)
+    K8s-->>BS: Return Allocatable CPU & Memory (e.g. 7800m CPU / 15786Mi Memory)
+    BS->>BS: Subtract safety margins if configured
+    BS->>BS: Use exact raw allocatable baseline (or optional rounding if VULTR_RESOURCE_ROUNDING=true)
     BS->>BS: Write env/vultr-resource-baseline.env
 
     Note over BS, RS: Phase 3: Manifest Rendering

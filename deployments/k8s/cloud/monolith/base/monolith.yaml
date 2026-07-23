@@ -24,6 +24,7 @@ spec:
           type: RuntimeDefault
       nodeSelector:
         node-group: app
+        architecture: monolith
       containers:
         - name: monolith
           image: REPLACE_WITH_MONOLITH_ECR_IMAGE
