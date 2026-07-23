@@ -35,9 +35,14 @@ if [ -z "$msa_db_ip" ] || [ "$msa_db_ip" = "null" ]; then
   msa_db_ip="10.0.4.206"
 fi
 
-jwt_secret="${JWT_SECRET:-super-secret-jwt-key-change-in-production}"
-admin_email="${ADMIN_USER_EMAIL:-admin@example.com}"
-admin_password="${ADMIN_USER_PASSWORD:-AdminPassword123!}"
+: "${JWT_SECRET:?JWT_SECRET must be set in environment or env/oci.env}"
+jwt_secret="$JWT_SECRET"
+
+: "${ADMIN_USER_EMAIL:?ADMIN_USER_EMAIL must be set in environment or env/oci.env}"
+admin_email="$ADMIN_USER_EMAIL"
+
+: "${ADMIN_USER_PASSWORD:?ADMIN_USER_PASSWORD must be set in environment or env/oci.env}"
+admin_password="$ADMIN_USER_PASSWORD"
 
 # Load AWS S3 credentials
 load_vultr_s3_credentials
