@@ -104,14 +104,22 @@ patch_image_file "$manifest_root/deployments/k8s/cloud/microservices/auth-migrat
 patch_image_file "$manifest_root/deployments/k8s/cloud/microservices/item-migration-job.yaml" "item-service"
 patch_image_file "$manifest_root/deployments/k8s/cloud/microservices/transaction-migration-job.yaml" "transaction-service"
 
+source scripts/lib/resource-configuration.sh
+
 patch_image_file "$manifest_root/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml" "k6-runner"
 patch_image_file "$manifest_root/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml" "k6-runner"
 patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml" "IMAGE_TAG" "\"${IMAGE_TAG}\""
 patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml" "IMAGE_TAG" "\"${IMAGE_TAG}\""
 patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml" "IMAGES_JSON" "'{\"monolith\":\"${registry_base}/monolith:${IMAGE_TAG}\"}'"
 patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml" "IMAGES_JSON" "'{\"api_gateway\":\"${registry_base}/api-gateway:${IMAGE_TAG}\",\"auth_service\":\"${registry_base}/auth-service:${IMAGE_TAG}\",\"item_service\":\"${registry_base}/item-service:${IMAGE_TAG}\",\"transaction_service\":\"${registry_base}/transaction-service:${IMAGE_TAG}\"}'"
-patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml" "INFRA_CONFIGURATION_JSON" "'{\"provider\":\"oci\",\"region\":\"${OCI_REGION:-ap-johor-1}\",\"cluster\":\"${OCI_MONOLITH_CLUSTER_NAME:-skripsi-oci-monolith}\",\"app_node_pool\":\"app-nodes\",\"testing_node_pool\":\"testing-nodes\",\"postgres_version\":\"14\"}'"
-patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml" "INFRA_CONFIGURATION_JSON" "'{\"provider\":\"oci\",\"region\":\"${OCI_REGION:-ap-johor-1}\",\"cluster\":\"${OCI_MSA_CLUSTER_NAME:-skripsi-oci-msa}\",\"app_node_pool\":\"app-nodes\",\"testing_node_pool\":\"testing-nodes\",\"postgres_version\":\"14\"}'"
+patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml" "INFRA_CONFIGURATION_JSON" "'{\"provider\":\"oci\",\"region\":\"${OCI_REGION:-ap-kulai-2}\",\"cluster\":\"${OCI_SEQUENTIAL_CLUSTER_NAME:-skripsi-oci-sequential}\",\"app_node_pool\":\"app-nodes\",\"testing_node_pool\":\"testing-nodes\",\"postgres_version\":\"18\"}'"
+patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml" "INFRA_CONFIGURATION_JSON" "'{\"provider\":\"oci\",\"region\":\"${OCI_REGION:-ap-kulai-2}\",\"cluster\":\"${OCI_SEQUENTIAL_CLUSTER_NAME:-skripsi-oci-sequential}\",\"app_node_pool\":\"app-nodes\",\"testing_node_pool\":\"testing-nodes\",\"postgres_version\":\"18\"}'"
+
+CLOUD_PROVIDER=oci
+mono_res_json="$(resources_configuration_json monolith fixed || echo '{}')"
+msa_res_json="$(resources_configuration_json microservices fixed || echo '{}')"
+patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-monolith-job.yaml" "RESOURCES_CONFIGURATION_JSON" "'${mono_res_json}'"
+patch_value_line "$manifest_root/deployments/k8s/benchmark/k6-benchmark-microservices-job.yaml" "RESOURCES_CONFIGURATION_JSON" "'${msa_res_json}'"
 
 trap - ERR
 echo "$OUTPUT_DIR"
