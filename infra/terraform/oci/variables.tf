@@ -84,13 +84,13 @@ variable "app_node_count" {
 variable "testing_node_ocpus" {
   description = "OCPU count for testing node pool."
   type        = number
-  default     = 1
+  default     = 4
 }
 
 variable "testing_node_memory_in_gbs" {
   description = "Memory in GB for testing node pool."
   type        = number
-  default     = 4
+  default     = 16
 }
 
 variable "testing_node_count" {

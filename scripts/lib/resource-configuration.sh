@@ -28,9 +28,13 @@ resources_configuration_json() {
       ;;
   esac
 
+  local oci_baseline_env="${OCI_RESOURCE_BASELINE_ENV:-env/oci-resource-baseline.env}"
   if [ "$provider" = "oci" ]; then
-    local oci_cpu_quota="7800m"
-    local oci_memory_quota="15000Mi"
+    if [ -f "$oci_baseline_env" ]; then
+      set -a; source "$oci_baseline_env"; set +a
+    fi
+    local oci_cpu_quota="${OCI_APP_CPU_QUOTA:-7800m}"
+    local oci_memory_quota="${OCI_APP_MEMORY_QUOTA:-15000Mi}"
 
     if [ "$architecture" = "monolith" ]; then
       local effective_mode="$scaling_mode"
@@ -50,10 +54,10 @@ resources_configuration_json() {
           hpa_enabled: false,
           namespace_resource_quota: {cpu: $cpu, memory: $memory},
           resource_profile: "oci-equal-split",
-          cpu_request: "3900m",
-          cpu_limit: "7800m",
-          memory_request: "7500Mi",
-          memory_limit: "15000Mi",
+          cpu_limit: $cpu,
+          cpu_request: ((($cpu | rtrimstr("m") | tonumber) / 2 | floor | tostring) + "m"),
+          memory_limit: $memory,
+          memory_request: ((($memory | rtrimstr("Mi") | tonumber) / 2 | floor | tostring) + "Mi"),
           replica_count: 1
         }'
       return 0
@@ -74,40 +78,40 @@ resources_configuration_json() {
         resource_profile: "oci-equal-split",
         services: {
           "api-gateway": {
-            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "950m" end),
-            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else "1900m" end),
-            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else "1800Mi" end),
-            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else "3600Mi" end),
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else ((($cpu | rtrimstr("m") | tonumber) / 8 | floor | tostring) + "m") end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else ((($cpu | rtrimstr("m") | tonumber) / 4 | floor | tostring) + "m") end),
+            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else ((($memory | rtrimstr("Mi") | tonumber) / 8 | floor | tostring) + "Mi") end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else ((($memory | rtrimstr("Mi") | tonumber) / 4 | floor | tostring) + "Mi") end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
           "auth-service": {
-            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "950m" end),
-            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else "1900m" end),
-            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else "1800Mi" end),
-            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else "3600Mi" end),
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else ((($cpu | rtrimstr("m") | tonumber) / 8 | floor | tostring) + "m") end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else ((($cpu | rtrimstr("m") | tonumber) / 4 | floor | tostring) + "m") end),
+            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else ((($memory | rtrimstr("Mi") | tonumber) / 8 | floor | tostring) + "Mi") end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else ((($memory | rtrimstr("Mi") | tonumber) / 4 | floor | tostring) + "Mi") end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
           "item-service": {
-            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "950m" end),
-            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else "1900m" end),
-            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else "1800Mi" end),
-            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else "3600Mi" end),
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else ((($cpu | rtrimstr("m") | tonumber) / 8 | floor | tostring) + "m") end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else ((($cpu | rtrimstr("m") | tonumber) / 4 | floor | tostring) + "m") end),
+            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else ((($memory | rtrimstr("Mi") | tonumber) / 8 | floor | tostring) + "Mi") end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else ((($memory | rtrimstr("Mi") | tonumber) / 4 | floor | tostring) + "Mi") end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),
             replica_count: (if $autoscaling_mode == "fixed" then 1 else null end)
           },
           "transaction-service": {
-            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else "950m" end),
-            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else "1900m" end),
-            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else "1800Mi" end),
-            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else "3600Mi" end),
+            cpu_request: (if $autoscaling_mode == "hpa" then "500m" else ((($cpu | rtrimstr("m") | tonumber) / 8 | floor | tostring) + "m") end),
+            cpu_limit: (if $autoscaling_mode == "hpa" then "950m" else ((($cpu | rtrimstr("m") | tonumber) / 4 | floor | tostring) + "m") end),
+            memory_request: (if $autoscaling_mode == "hpa" then "900Mi" else ((($memory | rtrimstr("Mi") | tonumber) / 8 | floor | tostring) + "Mi") end),
+            memory_limit: (if $autoscaling_mode == "hpa" then "1800Mi" else ((($memory | rtrimstr("Mi") | tonumber) / 4 | floor | tostring) + "Mi") end),
             min_replicas: (if $autoscaling_mode == "hpa" then 1 else null end),
             max_replicas: (if $autoscaling_mode == "hpa" then 5 else null end),
             target_cpu_utilization: (if $autoscaling_mode == "hpa" then 40 else null end),

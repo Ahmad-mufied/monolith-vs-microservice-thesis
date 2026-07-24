@@ -39,8 +39,8 @@ app_node_ocpus             = ${OCI_APP_NODE_OCPUS:-8}
 app_node_memory_in_gbs     = ${OCI_APP_NODE_MEMORY_IN_GBS:-32}
 app_node_count             = ${OCI_APP_NODE_COUNT:-1}
 
-testing_node_ocpus         = ${OCI_TESTING_NODE_OCPUS:-1}
-testing_node_memory_in_gbs = ${OCI_TESTING_NODE_MEMORY_IN_GBS:-4}
+testing_node_ocpus         = ${OCI_TESTING_NODE_OCPUS:-4}
+testing_node_memory_in_gbs = ${OCI_TESTING_NODE_MEMORY_IN_GBS:-16}
 testing_node_count         = ${OCI_TESTING_NODE_COUNT:-1}
 
 db_ocpus                   = ${OCI_DB_OCPUS:-2}

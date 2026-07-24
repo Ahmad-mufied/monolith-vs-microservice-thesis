@@ -10,8 +10,8 @@ app_node_ocpus           = 8  # 8 OCPU = 16 vCPUs
 app_node_memory_in_gbs   = 32
 app_node_count           = 1
 
-testing_node_ocpus       = 1  # 1 OCPU = 2 vCPUs
-testing_node_memory_in_gbs = 4
+testing_node_ocpus       = 4  # 4 OCPU = 8 vCPUs
+testing_node_memory_in_gbs = 16
 testing_node_count       = 1
 
 # OKE Kubernetes Version

@@ -194,8 +194,11 @@ dispatch_preflight_check() {
 
 dispatch_measure_resource_baseline() {
   case "$PLATFORM" in
-    eks|oci)
+    eks)
       echo "measure-resource-baseline is not required for PLATFORM=$PLATFORM"
+      ;;
+    oci)
+      bash scripts/measure-oci-resource-baseline.sh
       ;;
     vultr)
       bash scripts/measure-vultr-resource-baseline.sh

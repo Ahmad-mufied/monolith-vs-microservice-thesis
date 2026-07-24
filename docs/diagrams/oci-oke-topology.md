@@ -22,7 +22,7 @@ flowchart TB
 
   subgraph benchmark_cluster[OKE Cluster: skripsi-oci-sequential]
     app_pool[app-nodes<br/>1 x VM.Standard.E5.Flex<br/>4 OCPUs / 8 vCPUs / 16 GB RAM]
-    test_pool[testing-nodes<br/>1 x VM.Standard.E5.Flex<br/>1 OCPU / 2 vCPUs / 4 GB RAM]
+    test_pool[testing-nodes<br/>1 x VM.Standard.E5.Flex<br/>4 OCPUs / 8 vCPUs / 16 GB RAM]
     mono_phase[namespace mono<br/>active during monolith phase]
     msa_phase[namespace msa<br/>active during MSA phase]
     bench[namespace benchmark<br/>k6 + bootstrap jobs]
@@ -81,7 +81,7 @@ sequenceDiagram
   Op->>DH: Push images (ahmadmufied/*)
   Op->>TF: make env-init PLATFORM=oci EXECUTION_MODE=sequential
   Op->>TF: make oci-apply
-  TF->>OKE: Create OKE Cluster & Node Pools (app 4 OCPU, testing 1 OCPU)
+  TF->>OKE: Create OKE Cluster & Node Pools (app 4 OCPU, testing 4 OCPU)
   TF->>PG: Provision PostgreSQL VM (2 OCPU, 8 GB RAM)
   Op->>OKE: make oci-create-secrets (inject 10.0.4.206, gRPC ports)
   Op->>OKE: helm upgrade --install datadog

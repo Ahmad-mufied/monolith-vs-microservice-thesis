@@ -16,7 +16,7 @@ Kubernetes Version   : v1.36.0
 Node Pools:
   app-nodes          : 1 x VM.Standard.E5.Flex (4 OCPUs / 8 vCPUs / 16 GB RAM)
                        Allocatable Capacity: 7800m CPU / 15000Mi RAM
-  testing-nodes      : 1 x VM.Standard.E5.Flex (1 OCPU / 2 vCPUs / 4 GB RAM)
+  testing-nodes      : 1 x VM.Standard.E5.Flex (4 OCPUs / 8 vCPUs / 16 GB RAM)
                        Taint: workload=benchmark:NoSchedule
 
 Namespaces:

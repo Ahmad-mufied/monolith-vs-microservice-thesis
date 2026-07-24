@@ -19,7 +19,7 @@ The thesis benchmark supports multiple cloud execution targets (AWS EKS, Vultr V
 | **Execution Mode** | Parallel / Sequential | Parallel / Sequential | **Sequential Only (`skripsi-oci-sequential`)** | Strictly respects 200 GB block storage & OCPU limits |
 | **App Node VM** | `c8i.2xlarge` | `voc-c-8c-16gb-150s-amd` | `VM.Standard.E5.Flex` (4 OCPUs / 8 vCPUs / 16 GB) | Dedicated CPU allocation per active workload |
 | **Database Instance** | Amazon RDS PostgreSQL | Vultr Compute VM | OCI Compute VM (`VM.Standard.E5.Flex`, 2 OCPUs / 8 GB) | Dedicated PostgreSQL 18 with private VCN IP |
-| **Testing Node (k6)** | Dedicated EC2 Node | Dedicated VKE Node | Dedicated OKE Node (`VM.Standard.E5.Flex`, 1 OCPU / 4 GB) | Tainted node (`workload=benchmark:NoSchedule`) |
+| **Testing Node (k6)** | Dedicated EC2 Node | Dedicated VKE Node | Dedicated OKE Node (`VM.Standard.E5.Flex`, 4 OCPUs / 8 vCPUs / 16 GB) | Tainted node (`workload=benchmark:NoSchedule`) |
 | **Container Registry** | Amazon ECR | Docker Hub Public | Docker Hub Public (`docker.io/ahmadmufied/*`) | Centralized public image registry |
 | **Result Storage** | AWS S3 | AWS S3 | AWS S3 (`s3://skripsi-benchmark-results`) | Unified multi-cloud S3 result repository |
 | **Observability** | Datadog SaaS | Datadog SaaS | Datadog SaaS (`us5.datadoghq.com`) | Unified APM, DogStatsD, and system metrics |
@@ -34,7 +34,7 @@ This table details the allocation of OCI cloud resources and their mapping to ex
 |---|---|---|---|
 | **Kubernetes Cluster** | **Oracle Cloud (OCI)** | OKE (`skripsi-oci-sequential`) | Managed OKE Cluster, K8s v1.36.0, single-region deployment |
 | **App Node Pool** | **Oracle Cloud (OCI)** | Node Pool (`app-nodes`) | 1 x `VM.Standard.E5.Flex` (4 OCPUs / 8 vCPUs / 16 GB RAM) |
-| **Testing Node Pool** | **Oracle Cloud (OCI)** | Node Pool (`testing-nodes`) | 1 x `VM.Standard.E5.Flex` (1 OCPU / 2 vCPUs / 4 GB RAM), Tainted |
+| **Testing Node Pool** | **Oracle Cloud (OCI)** | Node Pool (`testing-nodes`) | 1 x `VM.Standard.E5.Flex` (4 OCPUs / 8 vCPUs / 16 GB RAM), Tainted |
 | **PostgreSQL Database** | **Oracle Cloud (OCI)** | OCI Compute VM (Dedicated) | 1 x `VM.Standard.E5.Flex` (2 OCPUs / 4 vCPUs / 8 GB RAM, PG 18) |
 | **Virtual Cloud Network** | **Oracle Cloud (OCI)** | OCI VCN (`10.0.0.0/16`) | Subnets: API (`10.0.0.0/28`), Worker (`10.0.10.0/24`), DB (`10.0.4.0/24`) |
 | **Firewall & Security** | **Oracle Cloud (OCI)** | OCI Security Lists | Port 5432 (Internal VCN ingress), Port 22 (SSH Ingress) |

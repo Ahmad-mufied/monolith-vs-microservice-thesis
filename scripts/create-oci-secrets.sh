@@ -66,6 +66,8 @@ append_secret_pair monolith_secret_pairs DATABASE_URL "postgres://postgres_admin
 append_secret_pair monolith_secret_pairs JWT_SECRET "$jwt_secret"
 append_secret_pair monolith_secret_pairs BCRYPT_COST "10"
 append_secret_pair monolith_secret_pairs DIAGNOSTIC_LOGGING_ENABLED "false"
+monolith_login_admission_enabled="${LOGIN_ADMISSION_ENABLED:-$(read_yaml_value ".cluster.monolith.LOGIN_ADMISSION_ENABLED")}"
+append_secret_pair monolith_secret_pairs LOGIN_ADMISSION_ENABLED "$monolith_login_admission_enabled"
 
 apply_secret_from_pairs "monolith" mono monolith-env "${monolith_secret_pairs[@]}"
 
@@ -91,6 +93,8 @@ append_secret_pair auth_secret_pairs DATABASE_URL "postgres://postgres_admin:${e
 append_secret_pair auth_secret_pairs JWT_SECRET "$jwt_secret"
 append_secret_pair auth_secret_pairs BCRYPT_COST "10"
 append_secret_pair auth_secret_pairs DIAGNOSTIC_LOGGING_ENABLED "false"
+auth_login_admission_enabled="${LOGIN_ADMISSION_ENABLED:-$(read_yaml_value ".cluster.microservices.\"auth-service\".LOGIN_ADMISSION_ENABLED")}"
+append_secret_pair auth_secret_pairs LOGIN_ADMISSION_ENABLED "$auth_login_admission_enabled"
 apply_secret_from_pairs "msa" msa auth-service-secret "${auth_secret_pairs[@]}"
 
 item_secret_pairs=()
