@@ -102,7 +102,7 @@ export const DATASET_VERSION = envString("DATASET_VERSION", "v1");
 export const IMAGE_TAG = envString("IMAGE_TAG", "");
 export const GIT_COMMIT = envString("GIT_COMMIT", "");
 
-const SUPPORTED_K6_PROFILES = new Set(["smoke", "steady", "ramp", "ramp-up", "hpa"]);
+const SUPPORTED_K6_PROFILES = new Set(["smoke", "steady", "ramp", "ramping-arrival-rate"]);
 
 function assertCondition(condition, message) {
   if (!condition) {
@@ -153,12 +153,12 @@ export function benchmarkOptions(name, metricTags = null) {
     return smokeOptions(metricTags);
   }
 
-  if (K6_PROFILE === "ramp" || K6_PROFILE === "ramp-up" || K6_PROFILE === "hpa") {
+  if (K6_PROFILE === "ramp" || K6_PROFILE === "ramping-arrival-rate") {
     return {
       scenarios: {
         [name]: {
           executor: "ramping-arrival-rate",
-          startRate: envInt("START_RPS", Math.max(1, Math.floor(TARGET_RPS / 10))),
+          startRate: envInt("START_RPS", 0),
           timeUnit: TIME_UNIT,
           preAllocatedVUs: PRE_ALLOCATED_VUS,
           maxVUs: MAX_VUS,
@@ -194,10 +194,10 @@ export function benchmarkScenarioDefinition(rate, options = {}) {
     options.scaleVusByTargetRps ? scaleCapacity(MAX_VUS, rate) : MAX_VUS
   );
 
-  if (K6_PROFILE === "ramp" || K6_PROFILE === "ramp-up" || K6_PROFILE === "hpa") {
+  if (K6_PROFILE === "ramp" || K6_PROFILE === "ramping-arrival-rate") {
     return {
       executor: "ramping-arrival-rate",
-      startRate: Math.max(1, Math.floor(rate / 10)),
+      startRate: envInt("START_RPS", 0),
       timeUnit: TIME_UNIT,
       preAllocatedVUs,
       maxVUs,
@@ -241,20 +241,25 @@ function parseStagesForTarget(targetRps) {
     }
   }
 
-  if (K6_PROFILE === "ramp-up" || K6_PROFILE === "hpa") {
-    return [
-      { target: Math.max(1, Math.floor(targetRps * 0.25)), duration: envString("HPA_RAMP_UP_1", "2m") },
-      { target: Math.max(1, Math.floor(targetRps * 0.50)), duration: envString("HPA_RAMP_UP_2", "2m") },
-      { target: targetRps, duration: envString("HPA_RAMP_UP_3", "3m") },
-      { target: targetRps, duration: envString("HPA_HOLD", "5m") },
-      { target: 0, duration: envString("HPA_RAMP_DOWN", "1m") },
-    ];
-  }
+  const level1 = envInt("RAMP_RPS_LEVEL_1", Math.max(1, Math.floor(targetRps * 0.10)));
+  const level2 = envInt("RAMP_RPS_LEVEL_2", Math.max(1, Math.floor(targetRps * 0.50)));
+  const level3 = targetRps;
 
   return [
-    { target: targetRps, duration: envString("RAMP_UP_DURATION", "1m") },
-    { target: targetRps, duration: TEST_DURATION },
-    { target: 0, duration: envString("RAMP_DOWN_DURATION", "30s") },
+    // --- LEVEL 1: Baseline (100 RPS) ---
+    { target: level1, duration: envString("RAMP_STAGE_1", "2m") },
+    { target: level1, duration: envString("HOLD_STAGE_1", "2m") },
+
+    // --- LEVEL 2: Moderate Load (500 RPS) ---
+    { target: level2, duration: envString("RAMP_STAGE_2", "2m") },
+    { target: level2, duration: envString("HOLD_STAGE_2", "2m") },
+
+    // --- LEVEL 3: Peak / Saturation Point (1.000 RPS) ---
+    { target: level3, duration: envString("RAMP_STAGE_3", "2m") },
+    { target: level3, duration: envString("HOLD_STAGE_3", "2m") },
+
+    // --- COOLDOWN ---
+    { target: 0,      duration: envString("RAMP_DOWN", "1m") },
   ];
 }
 

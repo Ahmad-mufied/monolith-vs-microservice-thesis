@@ -1,3 +1,4 @@
+import { sleep } from "k6";
 import { benchmarkOptions, TOKEN_POOL_SIZE, TRANSACTION_AMOUNT } from "./common/config.js";
 import { itemIds, users, randomInt } from "./common/data.js";
 import {
@@ -20,6 +21,23 @@ export function setup() {
 
   if (seededItems.length === 0) {
     throw new Error("No seeded item IDs available for create-transaction scenario.");
+  }
+
+  // Pod readiness probe: wait for services to be up after DB reset
+  let apiReady = false;
+  let probeRetries = 15;
+  while (probeRetries > 0) {
+    const auth = loginAndExtractToken(seededUsers[0].email, seededUsers[0].password, "readiness probe");
+    if (auth.token) {
+      apiReady = true;
+      break;
+    }
+    sleep(1);
+    probeRetries--;
+  }
+
+  if (!apiReady) {
+    throw new Error("API failed to become ready for create-transaction scenario.");
   }
 
   const tokenPool = [];

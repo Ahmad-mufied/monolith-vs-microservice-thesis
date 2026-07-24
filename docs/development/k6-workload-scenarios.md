@@ -237,8 +237,7 @@ not the final system-level workload used for primary RQ analysis.
 
 ## 4. Load Model
 
-Main fixed-mode benchmark scenarios use RPS-based execution with k6
-`constant-arrival-rate`.
+Main fixed-mode benchmark scenarios use RPS-based execution with k6 `constant-arrival-rate` (for steady profile) or `ramping-arrival-rate` (for the 5-Attempt Al-Debagy methodology).
 
 Reason:
 
@@ -259,6 +258,25 @@ smoke
 ramp
 hpa
 ```
+
+### 4.1 5-Attempt Al-Debagy Ramping-Arrival-Rate Suite Methodology
+
+For rigorous thesis evaluation, the primary benchmark suite uses the **5-Attempt Al-Debagy Ramping-Arrival-Rate Method**:
+
+- **Executor**: `ramping-arrival-rate` (`K6_PROFILE=ramp`).
+- **Stage Durations (Uniform 2-Minute 7-Stage Pattern)**:
+  - `RAMP_STAGE_1`: 2 minutes (`2m`) -> Ramp-up to Level 1 (100 RPS).
+  - `HOLD_STAGE_1`: 2 minutes (`2m`) -> **Baseline Load Plateau** at 100 RPS.
+  - `RAMP_STAGE_2`: 2 minutes (`2m`) -> Ramp-up to Level 2 (500 RPS).
+  - `HOLD_STAGE_2`: 2 minutes (`2m`) -> **Moderate Load Plateau** at 500 RPS.
+  - `RAMP_STAGE_3`: 2 minutes (`2m`) -> Ramp-up to Level 3 (1000 RPS).
+  - `HOLD_STAGE_3`: 2 minutes (`2m`) -> **Peak / Saturation Plateau** at 1000 RPS.
+  - `RAMP_DOWN`: 1 minute (`1m`) -> Cooldown back to 0 RPS.
+  - **Total duration per run**: **13 minutes** (780 seconds), capturing 3 load plateaus in a single run.
+- **Scenarios (3 Cases)**: `login`, `create-transaction`, `enriched-transactions`.
+- **Architectures**: `monolith`, `microservices`.
+- **Statistical Repetitions**: `ATTEMPTS_COUNT=5` independent attempts (`attempt-01` through `attempt-05`), yielding a total of **30 runs** (6 runs per attempt, ~6.5 hours total runtime) for computing Mean ($\mu$) and Standard Deviation ($\sigma$).
+- **Pod Readiness Probe**: `create-transaction.js` includes an in-script readiness probe loop (up to 15 login retries with 1s sleep) during `setup()` to guarantee service readiness after database reset.
 
 `hpa` profile should be used only when autoscaling behavior is part of the experiment.
 

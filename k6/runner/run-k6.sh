@@ -135,11 +135,15 @@ configured_duration_seconds() {
     smoke|steady)
       duration_seconds "$TEST_DURATION_VALUE"
       ;;
-    ramp)
+    ramp|ramping-arrival-rate)
       echo $(( \
-        $(duration_seconds "${RAMP_UP_DURATION:-1m}") + \
-        $(duration_seconds "$TEST_DURATION_VALUE") + \
-        $(duration_seconds "${RAMP_DOWN_DURATION:-30s}") \
+        $(duration_seconds "${RAMP_STAGE_1:-2m}") + \
+        $(duration_seconds "${HOLD_STAGE_1:-2m}") + \
+        $(duration_seconds "${RAMP_STAGE_2:-2m}") + \
+        $(duration_seconds "${HOLD_STAGE_2:-2m}") + \
+        $(duration_seconds "${RAMP_STAGE_3:-2m}") + \
+        $(duration_seconds "${HOLD_STAGE_3:-2m}") + \
+        $(duration_seconds "${RAMP_DOWN:-1m}") \
       ))
       ;;
     ramp-up|hpa)

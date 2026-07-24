@@ -12,7 +12,7 @@ The dual-architecture sequential suite is the primary entry point for comparing 
 
 ```mermaid
 flowchart TB
-  start(["Operator starts fixed suite<br/>make run-benchmark-suite<br/>SCALING_MODE=fixed K6_PROFILE=steady"])
+  start(["Operator starts fixed suite<br/>make run-benchmark-suite<br/>SCALING_MODE=fixed K6_PROFILE=ramp ATTEMPTS_COUNT=5"])
   dispatch["operator-dispatch.sh<br/>select sequential dual-arch suite runner"]
   matrix["Build benchmark matrix<br/>SCENARIO_RPS_MATRIX or<br/>SCENARIOS + RPS_LEVELS"]
   preflight["Suite preflight<br/>validate env, S3 access,<br/>Kubernetes context, image tag"]
@@ -27,7 +27,7 @@ flowchart TB
   scenarioLoop{"Next scenario<br/>(login, create-transaction, enriched-transactions)"}
   setupOnce["Run scenario setup<br/>reset + seed database"]
 
-  rpsLoop{"Next target RPS<br/>(25, 50, 100, 200, 300, 400, 500)"}
+  rpsLoop{"Next target RPS<br/>(1000 RPS 3-Level Al-Debagy Pattern)"}
   s3Case{"Case result already<br/>exists in S3?"}
   skipCase["Skip measured run<br/>reuse stored result classification"]
   singleCase["Execute k6 benchmark job"]

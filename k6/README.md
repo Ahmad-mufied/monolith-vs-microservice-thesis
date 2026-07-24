@@ -306,7 +306,7 @@ is **not** used by all profiles.
 |---|---|---|
 | `smoke` | `TEST_DURATION` | Yes |
 | `steady` | `TEST_DURATION` | Yes |
-| `ramp` | `RAMP_UP_DURATION` + `TEST_DURATION` + `RAMP_DOWN_DURATION` | Yes (hold stage) |
+| `ramp` | `RAMP_STAGE_1` + `HOLD_STAGE_1` + `RAMP_STAGE_2` + `HOLD_STAGE_2` + `RAMP_STAGE_3` + `HOLD_STAGE_3` + `RAMP_DOWN` | **No** |
 | `ramp-up` | `HPA_RAMP_UP_1/2/3` + `HPA_HOLD` + `HPA_RAMP_DOWN` | **No** |
 
 **Important:** When `K6_PROFILE=ramp-up` (formerly `hpa`), the `TEST_DURATION` variable is

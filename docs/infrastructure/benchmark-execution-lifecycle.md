@@ -41,6 +41,7 @@ Important rules:
 - use an explicit inter-case delay between measured suite cases when the next case
   should start from a stable system state,
 - upload k6 results to S3 before running the next execution or destroying infrastructure,
+- use `ATTEMPTS_COUNT="${ATTEMPTS_COUNT:-1}"` (e.g. `ATTEMPTS_COUNT=5`) in orchestrators to run multi-attempt iterations sequentially with attempt-isolated S3 paths (`attempt-01`, `attempt-02`, etc.),
 - do not run provider destroy commands until all expected result files are
   present in S3.
 

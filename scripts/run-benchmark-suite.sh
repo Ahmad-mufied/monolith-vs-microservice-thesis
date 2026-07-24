@@ -53,6 +53,7 @@ DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 K6_PROFILE="${K6_PROFILE:-}"
 EXPERIMENT_NAME="${EXPERIMENT_NAME:-}"
 RUN_ID="${RUN_ID:-}"
+ATTEMPTS_COUNT="${ATTEMPTS_COUNT:-1}"
 ATTEMPT="${ATTEMPT:-}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
@@ -320,7 +321,8 @@ if [ -n "$EXPERIMENT_NAME" ]; then
 fi
 
 if [ -z "$K6_PROFILE" ]; then
-  K6_PROFILE="steady"
+  echo "ERROR: K6_PROFILE is required. Please specify K6_PROFILE explicitly (e.g. K6_PROFILE=ramp or K6_PROFILE=ramping-arrival-rate)." >&2
+  exit 1
 fi
 
 validate_scaling_profile_pairing() {
@@ -696,11 +698,15 @@ estimate_case_duration_seconds() {
       seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_DOWN:-1m}")))
       printf '%s\n' "$seconds"
       ;;
-    ramp)
+    ramp|ramping-arrival-rate)
       seconds=0
-      seconds=$((seconds + $(duration_to_seconds "${RAMP_UP_DURATION:-1m}")))
-      seconds=$((seconds + $(duration_to_seconds "$TEST_DURATION")))
-      seconds=$((seconds + $(duration_to_seconds "${RAMP_DOWN_DURATION:-30s}")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_STAGE_1:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HOLD_STAGE_1:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_STAGE_2:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HOLD_STAGE_2:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_STAGE_3:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HOLD_STAGE_3:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_DOWN:-1m}")))
       printf '%s\n' "$seconds"
       ;;
     smoke|steady)
@@ -1285,6 +1291,7 @@ upload_suite_summary() {
       cases: .
     }' "$SUITE_CASES_JSONL" > "$summary_path"
 
+  benchmark_aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary-${ATTEMPT}.json" >/dev/null
   benchmark_aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary.json" >/dev/null
 }
 
@@ -1328,8 +1335,21 @@ maybe_wait_between_cases() {
 build_suite_matrix_file
 derive_effective_suite_metadata
 
-if [ -z "$ATTEMPT" ]; then
-  ATTEMPT="$(next_attempt_for_suite "$S3_RUN_URI" "$SUITE_MATRIX_TSV")"
+if ! [[ "$ATTEMPTS_COUNT" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ERROR: ATTEMPTS_COUNT must be a positive integer, got '$ATTEMPTS_COUNT'" >&2
+  exit 1
+fi
+
+attempts_list=()
+if [ "$ATTEMPTS_COUNT" -gt 1 ]; then
+  for ((a=1; a<=ATTEMPTS_COUNT; a++)); do
+    attempts_list+=("attempt-$(printf '%02d' "$a")")
+  done
+else
+  if [ -z "$ATTEMPT" ]; then
+    ATTEMPT="$(next_attempt_for_suite "$S3_RUN_URI" "$SUITE_MATRIX_TSV")"
+  fi
+  attempts_list+=("$ATTEMPT")
 fi
 
 echo "=== Parallel Benchmark Suite ==="
@@ -1337,7 +1357,7 @@ if [ -n "$EXPERIMENT_NAME" ]; then
   echo "  experiment   : $EXPERIMENT_NAME"
 fi
 echo "  run_id       : $RUN_ID"
-echo "  attempt      : $ATTEMPT"
+echo "  attempts_cnt : $ATTEMPTS_COUNT"
 echo "  scaling_mode : $SCALING_MODE"
 echo "  k6_profile   : $K6_PROFILE"
 echo "  duration     : $TEST_DURATION"
@@ -1356,16 +1376,28 @@ echo ""
 
 run_suite_preflight "suite bootstrap preflight"
 
-suite_failed=0
-completed_cases=0
 render_provider_manifests "$RENDER_ROOT"
 bash scripts/validate-cloud-assets.sh deploy "$RENDER_ROOT"
 verify_live_scaling_mode_state
-upload_suite_manifest
 
-echo "Warming S3 result-status cache for parallel suite resume and ETA checks..."
-prime_case_result_status_cache || true
-echo "Initial S3 result-status cache warmup finished."
+suite_failed=0
+attempt_idx=0
+total_attempts_count="${#attempts_list[@]}"
+
+for ATTEMPT in "${attempts_list[@]}"; do
+  attempt_idx=$((attempt_idx + 1))
+  echo "========================================================"
+  echo "=== Starting Parallel Suite Attempt ${attempt_idx}/${total_attempts_count}: ${ATTEMPT} ==="
+  echo "========================================================"
+
+  : > "$SUITE_CASES_JSONL"
+  upload_suite_manifest
+
+  echo "Warming S3 result-status cache for parallel suite resume and ETA checks (${ATTEMPT})..."
+  prime_case_result_status_cache || true
+  echo "Initial S3 result-status cache warmup finished for ${ATTEMPT}."
+
+  completed_cases=0
 
 while IFS=$'\t' read -r scenario scenario_rps_levels; do
   [ -z "$scenario" ] && continue
@@ -1486,22 +1518,25 @@ while IFS=$'\t' read -r scenario scenario_rps_levels; do
   done
 done < "$SUITE_MATRIX_TSV"
 
+if [ "$suite_failed" -ne 0 ]; then
+  upload_suite_summary "completed_with_non_pass_cases"
+else
+  upload_suite_summary "pass"
+fi
+done
+
 echo ""
 echo "=== Parallel Benchmark Suite Complete ==="
 if [ -n "$EXPERIMENT_NAME" ]; then
   echo "  experiment   : $EXPERIMENT_NAME"
 fi
 echo "  run_id       : $RUN_ID"
-echo "  attempt      : $ATTEMPT"
 echo "  report_s3_uri: $S3_RUN_URI"
 
+maybe_destroy_experiment_stack
+
 if [ "$suite_failed" -ne 0 ]; then
-  upload_suite_summary "completed_with_non_pass_cases"
-  maybe_destroy_experiment_stack
   echo "  suite_status : completed_with_non_pass_cases"
   exit 1
 fi
-
-upload_suite_summary "pass"
-maybe_destroy_experiment_stack
 echo "  suite_status : pass"

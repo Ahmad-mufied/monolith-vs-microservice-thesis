@@ -48,6 +48,7 @@ DATADOG_ENV="${DATADOG_ENV:-benchmark}"
 K6_PROFILE="${K6_PROFILE:-}"
 EXPERIMENT_NAME="${EXPERIMENT_NAME:-}"
 RUN_ID="${RUN_ID:-}"
+ATTEMPTS_COUNT="${ATTEMPTS_COUNT:-1}"
 ATTEMPT="${ATTEMPT:-attempt-01}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 ECR_NAMESPACE="${ECR_NAMESPACE:-skripsi}"
@@ -246,11 +247,15 @@ estimate_case_duration_seconds() {
       seconds=$((seconds + $(duration_to_seconds "${HPA_RAMP_DOWN:-1m}")))
       printf '%s\n' "$seconds"
       ;;
-    ramp)
+    ramp|ramping-arrival-rate)
       seconds=0
-      seconds=$((seconds + $(duration_to_seconds "${RAMP_UP_DURATION:-1m}")))
-      seconds=$((seconds + $(duration_to_seconds "$TEST_DURATION")))
-      seconds=$((seconds + $(duration_to_seconds "${RAMP_DOWN_DURATION:-30s}")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_STAGE_1:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HOLD_STAGE_1:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_STAGE_2:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HOLD_STAGE_2:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_STAGE_3:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${HOLD_STAGE_3:-2m}")))
+      seconds=$((seconds + $(duration_to_seconds "${RAMP_DOWN:-1m}")))
       printf '%s\n' "$seconds"
       ;;
     smoke|steady)
@@ -283,8 +288,12 @@ print_case_eta() {
   local pending_future_architecture_cases="${17}"
   local scenario_remaining_case_seconds="${18}"
   local suite_remaining_case_seconds="${19}"
+  local current_attempt_index="${20:-1}"
+  local total_attempts_count="${21:-1}"
+  local attempt_name="${22:-$ATTEMPT}"
   local now_epoch case_eta_epoch scenario_eta_epoch suite_eta_epoch
-  local suite_pending_cases suite_remaining_delay_seconds
+  local suite_pending_cases suite_remaining_delay_seconds current_attempt_remaining_seconds
+  local remaining_attempts full_attempt_case_seconds full_attempt_delay_seconds full_attempt_seconds total_remaining_seconds total_suite_eta_epoch
 
   now_epoch="$(date +%s)"
   case_eta_epoch=$((now_epoch + case_seconds))
@@ -305,14 +314,38 @@ print_case_eta() {
       suite_remaining_delay_seconds=$((suite_remaining_delay_seconds + ((pending_future_architecture_cases - 1) * INTER_CASE_DELAY)))
     fi
   fi
-  suite_eta_epoch=$((now_epoch + suite_remaining_case_seconds + suite_remaining_delay_seconds))
+  current_attempt_remaining_seconds=$((suite_remaining_case_seconds + suite_remaining_delay_seconds))
+  suite_eta_epoch=$((now_epoch + current_attempt_remaining_seconds))
+
+  remaining_attempts=$((total_attempts_count - current_attempt_index))
+  if [ "$remaining_attempts" -gt 0 ]; then
+    full_attempt_case_seconds=$((suite_total_cases * CASE_ESTIMATE_SECONDS))
+    full_attempt_delay_seconds=0
+    if [ "$total_cases" -gt 1 ]; then
+      full_attempt_delay_seconds=$((architecture_count * (total_cases - 1) * INTER_CASE_DELAY))
+    fi
+    if [ "$architecture_count" -gt 1 ]; then
+      full_attempt_delay_seconds=$((full_attempt_delay_seconds + ((architecture_count - 1) * ARCHITECTURE_SWITCH_DELAY)))
+    fi
+    full_attempt_seconds=$((full_attempt_case_seconds + full_attempt_delay_seconds))
+    total_remaining_seconds=$((current_attempt_remaining_seconds + (remaining_attempts * full_attempt_seconds)))
+  else
+    total_remaining_seconds="$current_attempt_remaining_seconds"
+  fi
+  total_suite_eta_epoch=$((now_epoch + total_remaining_seconds))
 
   log_info "=== Sequential ETA ==="
+  if [ "$total_attempts_count" -gt 1 ]; then
+    log_info "  attempt       : ${current_attempt_index}/${total_attempts_count} (${attempt_name})"
+  fi
   log_info "  case          : ${suite_case_number}/${suite_total_cases} ${architecture}/${scenario}/${target_rps}rps"
   log_info "  scenario      : ${scenario_case_number}/${scenario_total_cases} (${scenario})"
   log_info "  est_case      : $(format_duration "$case_seconds") -> $(format_eta_epoch "$case_eta_epoch")"
   log_info "  est_scenario  : $(format_eta_epoch "$scenario_eta_epoch")"
-  log_info "  est_suite     : $(format_eta_epoch "$suite_eta_epoch")"
+  log_info "  est_attempt   : $(format_duration "$current_attempt_remaining_seconds") -> $(format_eta_epoch "$suite_eta_epoch")"
+  if [ "$total_attempts_count" -gt 1 ]; then
+    log_info "  est_all_runs  : $(format_duration "$total_remaining_seconds") -> $(format_eta_epoch "$total_suite_eta_epoch") (${total_attempts_count} attempts total)"
+  fi
   log_info "  pending       : scenario=${pending_scenario_cases}, architecture=${pending_current_architecture_cases}, future_architecture=${pending_future_architecture_cases}"
   log_info "  eta_basis     : k6=$(format_duration "$k6_case_seconds") + full_overhead=$(format_duration "$SEQUENTIAL_CASE_OVERHEAD_SECONDS") or reused_overhead=$(format_duration "$SEQUENTIAL_REUSED_CASE_OVERHEAD_SECONDS") + retry_buffer=$(format_duration "$SEQUENTIAL_RETRY_BUFFER_SECONDS") + configured delays"
   log_info "  eta_mode      : $eta_mode"
@@ -854,12 +887,13 @@ sequential_case_timing_json() {
 }
 
 if [ -z "$K6_PROFILE" ]; then
-  K6_PROFILE="steady"
+  log_error "K6_PROFILE is required. Please specify K6_PROFILE explicitly (e.g. K6_PROFILE=ramp or K6_PROFILE=ramping-arrival-rate)."
+  exit 1
 fi
 
 if [ "$ALLOW_NONSTANDARD_SCALING_PROFILE" != "true" ]; then
   case "$SCALING_MODE:$K6_PROFILE" in
-    fixed:steady|fixed:ramp|fixed:smoke|fixed:ramp-up) ;;
+    fixed:steady|fixed:ramp|fixed:ramping-arrival-rate|fixed:smoke) ;;
     fixed:hpa)
       log_error "K6_PROFILE=hpa must not be used with SCALING_MODE=fixed. Set ALLOW_NONSTANDARD_SCALING_PROFILE=true only for a deliberate nonstandard experiment."
       exit 1
@@ -890,6 +924,19 @@ S3_RUN_URI="s3://${S3_BUCKET}/experiments/${RUN_ID}"
 SUITE_STARTED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 validate_architecture_order
+validate_seconds_value "ATTEMPTS_COUNT" "$ATTEMPTS_COUNT"
+if [ "$ATTEMPTS_COUNT" -lt 1 ]; then
+  log_error "ATTEMPTS_COUNT must be at least 1, got '$ATTEMPTS_COUNT'"
+  exit 1
+fi
+attempts_list=()
+if [ "$ATTEMPTS_COUNT" -gt 1 ]; then
+  for ((a=1; a<=ATTEMPTS_COUNT; a++)); do
+    attempts_list+=("attempt-$(printf '%02d' "$a")")
+  done
+else
+  attempts_list+=("$ATTEMPT")
+fi
 validate_seconds_value "INTER_CASE_DELAY" "$INTER_CASE_DELAY"
 validate_seconds_value "ARCHITECTURE_SWITCH_DELAY" "$ARCHITECTURE_SWITCH_DELAY"
 validate_seconds_value "SEQUENTIAL_CASE_OVERHEAD_SECONDS" "$SEQUENTIAL_CASE_OVERHEAD_SECONDS"
@@ -922,7 +969,7 @@ jq -n \
   --arg provider "$CLOUD_PROVIDER" \
   --arg terraform_stack "$(provider_sequential_stack_name)" \
   --arg run_id "$RUN_ID" \
-  --arg attempt "$ATTEMPT" \
+  --arg attempts_count "$ATTEMPTS_COUNT" \
   --arg scaling_mode "$SCALING_MODE" \
   --arg k6_profile "$K6_PROFILE" \
   --arg test_duration "$TEST_DURATION" \
@@ -932,13 +979,10 @@ jq -n \
   --arg started_at_utc "$SUITE_STARTED_AT_UTC" \
   --argjson architecture_order "$(words_json_array "$ARCHITECTURE_ORDER")" \
   --argjson scenario_rps_matrix "$(matrix_json)" \
-  '{provider:$provider, execution_mode:"sequential", terraform_stack:$terraform_stack, run_id:$run_id, attempt:$attempt, scaling_mode:$scaling_mode, k6_profile:$k6_profile, test_duration:$test_duration, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, architecture_order:$architecture_order, scenario_rps_matrix:$scenario_rps_matrix, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc}' \
+  '{provider:$provider, execution_mode:"sequential", terraform_stack:$terraform_stack, run_id:$run_id, attempts_count:$attempts_count, scaling_mode:$scaling_mode, k6_profile:$k6_profile, test_duration:$test_duration, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, architecture_order:$architecture_order, scenario_rps_matrix:$scenario_rps_matrix, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc}' \
   > "$manifest_path"
 benchmark_aws s3 cp "$manifest_path" "${S3_RUN_URI}/_suite/manifest.json" >/dev/null
 log_info "Sequential suite manifest uploaded to ${S3_RUN_URI}/_suite/manifest.json"
-log_info "Warming S3 result-status cache for sequential suite resume and ETA checks..."
-prime_case_result_status_cache || true
-log_info "Initial S3 result-status cache warmup finished."
 
 suite_failed=0
 total_cases=0
@@ -948,10 +992,27 @@ while IFS=$'\t' read -r scenario scenario_rps_levels; do
   done
 done < "$MATRIX_TSV"
 
-architecture_index=0
 architecture_count="$(wc -w <<<"$ARCHITECTURE_ORDER" | tr -d '[:space:]')"
 total_suite_cases=$((total_cases * architecture_count))
-completed_suite_cases=0
+
+attempt_idx=0
+total_attempts_count="${#attempts_list[@]}"
+
+for ATTEMPT in "${attempts_list[@]}"; do
+  attempt_idx=$((attempt_idx + 1))
+  log_info "========================================================"
+  log_info "=== Starting Sequential Suite Attempt ${attempt_idx}/${total_attempts_count}: ${ATTEMPT} ==="
+  log_info "========================================================"
+
+  : > "$CASES_JSONL"
+  : > "$PHASES_JSONL"
+
+  log_info "Warming S3 result-status cache for sequential suite resume and ETA checks (${ATTEMPT})..."
+  prime_case_result_status_cache || true
+  log_info "Initial S3 result-status cache warmup finished for ${ATTEMPT}."
+
+  architecture_index=0
+  completed_suite_cases=0
 for architecture in $ARCHITECTURE_ORDER; do
   architecture_index=$((architecture_index + 1))
   phase_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -1101,7 +1162,10 @@ for architecture in $ARCHITECTURE_ORDER; do
         "$pending_architecture_cases" \
         "$pending_future_architecture_cases" \
         "$scenario_remaining_case_seconds" \
-        "$((pending_current_architecture_case_seconds + pending_future_architecture_case_seconds))"
+        "$((pending_current_architecture_case_seconds + pending_future_architecture_case_seconds))" \
+        "$attempt_idx" \
+        "$total_attempts_count" \
+        "$ATTEMPT"
 
       case_started_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       log_info "Launching sequential benchmark case runner for ${architecture}/${scenario}/${target_rps}rps..."
@@ -1193,18 +1257,18 @@ done
 
 summary_path="$SUITE_WORKDIR/summary.json"
 finished_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-suite_status="pass"
+attempt_suite_status="pass"
 if [ "$suite_failed" -ne 0 ]; then
-  suite_status="completed_with_non_pass_cases"
+  attempt_suite_status="completed_with_non_pass_cases"
 fi
 
-log_info "Writing sequential suite summary to ${summary_path}..."
+log_info "Writing sequential suite summary for ${ATTEMPT} to ${summary_path}..."
 jq -s \
   --arg provider "$CLOUD_PROVIDER" \
   --arg terraform_stack "$(provider_sequential_stack_name)" \
   --arg run_id "$RUN_ID" \
   --arg attempt "$ATTEMPT" \
-  --arg suite_status "$suite_status" \
+  --arg suite_status "$attempt_suite_status" \
   --arg s3_run_uri "$S3_RUN_URI" \
   --arg started_at_utc "$SUITE_STARTED_AT_UTC" \
   --arg finished_at_utc "$finished_at_utc" \
@@ -1214,8 +1278,10 @@ jq -s \
   --slurpfile phases "$PHASES_JSONL" \
   '{provider:$provider, execution_mode:"sequential", terraform_stack:$terraform_stack, run_id:$run_id, attempt:$attempt, suite_status:$suite_status, architecture_order:$architecture_order, inter_case_delay_seconds:$inter_case_delay_seconds, architecture_switch_delay_seconds:$architecture_switch_delay_seconds, s3_run_uri:$s3_run_uri, started_at_utc:$started_at_utc, finished_at_utc:$finished_at_utc, architecture_phases:$phases, cases:.}' \
   "$CASES_JSONL" > "$summary_path"
+benchmark_aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary-${ATTEMPT}.json" >/dev/null
 benchmark_aws s3 cp "$summary_path" "${S3_RUN_URI}/_suite/summary.json" >/dev/null
-log_info "Sequential suite summary uploaded to ${S3_RUN_URI}/_suite/summary.json"
+log_info "Sequential suite summary uploaded to ${S3_RUN_URI}/_suite/summary-${ATTEMPT}.json and summary.json"
+done
 
 if [ "$AUTO_DESTROY_CONFIRMED" = "true" ]; then
   make "$(provider_sequential_destroy_target)"
